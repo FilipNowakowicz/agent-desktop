@@ -4,3 +4,21 @@ version = "0.0.1"
 description = "Experiments for a private Linux desktop for existing agents"
 requires-python = ">=3.12"
 dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+agent-desktop = "agent_desktop.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_desktop"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.10",
+]

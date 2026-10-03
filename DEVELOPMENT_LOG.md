@@ -1,5 +1,53 @@
 # Development log
 
+## 2026-10-03 — M1 initial persistent runtime and visible testing
+
+Implemented a packaged `agent-desktop` CLI and persistent per-session supervisor.
+The core handles create/list/status, application launch, window enumeration,
+screenshots, type/key, pointer movement/click, scroll, bounded log tails and teardown.
+All control requests identify a session and go to a private local Unix socket.
+The supervisor serializes requests and uses a private D-Bus/display environment.
+
+Added `create --mode visible`: labwc's Wayland backend connects to an explicit
+parent display socket and opens a nested desktop window. The application's and
+input clients' display remains the private socket. Headless stays the default.
+The visible window's lifecycle is tied to the session; an independent observer
+viewer is still deferred.
+
+Seven local tests passed: invalid identifiers/mode, unknown session, actual app
+and compositor crashes, headless input/capture/cleanup, distinct input to two
+simultaneous sessions, and the opt-in visible round trip. Both round trips check
+exact `private café λ` receipt, a real left mouse event, changed PNGs and removal
+of the session runtime directory. Invalid requests fail without reaching a host
+display. App crashes retain stderr/exit status; compositor crashes close the
+endpoint, remove runtime resources and leave failure metadata/logs.
+
+Initial validation reported unreaped supervisor warnings. A daemon reaper thread
+now retains/waits for client-created supervisors, and workers reap compositors
+during cleanup. The suite is rerun with ResourceWarning promoted to errors.
+That rerun also exposed a fixed-coordinate assumption in the visible fixture:
+the host can resize its nested output. The test now targets the center of a fresh
+screenshot instead of assuming a 1280×720 desktop. Visible mode needs resize-aware
+observations, and simultaneous human input can affect the nested desktop by design.
+
+Runtime logs are trimmed above 1 MiB to a 512 KiB tail; the log API returns at most
+16 KiB per file. Screenshots and session records are retained for evidence.
+Cleanup still relies on a per-session environment ownership token; arbitrary
+applications which daemonize or replace their environment need stronger ownership.
+Input startup delays, drag, alternate layouts, accessibility and general
+application compatibility remain open.
+
+Repository setup: private GitHub repository, `main` default, issues enabled,
+wiki/projects disabled, squash-only merges and automatic branch deletion. M0 was
+merged through PR #1. Added CI, a PR template and a runtime failure issue form.
+No host activation, permission changes or personal application profiles were used.
+
+The first Ubuntu CI run failed at compositor startup. Inspection of older labwc
+source confirmed it does not support the new `-t` title option used by the initial
+runtime. Removed that optional argument for compatibility and included log tails
+in startup errors so future CI failures expose their actual cause. CI is rerun
+before integrating M1.
+
 ## 2026-10-03 — M0 headless experiment
 
 **Outcome:** a disposable native Wayland application ran in an invisible labwc

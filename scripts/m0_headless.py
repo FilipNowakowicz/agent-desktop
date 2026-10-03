@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import shlex
 import shutil
 import signal
@@ -13,6 +12,7 @@ import sys
 import tempfile
 import time
 import uuid
+from pathlib import Path
 
 
 def run(argv, *, env=None, timeout=10):
@@ -38,7 +38,9 @@ def wait_for(predicate, process, description, timeout=15):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
-            raise RuntimeError(f"Compositor exited ({process.returncode}): {description}")
+            raise RuntimeError(
+                f"Compositor exited ({process.returncode}): {description}"
+            )
         value = predicate()
         if value:
             return value
@@ -103,43 +105,73 @@ def main():
             config = root / "config"
             config.mkdir()
             (config / "rc.xml").write_text(
-                '<labwc_config><core><decoration>server</decoration></core>'
-                '<keyboard><default/></keyboard></labwc_config>\n'
+                "<labwc_config><core><decoration>server</decoration></core>"
+                "<keyboard><default/></keyboard></labwc_config>\n"
             )
             # Empty files prevent loading personal startup/environment hooks.
             for filename in ("autostart", "environment", "shutdown"):
                 (config / filename).write_text("")
             ready = root / "ready"
             result = root / "typed.txt"
-            startup = shlex.join([
-                binaries["foot"], "--config=/dev/null", "--title=Agent desktop M0",
-                "--window-size-pixels=800x500", sys.executable,
-                str(Path(__file__).with_name("m0_terminal.py").resolve()), str(root),
-            ])
+            startup = shlex.join(
+                [
+                    binaries["foot"],
+                    "--config=/dev/null",
+                    "--title=Agent desktop M0",
+                    "--window-size-pixels=800x500",
+                    sys.executable,
+                    str(Path(__file__).with_name("m0_terminal.py").resolve()),
+                    str(root),
+                ]
+            )
             env = os.environ.copy()
             for key in (
-                "DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DBUS_SESSION_BUS_ADDRESS",
-                "DBUS_SESSION_BUS_PID", "AT_SPI_BUS_ADDRESS", "HYPRLAND_INSTANCE_SIGNATURE",
-                "SWAYSOCK", "I3SOCK", "SESSION_MANAGER", "DESKTOP_STARTUP_ID",
-                "XAUTHORITY", "XDG_ACTIVATION_TOKEN",
+                "DISPLAY",
+                "WAYLAND_DISPLAY",
+                "WAYLAND_SOCKET",
+                "DBUS_SESSION_BUS_ADDRESS",
+                "DBUS_SESSION_BUS_PID",
+                "AT_SPI_BUS_ADDRESS",
+                "HYPRLAND_INSTANCE_SIGNATURE",
+                "SWAYSOCK",
+                "I3SOCK",
+                "SESSION_MANAGER",
+                "DESKTOP_STARTUP_ID",
+                "XAUTHORITY",
+                "XDG_ACTIVATION_TOKEN",
             ):
                 env.pop(key, None)
-            env.update({
-                "HOME": str(home), "XDG_RUNTIME_DIR": str(runtime),
-                "XDG_CONFIG_HOME": str(home / ".config"),
-                "XDG_CACHE_HOME": str(home / ".cache"),
-                "XDG_DATA_HOME": str(home / ".local/share"),
-                "XDG_STATE_HOME": str(home / ".local/state"),
-                "XDG_SESSION_TYPE": "wayland", "XDG_CURRENT_DESKTOP": "labwc",
-                "WLR_BACKENDS": "headless", "WLR_RENDERER": "pixman",
-                "WLR_HEADLESS_OUTPUTS": "1", "WLR_LIBINPUT_NO_DEVICES": "1",
-                "XKB_DEFAULT_LAYOUT": "us",
-                "AGENT_DESKTOP_EXPERIMENT": token,
-            })
-            argv = ["dbus-run-session", "--", binaries["labwc"], "-C", str(config), "-s", startup]
+            env.update(
+                {
+                    "HOME": str(home),
+                    "XDG_RUNTIME_DIR": str(runtime),
+                    "XDG_CONFIG_HOME": str(home / ".config"),
+                    "XDG_CACHE_HOME": str(home / ".cache"),
+                    "XDG_DATA_HOME": str(home / ".local/share"),
+                    "XDG_STATE_HOME": str(home / ".local/state"),
+                    "XDG_SESSION_TYPE": "wayland",
+                    "XDG_CURRENT_DESKTOP": "labwc",
+                    "WLR_BACKENDS": "headless",
+                    "WLR_RENDERER": "pixman",
+                    "WLR_HEADLESS_OUTPUTS": "1",
+                    "WLR_LIBINPUT_NO_DEVICES": "1",
+                    "XKB_DEFAULT_LAYOUT": "us",
+                    "AGENT_DESKTOP_EXPERIMENT": token,
+                }
+            )
+            argv = [
+                "dbus-run-session",
+                "--",
+                binaries["labwc"],
+                "-C",
+                str(config),
+                "-s",
+                startup,
+            ]
             report["command"] = argv
             report["session_environment"] = {
-                key: env[key] for key in ("WLR_BACKENDS", "WLR_RENDERER", "XKB_DEFAULT_LAYOUT")
+                key: env[key]
+                for key in ("WLR_BACKENDS", "WLR_RENDERER", "XKB_DEFAULT_LAYOUT")
             }
             with (output / "session.log").open("w") as log:
                 process = subprocess.Popen(
@@ -147,26 +179,51 @@ def main():
                 )
                 try:
                     socket = wait_for(
-                        lambda: next((p for p in runtime.glob("wayland-*") if p.is_socket()), None),
-                        process, "waiting for private Wayland socket",
+                        lambda: next(
+                            (p for p in runtime.glob("wayland-*") if p.is_socket()),
+                            None,
+                        ),
+                        process,
+                        "waiting for private Wayland socket",
                     )
                     env["WAYLAND_DISPLAY"] = socket.name
-                    assert Path(env["XDG_RUNTIME_DIR"]) / env["WAYLAND_DISPLAY"] == socket
+                    assert (
+                        Path(env["XDG_RUNTIME_DIR"]) / env["WAYLAND_DISPLAY"] == socket
+                    )
                     wait_for(ready.exists, process, "waiting for disposable terminal")
                     time.sleep(0.5)
                     before = output / "before.png"
                     after = output / "after.png"
                     run([binaries["grim"], str(before)], env=env)
                     text = args.text
-                    run([binaries["wtype"], "-s", "200", "-d", "20", text, "-k", "Return"], env=env)
+                    run(
+                        [
+                            binaries["wtype"],
+                            "-s",
+                            "200",
+                            "-d",
+                            "20",
+                            text,
+                            "-k",
+                            "Return",
+                        ],
+                        env=env,
+                    )
                     wait_for(result.exists, process, "waiting for typed message")
                     received = result.read_text()
                     report["expected_text"] = text
                     report["received_text"] = received
                     if received != text:
                         raise RuntimeError(f"Keyboard mismatch: {received!r}")
-                    wait_for((root / "mouse-ready").exists, process, "waiting for mouse fixture")
-                    run([binaries["wlrctl"], "pointer", "move", "-10000", "-10000"], env=env)
+                    wait_for(
+                        (root / "mouse-ready").exists,
+                        process,
+                        "waiting for mouse fixture",
+                    )
+                    run(
+                        [binaries["wlrctl"], "pointer", "move", "-10000", "-10000"],
+                        env=env,
+                    )
                     run([binaries["wlrctl"], "pointer", "move", "640", "360"], env=env)
                     run([binaries["wlrctl"], "pointer", "click", "left"], env=env)
                     mouse = root / "mouse.json"
@@ -177,7 +234,8 @@ def main():
                     time.sleep(0.3)
                     run([binaries["grim"], str(after)], env=env)
                     report["screenshots"] = {
-                        p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (before, after)
+                        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                        for p in (before, after)
                     }
                     if before.read_bytes() == after.read_bytes():
                         raise RuntimeError("Screenshot did not change")

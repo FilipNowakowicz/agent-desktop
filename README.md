@@ -52,8 +52,11 @@ inside the private desktop remain native Wayland. Override optional tools with
 Each session has private display sockets, D-Bus, configuration and application
 profiles. The session supervisor is a child subreaper and starts the private bus
 itself, so daemonizing applications and D-Bus-activated services remain in its
-process tree and are stopped at teardown. `status` lists those processes. If the
-supervisor itself is killed, orphaned processes can escape; see the development log.
+process tree and are stopped at teardown. `status` lists those processes. A small
+guardian process watches the supervisor; if the supervisor dies, the guardian stops
+the session's processes and marks it `failed`. If both are killed, `destroy`
+recovers the session using its environment token (processes that cleared their
+environment cannot be found then).
 Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;

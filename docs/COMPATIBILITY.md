@@ -12,6 +12,7 @@ Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
 | NixOS, pointer fixture in foot and Chromium DOM pointer events | Absolute clicks repeat on the same cell; drag delivers press, held-button motion and release (pointer test 10/10 idle, 10/10 with 12 busy processes); Chromium drag 3/3 at the exact requested 427 px distance |
 | NixOS, persistent virtual keyboard into foot | Typing immediately after the window becomes active, 300+ distinct CJK characters (keymap reset), repeats, Ctrl modifier and invalid-key rejection: 10/10 idle, 10/10 with 12 busy processes; no wtype installed |
 | NixOS, wlr-randr 0.5.0 on headless output | Mode change to 1024×768 updates coordinate bounds; scale 2 is rejected |
+| NixOS, supervisor crash | SIGKILL of the worker: guardian stopped all processes including a token-less daemon, removed the runtime and marked the session failed. SIGKILL of worker and guardian: `destroy` recovered by token |
 | NixOS, terminal fixture plus daemonizing child, repeated lifecycle | Final code: 20/20 create/type/destroy cycles with 12 busy CPU processes on 12 cores; 40/40 earlier branch cycles (20 idle, 20 loaded). No token, daemon or runtime leftovers |
 
 The fixture is a native Wayland foot 1.28.0 terminal on the initial machine.

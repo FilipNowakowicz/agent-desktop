@@ -70,11 +70,14 @@ def owned_processes(token):
     return found
 
 
-def session_processes(token):
-    """Live processes owned by this worker: its subtree plus token carriers."""
+def session_processes(token, tree=True):
+    """Live session processes: token carriers, plus this supervisor's subtree."""
     table = process_table()
-    pids = set(descendants(os.getpid(), table)) | set(owned_processes(token))
-    pids.discard(os.getpid())
+    pids = set(owned_processes(token))
+    if tree:
+        pids |= set(descendants(os.getpid(), table))
+    # Never this supervisor or its parent (the worker's guardian).
+    pids -= {os.getpid(), os.getppid()}
     return sorted(p for p in pids if p in table and table[p][1] not in "ZX")
 
 
@@ -89,7 +92,7 @@ def reap_orphans(tracked=()):
                 pass
 
 
-def cleanup_processes(token, tracked=(), spare=()):
+def cleanup_processes(token, tracked=(), spare=(), tree=True):
     """Stop the session tree; processes in spare get SIGTERM only after the rest."""
     phases = [(signal.SIGTERM, 2, set(spare))] if spare else []
     phases += [(signal.SIGTERM, 2, set()), (signal.SIGKILL, 3, set())]
@@ -98,7 +101,7 @@ def cleanup_processes(token, tracked=(), spare=()):
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             # Rescan: a process may fork while the tree is being stopped.
-            remaining = set(session_processes(token)) - excluded
+            remaining = set(session_processes(token, tree)) - excluded
             if not remaining:
                 break
             for pid in remaining - signalled:
@@ -109,7 +112,7 @@ def cleanup_processes(token, tracked=(), spare=()):
                     pass
             reap_orphans(tracked)
             time.sleep(0.05)
-        if not session_processes(token):
+        if not session_processes(token, tree):
             return
     raise RuntimeError("Session processes remain after cleanup")
 
@@ -130,9 +133,7 @@ class Worker:
 
     def save(self, status, **values):
         self.info.update(status=status, **values)
-        temporary = self.root / "session.json.tmp"
-        temporary.write_text(json.dumps(self.info, indent=2) + "\n")
-        temporary.replace(self.root / "session.json")
+        write_manifest(self.root, self.info)
 
     def command(self, tool, *arguments, timeout=10):
         if self.compositor and self.compositor.poll() is not None:
@@ -469,7 +470,7 @@ class Worker:
             server.bind(endpoint)
             server.listen(16)
             server.settimeout(0.5)
-            self.save("ready", worker_pid=os.getpid())
+            self.save("ready", worker_pid=os.getpid(), guardian_pid=os.getppid())
             while not self.stop:
                 self.trim_logs()
                 reap_orphans(self.tracked())
@@ -534,6 +535,18 @@ class Worker:
             shutil.rmtree(self.root / name, ignore_errors=True)
 
 
+def write_manifest(root, info):
+    temporary = root / "session.json.tmp"
+    temporary.write_text(json.dumps(info, indent=2) + "\n")
+    temporary.replace(root / "session.json")
+
+
+def remove_session_files(root, runtime):
+    shutil.rmtree(runtime, ignore_errors=True)
+    for name in ("home", "config"):
+        shutil.rmtree(root / name, ignore_errors=True)
+
+
 def command_name(pid):
     try:
         return Path(f"/proc/{pid}/comm").read_text().strip()
@@ -547,9 +560,8 @@ def re_key(key):
     return re.fullmatch(r"[A-Za-z0-9_]+", key)
 
 
-def main():
-    become_subreaper()
-    worker = Worker(Path(sys.argv[1]))
+def run_worker(root):
+    worker = Worker(root)
 
     def stop(_signal, _frame):
         worker.stop = True
@@ -570,6 +582,52 @@ def main():
             failure = f"Cleanup failed: {error}"
             print(failure, file=sys.stderr, flush=True)
         worker.save("failed" if failure else "stopped", error=failure)
+    return 1 if failure else 0
+
+
+def guard(root, worker):
+    """Wait for the worker; if it dies abnormally, stop everything it left behind."""
+
+    def forward(signum, _frame):
+        try:
+            os.kill(worker, signum)
+        except ProcessLookupError:
+            pass
+
+    signal.signal(signal.SIGTERM, forward)
+    signal.signal(signal.SIGINT, forward)
+    _, status = os.waitpid(worker, 0)
+    info = json.loads((root / "session.json").read_text())
+    # The worker's orphans are now this process's children or token carriers.
+    cleanup_processes(info["token"])
+    if info["status"] in ("stopped", "failed"):
+        return 0
+    if os.WIFSIGNALED(status):
+        reason = f"signal {os.WTERMSIG(status)}"
+    else:
+        reason = f"exit status {os.waitstatus_to_exitcode(status)}"
+    error = f"Supervisor exited unexpectedly ({reason}); session processes stopped"
+    print(error, file=sys.stderr, flush=True)
+    remove_session_files(root, info["runtime"])
+    info.update(status="failed", error=error)
+    write_manifest(root, info)
+    return 1
+
+
+def main():
+    root = Path(sys.argv[1])
+    # Both processes are subreapers: orphans stay with the worker while it lives,
+    # then fall to the guardian, never to init or a host service manager.
+    become_subreaper()
+    worker = os.fork()
+    if worker == 0:
+        code = 1
+        try:
+            become_subreaper()  # not inherited across fork
+            code = run_worker(root)
+        finally:
+            os._exit(code)
+    raise SystemExit(guard(root, worker))
 
 
 if __name__ == "__main__":

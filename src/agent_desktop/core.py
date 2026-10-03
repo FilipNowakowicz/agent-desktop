@@ -190,15 +190,59 @@ def logs(session):
     return result
 
 
+def supervisor_alive(info):
+    marker = f"AGENT_DESKTOP_SESSION_TOKEN={info['token']}".encode()
+    for key in ("guardian_pid", "worker_pid"):
+        try:
+            environment = Path(f"/proc/{info[key]}/environ").read_bytes()
+        except (KeyError, OSError):
+            continue
+        if marker in environment.split(b"\0"):
+            return True
+    return False
+
+
+def recover(session, info):
+    """Clean up after supervisors that no longer exist, using the session token."""
+    from .worker import cleanup_processes, remove_session_files, write_manifest
+
+    root = session_path(session)
+    runtime = Path(info["runtime"])
+    host_runtime = os.environ.get("XDG_RUNTIME_DIR")
+    expected = Path(host_runtime or "/nonexistent") / "agent-desktop" / session
+    if not host_runtime or runtime.resolve() != expected.resolve():
+        raise DesktopError("Refusing to remove an unexpected runtime directory")
+    try:
+        # Token only: this process's own children are not session processes.
+        cleanup_processes(info["token"], tree=False)
+    except RuntimeError as error:
+        raise DesktopError(f"Recovery failed: {error}") from error
+    remove_session_files(root, runtime)
+    info.update(status="stopped", recovered=True)
+    write_manifest(root, info)
+    return {
+        "session": session,
+        "status": "stopped",
+        "recovered": True,
+        "runtime_removed": not runtime.exists(),
+    }
+
+
 def destroy(session):
     info = manifest(session)
     if info["status"] == "stopped":
         return {"session": session, "status": "stopped"}
-    request(session, "destroy")
+    try:
+        request(session, "destroy")
+    except DesktopError:
+        if supervisor_alive(info):
+            raise
+        return recover(session, info)
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         info = manifest(session)
-        if info["status"] == "stopped":
+        # Stopped means the supervisors have exited too, not just the worker's report.
+        if info["status"] == "stopped" and not supervisor_alive(info):
             return {
                 "session": session,
                 "status": "stopped",

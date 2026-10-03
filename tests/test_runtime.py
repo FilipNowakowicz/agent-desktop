@@ -148,7 +148,10 @@ class RuntimeTests(unittest.TestCase):
             Path(before["path"]).read_bytes(), Path(after["path"]).read_bytes()
         )
         info = core.manifest(session)
+        started = time.monotonic()
         result = core.destroy(session)
+        # Escalation phases take 2 s each; a clean teardown needs none of them.
+        self.assertLess(time.monotonic() - started, 2)
         self.assertTrue(result["runtime_removed"])
         self.assertFalse(Path(info["runtime"]).exists())
         self.assertEqual(core.destroy(session)["status"], "stopped")
@@ -420,6 +423,44 @@ class RuntimeTests(unittest.TestCase):
         )
         core.destroy(session)
         self.assertEqual(sleeping(duration), [])
+
+    def test_killed_supervisor_is_cleaned_up_by_guardian(self):
+        session = self.new_session()
+        duration = unique_duration()
+        core.request(
+            session,
+            "launch",
+            argv=["sh", "-c", f"setsid env -i sleep {duration} >/dev/null 2>&1 &"],
+        )
+        wait_for(lambda: sleeping(duration))
+        info = core.manifest(session)
+        os.kill(info["worker_pid"], signal.SIGKILL)
+        wait_for(lambda: core.manifest(session)["status"] == "failed")
+        self.assertIn("Supervisor", core.manifest(session)["error"])
+        self.assertEqual(sleeping(duration), [])
+        self.assertEqual(owned_processes(info["token"]), [])
+        self.assertFalse(Path(info["runtime"]).exists())
+        with self.assertRaises(core.DesktopError):
+            core.request(session, "status")
+
+    def test_destroy_recovers_session_without_supervisors(self):
+        session = self.new_session()
+        info = core.manifest(session)
+        compositor = info["compositor_pid"]
+        for pid in (info["guardian_pid"], info["worker_pid"]):
+            os.kill(pid, signal.SIGKILL)
+        wait_for(
+            lambda: (
+                {s["session"]: s["status"] for s in core.sessions()}[session]
+                == "unavailable"
+            )
+        )
+        result = core.destroy(session)
+        self.assertTrue(result["recovered"])
+        self.assertTrue(result["runtime_removed"])
+        wait_for(lambda: not Path(f"/proc/{compositor}").exists(), timeout=5)
+        self.assertEqual(owned_processes(info["token"]), [])
+        self.assertEqual(core.manifest(session)["status"], "stopped")
 
     def test_crashes_preserve_errors_and_cleanup(self):
         session = self.new_session()

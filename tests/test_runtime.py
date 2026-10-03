@@ -25,6 +25,23 @@ def wait_for(predicate, timeout=10):
     raise AssertionError("Timed out waiting for an observed result")
 
 
+def unique_duration():
+    # A unique sleep duration identifies test processes without name matching.
+    return f"{time.time_ns() % 10**6 + 10**6}.5"
+
+
+def sleeping(duration):
+    found = []
+    for path in Path("/proc").iterdir():
+        try:
+            argv = (path / "cmdline").read_bytes().split(b"\0")
+        except OSError:
+            continue
+        if argv[:2] == [b"sleep", duration.encode()]:
+            found.append(int(path.name))
+    return found
+
+
 class RoutingTests(unittest.TestCase):
     def test_invalid_session_identifiers(self):
         for session in ("", "../main", "/tmp/other", None, "a" * 13):
@@ -43,7 +60,7 @@ class RoutingTests(unittest.TestCase):
 @unittest.skipUnless(
     all(
         shutil.which(t)
-        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-run-session")
+        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-daemon")
     ),
     "desktop tools unavailable",
 )
@@ -183,6 +200,66 @@ class RuntimeTests(unittest.TestCase):
         wait_for((fixture_b / "typed.txt").exists)
         self.assertEqual((fixture_a / "typed.txt").read_text(), "only first")
         self.assertEqual((fixture_b / "typed.txt").read_text(), "only second")
+
+    def test_daemonizing_application_without_token_is_cleaned_up(self):
+        session = self.new_session()
+        duration = unique_duration()
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "sh",
+                "-c",
+                f"setsid env -i sleep {duration} </dev/null >/dev/null 2>&1 &",
+            ],
+        )
+        pid = wait_for(lambda: sleeping(duration))[0]
+        self.assertNotIn(
+            b"AGENT_DESKTOP_SESSION_TOKEN",
+            Path(f"/proc/{pid}/environ").read_bytes(),
+        )
+        status = core.request(session, "status")
+        self.assertIn(pid, [p["pid"] for p in status["processes"]])
+        core.destroy(session)
+        wait_for(lambda: not sleeping(duration), timeout=5)
+
+    def test_private_bus_and_term_ignoring_forks_are_cleaned_up(self):
+        session = self.new_session()
+        runtime = core.manifest(session)["runtime"]
+        output = self.root / "bus-address"
+        duration = unique_duration()
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "sh",
+                "-c",
+                f'echo "$DBUS_SESSION_BUS_ADDRESS" > {output}; trap "" TERM; '
+                f"while :; do sleep {duration} & sleep 0.02; done",
+            ],
+        )
+        wait_for(lambda: len(sleeping(duration)) > 3)
+        self.assertEqual(output.read_text().strip(), f"unix:path={runtime}/bus")
+        # Activated services inherit the bus environment, never host display/home.
+        bus = next(
+            p["pid"]
+            for p in core.request(session, "status")["processes"]
+            if p["command"] == "dbus-daemon"
+        )
+        environment = dict(
+            entry.split(b"=", 1)
+            for entry in Path(f"/proc/{bus}/environ").read_bytes().split(b"\0")
+            if b"=" in entry
+        )
+        self.assertTrue(environment[b"HOME"].startswith(str(self.root).encode()))
+        self.assertEqual(environment[b"XDG_RUNTIME_DIR"], runtime.encode())
+        self.assertNotIn(b"HYPRLAND_INSTANCE_SIGNATURE", environment)
+        self.assertEqual(
+            environment[b"WAYLAND_DISPLAY"],
+            core.manifest(session)["wayland_display"].encode(),
+        )
+        core.destroy(session)
+        self.assertEqual(sleeping(duration), [])
 
     def test_crashes_preserve_errors_and_cleanup(self):
         session = self.new_session()

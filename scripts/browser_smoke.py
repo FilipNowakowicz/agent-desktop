@@ -46,6 +46,8 @@ def main():
                 "--disable-gpu",
                 "--disable-background-networking",
                 "--disable-component-update",
+                # Disposable profile: avoid a private keyring creation prompt.
+                "--password-store=basic",
                 page.resolve().as_uri(),
             ],
         )
@@ -76,6 +78,8 @@ def main():
         else:
             raise RuntimeError("Browser did not submit the expected text")
         report["after"] = core.request(session, "screenshot")
+        # Chromium's helpers show whether ownership covers its whole process tree.
+        report["session_processes"] = core.request(session, "status")["processes"]
         assert (
             Path(report["before"]["path"]).read_bytes()
             != Path(report["after"]["path"]).read_bytes()

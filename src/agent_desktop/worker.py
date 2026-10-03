@@ -1,5 +1,6 @@
 """One supervisor, private D-Bus and compositor per session."""
 
+import ctypes
 import json
 import math
 import os
@@ -13,8 +14,47 @@ import time
 import uuid
 from pathlib import Path
 
+PR_SET_CHILD_SUBREAPER = 36
+
+
+def become_subreaper():
+    """Keep orphaned descendants, including daemons, inside this worker's tree."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0):
+        raise OSError(ctypes.get_errno(), "Cannot become a child subreaper")
+
+
+def process_table():
+    """Return {pid: (parent pid, state)} for every visible process."""
+    table = {}
+    for path in Path("/proc").iterdir():
+        if not path.name.isdecimal():
+            continue
+        try:
+            stat = (path / "stat").read_text()
+        except OSError:
+            continue
+        # The command name may contain spaces or parentheses; fields follow the last ")".
+        fields = stat[stat.rindex(")") + 2 :].split()
+        table[int(path.name)] = (int(fields[1]), fields[0])
+    return table
+
+
+def descendants(root, table=None):
+    table = process_table() if table is None else table
+    children = {}
+    for pid, (parent, _state) in table.items():
+        children.setdefault(parent, []).append(pid)
+    found, pending = [], [root]
+    while pending:
+        for child in children.get(pending.pop(), []):
+            found.append(child)
+            pending.append(child)
+    return found
+
 
 def owned_processes(token):
+    """Processes still carrying a session's environment token (any parent)."""
     marker = f"AGENT_DESKTOP_SESSION_TOKEN={token}".encode()
     found = []
     for path in Path("/proc").iterdir():
@@ -28,22 +68,48 @@ def owned_processes(token):
     return found
 
 
-def cleanup_processes(token, excluded=()):
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        for pid in owned_processes(token):
-            if pid in excluded:
-                continue
+def session_processes(token):
+    """Live processes owned by this worker: its subtree plus token carriers."""
+    table = process_table()
+    pids = set(descendants(os.getpid(), table)) | set(owned_processes(token))
+    pids.discard(os.getpid())
+    return sorted(p for p in pids if p in table and table[p][1] not in "ZX")
+
+
+def reap_orphans(tracked=()):
+    """Collect adopted orphans without stealing exit codes from Popen objects."""
+    me = os.getpid()
+    for pid, (parent, state) in process_table().items():
+        if parent == me and state == "Z" and pid not in tracked:
             try:
-                os.kill(pid, sig)
-            except ProcessLookupError:
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
                 pass
-        deadline = time.monotonic() + 2
+
+
+def cleanup_processes(token, tracked=(), spare=()):
+    """Stop the session tree; processes in spare get SIGTERM only after the rest."""
+    phases = [(signal.SIGTERM, 2, set(spare))] if spare else []
+    phases += [(signal.SIGTERM, 2, set()), (signal.SIGKILL, 3, set())]
+    for sig, wait, excluded in phases:
+        signalled = set()
+        deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
-            if not set(owned_processes(token)) - set(excluded):
-                return
+            # Rescan: a process may fork while the tree is being stopped.
+            remaining = set(session_processes(token)) - excluded
+            if not remaining:
+                break
+            for pid in remaining - signalled:
+                signalled.add(pid)
+                try:
+                    os.kill(pid, sig)
+                except ProcessLookupError:
+                    pass
+            reap_orphans(tracked)
             time.sleep(0.05)
-    if set(owned_processes(token)) - set(excluded):
-        raise RuntimeError("Session processes remain after cleanup")
+        if not session_processes(token):
+            return
+    raise RuntimeError("Session processes remain after cleanup")
 
 
 class Worker:
@@ -51,6 +117,7 @@ class Worker:
         self.root = root
         self.info = json.loads((root / "session.json").read_text())
         self.env = os.environ.copy()
+        self.bus = None
         self.compositor = None
         self.apps = {}
         self.viewer = None
@@ -91,6 +158,8 @@ class Worker:
             "XAUTHORITY",
             "DESKTOP_STARTUP_ID",
             "XDG_ACTIVATION_TOKEN",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "DBUS_SESSION_BUS_PID",
         ):
             self.env.pop(key, None)
         home = self.root / "home"
@@ -144,9 +213,40 @@ class Worker:
             if display:
                 self.env["WAYLAND_DISPLAY"] = str(display)
                 self.info["wayland_display"] = str(display)
+                # Activated services get the private display, never the host's.
+                self.start_bus()
                 return
             time.sleep(0.05)
         raise TimeoutError("Private compositor socket did not appear")
+
+    def start_bus(self):
+        # A child bus keeps D-Bus-activated services inside this worker's tree.
+        bus = Path(self.info["runtime"]) / "bus"
+        with (self.root / "dbus.log").open("ab") as log:
+            self.bus = subprocess.Popen(
+                [
+                    self.info["tools"]["dbus-daemon"],
+                    "--session",
+                    "--nofork",
+                    "--nopidfile",
+                    f"--address=unix:path={bus}",
+                ],
+                env=self.env,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+            )
+        deadline = time.monotonic() + 10
+        while not bus.is_socket():
+            if self.bus.poll() is not None or time.monotonic() > deadline:
+                detail = (self.root / "dbus.log").read_text()[-4096:]
+                raise RuntimeError(f"Private D-Bus did not start\n{detail}")
+            time.sleep(0.02)
+        self.env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus}"
+
+    def tracked(self):
+        processes = [self.bus, self.compositor, self.viewer, *self.apps.values()]
+        return {p.pid for p in processes if p}
 
     def screenshot(self):
         directory = self.root / "screenshots"
@@ -187,6 +287,10 @@ class Worker:
                 "status": "ready",
                 "applications": [
                     {"pid": p.pid, "exit_code": p.poll()} for p in self.apps.values()
+                ],
+                "processes": [
+                    {"pid": pid, "command": command_name(pid)}
+                    for pid in session_processes(self.info["token"])
                 ],
             }
         if operation == "launch":
@@ -325,6 +429,7 @@ class Worker:
             self.save("ready", worker_pid=os.getpid())
             while not self.stop:
                 self.trim_logs()
+                reap_orphans(self.tracked())
                 if self.compositor.poll() is not None:
                     raise RuntimeError("Private compositor crashed")
                 try:
@@ -367,24 +472,27 @@ class Worker:
                 self.compositor.wait(timeout=3)
             except (RuntimeError, subprocess.SubprocessError):
                 pass
-        # The parent D-Bus wrapper and daemon must survive until this worker exits.
-        protected = [os.getppid()]
-        bus_pid = os.environ.get("DBUS_SESSION_BUS_PID")
-        if bus_pid:
-            protected.append(int(bus_pid))
-        cleanup_processes(self.info["token"], excluded=protected)
-        if self.compositor:
-            self.compositor.wait(timeout=3)
-        if self.viewer:
-            self.viewer.wait(timeout=3)
-        for process in self.apps.values():
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+        try:
+            # Applications exit before their session bus disappears.
+            spare = [self.bus.pid] if self.bus else []
+            cleanup_processes(self.info["token"], self.tracked(), spare)
+        finally:
+            for process in (self.bus, self.compositor, self.viewer):
+                if process:
+                    process.poll()
+            for process in self.apps.values():
+                process.poll()
+            reap_orphans(self.tracked())
         shutil.rmtree(self.info["runtime"])
         for name in ("home", "config"):
             shutil.rmtree(self.root / name, ignore_errors=True)
+
+
+def command_name(pid):
+    try:
+        return Path(f"/proc/{pid}/comm").read_text().strip()
+    except OSError:
+        return None
 
 
 def re_key(key):
@@ -394,6 +502,7 @@ def re_key(key):
 
 
 def main():
+    become_subreaper()
     worker = Worker(Path(sys.argv[1]))
 
     def stop(_signal, _frame):

@@ -71,7 +71,7 @@ def create(mode="headless", tools=None):
     if mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
     paths = {}
-    for tool in ("labwc", "grim", "wtype", "wlrctl", "dbus-run-session"):
+    for tool in ("labwc", "grim", "wtype", "wlrctl", "dbus-daemon"):
         executable = (tools or {}).get(tool) or os.environ.get(
             "AGENT_DESKTOP_" + tool.upper().replace("-", "_"), tool
         )
@@ -124,8 +124,6 @@ def create(mode="headless", tools=None):
     with (root / "session.log").open("ab") as log:
         process = subprocess.Popen(
             [
-                paths["dbus-run-session"],
-                "--",
                 sys.executable,
                 "-m",
                 "agent_desktop.worker",

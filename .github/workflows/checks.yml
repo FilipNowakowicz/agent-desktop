@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install desktop runtime
-        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wtype wlrctl wayvnc dbus-x11 fonts-dejavu-core
+        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wtype wlrctl wayvnc dbus-daemon fonts-dejavu-core
       - name: Record runtime versions
-        run: dpkg-query -W labwc foot grim wtype wlrctl wayvnc
+        run: dpkg-query -W labwc foot grim wtype wlrctl wayvnc dbus-daemon
       - run: uv sync --locked --managed-python
       - name: Check Python source
         run: |
@@ -25,3 +25,5 @@ jobs:
           uv run python -m compileall -q src scripts tests
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
+      - name: Repeat lifecycle under CPU load
+        run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2

@@ -20,7 +20,7 @@ from agent_desktop.worker import owned_processes
 @unittest.skipUnless(
     all(
         shutil.which(t)
-        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-run-session")
+        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-daemon")
     ),
     "desktop tools unavailable",
 )

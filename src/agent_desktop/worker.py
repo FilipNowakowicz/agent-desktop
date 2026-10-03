@@ -14,7 +14,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .wayland import BUTTONS, VirtualPointer
+from .wayland import BUTTONS, Keysyms, VirtualKeyboard, VirtualPointer
 
 PR_SET_CHILD_SUBREAPER = 36
 
@@ -124,6 +124,8 @@ class Worker:
         self.apps = {}
         self.viewer = None
         self.virtual_pointer = None
+        self.virtual_keyboard = None
+        self.keysyms = None
         self.stop = False
 
     def save(self, status, **values):
@@ -169,8 +171,14 @@ class Worker:
         home.mkdir(mode=0o700)
         config = self.root / "config"
         config.mkdir(mode=0o700)
+        # Explicit window bindings only: labwc's defaults include Execute actions
+        # (terminal, pactl, brightnessctl) that could act on the host.
         (config / "rc.xml").write_text(
-            "<labwc_config><keyboard><default/></keyboard></labwc_config>\n"
+            "<labwc_config><keyboard>"
+            '<keybind key="A-Tab"><action name="NextWindow"/></keybind>'
+            '<keybind key="A-S-Tab"><action name="PreviousWindow"/></keybind>'
+            '<keybind key="A-F4"><action name="Close"/></keybind>'
+            "</keyboard></labwc_config>\n"
         )
         for name in ("environment", "autostart", "shutdown"):
             (config / name).write_text("")
@@ -220,6 +228,8 @@ class Worker:
                 self.start_bus()
                 # Create the pointer before applications so its seat capability is stable.
                 self.virtual_pointer = VirtualPointer(display)
+                self.virtual_keyboard = VirtualKeyboard(display, self.root)
+                self.keysyms = Keysyms(self.compositor.pid)
                 return
             time.sleep(0.05)
         raise TimeoutError("Private compositor socket did not appear")
@@ -269,6 +279,11 @@ class Worker:
         if self.compositor.poll() is not None:
             raise RuntimeError("Private compositor has exited")
         return self.virtual_pointer
+
+    def keyboard(self):
+        if self.compositor.poll() is not None:
+            raise RuntimeError("Private compositor has exited")
+        return self.virtual_keyboard
 
     def drag(self, pointer, start, end, button):
         pointer.move(*start)
@@ -419,11 +434,9 @@ class Worker:
             pointer.sync()
         elif operation == "type":
             text = request.get("text")
-            if not isinstance(text, str) or "\0" in text or len(text) > 1000:
-                raise ValueError(
-                    "Text must be a string of at most 1000 characters without NUL"
-                )
-            self.command("wtype", "-s", "200", "-d", "20", "--", text, timeout=25)
+            if not isinstance(text, str) or len(text) > 10000:
+                raise ValueError("Text must be a string of at most 10000 characters")
+            self.keyboard().type(text)
         elif operation == "key":
             key = request.get("key")
             modifiers = request.get("modifiers", [])
@@ -433,13 +446,7 @@ class Worker:
                 m not in ("ctrl", "alt", "shift", "logo") for m in modifiers
             ):
                 raise ValueError("Modifiers must be ctrl, alt, shift or logo")
-            args = ["-s", "200"]
-            for modifier in modifiers:
-                args += ["-M", modifier]
-            args += ["-k", key]
-            for modifier in reversed(modifiers):
-                args += ["-m", modifier]
-            self.command("wtype", *args)
+            self.keyboard().key(self.keysyms.resolve(key), modifiers)
         elif operation == "scroll":
             dx, dy = request.get("dx", 0), request.get("dy", 0)
             if not all(
@@ -502,8 +509,9 @@ class Worker:
                     stream.truncate()
 
     def cleanup(self):
-        if self.virtual_pointer:
-            self.virtual_pointer.close()
+        for device in (self.virtual_pointer, self.virtual_keyboard):
+            if device:
+                device.close()
         if self.compositor and self.compositor.poll() is None:
             try:
                 self.command("labwc", "-e", timeout=3)

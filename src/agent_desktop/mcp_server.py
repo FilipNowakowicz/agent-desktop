@@ -52,7 +52,7 @@ def desktop_screenshot(session: str) -> list:
 
 @mcp.tool()
 def desktop_type(session: str, text: str) -> dict:
-    """Type up to 1000 characters into the private focused app. Verify the result afterward."""
+    """Type up to 10000 characters into the private focused app. Verify the result afterward."""
     return core.request(session, "type", text=text)
 
 

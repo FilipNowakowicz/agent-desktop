@@ -2,9 +2,60 @@
 
 Give an existing agent its own Linux desktop while you keep using your computer.
 
-The first headless experiment works on NixOS + Hyprland. This is an experiment,
-not yet a persistent desktop runtime or MCP server. See [PROJECT_PLAN.md](PROJECT_PLAN.md)
-for the product direction and [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) for observed results.
+An initial persistent desktop runtime and CLI work on NixOS + Hyprland, with
+headless operation and a visible nested window for testing. The runtime is still
+experimental. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for stage status and
+[DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) for observed results.
+
+## Use a persistent desktop
+
+Install the runtime tools listed below, then run:
+
+```sh
+uv sync --managed-python
+uv run agent-desktop create
+uv run agent-desktop create --mode visible
+# Commands return JSON. Use the returned session identifier:
+uv run agent-desktop launch SESSION -- foot --config=/dev/null
+uv run agent-desktop windows SESSION
+uv run agent-desktop screenshot SESSION
+uv run agent-desktop type SESSION 'hello café λ'
+uv run agent-desktop key SESSION Return
+uv run agent-desktop click SESSION 640 360
+uv run agent-desktop scroll SESSION 120
+uv run agent-desktop status SESSION
+uv run agent-desktop logs SESSION
+uv run agent-desktop destroy SESSION
+uv run agent-desktop list
+```
+
+Headless mode never opens a host window. Visible mode requires a Wayland host and
+opens a nested desktop window that you can inspect and interact with directly.
+Opening that window can change host focus; closing it ends the nested session.
+This is not yet an independent viewer for an existing headless session.
+
+Each session has private display sockets, D-Bus, configuration and application
+profiles. Screenshots and bounded log tails remain in
+`~/.local/state/agent-desktop/SESSION/` after teardown. Set
+`AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
+verify its outcome using screenshots or application evidence.
+
+Coordinates currently assume one output at scale 1. Drag, accessibility trees and
+other keyboard layouts remain unimplemented. Applications run as your user, with
+host filesystem and network access; graphical separation is not a security sandbox.
+
+## Checks
+
+```sh
+uv run ruff check src scripts tests
+uv run ruff format --check src scripts tests
+uv run python -m unittest discover -s tests -v
+# Optional: opens and tears down a visible test desktop.
+DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
+```
+
+Integration tests skip when desktop tools are missing. CI installs them explicitly
+on Ubuntu; passing unit-only checks must not be described as a desktop validation.
 
 ## Run the experiment
 
@@ -37,5 +88,5 @@ sandbox. Applications still run as your user with host filesystem and network ac
 
 ## Next
 
-Implement persistent session lifecycle, application launch, observation and input
-through a small CLI/core. Add MCP and a viewer after that core works reliably.
+Expose the persistent core through MCP, exercise the protocol with an actual client,
+and then test real applications. Add an independent viewer after the runtime is dependable.

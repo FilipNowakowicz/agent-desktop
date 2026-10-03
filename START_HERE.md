@@ -1,8 +1,8 @@
 # Start development in a new chat
 
-Development update, 2026-10-03: M0 is now implemented and passed. Read
+Development update, 2026-10-03: M0 passed and M1's initial persistent runtime is implemented. Read
 `DEVELOPMENT_LOG.md` and the current `PROJECT_PLAN.md` before using the original
-starter prompt below. Continue with M1 rather than repeating completed M0 work.
+starter prompt below. Continue from the current status rather than repeating completed work.
 
 Open `/home/user/temp/gui` as the workspace and paste the following:
 

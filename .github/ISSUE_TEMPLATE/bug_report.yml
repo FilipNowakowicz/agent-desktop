@@ -1,0 +1,21 @@
+name: Runtime failure
+description: Report a reproducible desktop session failure
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Linux distribution, runtime versions and headless or visible mode
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs and screenshots
+      description: Remove credentials and personal data before attaching evidence.

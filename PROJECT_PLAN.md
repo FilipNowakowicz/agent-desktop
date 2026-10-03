@@ -1,6 +1,25 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-03. Status: M0 headless labwc experiment implemented and passed for screenshots, keyboard/mouse delivery and disposable-session cleanup on NixOS + Hyprland. M1 persistent runtime has not started. See `DEVELOPMENT_LOG.md` for commands, evidence, failures and limitations.
+Updated: 2026-10-03. Status: M0 passed; M1 initial persistent runtime and CLI implemented, including headless and visible nested desktops. Local integration checks passed; remote CI and M2 integration follow. See `DEVELOPMENT_LOG.md` for commands, evidence, failures and limitations.
+
+## Development status
+
+Repository: `FilipNowakowicz/private-agent-desktop` (private). Development stages use
+pull requests; successful stages may be integrated after checks. Every stage must
+update this status and the development log with completed work and remaining gaps.
+
+| Stage | State | Remaining work |
+| --- | --- | --- |
+| M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
+| M1 | Core implemented; headless and visible local tests passed | CI confirmation; stronger process ownership, input readiness and drag support |
+| M2 | Next | MCP adapter and a real protocol-client round trip; independent viewer remains separate |
+| M3 | Not started | Compatibility matrix, distribution setup and real application tasks |
+| M4 | Not started | Representative task benchmarks and measured improvements |
+
+Visible mode is an explicitly requested testing option: a nested labwc window on
+the host Wayland desktop, with its own application environment and targeted input.
+Opening it can take host focus; closing it ends that session. It is separate from
+the later observer-only viewer whose disconnection must preserve a headless session.
 
 ## 1. Read this first
 

@@ -1,12 +1,12 @@
 """Disposable terminal fixture that reports actual keyboard and mouse delivery."""
 
 import json
-from pathlib import Path
 import re
 import sys
 import termios
 import time
 import tty
+from pathlib import Path
 
 root = Path(sys.argv[1])
 print("PRIVATE AGENT DESKTOP\nType a message:", flush=True)
@@ -25,7 +25,9 @@ try:
         received += sys.stdin.read(1)
         match = re.search(r"\x1b\[<(\d+);(\d+);(\d+)M", received)
         if match:
-            event = dict(zip(("button", "column", "row"), map(int, match.groups())))
+            event = dict(
+                zip(("button", "column", "row"), map(int, match.groups()), strict=True)
+            )
             (root / "mouse.json").write_text(json.dumps(event))
             break
 finally:

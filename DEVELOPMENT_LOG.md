@@ -1,5 +1,76 @@
 # Development log
 
+## 2026-10-04 — M1 process ownership and private-bus environment
+
+**Outcome:** session teardown now covers processes that daemonize, call `setsid`,
+clear their environment or ignore SIGTERM while forking. This stage also fixed an
+isolation bug in the earlier runtime: D-Bus-activated services used the host
+environment.
+
+### Decisions
+
+- The worker marks itself a child subreaper (`prctl(PR_SET_CHILD_SUBREAPER)`),
+  so orphaned descendants are reparented to it, not to init. Ownership is the
+  worker's process subtree plus the existing environment-token scan.
+- The worker starts `dbus-daemon --session --nofork` itself, listening on
+  `RUNTIME/bus`, after the private compositor socket exists. This replaces
+  `dbus-run-session`, whose daemon was outside the worker's tree. Runtime dependency
+  changes from `dbus-run-session` to `dbus-daemon`.
+- Teardown: graceful labwc exit, then SIGTERM to everything except the bus, then
+  SIGTERM including the bus, then SIGKILL. Each phase rescans the tree so children
+  forked during teardown are included. Adopted zombies are reaped without taking
+  exit codes from tracked `Popen` objects. `os.pidfd_open` is still unavailable in
+  the uv-managed CPython 3.12.13 build, so PID-reuse races are reduced by short
+  rescans, not eliminated.
+- `status` lists live session processes (PID and command name).
+
+### Isolation bug found
+
+The Chromium smoke task failed 4 times in a row on this branch: a GNOME Keyring
+"Choose password for new keyring" dialog took focus inside the private desktop.
+The same task passed on `main`. Inspecting a `main` session's bus process showed why:
+`dbus-run-session` inherited the host environment, so `HOME=/home/user`, host
+`WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` were set. Activated services
+(gnome-keyring, mako, xdg-desktop-portal including the Hyprland backend) therefore ran
+against the user's real home and host compositor. Those services were found in the
+logs, but whether any of them actually changed host state was not investigated.
+
+On this branch, activated services get the private home, runtime directory and
+private Wayland socket. A test asserts the bus environment. gnome-keyring now
+offers to create a keyring inside the private session. Chromium was never meant
+to use a keyring here, so the disposable-profile smoke task passes
+`--password-store=basic`. Other applications may still show this private prompt;
+an agent sees it in screenshots.
+
+### Validation
+
+Executables came from `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim
+nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#chromium`; `dbus-daemon` came from the system.
+
+- `uv run python -m unittest discover -s tests`: 12 tests, 1 skipped (visible opt-in).
+  The new daemonizing-application test failed before the change and left a
+  `sleep` process running; that exact PID was removed manually.
+- `DESKTOP_TEST_VISIBLE=1 ... -k visible`: passed once.
+- `scripts/lifecycle_stress.py --cycles 20 --load 12` on the final code: 20/20
+  (`artifacts/stress/c46e4769a583`, median cycle 1.79 s). Earlier branch runs:
+  20/20 idle (median 1.45 s), 20/20 loaded (median 1.58 s). Each cycle verifies
+  exact typed text, a token-less `setsid env -i` daemon, and no leftovers.
+- `scripts/browser_smoke.py`: 3/3 passed (`artifacts/browser/3872f9b4f984`,
+  `eb0281eda3fa`, `3d1d83c98dc4`). 23 session processes, including chromium,
+  crashpad, xdg portals, document portal FUSE helper and mako. No Chromium D-Bus
+  abort at teardown, no leftover processes or `agent-desktop` mounts.
+
+### Remaining
+
+- If the worker itself is SIGKILLed, its adopted orphans go to init. Only
+  token-carrying processes are then discoverable. Crash recovery for stale
+  sessions is not implemented.
+- Processes started on the user's behalf by host services (host systemd user
+  manager, host portals) are outside the session tree. The private bus reduces,
+  but does not eliminate, this route.
+- Input readiness still relies on fixed wtype delays; the stress runs did not
+  reproduce a dropped or extra character. Drag remains unimplemented.
+
 ## 2026-10-04 — Development handoff and checkout location
 
 Updated the starter prompt to continue from the implemented stages, with current

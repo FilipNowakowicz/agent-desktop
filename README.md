@@ -49,7 +49,10 @@ inside the private desktop remain native Wayland. Override optional tools with
 `--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
 
 Each session has private display sockets, D-Bus, configuration and application
-profiles. Screenshots and bounded log tails remain in
+profiles. The session supervisor is a child subreaper and starts the private bus
+itself, so daemonizing applications and D-Bus-activated services remain in its
+process tree and are stopped at teardown. `status` lists those processes. If the
+supervisor itself is killed, orphaned processes can escape; see the development log. Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
 verify its outcome using screenshots or application evidence.
@@ -67,6 +70,8 @@ uv run ruff format --check src scripts tests
 uv run python -m unittest discover -s tests -v
 # Optional: opens and tears down a visible test desktop.
 DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
+# Repeated lifecycle cycles, optionally with busy CPU processes.
+uv run scripts/lifecycle_stress.py --cycles 20 --load 4
 ```
 
 Integration tests skip when desktop tools are missing. CI installs them explicitly
@@ -101,7 +106,7 @@ not yet been configured or validated.
 
 ## Run the experiment
 
-Install `labwc`, `foot`, `wtype`, `wlrctl`, `grim` and `dbus-run-session` using your
+Install `labwc`, `foot`, `wtype`, `wlrctl`, `grim` and `dbus-daemon` using your
 distribution's package manager. Python is managed with uv:
 
 ```sh

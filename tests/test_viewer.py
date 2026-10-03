@@ -33,7 +33,7 @@ def receive(connection, size):
             "wtype",
             "wlrctl",
             "foot",
-            "dbus-run-session",
+            "dbus-daemon",
             "wayvnc",
         )
     ),

@@ -1,5 +1,50 @@
 # Development log
 
+## 2026-10-04 — M1 supervisor crash recovery
+
+**Outcome:** a crashed session supervisor no longer leaves the session running.
+
+### Design
+
+- The session process forks. The parent is a minimal **guardian** that only waits
+  for the worker child. Both are child subreapers (not inherited across `fork`,
+  so each sets it). Orphans stay with the worker while it lives, then fall to the
+  guardian, never to init or the host service manager.
+- When the worker exits, the guardian stops anything left (subtree plus token). If
+  the manifest was not already `stopped`/`failed`, it removes the runtime and
+  home/config and records `failed` with the signal or exit status.
+- If both supervisors are gone, `destroy` checks that no process with the
+  session token is at the recorded supervisor PIDs. It then kills token
+  carriers (token only, never the caller's own children, which may be other sessions'
+  supervisors) and removes the runtime directory, after checking that it is
+  exactly `$XDG_RUNTIME_DIR/agent-desktop/SESSION`. It returns `recovered: true`.
+- `destroy` now returns only after the supervisors have exited. Before, the
+  guardian could still be exiting, which the stress script reported as a leftover.
+
+### Bug found during this stage
+
+The full suite slowed from about 20 s to 68 s. The worker's token scan included its
+parent, the guardian, which carries the token. Normal teardown therefore sent
+SIGTERM to the guardian (forwarded back), waited through two 2-second phases, and
+SIGKILLed it. Supervisors now exclude themselves and their parent. The round-trip
+test asserts that `destroy` takes less than 2 s; it measured 4.3 s with the bug.
+
+### Validation
+
+- Full suite: 17 tests, 1 skipped; about 20 s. New tests: SIGKILL of the worker (guardian
+  cleans up, including a `setsid env -i` daemon) and SIGKILL of both supervisors
+  (`destroy` recovers; compositor and token processes gone).
+- Lifecycle stress on the final code: 20/20 with 12 busy processes
+  (`artifacts/stress/3d4645165309`), 20/20 idle (`48906c384180`).
+- Chromium smoke 3/3 and visible test passed before the final `destroy` wait
+  change. The wait only affects when `destroy` returns.
+
+### Remaining
+
+- If both supervisors are SIGKILLed, processes that cleared their environment
+  escape recovery. A cgroup would close this gap but needs systemd delegation.
+  This has not been done, to stay distribution-neutral.
+
 ## 2026-10-04 — M1 persistent keyboard and safe compositor bindings
 
 **Outcome:** keyboard input no longer uses wtype or fixed sleeps. Each session
@@ -52,7 +97,9 @@ nixpkgs#wayvnc nixpkgs#wlr-randr nixpkgs#chromium`, with no wtype on PATH.
   virtual keyboard cannot prevent that.
 - IME/dead-key composition, apps reading physical layouts and key-repeat timing
   are untested. Xwayland clients are untested.
-- Supervisor crash recovery is still open.
+- Supervisor crash recovery was still open at this stage.
+
+PR #12 passed Ubuntu CI (run `37162378266`) without wtype installed and was merged.
 
 ## 2026-10-04 — M1 absolute pointer and drag
 

@@ -11,7 +11,7 @@ update this status and the development log with completed work and remaining gap
 | Stage | State | Remaining work |
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
-| M1 | Core integrated; subreaper ownership, private bus, persistent virtual pointer/keyboard, drag, safe compositor bindings | Supervisor-crash recovery, visible-mode concurrent host input, other layouts/IME |
+| M1 | Core integrated; subreaper ownership, private bus, persistent virtual pointer/keyboard, drag, safe compositor bindings | Stale-observation protection, visible-mode concurrent host input, IME |
 | M2 | MCP and read-only observer integrated with Ubuntu CI | Integration in the user's chosen client; issue #7 |
 | M3 | Ubuntu headless CLI/MCP verified in CI; disposable Chromium task passed locally | Broader application matrix, distribution setup and daily-use tasks |
 | M4 | Not started | Representative task benchmarks and measured improvements |
@@ -294,7 +294,7 @@ macOS host → managed Linux environment → same runtime
 
 - The planning conversation created no implementation or running desktop. Development subsequently completed the M0 experiment; temporary runtime packages were fetched without host activation. See `DEVELOPMENT_LOG.md`.
 - Development is underway; `START_HERE.md` provides a continuation prompt for the implemented stages and remaining issues.
-- The packaged persistent runtime uses uv-managed Python and headless labwc. Subreaper-based process ownership and persistent session-local input devices are implemented; supervisor-crash recovery remains open; keep improvements grounded in experiments.
+- The packaged persistent runtime uses uv-managed Python and headless labwc. Subreaper-based process ownership and persistent session-local input devices and supervisor-crash recovery are implemented; keep improvements grounded in experiments.
 - If Python is chosen, use `uv`, a uv-managed interpreter, `uv sync` and `uv run`; ignore `.venv`. Keep portable Python metadata. Do not add project Nix files solely to supply Python dependencies.
 - Nix packaging or a NixOS test environment for the actual Linux runtime is a separate legitimate design choice. Follow current user/local instructions.
 - For native wheel loading failures on NixOS, diagnose shared-library requirements and consider centralized workstation configuration rather than embedding machine-specific linker paths in the project.

@@ -201,6 +201,109 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual((fixture_a / "typed.txt").read_text(), "only first")
         self.assertEqual((fixture_b / "typed.txt").read_text(), "only second")
 
+    def test_absolute_pointer_drag_and_scroll_reach_application(self):
+        session = self.new_session()
+        directory = self.root / f"pointer-{session}"
+        directory.mkdir()
+        script = Path(__file__).resolve().parents[1] / "scripts/pointer_fixture.py"
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "foot",
+                "--config=/dev/null",
+                "--maximized",
+                sys.executable,
+                str(script),
+                str(directory),
+            ],
+        )
+        wait_for((directory / "ready").exists)
+        time.sleep(0.4)
+        log = directory / "events.jsonl"
+
+        def complete():
+            # The fixture may be mid-write; ignore an unterminated final line.
+            return log.read_text().split("\n")[:-1] if log.exists() else []
+
+        def events(count):
+            def read():
+                lines = complete()
+                return lines if len(lines) >= count else None
+
+            return [json.loads(line) for line in wait_for(read)]
+
+        def settled():
+            # Wait until no further events arrive, then return all of them.
+            previous = -1
+            while True:
+                time.sleep(0.2)
+                lines = complete()
+                if len(lines) == previous:
+                    return [json.loads(line) for line in lines]
+                previous = len(lines)
+
+        with self.assertRaises(core.DesktopError):
+            core.request(session, "click", x=-1, y=0)
+        core.request(session, "click", x=400, y=300)
+        core.request(session, "click", x=400, y=300)
+        core.request(session, "click", x=800, y=300)
+        clicks = events(6)
+        self.assertEqual([e["pressed"] for e in clicks], [True, False] * 3)
+        # Absolute positioning: repeated clicks land on the same cell.
+        self.assertEqual(clicks[0]["column"], clicks[2]["column"])
+        self.assertEqual(clicks[0]["row"], clicks[4]["row"])
+        self.assertGreater(clicks[4]["column"], clicks[0]["column"])
+
+        core.request(session, "drag", x=300, y=400, to_x=900, to_y=450)
+        drag = settled()[6:]
+        press, release = drag[0], drag[-1]
+        motion = drag[1:-1]
+        self.assertTrue(press["pressed"] and not press["motion"])
+        self.assertFalse(release["pressed"] or release["motion"])
+        self.assertGreaterEqual(len(motion), 3)
+        self.assertTrue(
+            all(e["motion"] and e["pressed"] and e["button"] == 0 for e in motion)
+        )
+        columns = [e["column"] for e in drag]
+        self.assertEqual(columns, sorted(columns))
+        self.assertGreater(release["column"], press["column"])
+        self.assertGreater(release["row"], press["row"])
+
+        before = len(drag) + 6
+        core.request(session, "scroll", dy=120)
+        self.assertTrue(any(e["wheel"] for e in events(before + 1)[before:]))
+
+        for arguments in ({"to_x": 5000, "to_y": 0}, {"to_x": -1, "to_y": 10}):
+            with self.assertRaises(core.DesktopError):
+                core.request(session, "drag", x=10, y=10, **arguments)
+
+    @unittest.skipUnless(shutil.which("wlr-randr"), "wlr-randr unavailable")
+    def test_output_changes_update_bounds_and_scale_fails_closed(self):
+        session = self.new_session()
+        environment = {
+            **os.environ,
+            "WAYLAND_DISPLAY": core.manifest(session)["wayland_display"],
+        }
+
+        def randr(*arguments):
+            subprocess.run(
+                ["wlr-randr", "--output", "HEADLESS-1", *arguments],
+                env=environment,
+                check=True,
+                capture_output=True,
+            )
+
+        randr("--custom-mode", "1024x768")
+        capture = core.request(session, "screenshot")
+        self.assertEqual((capture["width"], capture["height"]), (1024, 768))
+        core.request(session, "click", x=1000, y=700)
+        with self.assertRaises(core.DesktopError):
+            core.request(session, "click", x=1100, y=10)
+        randr("--scale", "2")
+        with self.assertRaisesRegex(core.DesktopError, "scale"):
+            core.request(session, "move", x=10, y=10)
+
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()
         duration = unique_duration()

@@ -75,6 +75,14 @@ def desktop_move(session: str, x: int, y: int) -> dict:
 
 
 @mcp.tool()
+def desktop_drag(
+    session: str, x: int, y: int, to_x: int, to_y: int, button: str = "left"
+) -> dict:
+    """Press at (x, y), move in steps to (to_x, to_y) and release, in the private desktop."""
+    return core.request(session, "drag", x=x, y=y, to_x=to_x, to_y=to_y, button=button)
+
+
+@mcp.tool()
 def desktop_scroll(session: str, dy: int, dx: int = 0) -> dict:
     """Scroll the private desktop at its current pointer location."""
     return core.request(session, "scroll", dy=dy, dx=dx)

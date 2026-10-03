@@ -26,6 +26,7 @@ def main():
         "launch",
         "click",
         "move",
+        "drag",
         "type",
         "key",
         "scroll",
@@ -34,10 +35,13 @@ def main():
         operation.add_argument("session")
         if command == "launch":
             operation.add_argument("argv", nargs=argparse.REMAINDER)
-        elif command in ("click", "move"):
+        elif command in ("click", "move", "drag"):
             operation.add_argument("x", type=int)
             operation.add_argument("y", type=int)
-            if command == "click":
+            if command == "drag":
+                operation.add_argument("to_x", type=int)
+                operation.add_argument("to_y", type=int)
+            if command in ("click", "drag"):
                 operation.add_argument(
                     "--button", default="left", choices=("left", "middle", "right")
                 )

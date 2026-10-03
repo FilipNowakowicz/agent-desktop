@@ -1,5 +1,50 @@
 # Development log
 
+## 2026-10-04 — M1 absolute pointer and drag
+
+**Outcome:** pointer input no longer depends on `wlrctl`. A small dependency-free
+Wayland client (`agent_desktop.wayland`) binds `zwlr_virtual_pointer_manager_v1`
+and `wl_output` on the private socket. It provides absolute moves, clicks, scroll
+and the new `drag` operation (CLI `drag SESSION X Y TO_X TO_Y`, MCP `desktop_drag`).
+Every pointer request finishes with a `wl_display.sync` roundtrip, so "delivered"
+means the compositor processed the events. Whether the application acted on them
+still needs a separate check. `wlrctl` is still used for window listing.
+
+### Decisions and evidence
+
+- **One persistent virtual pointer per session, created before any application.**
+  The first version created a pointer per request. A second click at the same
+  position was then lost, and so was the round-trip test's click after an
+  invalid request. Destroying the seat's only pointer removes its pointer
+  capability, and foot rebinds `wl_pointer` asynchronously, so the next press could
+  arrive without pointer focus. With the persistent pointer the failure did not recur.
+- Absolute motion uses the live output mode as its extent. Before each pointer
+  operation a roundtrip processes pending `wl_output` events. Changes of mode
+  update the bounds; scale other than 1 or more than one output fails closed.
+  Coordinates are no longer checked by taking a screenshot.
+- Drag: move, press, 8–60 interpolated motions about 10 ms apart, then release.
+  Scroll matches `wlrctl` (finger source, axis, frame, axis stop).
+
+### Validation
+
+- `scripts/pointer_fixture.py` enables xterm button-event tracking in foot and records
+  every SGR press/motion/release. Test: repeated absolute clicks hit the same
+  cell; ordering is correct; a drag gives press, ≥3 held-button motions and a release with
+  monotonic columns; scroll produces a wheel event; out-of-bounds drags fail.
+  10/10 idle and 10/10 with 12 busy CPU processes.
+- Full suite: 14 tests, 1 skipped (visible); visible test passed separately.
+- `wlr-randr` 0.5.0 (optional test, added to CI): custom mode 1024×768 changes
+  screenshot size and bounds; scale 2 is rejected.
+- Chromium smoke task now drags across a DOM pointer-event pad: 3/3 reported exactly the
+  requested 427 px over 16–17 `pointermove` events with the button held
+  (`artifacts/browser/089056ae72a1`, `9160edf57803`, `6ffb5ea64282`).
+
+### Remaining
+
+- Keyboard input still uses wtype with fixed delays (next stage).
+- No HiDPI/fractional scaling or multiple outputs; drag speed is fixed; no
+  modifier-held drag.
+
 ## 2026-10-04 — M1 process ownership and private-bus environment
 
 **Outcome:** session teardown now covers processes that daemonize, call `setsid`,
@@ -60,6 +105,9 @@ nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#chromium`; `dbus-daemon` cam
   crashpad, xdg portals, document portal FUSE helper and mako. No Chromium D-Bus
   abort at teardown, no leftover processes or `agent-desktop` mounts.
 
+PR #10 passed Ubuntu CI (run `37161251759`, including 5/5 loaded stress cycles)
+and was merged.
+
 ### Remaining
 
 - If the worker itself is SIGKILLed, its adopted orphans go to init. Only
@@ -69,7 +117,7 @@ nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#chromium`; `dbus-daemon` cam
   manager, host portals) are outside the session tree. The private bus reduces,
   but does not eliminate, this route.
 - Input readiness still relies on fixed wtype delays; the stress runs did not
-  reproduce a dropped or extra character. Drag remains unimplemented.
+  reproduce a dropped or extra character. Drag was unimplemented at this stage.
 
 ## 2026-10-04 — Development handoff and checkout location
 

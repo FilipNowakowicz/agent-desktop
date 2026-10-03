@@ -2,6 +2,7 @@ import argparse
 import json
 
 from .core import DesktopError, create, destroy, logs, request, sessions
+from .viewer import view
 
 
 def main():
@@ -12,6 +13,10 @@ def main():
     for tool in ("labwc", "grim", "wtype", "wlrctl"):
         new.add_argument(f"--{tool}", default=tool)
     sub.add_parser("list")
+    observer = sub.add_parser("view")
+    observer.add_argument("session")
+    observer.add_argument("--wayvnc")
+    observer.add_argument("--viewer")
     for command in (
         "status",
         "windows",
@@ -58,6 +63,8 @@ def main():
             result = logs(args["session"])
         elif command == "destroy":
             result = destroy(args["session"])
+        elif command == "view":
+            result = view(**args)
         else:
             session = args.pop("session")
             if command == "launch" and args["argv"][:1] == ["--"]:

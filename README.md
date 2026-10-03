@@ -34,6 +34,20 @@ opens a nested desktop window that you can inspect and interact with directly.
 Opening that window can change host focus; closing it ends the nested session.
 This is not yet an independent viewer for an existing headless session.
 
+To observe a headless session without forwarding human input, install optional
+`wayvnc` and TigerVNC's `vncviewer`, then run:
+
+```sh
+uv run agent-desktop view SESSION
+```
+
+The observer uses a Unix VNC socket inside the private session runtime directory,
+with input disabled on the server and clipboard transfer/remote resizing disabled
+in the client. It opens no TCP listener. Closing the viewer preserves the desktop.
+TigerVNC's graphical client needs a host X11 display or Xwayland; the applications
+inside the private desktop remain native Wayland. Override optional tools with
+`--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
+
 Each session has private display sockets, D-Bus, configuration and application
 profiles. Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set

@@ -12,7 +12,7 @@ update this status and the development log with completed work and remaining gap
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
 | M1 | Initial core integrated; headless Ubuntu CI passed | Stronger process ownership, input readiness, visible-mode repeatability and drag support |
-| M2 | MCP adapter and real stdio/image round trip passed locally | CI confirmation, integration in the user's chosen client, independent viewer |
+| M2 | MCP integrated with Ubuntu CI; read-only observer passed locally | Viewer CI confirmation, integration in the user's chosen client |
 | M3 | Ubuntu headless CLI verified in CI | Compatibility matrix, distribution setup and real application tasks |
 | M4 | Not started | Representative task benchmarks and measured improvements |
 

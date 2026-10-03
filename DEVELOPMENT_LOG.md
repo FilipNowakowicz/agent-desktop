@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-10-03 — M2 independent read-only observer
+
+Added `agent-desktop view SESSION`, using optional wayvnc and TigerVNC. wayvnc runs
+inside the private desktop and listens only on a Unix socket under its 0700 runtime
+directory. Server-side input is disabled. The graphical client uses ViewOnly,
+disables clipboard transfers and remote resizing, and uses disposable configuration.
+No TCP endpoint or personal viewer configuration is used.
+
+The actual VNC handshake was tested. A client deliberately sending a keyboard
+event could not modify the terminal's next received message; the private input API
+still worked. Disconnecting the observer preserved the session and screenshots.
+The optional graphical smoke test mapped a real TigerVNC window on Hyprland, then
+closed only its own viewer and confirmed that the headless desktop survived.
+Tested optional packages: wayvnc 0.10.1 and TigerVNC 1.16.2, fetched temporarily
+without host activation. The VNC server remains session-owned until teardown.
+
+MCP PR #3 passed Ubuntu CI (run `37159264698`) and was merged. Observer tests are
+added to CI with the distribution wayvnc package; that validation is pending.
+The observer is distinct from the interactive nested testing mode: host input
+cannot be forwarded through this observer, even by a client ignoring ViewOnly.
+
 ## 2026-10-03 — M2 stdio MCP integration
 
 Added `agent-desktop-mcp`, a thin adapter over the persistent core. Tools expose

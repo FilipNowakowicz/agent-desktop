@@ -183,7 +183,7 @@ def sessions():
 
 def logs(session):
     root = session_path(session)
-    files = [root / "session.log", *sorted(root.glob("app-*.log"))]
+    files = sorted(root.glob("*.log"))
     result = {}
     for path in files:
         with path.open("rb") as stream:

@@ -1,0 +1,6 @@
+[project]
+name = "private-agent-desktop"
+version = "0.0.1"
+description = "Experiments for a private Linux desktop for existing agents"
+requires-python = ">=3.12"
+dependencies = []

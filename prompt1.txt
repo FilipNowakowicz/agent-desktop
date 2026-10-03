@@ -1,0 +1,737 @@
+# Project: Linux Agent Runtime with Private Desktop
+
+I want to explore and build an open-source Linux-first tool that gives coding agents such as Codex a private, controllable graphical desktop together with deeper system/debugging capabilities.
+
+Treat this as both a software project and a product/research exploration. Help me refine the architecture and identify existing work before committing to major design decisions. Do not blindly implement everything described below; distinguish the minimal useful core from longer-term ideas.
+
+## Background
+
+My main machine runs NixOS with Hyprland. I already use Codex directly on the system, which is extremely useful because it can inspect and edit my repositories, Nix configuration, logs, processes, run commands, rebuild the system, launch applications, etc.
+
+The major limitation is graphical interaction.
+
+Currently Codex can sometimes launch an application and screenshot it, but to inspect the application it may need to:
+
+1. launch the app into my Hyprland session,
+2. move/focus it on a workspace,
+3. switch my visible workspace,
+4. screenshot my actual display,
+5. inspect the screenshot.
+
+This interferes with what I am doing.
+
+I want to solve this properly.
+
+# Core Idea
+
+Give the coding agent its own **private Linux graphical desktop/session** that runs independently of my physical desktop.
+
+Conceptually:
+
+```text
+Linux host
+│
+├── User desktop
+│   └── Hyprland
+│       └── physical monitor/input
+│
+└── Agent desktop
+    └── headless/virtual Wayland environment
+        ├── applications
+        ├── virtual display
+        ├── virtual keyboard
+        └── virtual mouse
+```
+
+The agent should be able to:
+
+```text
+create desktop
+launch application
+list windows
+inspect desktop
+take screenshot
+move/click mouse
+type text
+send keys
+scroll/drag
+wait for UI changes
+restart application
+destroy desktop
+```
+
+without:
+
+- changing my visible workspace,
+- moving my physical cursor,
+- stealing keyboard focus,
+- requiring the agent's desktop to be displayed on a real monitor.
+
+The virtual desktop must be directly screenshot-able even while completely invisible/headless.
+
+An optional viewer should allow me to watch the agent desktop when desired, without the viewer being necessary for operation.
+
+For example:
+
+```bash
+agent-desktop create
+agent-desktop launch firefox
+agent-desktop screenshot
+agent-desktop windows
+agent-desktop click ...
+agent-desktop type "hello"
+agent-desktop key ctrl+l
+agent-desktop view
+agent-desktop destroy
+```
+
+These commands are illustrative; design a better API if appropriate.
+
+# Agent Integration
+
+The system should eventually expose a clean interface usable by:
+
+- Codex
+- Claude Code
+- other coding agents
+- generic MCP clients
+
+MCP seems like an obvious integration layer, but do not assume it must be the only API.
+
+The underlying functionality should ideally be usable independently of MCP.
+
+Possible architecture:
+
+```text
+Coding Agent
+      │
+      │ MCP / API
+      ▼
+Agent Runtime
+      │
+      ├── desktop session
+      ├── structured UI
+      ├── screenshots
+      ├── input
+      ├── processes
+      ├── logs
+      ├── filesystem observations
+      └── debugging information
+```
+
+# Important Design Principle: Don't Rely Exclusively on Screenshots
+
+Screenshot → vision → coordinate guessing → click should be the fallback, not necessarily the primary interface.
+
+Where possible, expose structured information.
+
+For example:
+
+```text
+Window: Firefox
+PID: 18432
+Geometry: 1280x720
+
+Elements:
+[12] button "Back"
+[13] textbox "Address"
+[14] button "Reload"
+[15] button "Settings"
+```
+
+Then the agent could perform something like:
+
+```text
+click(element=15)
+```
+
+rather than:
+
+```text
+click(x=1174, y=62)
+```
+
+Investigate Linux accessibility APIs and other mechanisms that could provide semantic UI trees.
+
+The ideal observation hierarchy is something like:
+
+```text
+structured state
+    ↓
+window/process metadata
+    ↓
+accessibility/UI tree
+    ↓
+cropped/low-resolution vision
+    ↓
+full screenshot/high-detail vision
+```
+
+Use expensive visual information only when necessary.
+
+# Adaptive Vision / Token Efficiency
+
+Screenshots consume significant model context/tokens.
+
+The system should therefore support:
+
+- screenshots on demand rather than continuous video,
+- screenshots after meaningful state changes,
+- active-window screenshots,
+- region crops,
+- configurable/downscaled resolution,
+- low-detail observation,
+- high-detail observation when requested,
+- UI/accessibility information before vision when possible.
+
+The normal loop should be:
+
+```text
+observe
+→ reason
+→ action
+→ wait for meaningful change
+→ observe
+```
+
+rather than streaming video.
+
+# Linux First
+
+Initial target:
+
+- Linux
+- Wayland
+- NixOS
+- Hyprland
+
+However, do NOT unnecessarily couple the core architecture to NixOS or Hyprland.
+
+NixOS/Hyprland should be the first implementation because that is what I use and can test.
+
+Eventually Linux support could include:
+
+- Hyprland
+- KDE/KWin
+- GNOME/Mutter
+- other Wayland compositors
+
+Potentially design backend interfaces such as:
+
+```text
+DesktopBackend
+    └── LinuxWaylandBackend
+          ├── Hyprland
+          ├── KDE
+          └── GNOME
+```
+
+The project should eventually be usable on ordinary Linux distributions, not only NixOS.
+
+Nix should nevertheless be used heavily where beneficial for:
+
+- development environments,
+- reproducibility,
+- packaging,
+- tests,
+- disposable environments.
+
+A future user experience might eventually be as simple as:
+
+```bash
+nix run github:<repo>
+```
+
+but don't constrain the architecture around this syntax.
+
+Windows/macOS are explicitly NOT initial targets.
+
+The architecture may leave room for future platform backends, but do not spend development effort on them now.
+
+# Security
+
+Desktop control gives an agent significant authority.
+
+Security should therefore be part of the architecture.
+
+Possible concepts:
+
+```text
+observe-only
+app-control
+desktop-control
+system-debug
+full-control
+```
+
+Consider:
+
+- blocked applications,
+- secret/password-manager protection,
+- explicit permission boundaries,
+- destructive-action confirmation,
+- isolation,
+- action logging,
+- auditing,
+- limiting which applications can be launched,
+- limiting host access where appropriate.
+
+Do not let security requirements make the first prototype impossible, but avoid architectural decisions that make safe operation impossible later.
+
+# Bigger Idea: Agent Debugging Environment
+
+The private desktop could eventually become only one capability of a broader **local execution/debugging environment for autonomous coding agents**.
+
+A task environment could contain:
+
+```text
+Agent Task / GitHub Issue
+│
+├── Git worktree
+├── shell
+├── isolated processes
+├── logs
+├── services
+├── network observations
+├── filesystem change tracking
+├── tests
+└── virtual desktop
+```
+
+The agent should use the cheapest/highest-level tool appropriate to the problem:
+
+```text
+source/code
+    ↓
+shell/tests
+    ↓
+system/process observation
+    ↓
+semantic UI
+    ↓
+screenshots/input
+```
+
+GUI interaction should not be required for tasks that don't need it.
+
+# System Observability
+
+A particularly interesting extension is automatically correlating GUI actions with underlying Linux activity.
+
+For example:
+
+```text
+14:03:21.402 CLICK button("Connect")
+14:03:21.437 process opened TCP connection
+14:03:21.481 DBus call
+14:03:21.532 stderr: ConnectionRefused
+14:03:21.540 dialog appeared: "Unable to connect"
+```
+
+Potential observable information:
+
+- process creation/exits,
+- stdout/stderr,
+- journal entries,
+- network connections,
+- ports,
+- filesystem changes,
+- DBus activity,
+- resource usage,
+- application logs,
+- window/UI changes.
+
+This could make the tool substantially more useful for coding agents than generic computer-use software.
+
+Instead of Codex manually executing:
+
+```bash
+ps
+journalctl
+ss
+git diff
+cat logs
+```
+
+the runtime could provide relevant events automatically.
+
+# Debugging Loop
+
+A major target use case:
+
+```text
+Agent receives bug
+        ↓
+launch application
+        ↓
+reproduce bug through UI
+        ↓
+observe UI + system state
+        ↓
+inspect logs/processes/source
+        ↓
+modify code/config/Nix
+        ↓
+build
+        ↓
+restart application
+        ↓
+repeat interaction
+        ↓
+verify fix
+```
+
+All of this should happen without interfering with the user's real desktop.
+
+# Recording and Replay
+
+Potential extension:
+
+Record interaction traces containing:
+
+- actions,
+- semantic UI state,
+- screenshots where useful,
+- logs,
+- process/system events,
+- timing,
+- application version/commit.
+
+Example:
+
+```text
+launch app
+↓
+UI state A
+↓
+click(Settings)
+↓
+UI state B
+↓
+type(...)
+↓
+UI state C
+↓
+error
+```
+
+Potential command:
+
+```bash
+agent-desktop replay trace-283
+```
+
+Possible uses:
+
+- reproduce bugs,
+- compare before/after fixes,
+- attach reproducible traces to GitHub issues,
+- inspect what an autonomous agent actually did.
+
+# GUI Testing
+
+Successful agent interactions could potentially become permanent GUI tests.
+
+Example conceptual format:
+
+```yaml
+app: ./result/bin/my-app
+
+steps:
+  - click: Settings
+  - click: Network
+  - type:
+      field: Server
+      value: localhost
+  - click: Connect
+
+assert:
+  visible: "Connected"
+```
+
+Then:
+
+```bash
+agent-desktop test tests/connect.yaml
+```
+
+Prefer semantic assertions where possible:
+
+```text
+button("Save").enabled == true
+dialog("Error").visible == false
+text("Connected").visible == true
+```
+
+Vision-based assertions should be available for things semantic APIs cannot describe.
+
+This could make the project useful as an AI-friendly Linux GUI testing framework independently of Codex.
+
+# Before/After and PR Comparison
+
+Another possible extension:
+
+Run different code revisions in separate agent environments.
+
+```text
+main
+ └── desktop A
+
+PR branch
+ └── desktop B
+```
+
+Then automatically compare:
+
+- UI states,
+- screenshots,
+- logs,
+- behavior,
+- performance,
+- processes,
+- tests.
+
+Potential conceptual interface:
+
+```bash
+agent-desktop compare main HEAD
+```
+
+This could eventually support automated PR verification.
+
+# Disposable Environments and Snapshots
+
+Explore:
+
+```bash
+agent-desktop snapshot clean
+agent-desktop run ...
+agent-desktop restore clean
+```
+
+The goal is reproducibility.
+
+Potential combination:
+
+```text
+Nix environment
++ source revision
++ filesystem state
++ services
++ desktop state
++ interaction trace
+= reproducible GUI bug
+```
+
+# Parallel Agent Experimentation
+
+Longer-term possibility:
+
+Create multiple environments simultaneously.
+
+```text
+Hypothesis A → environment A
+Hypothesis B → environment B
+Hypothesis C → environment C
+```
+
+Agents could attempt different fixes and compare verification results.
+
+Another possibility:
+
+```text
+implementation agent
+        ↓
+fresh environment
+        ↓
+independent verification agent
+```
+
+This could become useful for autonomous coding workflows.
+
+# Persistent Task Environments
+
+Potentially associate environments with:
+
+- GitHub issues,
+- branches,
+- PRs,
+- agent tasks.
+
+A long-running task could retain:
+
+- running services,
+- logs,
+- state,
+- previous observations,
+- debugging traces.
+
+This could reduce the amount of context an agent has to reconstruct after restarting.
+
+# Existing Technologies to Investigate
+
+Before implementing low-level functionality ourselves, investigate existing Linux projects/primitives for:
+
+- headless Wayland compositors,
+- nested Wayland compositors,
+- virtual/headless outputs,
+- Hyprland headless capabilities,
+- Weston,
+- wlroots,
+- screenshots,
+- PipeWire,
+- accessibility APIs,
+- AT-SPI,
+- virtual input,
+- uinput,
+- ydotool,
+- evemu,
+- window/compositor IPC,
+- sandboxing/containerization.
+
+Also investigate existing AI/computer-use projects and MCP servers.
+
+We previously encountered projects/concepts such as:
+
+- wayland-mcp
+- desktop-mcp
+- codex-desktop-linux
+
+Do not assume they are currently maintained or that the earlier descriptions are completely accurate. Research their current state and other competitors before deciding what to reuse.
+
+The objective is NOT to unnecessarily rewrite working Linux infrastructure.
+
+# Product Differentiation
+
+A simple MCP wrapper around screenshots + ydotool is probably not sufficiently interesting.
+
+Potential differentiation is the combination of:
+
+```text
+private headless Linux desktop
++
+coding-agent integration
++
+semantic UI representation
++
+adaptive vision
++
+host/system observability
++
+reproducible environments
++
+record/replay
++
+GUI testing
++
+automated verification
+```
+
+Individual components likely already exist.
+
+The research question is whether anyone has combined them into a polished **developer-oriented runtime for autonomous coding agents**.
+
+Do not claim novelty without investigating existing work.
+
+# Potential Product Positioning
+
+Initially:
+
+> Give coding agents a private Linux desktop they can see and control without interfering with your desktop.
+
+Potentially later:
+
+> A Linux execution, debugging and verification runtime designed for autonomous coding agents.
+
+The second is considerably broader, so don't start by trying to implement all of it.
+
+# Initial MVP
+
+The first milestone should probably be deliberately small.
+
+Something approximately equivalent to:
+
+```text
+agent-desktop create
+agent-desktop launch <application>
+agent-desktop screenshot
+agent-desktop windows
+agent-desktop click <x> <y>
+agent-desktop type <text>
+agent-desktop key <key>
+agent-desktop scroll ...
+agent-desktop destroy
+```
+
+Requirements:
+
+1. Runs on my NixOS + Hyprland machine.
+2. Creates a genuinely separate graphical environment.
+3. Applications launched there do not appear on my normal desktop.
+4. Agent input does not affect my real keyboard/mouse session.
+5. Screenshots capture the agent desktop without displaying it.
+6. Codex can use these capabilities.
+7. The implementation should not unnecessarily prevent future semantic UI or broader Linux support.
+
+Optional early feature:
+
+```text
+agent-desktop view
+```
+
+so I can observe the private desktop when debugging the tool itself.
+
+# Development Philosophy
+
+Follow these principles:
+
+1. Research existing solutions before implementing infrastructure.
+2. Reuse established Linux primitives wherever possible.
+3. Keep the first working prototype small.
+4. Separate core interfaces from compositor/platform-specific implementations.
+5. Avoid NixOS-only assumptions in core code.
+6. Make the project pleasant to package with Nix.
+7. Build around coding-agent workflows rather than generic RPA.
+8. Prefer structured/semantic information over pixels where possible.
+9. Make actions observable and auditable.
+10. Keep security/isolation in mind from the beginning.
+11. Benchmark assumptions rather than guessing, especially screenshot/token/performance costs.
+12. Write tests for core abstractions as they emerge.
+
+# What I Want You To Do First
+
+Do NOT immediately start implementing the full vision.
+
+Start by:
+
+1. Inspecting the current repository and my environment.
+2. Researching existing projects and Linux primitives that overlap with this idea.
+3. Determining the simplest technically sound way to create a private headless graphical session on NixOS/Wayland that:
+   - can launch normal GUI applications,
+   - can be screenshotted while invisible,
+   - accepts isolated synthetic keyboard/mouse input.
+4. Compare reasonable implementation approaches and their tradeoffs.
+5. Identify what can be reused versus what we should build.
+6. Propose a clean architecture that can grow toward the longer-term vision without overengineering the MVP.
+7. Define concrete MVP acceptance criteria.
+8. Produce a short implementation roadmap.
+9. Identify the riskiest technical assumptions and design small experiments to validate those first.
+10. Only after this investigation, begin implementing the smallest end-to-end prototype.
+
+Keep a document in the repository describing:
+
+- vision,
+- architecture,
+- decisions,
+- alternatives considered,
+- roadmap,
+- open research questions,
+- longer-term ideas from this prompt.
+
+As development progresses, update it rather than allowing important architectural reasoning to exist only in the agent conversation.
+
+The immediate success criterion is simple:
+
+> From my normal Hyprland desktop, Codex can create an invisible private desktop, launch a GUI application inside it, obtain a screenshot of that application, interact with it using isolated keyboard/mouse input, obtain another screenshot showing the result, and tear the environment down — all without changing or interfering with what is displayed on my physical desktop.
+
+Everything beyond that should build on this foundation.

@@ -72,7 +72,10 @@ def create(mode="headless", tools=None):
         raise DesktopError("Mode must be headless or visible")
     paths = {}
     for tool in ("labwc", "grim", "wtype", "wlrctl", "dbus-run-session"):
-        executable = (tools or {}).get(tool, tool)
+        executable = (tools or {}).get(
+            tool,
+            os.environ.get("AGENT_DESKTOP_" + tool.upper().replace("-", "_"), tool),
+        )
         paths[tool] = shutil.which(executable)
         if not paths[tool]:
             raise DesktopError(f"Missing executable: {executable}")

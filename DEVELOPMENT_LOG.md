@@ -1,5 +1,28 @@
 # Development log
 
+## 2026-10-03 — M2 stdio MCP integration
+
+Added `agent-desktop-mcp`, a thin adapter over the persistent core. Tools expose
+create/list/status, launch, windows, screenshot, keyboard and pointer input, logs
+and destroy. Screenshot results include PNG image content and text with dimensions
+and the retained artifact path. The server uses stdio and opens no network endpoint.
+Runtime executable overrides are available through `AGENT_DESKTOP_*` variables.
+
+Selected the official MCP Python SDK's stable v1 API and pinned the dependency to
+`mcp>=1,<2` (resolved to 1.30.0), avoiding an incidental migration to the v2 API.
+The API was checked against installed signatures and the
+[official SDK](https://github.com/modelcontextprotocol/python-sdk).
+
+A real stdio client integration test passed: initialize, discover tools, reject
+an unknown session, create a desktop, launch the native Wayland terminal fixture,
+receive a real PNG block, type exact `MCP café λ`, send Return, receive a left click,
+and destroy the runtime. A second created session remained available after the
+MCP client disconnected; it was explicitly destroyed afterward. This validates
+the transport and tool/image semantics, not every client application's support.
+
+No persistent MCP client configuration was changed. The README supplies a generic
+configuration; a chosen interactive client and an independent viewer remain open.
+
 ## 2026-10-03 — M1 initial persistent runtime and visible testing
 
 Implemented a packaged `agent-desktop` CLI and persistent per-session supervisor.

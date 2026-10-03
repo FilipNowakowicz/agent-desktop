@@ -1,6 +1,7 @@
 """One supervisor, private D-Bus and compositor per session."""
 
 import ctypes
+import hashlib
 import json
 import math
 import os
@@ -14,7 +15,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .wayland import BUTTONS, Keysyms, VirtualKeyboard, VirtualPointer
+from .wayland import BUTTONS, Keysyms, Toplevels, VirtualKeyboard, VirtualPointer
 
 PR_SET_CHILD_SUBREAPER = 36
 
@@ -117,6 +118,13 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
     raise RuntimeError("Session processes remain after cleanup")
 
 
+INPUT_OPERATIONS = ("click", "move", "drag", "scroll", "type", "key")
+
+
+class StaleObservation(RuntimeError):
+    pass
+
+
 class Worker:
     def __init__(self, root):
         self.root = root
@@ -128,6 +136,7 @@ class Worker:
         self.viewer = None
         self.virtual_pointer = None
         self.virtual_keyboard = None
+        self.toplevels = None
         self.keysyms = None
         self.stop = False
 
@@ -231,6 +240,7 @@ class Worker:
                 self.virtual_pointer = VirtualPointer(display)
                 self.virtual_keyboard = VirtualKeyboard(display, self.root)
                 self.keysyms = Keysyms(self.compositor.pid)
+                self.toplevels = Toplevels(display)
                 return
             time.sleep(0.05)
         raise TimeoutError("Private compositor socket did not appear")
@@ -268,13 +278,46 @@ class Worker:
         directory = self.root / "screenshots"
         directory.mkdir(exist_ok=True, mode=0o700)
         path = directory / (uuid.uuid4().hex + ".png")
-        self.command("grim", path)
+        # Retry so the token describes the layout the image actually shows.
+        for _ in range(3):
+            before = self.observation()
+            self.command("grim", path)
+            if self.observation() == before:
+                break
         with path.open("rb") as stream:
             header = stream.read(24)
         if not header.startswith(b"\x89PNG\r\n\x1a\n"):
             raise RuntimeError("Capture did not produce a PNG")
         width, height = struct.unpack(">II", header[16:24])
-        return {"path": str(path), "width": width, "height": height}
+        return {
+            "path": str(path),
+            "width": width,
+            "height": height,
+            "observation": before,
+        }
+
+    def observation(self):
+        """Token for the window layout: output, windows, focus and states.
+
+        Titles are excluded because many applications update them continuously.
+        """
+        self.virtual_pointer.connection.roundtrip()
+        output = self.virtual_pointer.output
+        windows = sorted(
+            (w["id"], w["app_id"], w["states"], w["parent"])
+            for w in self.toplevels.current()
+        )
+        layout = [output["width"], output["height"], output["scale"], windows]
+        return hashlib.sha256(json.dumps(layout).encode()).hexdigest()[:16]
+
+    def check_observation(self, token):
+        if not isinstance(token, str):
+            raise ValueError("Observation must be a token from screenshot")
+        if token != self.observation():
+            raise StaleObservation(
+                "Windows, focus or output changed since that screenshot; "
+                "no input was sent. Take a new screenshot."
+            )
 
     def pointer(self):
         if self.compositor.poll() is not None:
@@ -353,7 +396,17 @@ class Worker:
                 "logs": str(log_path),
             }
         if operation == "windows":
-            return {"windows": self.command("wlrctl", "toplevel", "list").splitlines()}
+            return {"windows": self.toplevels.current()}
+        if operation == "focus":
+            window = request.get("window")
+            if not isinstance(window, str):
+                raise ValueError("Focus requires a window identifier")
+            self.toplevels.activate(window)
+            return {
+                "session": self.info["id"],
+                "operation": operation,
+                "delivered": True,
+            }
         if operation == "screenshot":
             return self.screenshot()
         if operation == "viewer_start":
@@ -405,6 +458,8 @@ class Worker:
             self.viewer.terminate()
             self.viewer.wait(timeout=3)
             raise TimeoutError("Viewer socket did not appear")
+        if operation in INPUT_OPERATIONS and request.get("observation") is not None:
+            self.check_observation(request["observation"])
         if operation in ("click", "move", "drag"):
             button = request.get("button", "left")
             if button not in BUTTONS:
@@ -510,7 +565,7 @@ class Worker:
                     stream.truncate()
 
     def cleanup(self):
-        for device in (self.virtual_pointer, self.virtual_keyboard):
+        for device in (self.virtual_pointer, self.virtual_keyboard, self.toplevels):
             if device:
                 device.close()
         if self.compositor and self.compositor.poll() is None:

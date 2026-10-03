@@ -10,7 +10,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     new = sub.add_parser("create")
     new.add_argument("--mode", choices=("headless", "visible"), default="headless")
-    for tool in ("labwc", "grim", "wlrctl"):
+    for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
     observer = sub.add_parser("view")
@@ -27,6 +27,7 @@ def main():
         "click",
         "move",
         "drag",
+        "focus",
         "type",
         "key",
         "scroll",
@@ -55,6 +56,13 @@ def main():
         elif command == "scroll":
             operation.add_argument("dy", type=int)
             operation.add_argument("--dx", type=int, default=0)
+        elif command == "focus":
+            operation.add_argument("window")
+        if command in ("click", "move", "drag", "type", "key", "scroll"):
+            operation.add_argument(
+                "--observation",
+                help="screenshot token; refuse input if windows or output changed",
+            )
     args = vars(parser.parse_args())
     command = args.pop("command")
     try:

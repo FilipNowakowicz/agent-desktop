@@ -18,6 +18,7 @@ uv run agent-desktop create --mode visible
 # Commands return JSON. Use the returned session identifier:
 uv run agent-desktop launch SESSION -- foot --config=/dev/null
 uv run agent-desktop windows SESSION
+uv run agent-desktop focus SESSION WINDOW_ID
 uv run agent-desktop screenshot SESSION
 uv run agent-desktop type SESSION 'hello café λ'
 uv run agent-desktop key SESSION Return
@@ -33,7 +34,9 @@ uv run agent-desktop list
 Headless mode never opens a host window. Visible mode requires a Wayland host and
 opens a nested desktop window that you can inspect and interact with directly.
 Opening that window can change host focus; closing it ends the nested session.
-This is not yet an independent viewer for an existing headless session.
+While the nested window has host focus, your physical keyboard input also reaches
+the agent's desktop, so do not type into it unintentionally. Use the read-only `view`
+observer below to watch a headless session without this.
 
 To observe a headless session without forwarding human input, install optional
 `wayvnc` and TigerVNC's `vncviewer`, then run:
@@ -61,6 +64,15 @@ Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
 verify its outcome using screenshots or application evidence.
+
+`windows` lists each window's id, title, app_id, states (`activated`, `maximized`,
+`minimized`, `fullscreen`) and parent; `focus` activates one by id. Each screenshot
+returns an `observation` token describing the output and windows (ids, app ids,
+states, parents; not titles). Pass it with `--observation` (CLI) or `observation`
+(MCP) to input requests: if a window appeared, closed or changed focus/state, or
+the output changed, the request fails with `StaleObservation` and sends nothing.
+Changes inside a window are not detected, and a change between the check and the
+input is still possible.
 
 Pointer input uses one persistent wlroots virtual pointer per session with absolute
 coordinates in screenshot pixels. Output mode changes are tracked; anything other
@@ -111,17 +123,16 @@ A generic client configuration looks like:
 
 The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
 visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
-`AGENT_DESKTOP_LABWC`, `AGENT_DESKTOP_GRIM` and `AGENT_DESKTOP_WLRCTL` with their
-executable paths in the client's environment.
+`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the client's environment.
 The protocol is tested with the official Python SDK's stdio client, including
 actual image blocks and observed GUI input. Individual client applications have
 not yet been configured or validated.
 
 ## Run the experiment
 
-The runtime needs `labwc`, `grim`, `wlrctl` and `dbus-daemon`; tests also use `foot`.
-The original M0 experiment script additionally needs `wtype`. Install them using your
-distribution's package manager. Python is managed with uv:
+The runtime needs `labwc`, `grim` and `dbus-daemon`; tests also use `foot`.
+The original M0 experiment script additionally needs `wtype` and `wlrctl`. Install
+them using your distribution's package manager. Python is managed with uv:
 
 ```sh
 uv sync --managed-python
@@ -139,8 +150,8 @@ nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
 uv run agent-desktop create
 ```
 
-Runtime executable paths can be supplied with `--labwc`, `--wlrctl` and `--grim`
-(the M0 script also accepts `--foot` and `--wtype`). The tested NixOS invocation is
+Runtime executable paths can be supplied with `--labwc` and `--grim` (the M0
+script also accepts `--foot`, `--wtype` and `--wlrctl`). The tested NixOS invocation is
 in the development log. Beyond the Ubuntu CI runner, other Linux distributions
 have not yet been tested.
 

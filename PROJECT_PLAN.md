@@ -11,7 +11,7 @@ update this status and the development log with completed work and remaining gap
 | Stage | State | Remaining work |
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
-| M1 | Core integrated; subreaper ownership, private bus, persistent virtual pointer/keyboard, drag, safe compositor bindings | Stale-observation protection, visible-mode concurrent host input, IME |
+| M1 | Core integrated; subreaper ownership, private bus, persistent virtual pointer/keyboard, drag, safe compositor bindings | Hardening items in #5 addressed; open: in-window change detection, IME, Xwayland (M3) |
 | M2 | MCP and read-only observer integrated with Ubuntu CI | Integration in the user's chosen client; issue #7 |
 | M3 | Ubuntu headless CLI/MCP verified in CI; disposable Chromium task passed locally | Broader application matrix, distribution setup and daily-use tasks |
 | M4 | Not started | Representative task benchmarks and measured improvements |

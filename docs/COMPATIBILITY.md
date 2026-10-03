@@ -5,7 +5,7 @@ Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
 | Environment | Observation |
 | --- | --- |
 | NixOS / Hyprland 0.56.2, labwc 0.20.2 / wlroots 0.20.2 | Headless keyboard, mouse, screenshots, concurrent sessions, CLI lifecycle and stdio MCP transport passed locally |
-| Same host, visible nested labwc | Complete round trips passed, but a later run received an extra space; concurrent-input repeatability remains open |
+| Same host, visible nested labwc | Round trips pass when the host keyboard is idle. Host keyboard input reaches the nested session whenever its window has host focus; three 2026-10-04 runs received an extra character decoded with the host keymap |
 | Ubuntu 24.04 GitHub Actions runner, distribution runtime packages | Headless CLI tests passed in run 37159062985; real stdio MCP/image integration passed in run 37159264698 |
 | NixOS / Hyprland, wayvnc 0.10.1 + TigerVNC 1.16.2 | Unix VNC handshake, ignored observer input, viewer disconnect survival and graphical observer window passed locally |
 | NixOS / Chromium 153.0.8010.52, native Wayland, disposable profile | Local HTML form task passed with Unicode text, submitted-title verification, changed screenshot and no owned processes remaining; with `--password-store=basic` after the private-bus fix (3/3 runs, 23 owned processes including crashpad, portals and mako) |

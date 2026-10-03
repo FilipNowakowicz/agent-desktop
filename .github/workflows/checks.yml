@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install desktop runtime
-        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wlrctl wayvnc wlr-randr dbus-daemon fonts-dejavu-core
+        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wayvnc wlr-randr dbus-daemon fonts-dejavu-core
       - name: Record runtime versions
-        run: dpkg-query -W labwc foot grim wlrctl wayvnc wlr-randr dbus-daemon
+        run: dpkg-query -W labwc foot grim wayvnc wlr-randr dbus-daemon
       - run: uv sync --locked --managed-python
       - name: Check Python source
         run: |

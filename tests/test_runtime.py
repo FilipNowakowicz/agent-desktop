@@ -58,7 +58,7 @@ class RoutingTests(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    all(shutil.which(t) for t in ("labwc", "grim", "wlrctl", "foot", "dbus-daemon")),
+    all(shutil.which(t) for t in ("labwc", "grim", "foot", "dbus-daemon")),
     "desktop tools unavailable",
 )
 class RuntimeTests(unittest.TestCase):
@@ -118,7 +118,7 @@ class RuntimeTests(unittest.TestCase):
         fixture = self.fixture(session)
         self.assertTrue(
             any(
-                "Session fixture" in w
+                "Session fixture" in w["title"]
                 for w in core.request(session, "windows")["windows"]
             )
         )
@@ -332,19 +332,11 @@ class RuntimeTests(unittest.TestCase):
                 str(directory),
             ],
         )
-        environment = {
-            **os.environ,
-            "WAYLAND_DISPLAY": core.manifest(session)["wayland_display"],
-        }
         wait_for(directory.joinpath("ready").exists)
         wait_for(
-            lambda: (
-                subprocess.run(
-                    ["wlrctl", "toplevel", "find", f"title:{title}", "state:active"],
-                    env=environment,
-                    capture_output=True,
-                ).returncode
-                == 0
+            lambda: any(
+                w["title"] == title and "activated" in w["states"]
+                for w in core.request(session, "windows")["windows"]
             )
         )
         # No settling delay: the first character must arrive.
@@ -363,6 +355,55 @@ class RuntimeTests(unittest.TestCase):
         core.request(session, "key", key="Return", modifiers=["logo"])
         time.sleep(1)
         self.assertFalse(marker.exists())
+
+    def test_focus_and_stale_observations(self):
+        session = self.new_session()
+        first = self.fixture(session)
+        second = self.root / f"second-{session}"
+        second.mkdir()
+        script = Path(__file__).resolve().parents[1] / "scripts/m0_terminal.py"
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "foot",
+                "--config=/dev/null",
+                "--title=Second fixture",
+                sys.executable,
+                str(script),
+                str(second),
+            ],
+        )
+        wait_for(second.joinpath("ready").exists)
+
+        def windows():
+            return {w["title"]: w for w in core.request(session, "windows")["windows"]}
+
+        wait_for(lambda: "activated" in windows()["Second fixture"]["states"])
+        listed = windows()
+        self.assertEqual(listed["Session fixture"]["app_id"], "foot")
+        self.assertNotIn("activated", listed["Session fixture"]["states"])
+
+        token = core.request(session, "screenshot")["observation"]
+        core.request(session, "move", x=5, y=5, observation=token)
+        core.request(session, "focus", window=listed["Session fixture"]["id"])
+        wait_for(lambda: "activated" in windows()["Session fixture"]["states"])
+        # Focus changed after the screenshot: refuse, and send nothing.
+        with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
+            core.request(session, "type", text="stale", observation=token)
+        with self.assertRaises(core.DesktopError):
+            core.request(session, "focus", window="w999")
+        token = core.request(session, "screenshot")["observation"]
+        core.request(session, "type", text="fresh", observation=token)
+        core.request(session, "key", key="Return", observation=token)
+        wait_for(first.joinpath("typed.txt").exists)
+        self.assertEqual(first.joinpath("typed.txt").read_text(), "fresh")
+        self.assertFalse(second.joinpath("typed.txt").exists())
+        # A newly mapped window also invalidates the token.
+        core.request(session, "launch", argv=["foot", "--config=/dev/null"])
+        wait_for(lambda: len(core.request(session, "windows")["windows"]) == 3)
+        with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
+            core.request(session, "click", x=5, y=5, observation=token)
 
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()

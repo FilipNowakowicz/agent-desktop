@@ -22,6 +22,7 @@ uv run agent-desktop screenshot SESSION
 uv run agent-desktop type SESSION 'hello café λ'
 uv run agent-desktop key SESSION Return
 uv run agent-desktop click SESSION 640 360
+uv run agent-desktop drag SESSION 300 400 900 400
 uv run agent-desktop scroll SESSION 120
 uv run agent-desktop status SESSION
 uv run agent-desktop logs SESSION
@@ -57,8 +58,10 @@ supervisor itself is killed, orphaned processes can escape; see the development 
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
 verify its outcome using screenshots or application evidence.
 
-Coordinates currently assume one output at scale 1. Drag, accessibility trees and
-other keyboard layouts remain unimplemented. Applications run as your user, with
+Pointer input uses one persistent wlroots virtual pointer per session with absolute
+coordinates in screenshot pixels. Output mode changes are tracked; anything other
+than one output at scale 1 is rejected. Accessibility trees and other keyboard
+layouts remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
 Typing is limited to 1000 characters per request with the current paced-input helper.
 

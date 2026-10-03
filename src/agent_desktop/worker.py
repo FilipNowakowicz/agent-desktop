@@ -14,6 +14,8 @@ import time
 import uuid
 from pathlib import Path
 
+from .wayland import BUTTONS, VirtualPointer
+
 PR_SET_CHILD_SUBREAPER = 36
 
 
@@ -121,6 +123,7 @@ class Worker:
         self.compositor = None
         self.apps = {}
         self.viewer = None
+        self.virtual_pointer = None
         self.stop = False
 
     def save(self, status, **values):
@@ -215,6 +218,8 @@ class Worker:
                 self.info["wayland_display"] = str(display)
                 # Activated services get the private display, never the host's.
                 self.start_bus()
+                # Create the pointer before applications so its seat capability is stable.
+                self.virtual_pointer = VirtualPointer(display)
                 return
             time.sleep(0.05)
         raise TimeoutError("Private compositor socket did not appear")
@@ -260,18 +265,27 @@ class Worker:
         width, height = struct.unpack(">II", header[16:24])
         return {"path": str(path), "width": width, "height": height}
 
-    def position(self, x, y):
-        if not all(
-            isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
-            for v in (x, y)
-        ):
-            raise ValueError("Coordinates must be finite numbers")
-        capture = self.screenshot()
-        if not (0 <= x < capture["width"] and 0 <= y < capture["height"]):
-            raise ValueError("Coordinates outside private desktop")
-        # Single output, scale 1. Relative pointer movement supplies the initial MVP.
-        self.command("wlrctl", "pointer", "move", -100000, -100000)
-        self.command("wlrctl", "pointer", "move", x, y)
+    def pointer(self):
+        if self.compositor.poll() is not None:
+            raise RuntimeError("Private compositor has exited")
+        return self.virtual_pointer
+
+    def drag(self, pointer, start, end, button):
+        pointer.move(*start)
+        pointer.sync()
+        pointer.button(button, True)
+        pointer.sync()
+        distance = math.dist(start, end)
+        steps = min(60, max(8, int(distance / 16)))
+        for step in range(1, steps + 1):
+            time.sleep(0.01)
+            pointer.move(
+                round(start[0] + (end[0] - start[0]) * step / steps),
+                round(start[1] + (end[1] - start[1]) * step / steps),
+            )
+        pointer.sync()
+        time.sleep(0.05)
+        pointer.button(button, False)
 
     def handle(self, request):
         operation = request["operation"]
@@ -375,14 +389,34 @@ class Worker:
             self.viewer.terminate()
             self.viewer.wait(timeout=3)
             raise TimeoutError("Viewer socket did not appear")
-        if operation in ("click", "move"):
-            if operation == "click":
-                button = request.get("button", "left")
-                if button not in ("left", "middle", "right"):
-                    raise ValueError("Unsupported mouse button")
-            self.position(request.get("x"), request.get("y"))
-            if operation == "click":
-                self.command("wlrctl", "pointer", "click", button)
+        if operation in ("click", "move", "drag"):
+            button = request.get("button", "left")
+            if button not in BUTTONS:
+                raise ValueError("Unsupported mouse button")
+            names = ("x", "y", "to_x", "to_y") if operation == "drag" else ("x", "y")
+            values = [request.get(name) for name in names]
+            if not all(
+                isinstance(v, (int, float))
+                and not isinstance(v, bool)
+                and math.isfinite(v)
+                for v in values
+            ):
+                raise ValueError("Coordinates must be finite numbers")
+            points = [
+                (int(values[i]), int(values[i + 1])) for i in (0, len(values) - 2)
+            ]
+            pointer = self.pointer()
+            for point in points:
+                pointer.check(*point)
+            if operation == "drag":
+                self.drag(pointer, points[0], points[1], button)
+            else:
+                pointer.move(*points[0])
+                if operation == "click":
+                    pointer.sync()
+                    pointer.button(button, True)
+                    pointer.button(button, False)
+            pointer.sync()
         elif operation == "type":
             text = request.get("text")
             if not isinstance(text, str) or "\0" in text or len(text) > 1000:
@@ -415,7 +449,9 @@ class Worker:
                 raise ValueError(
                     "Scroll distances must be integers between -10000 and 10000"
                 )
-            self.command("wlrctl", "pointer", "scroll", dy, dx)
+            pointer = self.pointer()
+            pointer.scroll(dy, dx)
+            pointer.sync()
         else:
             raise ValueError(f"Unsupported operation: {operation}")
         return {"session": self.info["id"], "operation": operation, "delivered": True}
@@ -466,6 +502,8 @@ class Worker:
                     stream.truncate()
 
     def cleanup(self):
+        if self.virtual_pointer:
+            self.virtual_pointer.close()
         if self.compositor and self.compositor.poll() is None:
             try:
                 self.command("labwc", "-e", timeout=3)

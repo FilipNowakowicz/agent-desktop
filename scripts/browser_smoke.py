@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import time
 import uuid
@@ -26,7 +27,13 @@ def main():
         '<!doctype html><meta charset="utf-8"><title>Private browser fixture - ready</title>'
         '<h1>Private browser fixture</h1><form id="form">'
         '<label>Message <input id="message" autofocus></label><button>Submit</button></form>'
-        '<p id="result"></p><script>form.onsubmit=(event)=>{event.preventDefault();'
+        '<p id="result"></p><div id="pad" style="height:360px;background:#cde">'
+        "Drag here</div><script>let start=null,moves=0;"
+        "pad.onpointerdown=(e)=>{start=e.clientX;moves=0;};"
+        "pad.onpointermove=(e)=>{if(start!==null&&e.buttons===1)moves++;};"
+        'pad.onpointerup=(e)=>{document.title="Private browser fixture - dragged "'
+        '+Math.round(e.clientX-start)+" px in "+moves+" moves";start=null;};'
+        "form.onsubmit=(event)=>{event.preventDefault();"
         'const text=document.getElementById("message").value;'
         'document.getElementById("result").textContent="Received: "+text;'
         'document.title="Private browser fixture - submitted: "+text;};</script>'
@@ -78,6 +85,32 @@ def main():
         else:
             raise RuntimeError("Browser did not submit the expected text")
         report["after"] = core.request(session, "screenshot")
+        # The pad spans the page below the form; drag horizontally across it.
+        width, height = report["after"]["width"], report["after"]["height"]
+        core.request(
+            session,
+            "drag",
+            x=width // 3,
+            y=height * 2 // 3,
+            to_x=width * 2 // 3,
+            to_y=height * 2 // 3,
+        )
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            dragged = [
+                w for w in core.request(session, "windows")["windows"] if "dragged" in w
+            ]
+            if dragged:
+                report["drag_window"] = dragged[0]
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("Browser did not report a pointer drag")
+        distance, moves = map(
+            int, re.search(r"dragged (-?\d+) px in (\d+) moves", dragged[0]).groups()
+        )
+        if not (abs(distance - (width * 2 // 3 - width // 3)) <= 2 and moves >= 3):
+            raise RuntimeError(f"Unexpected drag: {dragged[0]}")
         # Chromium's helpers show whether ownership covers its whole process tree.
         report["session_processes"] = core.request(session, "status")["processes"]
         assert (

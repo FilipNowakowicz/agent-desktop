@@ -53,6 +53,7 @@ class Worker:
         self.env = os.environ.copy()
         self.compositor = None
         self.apps = {}
+        self.viewer = None
         self.stop = False
 
     def save(self, status, **values):
@@ -221,6 +222,50 @@ class Worker:
             return {"windows": self.command("wlrctl", "toplevel", "list").splitlines()}
         if operation == "screenshot":
             return self.screenshot()
+        if operation == "viewer_start":
+            endpoint = Path(self.info["runtime"]) / "vnc.sock"
+            if self.viewer and self.viewer.poll() is None:
+                return {"socket": str(endpoint), "read_only": True}
+            executable = shutil.which(
+                request.get("wayvnc", "wayvnc"), path=self.env.get("PATH")
+            )
+            if not executable:
+                raise ValueError("Missing optional viewer dependency: wayvnc")
+            endpoint.unlink(missing_ok=True)
+            help_result = subprocess.run(
+                [executable, "--help"], capture_output=True, text=True, check=False
+            )
+            flags = [
+                "-u",
+                "-d",
+                "-C",
+                "/dev/null",
+                "-f",
+                "10",
+                "-S",
+                str(Path(self.info["runtime"]) / "vnc-control.sock"),
+            ]
+            if "--disable-resizing" in help_result.stdout:
+                flags.append("-R")
+            with (self.root / "viewer.log").open("ab") as log:
+                self.viewer = subprocess.Popen(
+                    [executable, *flags, str(endpoint)],
+                    env=self.env,
+                    stdout=log,
+                    stderr=log,
+                )
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if self.viewer.poll() is not None:
+                    raise RuntimeError(
+                        f"Viewer server failed; see {self.root / 'viewer.log'}"
+                    )
+                if endpoint.is_socket():
+                    return {"socket": str(endpoint), "read_only": True}
+                time.sleep(0.05)
+            self.viewer.terminate()
+            self.viewer.wait(timeout=3)
+            raise TimeoutError("Viewer socket did not appear")
         if operation in ("click", "move"):
             if operation == "click":
                 button = request.get("button", "left")
@@ -301,7 +346,7 @@ class Worker:
                         pass
 
     def trim_logs(self):
-        for path in [self.root / "session.log", *self.root.glob("app-*.log")]:
+        for path in self.root.glob("*.log"):
             if path.stat().st_size > 1024 * 1024:
                 with path.open("r+b") as stream:
                     stream.seek(-512 * 1024, 2)
@@ -325,6 +370,8 @@ class Worker:
         cleanup_processes(self.info["token"], excluded=protected)
         if self.compositor:
             self.compositor.wait(timeout=3)
+        if self.viewer:
+            self.viewer.wait(timeout=3)
         for process in self.apps.values():
             try:
                 process.wait(timeout=2)

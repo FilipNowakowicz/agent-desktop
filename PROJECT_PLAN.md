@@ -293,8 +293,8 @@ macOS host → managed Linux environment → same runtime
 ## 8. Development conventions and boundaries
 
 - The planning conversation created no implementation or running desktop. Development subsequently completed the M0 experiment; temporary runtime packages were fetched without host activation. See `DEVELOPMENT_LOG.md`.
-- The user chose development as the next step; use the starter prompt for an explicit implementation request in the new chat.
-- M0 uses uv-managed Python and headless labwc. Persistent-runtime packaging and the production input implementation remain open; keep these choices grounded in experiments.
+- Development is underway; `START_HERE.md` provides a continuation prompt for the implemented stages and remaining issues.
+- The packaged persistent runtime uses uv-managed Python and headless labwc. Production input readiness and stronger process ownership remain open; keep improvements grounded in experiments.
 - If Python is chosen, use `uv`, a uv-managed interpreter, `uv sync` and `uv run`; ignore `.venv`. Keep portable Python metadata. Do not add project Nix files solely to supply Python dependencies.
 - Nix packaging or a NixOS test environment for the actual Linux runtime is a separate legitimate design choice. Follow current user/local instructions.
 - For native wheel loading failures on NixOS, diagnose shared-library requirements and consider centralized workstation configuration rather than embedding machine-specific linker paths in the project.

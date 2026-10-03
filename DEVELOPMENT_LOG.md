@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-04 — Development handoff and checkout location
+
+Updated the starter prompt to continue from the implemented stages, with current
+issues and priorities instead of repeating M0. Removed obsolete packaging status
+from the plan. The checkout is moving to `/home/user/private-agent-desktop` at the
+user's request. Historical experiment paths remain unchanged as evidence.
+This documentation change adds no new runtime validation claims.
+
 ## 2026-10-03 — M3 initial real application coverage
 
 Added an opt-in Chromium smoke task with a new private user-data directory, explicit

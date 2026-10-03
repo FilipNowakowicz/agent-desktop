@@ -1,30 +1,32 @@
-# Start development in a new chat
+# Continue development in a new chat
 
-Development update, 2026-10-03: M0 passed and M1's initial persistent runtime is implemented. Read
-`DEVELOPMENT_LOG.md` and the current `PROJECT_PLAN.md` before using the original
-starter prompt below. Continue from the current status rather than repeating completed work.
+Updated: 2026-10-04. The persistent runtime, MCP tools and read-only observer are
+implemented. Continue from the current status rather than repeating completed work.
 
-Open `/home/user/temp/gui` as the workspace and paste the following:
+Open `/home/user/private-agent-desktop` as the workspace and paste the following:
 
 ---
 
-I want to start implementing the private Linux desktop for AI agents that we planned.
+Continue development of the private Linux desktop for existing agents.
 
-Read `PROJECT_PLAN.md` first. Then read `prompt1.txt` and `prompt2.txt` for the full original brainstorm, and `RESEARCH_FINDINGS.md` for earlier competitor research. The newer direction in `PROJECT_PLAN.md` supersedes the older debugging-first recommendation.
+Read `AGENTS.md`, `PROJECT_PLAN.md`, `DEVELOPMENT_LOG.md`, `README.md` and `docs/COMPATIBILITY.md`. Inspect git status, source, GitHub issues and latest checks. The repository is `FilipNowakowicz/private-agent-desktop` and must remain private. `prompt1.txt` and `prompt2.txt` preserve the original brainstorm. The current plan supersedes the older debugging-first recommendation in `RESEARCH_FINDINGS.md`.
 
 The chosen goal is general computer use by existing agents, starting with a private headless Linux desktop that does not interfere with my physical desktop. Develop on Linux and test on my NixOS + Hyprland machine; keep the core usable on other Linux distributions. Do not pivot this into a standalone debugging/testing product or attempt the future Windows/macOS platform now.
 
-Start with milestone M0, then implement the smallest end-to-end version that works:
+The working foundation uses Python/uv and private labwc sessions. Persistent lifecycle, CLI input/screenshots/logs, stdio MCP image blocks, visible nested testing and a read-only viewer exist. Five stage PRs (#1, #2, #3, #4, #8) are merged. Ubuntu CI and a disposable native Wayland Chromium form task passed. Do not restart M0 unless a concrete failure justifies it.
 
-1. Inspect the workspace, applicable instructions and available system tools/versions.
-2. Briefly examine the closest existing implementation and choose a compositor experiment. Reuse Linux infrastructure; do not begin with an elaborate backend framework.
-3. Create a separate invisible session, launch a disposable GUI app, capture a screenshot, send input only to that session, and capture the resulting change.
-4. Verify that my real workspace/focus/pointer were not disturbed and clean up only the session's own resources.
-5. Turn the working experiment into a small CLI/core, then expose it to the agent through MCP. Add an optional viewer after the headless loop works.
+Next priorities:
+
+1. Runtime hardening (#5): input readiness, stronger ownership/cleanup for daemonizing applications, drag and repeated sessions under load. Visible mode has received an extra input character; its cause is unproven.
+2. Interactive client integration (#7): MCP transport works, but no actual interactive client is configured. Determine the intended client before changing its persistent configuration; validate images and a real GUI task. Human takeover/action ownership is not implemented.
+3. Compatibility (#6): more applications, Xwayland, keyboard layouts, resizing/scaling and Linux setup coverage. Terminal and Chromium fixture results do not establish universal support.
+4. Benchmarks (M4): measure real task completion, cleanup failures and required human intervention once the core is dependable.
+
+Continue autonomously with project-local implementation and testing. Use stage branches and PRs, integrate successful stages after required checks, and keep the repo private. Update the plan and development log with completed work, validation, failures and next work. Notify me when my input is needed.
 
 Proceed with project-local implementation and reversible experiments. Do not activate/rebuild my host, alter persistent system permissions, close unrelated apps or use personal browser profiles without specific authorization. If a host change is genuinely necessary, explain the exact change and why after completing the independent work.
 
-Use `uv` if choosing Python and follow my development instructions. No language or compositor has already been selected. Record actual decisions, commands, versions, validation results and remaining failures in the project documents. Keep the original two prompt files unchanged.
+Use uv-managed Python, `uv sync` and `uv run`; follow `AGENTS.md` for commit/PR conventions. Desktop separation is not a filesystem/network security sandbox. Keep the original two prompt files unchanged.
 
 The immediate success criterion is: my agent can launch and operate an application in an invisible private desktop while I continue using my normal desktop, then tear its session down cleanly.
 

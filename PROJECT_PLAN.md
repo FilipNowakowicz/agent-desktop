@@ -1,6 +1,6 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-03. Status: M0 integrated; M1 persistent runtime and visible testing pass locally, with Ubuntu CI being repaired for older labwc. M2 stdio MCP adapter and real protocol-client round trip pass locally. The independent viewer and reliability hardening remain open. See `DEVELOPMENT_LOG.md` for evidence and limitations.
+Updated: 2026-10-03. Status: M0 and initial M1 integrated; M1 headless Ubuntu CI passed. M2 stdio MCP adapter and real protocol-client round trip pass locally. Visible-mode round trips have passed, but a later run received an extra character and remains sensitive to concurrent input. The independent viewer and reliability hardening remain open. See `DEVELOPMENT_LOG.md`.
 
 ## Development status
 
@@ -11,9 +11,9 @@ update this status and the development log with completed work and remaining gap
 | Stage | State | Remaining work |
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
-| M1 | Core implemented; headless and visible local tests passed | CI confirmation; stronger process ownership, input readiness and drag support |
+| M1 | Initial core integrated; headless Ubuntu CI passed | Stronger process ownership, input readiness, visible-mode repeatability and drag support |
 | M2 | MCP adapter and real stdio/image round trip passed locally | CI confirmation, integration in the user's chosen client, independent viewer |
-| M3 | Ubuntu headless CI being validated | Compatibility matrix, distribution setup and real application tasks |
+| M3 | Ubuntu headless CLI verified in CI | Compatibility matrix, distribution setup and real application tasks |
 | M4 | Not started | Representative task benchmarks and measured improvements |
 
 Visible mode is an explicitly requested testing option: a nested labwc window on

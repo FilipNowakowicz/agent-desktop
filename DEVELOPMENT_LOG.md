@@ -23,6 +23,18 @@ the transport and tool/image semantics, not every client application's support.
 No persistent MCP client configuration was changed. The README supplies a generic
 configuration; a chosen interactive client and an independent viewer remain open.
 
+The complete rerun passed all headless/core/MCP tests, but the visible test observed
+` private café λ` (an extra leading space). Concurrent host input can reach a
+nested desktop; this observation does not establish the source of that character.
+Earlier visible round trips passed, but repeatability with a human using the host
+is not established. The visible test remains explicit opt-in and this gap remains
+tracked; it must not be reported as the same isolation guarantee as headless mode.
+
+M1's corrected Ubuntu CI run passed (run `37159062985`), and PR #2 was merged.
+The repository now requires the `runtime` status check and pull requests on main,
+requires linear history and resolved conversations, and rejects force pushes and
+branch deletion. No reviewer count was imposed. The private visibility was verified.
+
 ## 2026-10-03 — M1 initial persistent runtime and visible testing
 
 Implemented a packaged `agent-desktop` CLI and persistent per-session supervisor.

@@ -11,7 +11,7 @@ def main():
     new = sub.add_parser("create")
     new.add_argument("--mode", choices=("headless", "visible"), default="headless")
     for tool in ("labwc", "grim", "wtype", "wlrctl"):
-        new.add_argument(f"--{tool}", default=tool)
+        new.add_argument(f"--{tool}")
     sub.add_parser("list")
     observer = sub.add_parser("view")
     observer.add_argument("session")

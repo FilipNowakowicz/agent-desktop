@@ -18,6 +18,17 @@ Added the compatibility matrix and replayable NixOS runtime-shell instructions.
 The shell supplies Linux desktop executables; Python dependencies still use uv.
 Ubuntu CI validates terminal/core/MCP behavior separately from this Chromium task.
 
+Setup validation also found that CLI defaults masked runtime executable environment
+overrides. The CLI now uses the same override resolution as MCP; a real CLI test
+checks the selected labwc executable. Typing is capped at 1000 characters so its
+paced input stays within the current tool timeout. Viewer helper discovery has a
+deadline and reports its actual log tail on startup failure. CI records package
+versions, and the graphical smoke test verifies ownership of the mapped viewer.
+
+Observer PR #4 passed Ubuntu CI (run `37159636661`) and was merged. Remaining work
+is tracked in issues #5 (runtime hardening), #7 (interactive client/action ownership)
+and #6 (application and Linux compatibility).
+
 ## 2026-10-03 — M2 independent read-only observer
 
 Added `agent-desktop view SESSION`, using optional wayvnc and TigerVNC. wayvnc runs

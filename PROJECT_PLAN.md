@@ -1,6 +1,6 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-03. Status: M0, initial M1 and MCP integration are integrated with passing Ubuntu CI. An independent read-only observer and a scripted Chromium GUI task passed locally. Viewer CI is pending. Interactive nested mode remains sensitive to concurrent input; ownership, input readiness and broader compatibility remain open. See `DEVELOPMENT_LOG.md`.
+Updated: 2026-10-03. Status: M0, initial M1, MCP and the independent observer are integrated with passing Ubuntu CI. A scripted Chromium GUI task passed locally. Interactive nested mode remains sensitive to concurrent input; ownership, input readiness and broader compatibility remain open. See `DEVELOPMENT_LOG.md`.
 
 ## Development status
 
@@ -12,7 +12,7 @@ update this status and the development log with completed work and remaining gap
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
 | M1 | Initial core integrated; headless Ubuntu CI passed | Stronger process ownership, input readiness, visible-mode repeatability and drag support |
-| M2 | MCP integrated with Ubuntu CI; read-only observer passed locally | Viewer CI confirmation, integration in the user's chosen client |
+| M2 | MCP and read-only observer integrated with Ubuntu CI | Integration in the user's chosen client; issue #7 |
 | M3 | Ubuntu headless CLI/MCP verified in CI; disposable Chromium task passed locally | Broader application matrix, distribution setup and daily-use tasks |
 | M4 | Not started | Representative task benchmarks and measured improvements |
 

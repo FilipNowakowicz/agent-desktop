@@ -57,6 +57,7 @@ verify its outcome using screenshots or application evidence.
 Coordinates currently assume one output at scale 1. Drag, accessibility trees and
 other keyboard layouts remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
+Typing is limited to 1000 characters per request with the current paced-input helper.
 
 ## Checks
 

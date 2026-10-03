@@ -3,7 +3,9 @@ name = "private-agent-desktop"
 version = "0.0.1"
 description = "Experiments for a private Linux desktop for existing agents"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "mcp>=1,<2",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -11,6 +13,7 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 agent-desktop = "agent_desktop.cli:main"
+agent-desktop-mcp = "agent_desktop.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_desktop"]

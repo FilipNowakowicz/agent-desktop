@@ -57,6 +57,33 @@ DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
 Integration tests skip when desktop tools are missing. CI installs them explicitly
 on Ubuntu; passing unit-only checks must not be described as a desktop validation.
 
+## MCP
+
+Run the stdio server with `uv run agent-desktop-mcp`. It exposes session lifecycle,
+launch, windows, PNG images with dimensions, input and logs through the same core.
+Desktop sessions persist when an MCP client disconnects; destroy them explicitly.
+
+A generic client configuration looks like:
+
+```json
+{
+  "mcpServers": {
+    "private-desktop": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/private-agent-desktop", "run", "agent-desktop-mcp"]
+    }
+  }
+}
+```
+
+The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
+visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
+`AGENT_DESKTOP_LABWC`, `AGENT_DESKTOP_GRIM`, `AGENT_DESKTOP_WTYPE` and
+`AGENT_DESKTOP_WLRCTL` with their executable paths in the client's environment.
+The protocol is tested with the official Python SDK's stdio client, including
+actual image blocks and observed GUI input. Individual client applications have
+not yet been configured or validated.
+
 ## Run the experiment
 
 Install `labwc`, `foot`, `wtype`, `wlrctl`, `grim` and `dbus-run-session` using your
@@ -88,5 +115,5 @@ sandbox. Applications still run as your user with host filesystem and network ac
 
 ## Next
 
-Expose the persistent core through MCP, exercise the protocol with an actual client,
-and then test real applications. Add an independent viewer after the runtime is dependable.
+Harden session ownership and input readiness, test real applications, and add an
+independent viewer. The current roadmap records which configurations are actually validated.

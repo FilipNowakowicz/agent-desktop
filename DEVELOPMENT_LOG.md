@@ -1,5 +1,47 @@
 # Development log
 
+## 2026-10-04 — M1 structured windows, focus and stale-observation protection
+
+**Outcome:** `wlrctl` is no longer a runtime dependency. A persistent
+`zwlr_foreign_toplevel_manager_v1` client provides a structured window list (stable
+session-local id, title, app_id, states and parent) and a `focus` operation
+(`activate` on the seat). The runtime now needs only labwc, grim and dbus-daemon.
+
+Screenshots return an `observation` token: a hash of output size/scale and each
+window's id, app_id, states and parent. It is computed before and after capture;
+if the two differ, the capture is retried, so the token matches the image. Input
+operations given a token compare it with the current layout and fail with
+`StaleObservation` without sending anything if it differs. Titles are excluded
+because browsers and terminals rewrite them continuously. This catches
+appearing/closing dialogs, focus changes and output resizes. It does not catch
+changes inside a window, and a change between the check and the input is still possible.
+
+### Visible-mode extra input explained
+
+On this branch the opt-in visible test failed 4/4 consecutive runs (one more
+earlier the same day). Each time, one extra character arrived before
+`private café λ`: `l` once and `\x08` (foot's Ctrl+BackSpace) twice. The
+session's virtual keymap contained only the characters of that text at the time,
+so the extra events were decoded with another keymap. The only other keyboard on
+the nested seat is the wlroots Wayland backend's keyboard, which mirrors the
+host seat. The cause is therefore host keyboard input reaching the nested window
+while it has host focus; this also explains the earlier "extra space". Host
+keystrokes were not injected to confirm it, because that would act on the
+physical desktop. Headless sessions and the read-only observer have no host
+keyboard. The README now warns about this for visible mode.
+
+### Validation
+
+Executables came from `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wayvnc
+nixpkgs#wlr-randr nixpkgs#chromium`, with no wlrctl or wtype on PATH.
+
+- Full suite: 18 tests, 1 skipped. New test: two foot windows; structured
+  listing; `focus` changes the activated window; a stale token refuses `type`
+  and nothing reaches either app; a fresh token types into the focused window only;
+  a newly mapped window makes the token stale. 10/10 repeated runs.
+- Chromium smoke 3/3 using structured window titles, including the 427 px drag.
+- Lifecycle stress 10/10 with 12 busy processes.
+
 ## 2026-10-04 — M1 supervisor crash recovery
 
 **Outcome:** a crashed session supervisor no longer leaves the session running.
@@ -44,6 +86,8 @@ test asserts that `destroy` takes less than 2 s; it measured 4.3 s with the bug.
 - If both supervisors are SIGKILLed, processes that cleared their environment
   escape recovery. A cgroup would close this gap but needs systemd delegation.
   This has not been done, to stay distribution-neutral.
+
+PR #13 passed Ubuntu CI (run `37162992248`) and was merged.
 
 ## 2026-10-04 — M1 persistent keyboard and safe compositor bindings
 

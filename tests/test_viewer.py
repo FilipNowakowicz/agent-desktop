@@ -30,7 +30,6 @@ def receive(connection, size):
         for t in (
             "labwc",
             "grim",
-            "wlrctl",
             "foot",
             "dbus-daemon",
             "wayvnc",

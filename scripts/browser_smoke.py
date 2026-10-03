@@ -62,7 +62,7 @@ def main():
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if any(
-                "Private browser fixture - ready" in w
+                "Private browser fixture - ready" in w["title"]
                 for w in core.request(session, "windows")["windows"]
             ):
                 break
@@ -78,7 +78,7 @@ def main():
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             windows = core.request(session, "windows")["windows"]
-            if any(expected in w for w in windows):
+            if any(expected in w["title"] for w in windows):
                 report["observed_windows"] = windows
                 break
             time.sleep(0.1)
@@ -98,7 +98,9 @@ def main():
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             dragged = [
-                w for w in core.request(session, "windows")["windows"] if "dragged" in w
+                w["title"]
+                for w in core.request(session, "windows")["windows"]
+                if "dragged" in w["title"]
             ]
             if dragged:
                 report["drag_window"] = dragged[0]

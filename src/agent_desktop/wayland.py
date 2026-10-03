@@ -347,3 +347,80 @@ class VirtualKeyboard:
         if mask:
             self.modifiers(0)
         self.connection.roundtrip()
+
+
+TOPLEVEL_STATES = {0: "maximized", 1: "minimized", 2: "activated", 3: "fullscreen"}
+
+
+def read_string(payload, offset=0):
+    (length,) = struct.unpack_from("=I", payload, offset)
+    return payload[offset + 4 : offset + 4 + length - 1].decode(errors="replace")
+
+
+class Toplevels:
+    """Live window list from the wlr foreign-toplevel protocol."""
+
+    def __init__(self, display_path):
+        self.connection = Connection(display_path)
+        self.seat = self.connection.bind("wl_seat", 1)
+        manager = self.connection.bind("zwlr_foreign_toplevel_manager_v1", 3)
+        self.connection.listeners[manager] = self.manager_event
+        self.windows = {}  # protocol object id -> window record
+        self.serial = 0
+        self.connection.roundtrip()
+
+    def close(self):
+        self.connection.close()
+
+    def manager_event(self, opcode, payload):
+        if opcode != 0:  # toplevel(new_id)
+            return
+        (handle,) = struct.unpack_from("=I", payload)
+        self.serial += 1
+        window = {
+            "id": f"w{self.serial}",
+            "title": "",
+            "app_id": "",
+            "states": [],
+            "parent": None,
+        }
+        pending = dict(window)
+
+        def event(opcode, payload):
+            if opcode == 0:
+                pending["title"] = read_string(payload)
+            elif opcode == 1:
+                pending["app_id"] = read_string(payload)
+            elif opcode == 4:
+                (length,) = struct.unpack_from("=I", payload)
+                values = struct.unpack_from(f"={length // 4}I", payload, 4)
+                pending["states"] = sorted(
+                    TOPLEVEL_STATES[v] for v in values if v in TOPLEVEL_STATES
+                )
+            elif opcode == 5:  # done: apply the atomic update
+                self.windows[handle] = dict(pending)
+            elif opcode == 6:  # closed
+                self.windows.pop(handle, None)
+                self.connection.listeners.pop(handle, None)
+                self.connection.send(handle, 6)  # destroy
+            elif opcode == 7:
+                (parent,) = struct.unpack_from("=I", payload)
+                pending["parent"] = parent or None
+
+        self.connection.listeners[handle] = event
+
+    def current(self):
+        self.connection.roundtrip()
+        by_handle = {h: w["id"] for h, w in self.windows.items()}
+        return [
+            {**w, "parent": by_handle.get(w["parent"])} for w in self.windows.values()
+        ]
+
+    def activate(self, window_id):
+        self.connection.roundtrip()
+        for handle, window in self.windows.items():
+            if window["id"] == window_id:
+                self.connection.send(handle, 4, struct.pack("=I", self.seat))
+                self.connection.roundtrip()
+                return
+        raise ValueError(f"Unknown window: {window_id}")

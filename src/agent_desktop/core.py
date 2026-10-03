@@ -71,7 +71,7 @@ def create(mode="headless", tools=None):
     if mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
     paths = {}
-    for tool in ("labwc", "grim", "wlrctl", "dbus-daemon"):
+    for tool in ("labwc", "grim", "dbus-daemon"):
         executable = (tools or {}).get(tool) or os.environ.get(
             "AGENT_DESKTOP_" + tool.upper().replace("-", "_"), tool
         )

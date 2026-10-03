@@ -4,9 +4,13 @@ Speaks just enough of the wire protocol to bind wl_output and
 zwlr_virtual_pointer_manager_v1 on one private compositor socket.
 """
 
+import array
+import ctypes
 import socket
 import struct
+import tempfile
 import time
+from pathlib import Path
 
 BUTTONS = {"left": 0x110, "right": 0x111, "middle": 0x112}
 VERTICAL, HORIZONTAL = 0, 1
@@ -59,9 +63,16 @@ class Connection:
         self.next_id += 1
         return value
 
-    def send(self, obj, opcode, payload=b""):
+    def send(self, obj, opcode, payload=b"", fd=None):
         size = 8 + len(payload)
-        self.socket.sendall(struct.pack("=II", obj, size << 16 | opcode) + payload)
+        message = struct.pack("=II", obj, size << 16 | opcode) + payload
+        if fd is None:
+            self.socket.sendall(message)
+            return
+        rights = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", [fd]))]
+        sent = self.socket.sendmsg([message], rights)
+        if sent < len(message):
+            self.socket.sendall(message[sent:])
 
     def bind(self, interface, version):
         if interface not in self.globals:
@@ -202,4 +213,137 @@ class VirtualPointer:
 
     def sync(self):
         """Wait until the compositor has processed every request sent so far."""
+        self.connection.roundtrip()
+
+
+MODIFIERS = {"shift": 1, "ctrl": 4, "alt": 8, "logo": 64}
+CONTROL_KEYSYMS = {"\n": 0xFF0D, "\t": 0xFF09, "\b": 0xFF08, "\x1b": 0xFF1B}
+# X11 clients cannot use keycodes above 255; xkb keycode = evdev code + 8.
+MAX_KEYS = 255 - 8
+
+
+def char_keysym(character):
+    """Keysym for one character, matching xkbcommon's Unicode fallback rules."""
+    if character in CONTROL_KEYSYMS:
+        return CONTROL_KEYSYMS[character]
+    point = ord(character)
+    if point < 0x20 or 0x7F <= point < 0xA0 or 0xD800 <= point < 0xE000:
+        raise ValueError(f"Cannot type control character U+{point:04X}")
+    return point if point < 0x100 else 0x1000000 | point
+
+
+class Keysyms:
+    """Resolve keysym names with the libxkbcommon already loaded by the compositor."""
+
+    def __init__(self, compositor_pid):
+        library = None
+        try:
+            for line in Path(f"/proc/{compositor_pid}/maps").read_text().splitlines():
+                path = line.split()[-1]
+                if "/libxkbcommon.so" in path:
+                    library = path
+                    break
+        except OSError:
+            pass
+        if not library:
+            raise WaylandError("Cannot locate the compositor's libxkbcommon")
+        self.library = ctypes.CDLL(library)
+        self.library.xkb_keysym_from_name.restype = ctypes.c_uint32
+        self.library.xkb_keysym_from_name.argtypes = [ctypes.c_char_p, ctypes.c_int]
+
+    def resolve(self, name):
+        keysym = self.library.xkb_keysym_from_name(name.encode(), 0)
+        if not keysym:
+            raise ValueError(f"Unknown key name: {name}")
+        return keysym
+
+
+class VirtualKeyboard:
+    """A persistent virtual keyboard with a cumulative one-key-per-keysym keymap.
+
+    Keymap uploads and key events share one ordered connection, so a client
+    always receives the keymap before the keys that need it.
+    """
+
+    def __init__(self, display_path, scratch_directory):
+        self.connection = Connection(display_path)
+        self.scratch = scratch_directory
+        seat = self.connection.bind("wl_seat", 1)
+        manager = self.connection.bind("zwp_virtual_keyboard_manager_v1", 1)
+        self.id = self.connection.new_id()
+        self.connection.send(manager, 0, struct.pack("=II", seat, self.id))
+        self.keys = []
+        self.uploaded = None
+        self.upload()
+        self.connection.roundtrip()
+
+    def close(self):
+        self.connection.close()
+
+    def keymap(self):
+        count = max(1, len(self.keys))
+        lines = [
+            "xkb_keymap {",
+            'xkb_keycodes "(unnamed)" {',
+            f"minimum = 8; maximum = {count + 8};",
+            *(f"<K{i}> = {i + 8};" for i in range(1, count + 1)),
+            "};",
+            'xkb_types "(unnamed)" { include "complete" };',
+            'xkb_compatibility "(unnamed)" { include "complete" };',
+            'xkb_symbols "(unnamed)" {',
+            *(f"key <K{i}> {{[0x{k:x}]}};" for i, k in enumerate(self.keys, 1)),
+            "};",
+            "};",
+        ]
+        return ("\n".join(lines) + "\n").encode() + b"\0"
+
+    def upload(self):
+        data = self.keymap()
+        with tempfile.TemporaryFile(dir=self.scratch) as stream:
+            stream.write(data)
+            stream.flush()
+            # zwp_virtual_keyboard_v1.keymap(format=xkb_v1, fd, size)
+            self.connection.send(
+                self.id, 0, struct.pack("=II", 1, len(data)), fd=stream.fileno()
+            )
+            self.connection.roundtrip()
+        self.uploaded = list(self.keys)
+
+    def codes(self, keysyms):
+        """Evdev codes for keysyms, uploading a new keymap only when needed."""
+        missing = [k for k in dict.fromkeys(keysyms) if k not in self.keys]
+        if missing:
+            if len(self.keys) + len(missing) > MAX_KEYS:
+                self.keys = list(dict.fromkeys(keysyms))
+                if len(self.keys) > MAX_KEYS:
+                    raise ValueError("Too many distinct characters in one chunk")
+            else:
+                self.keys += missing
+            self.upload()
+        return [self.keys.index(k) + 1 for k in keysyms]
+
+    def tap(self, code):
+        self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 1))
+        self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 0))
+
+    def modifiers(self, mask):
+        self.connection.send(self.id, 2, struct.pack("=IIII", mask, 0, 0, 0))
+
+    def type(self, text):
+        keysyms = [char_keysym(c) for c in text]
+        for start in range(0, len(keysyms), MAX_KEYS):
+            for code in self.codes(keysyms[start : start + MAX_KEYS]):
+                self.tap(code)
+        self.connection.roundtrip()
+
+    def key(self, keysym, modifiers=()):
+        (code,) = self.codes([keysym])
+        mask = 0
+        for name in modifiers:
+            mask |= MODIFIERS[name]
+        if mask:
+            self.modifiers(mask)
+        self.tap(code)
+        if mask:
+            self.modifiers(0)
         self.connection.roundtrip()

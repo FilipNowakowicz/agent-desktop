@@ -10,7 +10,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     new = sub.add_parser("create")
     new.add_argument("--mode", choices=("headless", "visible"), default="headless")
-    for tool in ("labwc", "grim", "wtype", "wlrctl"):
+    for tool in ("labwc", "grim", "wlrctl"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
     observer = sub.add_parser("view")

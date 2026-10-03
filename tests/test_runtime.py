@@ -58,10 +58,7 @@ class RoutingTests(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    all(
-        shutil.which(t)
-        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-daemon")
-    ),
+    all(shutil.which(t) for t in ("labwc", "grim", "wlrctl", "foot", "dbus-daemon")),
     "desktop tools unavailable",
 )
 class RuntimeTests(unittest.TestCase):
@@ -303,6 +300,66 @@ class RuntimeTests(unittest.TestCase):
         randr("--scale", "2")
         with self.assertRaisesRegex(core.DesktopError, "scale"):
             core.request(session, "move", x=10, y=10)
+
+    def test_keyboard_is_ready_once_window_is_active(self):
+        # labwc's default W-Return binding runs this; it must never be reached.
+        bindir = self.root / "bin"
+        bindir.mkdir()
+        marker = self.root / "default-binding-ran"
+        fake = bindir / "lab-sensible-terminal"
+        fake.write_text(f"#!/bin/sh\ntouch {marker}\n")
+        fake.chmod(0o755)
+        path = os.environ["PATH"]
+        os.environ["PATH"] = f"{bindir}:{path}"
+        self.addCleanup(os.environ.__setitem__, "PATH", path)
+        session = self.new_session()
+        directory = self.root / f"keys-{session}"
+        directory.mkdir()
+        script = Path(__file__).resolve().parents[1] / "scripts/m0_terminal.py"
+        title = f"Keyboard fixture {session}"
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "foot",
+                "--config=/dev/null",
+                f"--title={title}",
+                sys.executable,
+                str(script),
+                str(directory),
+            ],
+        )
+        environment = {
+            **os.environ,
+            "WAYLAND_DISPLAY": core.manifest(session)["wayland_display"],
+        }
+        wait_for(directory.joinpath("ready").exists)
+        wait_for(
+            lambda: (
+                subprocess.run(
+                    ["wlrctl", "toplevel", "find", f"title:{title}", "state:active"],
+                    env=environment,
+                    capture_output=True,
+                ).returncode
+                == 0
+            )
+        )
+        # No settling delay: the first character must arrive.
+        core.request(session, "type", text="discarded")
+        core.request(session, "key", key="u", modifiers=["ctrl"])
+        with self.assertRaises(core.DesktopError):
+            core.request(session, "key", key="NotARealKeyName")
+        # More distinct characters than one keymap holds, plus repeats.
+        wide = "".join(chr(0x4E00 + i) for i in range(300))
+        text = f"aa café λ {wide} zz"
+        core.request(session, "type", text=text)
+        core.request(session, "key", key="Return")
+        wait_for(directory.joinpath("typed.txt").exists)
+        self.assertEqual(directory.joinpath("typed.txt").read_text(), text)
+        # Without labwc's default bindings, logo+Return launches nothing.
+        core.request(session, "key", key="Return", modifiers=["logo"])
+        time.sleep(1)
+        self.assertFalse(marker.exists())
 
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()

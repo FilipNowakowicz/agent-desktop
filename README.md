@@ -53,17 +53,24 @@ Each session has private display sockets, D-Bus, configuration and application
 profiles. The session supervisor is a child subreaper and starts the private bus
 itself, so daemonizing applications and D-Bus-activated services remain in its
 process tree and are stopped at teardown. `status` lists those processes. If the
-supervisor itself is killed, orphaned processes can escape; see the development log. Screenshots and bounded log tails remain in
+supervisor itself is killed, orphaned processes can escape; see the development log.
+Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
 verify its outcome using screenshots or application evidence.
 
 Pointer input uses one persistent wlroots virtual pointer per session with absolute
 coordinates in screenshot pixels. Output mode changes are tracked; anything other
-than one output at scale 1 is rejected. Accessibility trees and other keyboard
-layouts remain unimplemented. Applications run as your user, with
+than one output at scale 1 is rejected.
+
+Keyboard input uses one persistent virtual keyboard per session. Typed text gets a
+generated keymap with one key per character, so it does not depend on a keyboard
+layout; up to 10000 characters per request, without fixed delays. `key` accepts
+XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
+modifiers. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
+default bindings, which execute host commands such as `brightnessctl`, are not loaded.
+Accessibility trees remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
-Typing is limited to 1000 characters per request with the current paced-input helper.
 
 ## Checks
 
@@ -101,15 +108,16 @@ A generic client configuration looks like:
 
 The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
 visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
-`AGENT_DESKTOP_LABWC`, `AGENT_DESKTOP_GRIM`, `AGENT_DESKTOP_WTYPE` and
-`AGENT_DESKTOP_WLRCTL` with their executable paths in the client's environment.
+`AGENT_DESKTOP_LABWC`, `AGENT_DESKTOP_GRIM` and `AGENT_DESKTOP_WLRCTL` with their
+executable paths in the client's environment.
 The protocol is tested with the official Python SDK's stdio client, including
 actual image blocks and observed GUI input. Individual client applications have
 not yet been configured or validated.
 
 ## Run the experiment
 
-Install `labwc`, `foot`, `wtype`, `wlrctl`, `grim` and `dbus-daemon` using your
+The runtime needs `labwc`, `grim`, `wlrctl` and `dbus-daemon`; tests also use `foot`.
+The original M0 experiment script additionally needs `wtype`. Install them using your
 distribution's package manager. Python is managed with uv:
 
 ```sh
@@ -128,9 +136,10 @@ nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
 uv run agent-desktop create
 ```
 
-Executable paths can be supplied with `--labwc`, `--foot`, `--wtype`, `--wlrctl`
-and `--grim`. The tested NixOS invocation is in the development log. Other Linux
-distributions have not yet been tested.
+Runtime executable paths can be supplied with `--labwc`, `--wlrctl` and `--grim`
+(the M0 script also accepts `--foot` and `--wtype`). The tested NixOS invocation is
+in the development log. Beyond the Ubuntu CI runner, other Linux distributions
+have not yet been tested.
 
 The experiment creates a temporary headless labwc session with software rendering,
 a private runtime directory, disposable home/configuration and a separate D-Bus

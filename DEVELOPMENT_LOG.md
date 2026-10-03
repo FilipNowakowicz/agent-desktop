@@ -1,5 +1,59 @@
 # Development log
 
+## 2026-10-04 — M1 persistent keyboard and safe compositor bindings
+
+**Outcome:** keyboard input no longer uses wtype or fixed sleeps. Each session
+creates one `zwp_virtual_keyboard_v1` (with the pointer, before applications)
+and keeps a cumulative keymap with one keycode per keysym. A new keymap is
+uploaded only when new characters appear, on the same ordered connection as the keys,
+followed by a sync roundtrip. With the old wtype path, every request created a new
+virtual keyboard and relied on a 200 ms start delay and 20 ms per key.
+
+### Decisions
+
+- Typed characters map to numeric keysyms with xkbcommon's Unicode rules
+  (Latin-1 direct, otherwise `0x1000000 | codepoint`; newline, tab, backspace and
+  escape map to their function keysyms). Numeric keysyms in `xkb_symbols` were
+  verified with xkbcommon 1.13.2. Text is layout-independent; limit raised to
+  10000 characters.
+- At most 247 keys (keycodes 9–255, for X11 compatibility). When a chunk needs
+  more, the keymap is replaced by that chunk's characters.
+- `key` names are resolved with `xkb_keysym_from_name` from the libxkbcommon that the
+  compositor already maps (found in `/proc/PID/maps`), so an invalid name fails
+  before a broken keymap can reach clients. Modifiers use the virtual keyboard
+  modifier request (shift 1, ctrl 4, alt 8, logo 64), as wtype did.
+- The keymap is passed via `SCM_RIGHTS` from an unlinked file in the session
+  state directory: `os.memfd_create` is also unavailable in the uv CPython build.
+- **Host-interference fix:** `rc.xml` used `<keyboard><default/>`. labwc 0.20.2's
+  defaults include Execute bindings: `W-Return` → `lab-sensible-terminal`, audio
+  keys → `pactl`, brightness keys → `brightnessctl`. An agent's key request
+  could therefore run host commands, including changing physical backlight. Now
+  only A-Tab, A-S-Tab and A-F4 are bound. A test puts a fake
+  `lab-sensible-terminal` on PATH; it ran with the old config (test failed) and
+  did not run with the new one. Brightness/audio keys were not sent during testing.
+
+### Validation
+
+Executables came from `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wlrctl
+nixpkgs#wayvnc nixpkgs#wlr-randr nixpkgs#chromium`, with no wtype on PATH.
+
+- Full suite: 15 tests, 1 skipped (visible); visible test passed separately.
+- Keyboard test (type immediately once foot is `state:active`, Ctrl-U line kill,
+  invalid key, `aa café λ` + 300 distinct CJK ideographs + `zz`, exact receipt):
+  10/10 idle, 10/10 with 12 busy CPU processes.
+- With the same 12 busy processes: lifecycle stress 20/20
+  (`artifacts/stress/397c9ca2d3dd`, median 1.86 s); Chromium smoke 3/3 including
+  `browser café λ` and the 427 px drag.
+
+### Remaining
+
+- The unexplained extra character in visible mode is not reproduced. A plausible but
+  unproven cause is host keyboard input reaching the focused nested window; the
+  virtual keyboard cannot prevent that.
+- IME/dead-key composition, apps reading physical layouts and key-repeat timing
+  are untested. Xwayland clients are untested.
+- Supervisor crash recovery is still open.
+
 ## 2026-10-04 — M1 absolute pointer and drag
 
 **Outcome:** pointer input no longer depends on `wlrctl`. A small dependency-free
@@ -41,9 +95,11 @@ still needs a separate check. `wlrctl` is still used for window listing.
 
 ### Remaining
 
-- Keyboard input still uses wtype with fixed delays (next stage).
+- Keyboard input still used wtype with fixed delays at this stage.
 - No HiDPI/fractional scaling or multiple outputs; drag speed is fixed; no
   modifier-held drag.
+
+PR #11 passed Ubuntu CI (run `37161930144`; wlr-randr 0.3.0 test ran) and was merged.
 
 ## 2026-10-04 — M1 process ownership and private-bus environment
 

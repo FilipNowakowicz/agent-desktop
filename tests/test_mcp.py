@@ -18,10 +18,7 @@ from agent_desktop.worker import owned_processes
 
 
 @unittest.skipUnless(
-    all(
-        shutil.which(t)
-        for t in ("labwc", "grim", "wtype", "wlrctl", "foot", "dbus-daemon")
-    ),
+    all(shutil.which(t) for t in ("labwc", "grim", "wlrctl", "foot", "dbus-daemon")),
     "desktop tools unavailable",
 )
 class MCPTests(unittest.IsolatedAsyncioTestCase):

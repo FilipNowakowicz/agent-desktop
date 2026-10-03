@@ -233,7 +233,11 @@ class Worker:
                 raise ValueError("Missing optional viewer dependency: wayvnc")
             endpoint.unlink(missing_ok=True)
             help_result = subprocess.run(
-                [executable, "--help"], capture_output=True, text=True, check=False
+                [executable, "--help"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=3,
             )
             flags = [
                 "-u",
@@ -257,8 +261,9 @@ class Worker:
             deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
                 if self.viewer.poll() is not None:
+                    detail = (self.root / "viewer.log").read_text()[-4096:]
                     raise RuntimeError(
-                        f"Viewer server failed; see {self.root / 'viewer.log'}"
+                        f"Viewer server failed; see {self.root / 'viewer.log'}\n{detail}"
                     )
                 if endpoint.is_socket():
                     return {"socket": str(endpoint), "read_only": True}
@@ -276,9 +281,9 @@ class Worker:
                 self.command("wlrctl", "pointer", "click", button)
         elif operation == "type":
             text = request.get("text")
-            if not isinstance(text, str) or "\0" in text or len(text) > 16384:
+            if not isinstance(text, str) or "\0" in text or len(text) > 1000:
                 raise ValueError(
-                    "Text must be a string of at most 16384 characters without NUL"
+                    "Text must be a string of at most 1000 characters without NUL"
                 )
             self.command("wtype", "-s", "200", "-d", "20", "--", text, timeout=25)
         elif operation == "key":

@@ -57,6 +57,7 @@ verify its outcome using screenshots or application evidence.
 Coordinates currently assume one output at scale 1. Drag, accessibility trees and
 other keyboard layouts remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
+Typing is limited to 1000 characters per request with the current paced-input helper.
 
 ## Checks
 
@@ -109,6 +110,16 @@ uv run scripts/m0_headless.py
 uv run scripts/m0_headless.py --text 'agent café λ 123'
 ```
 
+On NixOS, an optional temporary shell can supply the actual desktop runtime tools.
+Python and project dependencies remain managed with uv:
+
+```sh
+nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
+  nixpkgs#wayvnc nixpkgs#tigervnc --command zsh
+# Inside that temporary shell:
+uv run agent-desktop create
+```
+
 Executable paths can be supplied with `--labwc`, `--foot`, `--wtype`, `--wlrctl`
 and `--grim`. The tested NixOS invocation is in the development log. Other Linux
 distributions have not yet been tested.
@@ -129,5 +140,19 @@ sandbox. Applications still run as your user with host filesystem and network ac
 
 ## Next
 
-Harden session ownership and input readiness, test real applications, and add an
-independent viewer. The current roadmap records which configurations are actually validated.
+Harden session ownership and input readiness, expand application coverage, and
+validate an interactive MCP client. See [the compatibility matrix](docs/COMPATIBILITY.md)
+for tested configurations and [the roadmap](PROJECT_PLAN.md) for remaining stages.
+
+For a scripted Chromium GUI task with a disposable profile and local HTML fixture:
+
+```sh
+uv run scripts/browser_smoke.py
+```
+
+For an optional graphical observer smoke test on Hyprland (opens and closes its
+own viewer window):
+
+```sh
+uv run scripts/viewer_smoke.py
+```

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -142,6 +143,27 @@ class RuntimeTests(unittest.TestCase):
 
     def test_headless_round_trip(self):
         self.exercise("headless")
+
+    def test_cli_honors_runtime_executable_environment(self):
+        alias = self.root / "chosen-labwc"
+        alias.symlink_to(shutil.which("labwc"))
+        environment = os.environ.copy()
+        environment["AGENT_DESKTOP_LABWC"] = str(alias)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from agent_desktop.cli import main; raise SystemExit(main())",
+                "create",
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        session = json.loads(result.stdout)["session"]
+        self.created.append(session)
+        self.assertEqual(core.manifest(session)["tools"]["labwc"], str(alias))
 
     @unittest.skipUnless(
         os.environ.get("DESKTOP_TEST_VISIBLE") == "1", "visible mode opt-in"

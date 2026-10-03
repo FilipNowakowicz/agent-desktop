@@ -1,5 +1,34 @@
 # Development log
 
+## 2026-10-03 — M3 initial real application coverage
+
+Added an opt-in Chromium smoke task with a new private user-data directory, explicit
+native Wayland mode and a local HTML form. No personal profile was accessed, and
+the browser sandbox was not disabled. The task typed `browser café λ`, submitted
+the form through keyboard navigation, observed the expected submitted window title
+and produced a changed screenshot. The final screenshot was visually inspected.
+
+Observed version: Chromium 153.0.8010.52. Evidence is retained in
+`artifacts/browser/cfac3e875848/`, including JSON report, before/after PNGs and logs.
+Teardown removed the runtime and browser profile; the final owned-process scan
+was empty. This is one scripted task, not a claim of general browser reliability
+or model-agent completion rates. Chromium is an optional smoke-test dependency.
+
+Added the compatibility matrix and replayable NixOS runtime-shell instructions.
+The shell supplies Linux desktop executables; Python dependencies still use uv.
+Ubuntu CI validates terminal/core/MCP behavior separately from this Chromium task.
+
+Setup validation also found that CLI defaults masked runtime executable environment
+overrides. The CLI now uses the same override resolution as MCP; a real CLI test
+checks the selected labwc executable. Typing is capped at 1000 characters so its
+paced input stays within the current tool timeout. Viewer helper discovery has a
+deadline and reports its actual log tail on startup failure. CI records package
+versions, and the graphical smoke test verifies ownership of the mapped viewer.
+
+Observer PR #4 passed Ubuntu CI (run `37159636661`) and was merged. Remaining work
+is tracked in issues #5 (runtime hardening), #7 (interactive client/action ownership)
+and #6 (application and Linux compatibility).
+
 ## 2026-10-03 — M2 independent read-only observer
 
 Added `agent-desktop view SESSION`, using optional wayvnc and TigerVNC. wayvnc runs

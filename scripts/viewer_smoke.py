@@ -39,11 +39,18 @@ def main():
                         text=True,
                     ).stdout
                 )
-                if any(
-                    "WayVNC" in client.get("title", "")
-                    and "vnc" in client.get("class", "").lower()
-                    for client in clients
-                ):
+                owned_windows = []
+                for client in clients:
+                    try:
+                        stat = (
+                            Path("/proc") / str(client.get("pid")) / "stat"
+                        ).read_text()
+                        parent = int(stat.rsplit(")", 1)[1].split()[1])
+                        if parent == process.pid:
+                            owned_windows.append(client)
+                    except (OSError, ValueError, IndexError):
+                        continue
+                if any("WayVNC" in client.get("title", "") for client in owned_windows):
                     observed = True
                     break
                 time.sleep(0.1)

@@ -147,7 +147,10 @@ def create(mode="headless", tools=None):
                 "logs": str(root / "session.log"),
             }
         if process.poll() is not None or latest["status"] == "failed":
-            raise DesktopError(f"Session startup failed; see {root / 'session.log'}")
+            detail = logs(session).get("session.log", "")[-4096:]
+            raise DesktopError(
+                f"Session startup failed; see {root / 'session.log'}\n{detail}"
+            )
         time.sleep(0.1)
     # The process group is created exclusively for this new session.
     import signal

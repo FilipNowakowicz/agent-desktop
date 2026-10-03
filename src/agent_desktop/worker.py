@@ -128,8 +128,6 @@ class Worker:
                 self.info["tools"]["labwc"],
                 "-C",
                 str(config),
-                "-t",
-                "Private desktop " + self.info["id"],
             ],
             env=self.env,
         )

@@ -38,9 +38,15 @@ Input startup delays, drag, alternate layouts, accessibility and general
 application compatibility remain open.
 
 Repository setup: private GitHub repository, `main` default, issues enabled,
-wiki/projects disabled, squash-only merges and automatic branch deletion. M0 is
-tracked in PR #1. Added CI, a PR template and a runtime failure issue form.
+wiki/projects disabled, squash-only merges and automatic branch deletion. M0 was
+merged through PR #1. Added CI, a PR template and a runtime failure issue form.
 No host activation, permission changes or personal application profiles were used.
+
+The first Ubuntu CI run failed at compositor startup. Inspection of older labwc
+source confirmed it does not support the new `-t` title option used by the initial
+runtime. Removed that optional argument for compatibility and included log tails
+in startup errors so future CI failures expose their actual cause. CI is rerun
+before integrating M1.
 
 ## 2026-10-03 — M0 headless experiment
 

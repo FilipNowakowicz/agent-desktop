@@ -241,7 +241,7 @@ Use the measured failure distribution to choose extensions. Do not interpret a l
 | Adaptive observation (crops and scaled images implemented) | Filtered accessibility state, changed elements, crops and full images on demand | Lower actual model usage without missing task-critical changes |
 | Semantic UI (AT-SPI tree and press/focus/set_text implemented) | AT-SPI names, roles, states and actions, with visual fallback | Better supported-app completion rate; no claims that semantic success proves visual correctness |
 | Event-aware waiting (window and settled-screen waits implemented) | Wait for relevant window, UI or process changes with deadlines | Less unnecessary polling and fewer premature actions |
-| Verified outcomes | Separate action delivery from an observed postcondition | Fewer false success reports |
+| Verified outcomes (window, UI element and settled-screen waits) | Separate action delivery from an observed postcondition | Fewer false success reports |
 
 ### B. Shared desktop experience
 

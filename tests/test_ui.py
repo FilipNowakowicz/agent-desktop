@@ -90,6 +90,32 @@ class UITests(UISessionTest):
         lines = Path(app["logs"]).read_text().strip().splitlines()
         self.assertEqual(lines[-1], "Ada Lovelace ✓")
 
+    def test_wait_for_elements_after_actions(self):
+        core.request(
+            self.session,
+            "launch",
+            argv=["zenity", "--entry", "--title=Wait test", "--text=Code"],
+        )
+        field = self.find(lambda n: "editable" in n["states"])
+        # As a step in a sequence, an element wait re-baselines like other waits.
+        result = core.run_actions(
+            self.session,
+            [{"action": "wait", "element": "OK", "role": "button", "timeout": 10}],
+        )
+        self.assertIsNone(result["stopped"], result)
+        core.request(
+            self.session, "ui_action", node=field["id"], action="set_text", text="4711"
+        )
+        found = core.wait(self.session, role=field["role"], text="4711", timeout=10)
+        self.assertTrue(found["satisfied"], found)
+        self.assertEqual(found["elements"][0]["id"], field["id"])
+        missing = core.wait(self.session, element="No such element", timeout=0.5)
+        self.assertEqual(missing["reason"], "no element")
+        button = self.find(lambda n: n["role"] == "button" and n["name"] == "OK")
+        core.request(self.session, "ui_action", node=button["id"], action="press")
+        closed = core.wait(self.session, element="OK", gone=True, timeout=10)
+        self.assertTrue(closed["satisfied"], closed)
+
     def test_tree_filters_and_limits(self):
         core.request(
             self.session,

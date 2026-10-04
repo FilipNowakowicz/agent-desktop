@@ -72,15 +72,23 @@ def desktop_wait(
     gone: bool = False,
     stable_ms: int = 0,
     timeout: float = 10,
+    element: str | None = None,
+    role: str | None = None,
+    text: str | None = None,
 ) -> dict:
     """Wait instead of polling with screenshots.
 
     With title (substring) and/or app_id (exact), wait for a matching window, or
-    for none to remain if gone is true. With stable_ms, then wait until the screen
-    has not changed for that long (a blinking caret is ignored). Returns
-    satisfied=false at the timeout (at most 120 s). Take a screenshot afterwards.
+    for none to remain if gone is true. With element (accessible name substring),
+    role (exact, as listed by desktop_ui) and/or text (substring of its text or
+    value), wait for a matching UI element, e.g. a "Saved" label, or for it to
+    disappear when gone is true and no window is given. With stable_ms, then wait
+    until the screen has not changed for that long (a blinking caret is ignored).
+    Returns satisfied=false at the timeout (at most 120 s).
     """
-    return core.wait(session, title, app_id, gone, stable_ms, timeout)
+    return core.wait(
+        session, title, app_id, gone, stable_ms, timeout, element, role, text
+    )
 
 
 @mcp.tool()

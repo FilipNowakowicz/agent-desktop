@@ -313,8 +313,14 @@ def wait(
     gone=False,
     stable_ms=0,
     timeout=10,
+    element=None,
+    role=None,
+    text=None,
 ):
-    """Wait for a window to appear (or disappear), then for the screen to settle.
+    """Wait for a window to appear (or disappear), then for a UI element
+    (accessibility name substring, exact role and/or text or value substring),
+    then for the screen to settle. `gone` applies to the window condition, or to
+    the element condition when no window condition is given.
 
     Changes covering at most QUIET_AREA square pixels, such as a blinking caret,
     count as settled. Returns whether every condition held before the deadline.
@@ -326,13 +332,24 @@ def wait(
     started = time.monotonic()
     deadline = started + timeout
 
+    elements = []
+
     def result(satisfied, reason, matches=None):
         return {
             "satisfied": satisfied,
             "reason": reason,
             "elapsed_ms": round((time.monotonic() - started) * 1000),
             "windows": matches or [],
+            "elements": elements[:5],
         }
+
+    def element_matches(node):
+        content = str(node.get("text") or "") + str(node.get("value") or "")
+        return (
+            (element is None or element in node["name"])
+            and (role is None or node["role"] == role)
+            and (text is None or text in content)
+        )
 
     matches = []
     if title is not None or app_id is not None:
@@ -349,6 +366,20 @@ def wait(
             if time.monotonic() >= deadline:
                 return result(False, "window still present" if gone else "no window")
             time.sleep(0.05)
+    if element is not None or role is not None or text is not None:
+        element_gone = gone and title is None and app_id is None
+        while True:
+            nodes = request(session, "ui", max_nodes=2000)["nodes"]
+            elements = [n for n in nodes if element_matches(n)]
+            if bool(elements) != element_gone:
+                break
+            if time.monotonic() >= deadline:
+                return result(
+                    False,
+                    "element still present" if element_gone else "no element",
+                    matches,
+                )
+            time.sleep(0.2)
     if stable_ms:
         quiet_since = time.monotonic()
         frame = request(session, "frame")["frame"]

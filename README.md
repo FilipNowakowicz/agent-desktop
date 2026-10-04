@@ -75,7 +75,7 @@ set_text --text ...` (MCP: `desktop_ui_action`, also usable as a `ui_action` ste
 action sequences) acts without coordinates, which Wayland does not provide to
 AT-SPI. Coverage depends on the toolkit: GTK 3/4 expose rich trees; Chromium needs
 `--force-renderer-accessibility` (sessions set `ACCESSIBILITY_ENABLED=1`) and gets
-`set_text` by focusing the field and typing; Qt is enabled but not yet verified;
+`set_text` by focusing the field and typing; Qt 6 (kdialog) works;
 X11-only and custom-drawn applications may expose little. Like other input, actions are refused while a person has control.
 
 ### Partial and scaled screenshots

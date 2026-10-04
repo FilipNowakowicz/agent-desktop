@@ -112,6 +112,42 @@ class UITests(UISessionTest):
 
 
 @unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "kdialog"))
+    and find_registryd(),
+    "desktop tools, kdialog or at-spi2-core unavailable",
+)
+class QtUITests(UISessionTest):
+    def test_qt_input_dialog(self):
+        app = core.request(
+            self.session,
+            "launch",
+            argv=[
+                "env",
+                "QT_QPA_PLATFORM=wayland",
+                "kdialog",
+                "--inputbox",
+                "Your name",
+            ],
+        )
+
+        def nodes():
+            return core.request(self.session, "ui", app="kdialog")["nodes"]
+
+        field = wait_for(
+            lambda: next((n for n in nodes() if "editable" in n["states"]), None),
+            timeout=20,
+        )
+        core.request(
+            self.session, "ui_action", node=field["id"], action="set_text", text="Grace"
+        )
+        button = next(n for n in nodes() if n["name"] == "OK")
+        core.request(self.session, "ui_action", node=button["id"], action="press")
+        wait_for(
+            lambda: Path(app["logs"]).read_text().strip().splitlines()[-1:] == ["Grace"]
+        )
+
+
+@unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon"))
     and CHROMIUM
     and find_registryd(),

@@ -43,7 +43,10 @@ the `focused` state, Ctrl+A and typing with the session keyboard (reported as
 filled, "Sign in" pressed and the page title confirmed the value.
 `tests/test_ui.py` now includes that Chromium flow; 3/3 runs.
 
-Not verified: Qt trees, LibreOffice, latency of large trees.
+Qt 6 kdialog 26.08.1 (Wayland): input dialog tree read, `set_text` and OK press
+worked natively; added as a test.
+
+Not verified: LibreOffice, Electron apps, latency of large trees.
 
 ## 2026-10-04 — Partial and scaled screenshots
 

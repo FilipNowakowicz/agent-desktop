@@ -8,6 +8,12 @@ Cua: 7 calls, 0 errors, 12.2 s, $0.1037486 API-equivalent; native: 7 calls,
 0 errors, 13.0 s, $0.0803638. Both use 3 screenshots, 2 clicks, 1 type and
 1 drag. Final screenshots and independent title verifiers agree; no model
 shell/file/launch tools are exposed. All owned containers were removed.
+After deleting local:baseline-probe, an actual stdio type call returned a
+not_found error. Removed the exact pinned image from the project-only store,
+reducing its VFS footprint from roughly 41 GiB to 184 KiB, then stopped only
+the API process whose argv matched the project root and Unix endpoint. The
+service exited successfully. Screenshot/report artifacts remain; future runs
+must pull the pinned image again using their configured policy.
 
 The Cua image startup took 16.2 s with cached image/VFS storage; native startup
 was not timed. Source preparation, native result and container result were

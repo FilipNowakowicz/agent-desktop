@@ -1,6 +1,6 @@
 # Continue development in a new chat
 
-Updated: 2026-10-04 (after PR #27; local baseline stage in progress). The hardened runtime, MCP tools and read-only
+Updated: 2026-10-04 (after PR #27; local baseline PR #28 awaiting checks). The hardened runtime, MCP tools and read-only
 observer are implemented. Continue from the current status rather than repeating completed work.
 
 Open `/home/user/private-agent-desktop` as the workspace and paste the following:

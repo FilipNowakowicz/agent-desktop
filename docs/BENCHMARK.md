@@ -261,3 +261,36 @@ first form/confirmation batch also overlapped container dry setup. These results
 support neither a general performance winner nor a decision to replace the
 runtime. Widget/frame readiness and broader daily-use tasks need measurements
 before choosing further interaction extensions.
+
+## Tool profile comparison, 2026-10-04 (claude-opus-5-5, accessibility on in both)
+
+`--tools basic` disables wait, actions and semantic UI; `--tools full` allows them.
+Two rounds, seeds 7 and 8. Results: `benchmarks/results/2026-10-04-tool-profiles.json`.
+
+| Suite / profile | Passed | Tool calls | Cost (USD) | Total tokens |
+| --- | --- | --- | --- | --- |
+| hard basic | 10, 10 | 126, 125 | 1.13, 1.13 | 0.78 M, 0.78 M |
+| hard full | 10, 10 | 79, 80 | 1.09, 1.06 | 0.91 M, 0.88 M |
+| standard basic | 20, 19 | 157, 143 | 1.50, 1.48 | 0.94 M, 0.85 M |
+| standard full | 19, 20 | 128, 120 | 1.62, 1.58 | 1.29 M, 1.25 M |
+
+Full tools cut calls by ~37% (hard) and 15-18% (standard). Standard cost rose 5-9%:
+Chromium UI listings were 10-13 K characters and stayed in context. Fixes after
+round 1/2: registry readiness before `ready` (an app launched immediately was
+invisible), coordinates follow scaled/cropped screenshot tokens (the round-1
+full failure clicked image coordinates on a half-scale screenshot), `wait`
+accepts `seconds`, and listings became compact text with short ids (3176 -> 1419
+characters for a form page).
+
+Round 3 (seed 9, full tools only, after the fixes and compact listings; the
+first attempt hit the Claude session limit and was discarded):
+
+| Suite | Passed | Tool calls | Cost (USD) | Total tokens | Run |
+| --- | --- | --- | --- | --- | --- |
+| standard full | 20/20 | 129 | 1.41 | 1.19 M | `20261005-000847-8fe7` |
+| hard full | 10/10 | 81 | 0.89 | 0.78 M | `20261005-001522-1b6f` |
+
+Against the basic rounds, full tools now cost about 5% less on the standard
+suite (previously 5-9% more) and about 21% less on the hard suite, with 10-35%
+fewer tool calls. One round per configuration after the fixes; differences of a
+few percent are within the variation seen between rounds.

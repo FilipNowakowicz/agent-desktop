@@ -17,12 +17,10 @@ STATES = {
     1: "active",
     4: "checked",
     7: "editable",
-    8: "enabled",
     10: "expanded",
     12: "focused",
     20: "pressed",
     23: "selected",
-    25: "showing",
     36: "invalid",
     43: "read-only",
 }
@@ -50,6 +48,41 @@ class AccessibilityError(RuntimeError):
 
 class Unsupported(AccessibilityError):
     pass
+
+
+def wait_for_registry(session_bus, timeout=5):
+    """Wait until the AT-SPI registry owns its name on the session's a11y bus.
+
+    Applications register only at startup, so one started before the registry
+    would stay invisible to the semantic UI tools.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            accessibility = Accessibility(session_bus)
+            try:
+                reply = accessibility.connection.send_and_get_reply(
+                    new_method_call(
+                        DBusAddress(
+                            "/org/freedesktop/DBus",
+                            "org.freedesktop.DBus",
+                            "org.freedesktop.DBus",
+                        ),
+                        "NameHasOwner",
+                        "s",
+                        (REGISTRY[0],),
+                    ),
+                    timeout=1,
+                )
+                if unwrap_msg(reply)[0]:
+                    return
+            finally:
+                accessibility.close()
+        except (OSError, DBusErrorResponse, TimeoutError):
+            pass
+        if time.monotonic() >= deadline:
+            raise AccessibilityError("The accessibility registry did not start")
+        time.sleep(0.05)
 
 
 class Accessibility:

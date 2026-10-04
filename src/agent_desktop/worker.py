@@ -16,7 +16,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .atspi import Accessibility, Unsupported
+from .atspi import Accessibility, Unsupported, wait_for_registry
 from .wayland import (
     BUTTONS,
     Keysyms,
@@ -154,6 +154,7 @@ class Worker:
         self.needs_screenshot = False
         self.registry = None
         self.atspi = None
+        self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.frames = {}  # recent raw frames for change detection, oldest first
         self.virtual_pointer = None
         self.virtual_keyboard = None
@@ -331,6 +332,18 @@ class Worker:
                 stdout=log,
                 stderr=log,
             )
+        wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
+
+    def short_id(self, node):
+        """Short, stable identifiers for UI nodes, to keep listings small."""
+        if node not in self.ui_names:
+            if len(self.ui_ids) >= 50000:
+                self.ui_ids.clear()
+                self.ui_names.clear()
+            short = f"n{len(self.ui_ids) + 1}"
+            self.ui_ids[short] = node
+            self.ui_names[node] = short
+        return self.ui_names[node]
 
     def accessibility(self):
         if not self.info.get("accessibility"):
@@ -435,7 +448,7 @@ class Worker:
             "height": height,
             "region": region,
             "scale": scale or 1,
-            "observation": before,
+            "observation": image_token(before, region, scale),
         }
 
     def capture_pixels(self):
@@ -510,7 +523,7 @@ class Worker:
     def check_observation(self, token):
         if not isinstance(token, str):
             raise ValueError("Observation must be a token from screenshot")
-        if token != self.observation():
+        if token.partition("@")[0] != self.observation():
             raise StaleObservation(
                 "Windows, focus or output changed since that screenshot; "
                 "no input was sent. Take a new screenshot."
@@ -757,20 +770,27 @@ class Worker:
             max_nodes = request.get("max_nodes", 300)
             if not isinstance(max_nodes, int) or not 1 <= max_nodes <= 2000:
                 raise ValueError("max_nodes must be an integer from 1 to 2000")
-            return self.accessibility().tree(
+            tree = self.accessibility().tree(
                 request.get("app"), request.get("window"), max_nodes
             )
+            for node in tree["nodes"]:
+                node["id"] = self.short_id(node["id"])
+            return tree
         if operation == "ui_action":
             if request.get("observation") is not None:
                 self.check_observation(request["observation"])
             accessibility = self.accessibility()
+            node = self.ui_ids.get(request.get("node"), request.get("node"))
             try:
-                return accessibility.act(
-                    request.get("node"), request.get("action"), request.get("text")
-                )
+                return {
+                    **accessibility.act(
+                        node, request.get("action"), request.get("text")
+                    ),
+                    "node": request["node"],
+                }
             except Unsupported:
                 # e.g. Chromium: focus the field, verify, then replace by typing.
-                accessibility.focus(request["node"])
+                accessibility.focus(node)
                 self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)
                 self.keyboard().type(request["text"])
                 return {
@@ -798,8 +818,14 @@ class Worker:
                 for v in values
             ):
                 raise ValueError("Coordinates must be finite numbers")
+            # A cropped or scaled screenshot's token makes x/y image coordinates.
+            origin_x, origin_y, factor = token_mapping(request.get("observation"))
             points = [
-                (int(values[i]), int(values[i + 1])) for i in (0, len(values) - 2)
+                (
+                    round(origin_x + values[i] / factor),
+                    round(origin_y + values[i + 1] / factor),
+                )
+                for i in (0, len(values) - 2)
             ]
             pointer = self.pointer()
             for point in points:
@@ -973,6 +999,28 @@ def remove_session_files(root, runtime):
     shutil.rmtree(runtime, ignore_errors=True)
     for name in ("home", "config"):
         shutil.rmtree(root / name, ignore_errors=True)
+
+
+def image_token(layout, region, scale):
+    """Observation token; cropped or scaled captures append their mapping."""
+    x, y = region[:2]
+    if (x, y) == (0, 0) and not scale:
+        return layout
+    return f"{layout}@{x},{y},{scale or 1}"
+
+
+def token_mapping(token):
+    """(origin x, origin y, scale) for image coordinates relative to a token."""
+    if not isinstance(token, str) or "@" not in token:
+        return 0, 0, 1
+    try:
+        x, y, scale = token.partition("@")[2].split(",")
+        mapping = int(x), int(y), float(scale)
+    except ValueError:
+        raise ValueError("Malformed observation token") from None
+    if not 0.1 <= mapping[2] <= 1:
+        raise ValueError("Malformed observation token")
+    return mapping
 
 
 def first_difference(a, b):

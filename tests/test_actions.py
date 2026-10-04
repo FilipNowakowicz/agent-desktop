@@ -59,7 +59,15 @@ class ActionTests(unittest.TestCase):
         )
         if wait:
             wait_for((directory / "ready").exists)
-            time.sleep(0.4)
+            # Keys sent before the window has keyboard focus are dropped, while
+            # later ones arrive: wait for activation, not just the process.
+            wait_for(
+                lambda: any(
+                    w["title"] == name and "activated" in w["states"]
+                    for w in core.request(self.session, "windows")["windows"]
+                )
+            )
+            time.sleep(0.2)
         return directory
 
     def test_steps_run_in_order(self):

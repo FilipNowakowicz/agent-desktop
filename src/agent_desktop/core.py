@@ -316,6 +316,7 @@ def wait(
     element=None,
     role=None,
     text=None,
+    seconds=0,
 ):
     """Wait for a window to appear (or disappear), then for a UI element
     (accessibility name substring, exact role and/or text or value substring),
@@ -329,7 +330,11 @@ def wait(
         raise DesktopError("Timeout must be between 0 and 120 seconds")
     if not isinstance(stable_ms, int) or not 0 <= stable_ms <= 30000:
         raise DesktopError("stable_ms must be an integer from 0 to 30000")
+    if not isinstance(seconds, (int, float)) or not 0 <= seconds <= 30:
+        raise DesktopError("seconds must be between 0 and 30")
     started = time.monotonic()
+    # A plain pause first, for changes no condition can describe.
+    time.sleep(seconds)
     deadline = started + timeout
 
     elements = []
@@ -425,6 +430,8 @@ def run_actions(session, actions, observation=None):
         if "observation" in step or "session" in step:
             raise DesktopError(f"Step {index} must not set observation or session")
     baseline = observation or request(session, "observe")["observation"]
+    # Keep a cropped or scaled screenshot's coordinate mapping for every step.
+    mapping = "@" + observation.partition("@")[2] if "@" in (observation or "") else ""
     for index, step in enumerate(actions):
         arguments = {k: v for k, v in step.items() if k != "action"}
         action = step["action"]
@@ -437,9 +444,17 @@ def run_actions(session, actions, observation=None):
                 request(session, "focus", **arguments)
             else:
                 request(session, action, observation=baseline, **arguments)
-        except (DesktopError, TypeError) as error:
+        except DesktopError as error:
             return stopped(index, len(actions), str(error))
-        baseline = request(session, "observe")["observation"]
+        except TypeError as error:
+            hint = (
+                "; wait accepts title, app_id, gone, stable_ms, timeout, element, "
+                "role, text and seconds"
+                if action == "wait"
+                else ""
+            )
+            return stopped(index, len(actions), f"{error}{hint}")
+        baseline = request(session, "observe")["observation"] + mapping
     return {"completed": len(actions), "total": len(actions), "stopped": None}
 
 
@@ -449,6 +464,30 @@ def stopped(index, total, reason):
         "total": total,
         "stopped": {"step": index, "reason": reason},
     }
+
+
+def render_tree(tree):
+    """Compact text for agents: one indented line per UI element."""
+    lines = []
+    for node in tree["nodes"]:
+        line = "  " * node["depth"] + f"{node['id']} {node['role']}"
+        if node["name"]:
+            line += f" {node['name']!r}"
+        if node["states"]:
+            line += f" [{','.join(node['states'])}]"
+        if node.get("text") is not None:
+            text = node["text"]
+            line += f" text={text[:200]!r}" + ("…" if len(text) > 200 else "")
+        if "value" in node:
+            line += f" value={node['value']:g}"
+        # Chromium offers doDefault everywhere; "press" still falls back to it.
+        actions = [a for a in node.get("actions", ()) if a != "doDefault"]
+        if actions:
+            line += f" actions={','.join(actions)}"
+        lines.append(line)
+    if tree["truncated"]:
+        lines.append("… truncated: filter by app or window, or raise max_nodes")
+    return "\n".join(lines) or "(no accessible elements)"
 
 
 def wait_for_agent_control(session, timeout):

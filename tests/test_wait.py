@@ -84,6 +84,20 @@ class WaitTests(unittest.TestCase):
         gone = core.wait(self.session, title="Quiet", gone=True, timeout=10)
         self.assertTrue(gone["satisfied"], gone)
 
+    def test_plain_pause_and_sequence_hint(self):
+        paused = core.wait(self.session, seconds=0.3)
+        self.assertTrue(paused["satisfied"])
+        self.assertGreaterEqual(paused["elapsed_ms"], 300)
+        for bad in (-1, 31, "1"):
+            with self.subTest(seconds=bad), self.assertRaises(core.DesktopError):
+                core.wait(self.session, seconds=bad)
+        result = core.run_actions(
+            self.session,
+            [{"action": "wait", "delay": 1}, {"action": "key", "key": "a"}],
+        )
+        self.assertEqual(result["completed"], 0)
+        self.assertIn("seconds", result["stopped"]["reason"])
+
     def test_changing_screen_never_settles(self):
         self.launch("Busy window", "while :; do date +%N; sleep 0.02; done")
         self.assertTrue(core.wait(self.session, title="Busy", timeout=15)["satisfied"])

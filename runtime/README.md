@@ -30,7 +30,9 @@ the repair. Choose this runtime explicitly on `PATH` or through `core.create`'s
 `tools` argument. Python dependencies and the core remain portable.
 
 Arch CI tests this private repair. Ubuntu/Fedora continue using their stock
-runtime packages. Other build environments, versions and visible-mode behavior
+runtime packages. The patched local runtime passed 150 loaded Xterm sessions (one logged repair),
+100 loaded sessions with an already-running XWM, and the full 33-test suite
+with visible mode skipped. Other build environments, versions and visible-mode behavior
 of the repair require separate validation. On NixOS the same patch was tested
 using project-local `labwc.override { wlroots_0_20 = patchedWlroots; }`, with
 `patchedWlroots` adding this patch via `overrideAttrs`; no host activation.

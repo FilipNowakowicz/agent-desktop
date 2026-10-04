@@ -29,7 +29,19 @@ new project-local output, copied labwc with a private library path) and configur
 Arch CI to use it. Ubuntu/Fedora stay on stock packages. No Python linker paths,
 host configuration, activation, profiles or permissions were changed. The
 comparison remains complete at $1.0474778; no more paid trials were run.
-Full-suite, warm-XWM repetitions and repaired distribution CI remain pending.
+Patched full suite: 33 tests in 61.067 s, all applicable checks passed, visible
+mode skipped. Additional warm-XWM experiment: private `xprop -root -spy` stayed
+connected before each Xterm launch; 100/100 loaded sessions passed in 123.715 s
+with protocol logging. No buffered-at-association events occurred in that set;
+the initial 150-session set contains the observed recovery. Two initial helper
+runs stopped before any application trial (missing import path / xprop executable)
+and were corrected without changing the runtime. Test cleanup and load-helper
+termination completed. First portable-build CI `37214209581` compiled/installed the patched library,
+but the loader check failed before desktop tests. Its exact-path grep failed
+because `$ORIGIN/../lib` retains `bin/../lib` in ldd output (confirmed with a
+local copied binary). The check now prints dependencies and compares canonical
+paths; it still requires the private library, rather than removing verification.
+Repaired distribution CI remains pending at this commit.
 
 ## 2026-10-04 — Repeated comparison complete within budget
 

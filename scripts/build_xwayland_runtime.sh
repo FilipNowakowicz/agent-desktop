@@ -19,6 +19,10 @@ if [ -e "$1" ]; then
 fi
 repository=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 compositor=$(command -v labwc)
+case "$(patchelf --print-needed "$compositor")" in
+    *libwlroots-0.20.so*) ;;
+    *) echo "labwc must link to libwlroots-0.20.so" >&2; exit 1 ;;
+esac
 mkdir -p -- "$1"
 output=$(CDPATH= cd -- "$1" && pwd)
 archive="$output/wlroots-0.20.2.tar.gz"

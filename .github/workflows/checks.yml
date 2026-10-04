@@ -99,7 +99,10 @@ jobs:
         if: matrix.name == 'arch'
         run: |
           sh scripts/build_xwayland_runtime.sh "$RUNNER_TEMP/private-runtime"
-          ldd "$RUNNER_TEMP/private-runtime/install/bin/labwc" | grep "$RUNNER_TEMP/private-runtime/install/lib/libwlroots-0.20.so"
+          ldd "$RUNNER_TEMP/private-runtime/install/bin/labwc" > "$RUNNER_TEMP/private-runtime/libraries.txt"
+          cat "$RUNNER_TEMP/private-runtime/libraries.txt"
+          resolved=$(awk '$1 == "libwlroots-0.20.so" {print $3}' "$RUNNER_TEMP/private-runtime/libraries.txt")
+          test "$(realpath "$resolved")" = "$RUNNER_TEMP/private-runtime/install/lib/libwlroots-0.20.so"
           echo "$RUNNER_TEMP/private-runtime/install/bin" >> "$GITHUB_PATH"
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v

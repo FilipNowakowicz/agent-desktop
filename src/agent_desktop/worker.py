@@ -16,7 +16,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .atspi import Accessibility
+from .atspi import Accessibility, Unsupported
 from .wayland import (
     BUTTONS,
     Keysyms,
@@ -313,6 +313,7 @@ class Worker:
         for key in ("NO_AT_BRIDGE", "GTK_A11Y"):
             self.env.pop(key, None)
         self.env["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] = "1"
+        self.env["ACCESSIBILITY_ENABLED"] = "1"  # Chromium/Electron
         # Let the private bus activate the matching bus launcher (e.g. from Nix).
         share = Path(registryd).resolve().parent.parent / "share"
         if (share / "dbus-1/services/org.a11y.Bus.service").is_file():
@@ -762,9 +763,22 @@ class Worker:
         if operation == "ui_action":
             if request.get("observation") is not None:
                 self.check_observation(request["observation"])
-            return self.accessibility().act(
-                request.get("node"), request.get("action"), request.get("text")
-            )
+            accessibility = self.accessibility()
+            try:
+                return accessibility.act(
+                    request.get("node"), request.get("action"), request.get("text")
+                )
+            except Unsupported:
+                # e.g. Chromium: focus the field, verify, then replace by typing.
+                accessibility.focus(request["node"])
+                self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)
+                self.keyboard().type(request["text"])
+                return {
+                    "node": request["node"],
+                    "action": "set_text",
+                    "delivered": True,
+                    "method": "keyboard",
+                }
         if operation == "observe":
             return {"observation": self.observation()}
         if operation == "frame":

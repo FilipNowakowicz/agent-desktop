@@ -5,6 +5,7 @@ Wayland gives AT-SPI no global coordinates, so actions use AT-SPI itself
 """
 
 import re
+import time
 
 from jeepney import DBusAddress, new_method_call
 from jeepney.io.blocking import open_dbus_connection
@@ -37,11 +38,17 @@ CONTAINERS = {
     "generic",
 }
 TEXT_ROLES = {"text", "entry", "text box", "paragraph", "terminal", "document text"}
-PRESS_ACTIONS = ("click", "press", "activate", "toggle", "jump")
+PRESS_ACTIONS = ("click", "press", "activate", "toggle", "jump", "dodefault")
+# Offered by every Chromium node; omitted from listings, still callable by name.
+HIDDEN_ACTIONS = {"showContextMenu"}
 NODE = re.compile(r"(:[0-9]+\.[0-9]+)((?:/[A-Za-z0-9_]+)+)")
 
 
 class AccessibilityError(RuntimeError):
+    pass
+
+
+class Unsupported(AccessibilityError):
     pass
 
 
@@ -100,13 +107,40 @@ class Accessibility:
         if "org.a11y.atspi.Value" in interfaces:
             record["value"] = self.get(node, "org.a11y.atspi.Value", "CurrentValue")
         if "org.a11y.atspi.Action" in interfaces:
-            actions = self.call(node, "org.a11y.atspi.Action", "GetActions")[0]
             # GTK 4 also exposes widget action groups (clipboard.copy, ...);
             # they stay usable by name but are omitted to keep the list short.
-            record["actions"] = [a[0] for a in actions if "." not in a[0]]
+            record["actions"] = [
+                n
+                for n in self.action_names(node)
+                if n and "." not in n and n not in HIDDEN_ACTIONS
+            ]
         if "org.a11y.atspi.EditableText" in interfaces:
             record.setdefault("actions", []).append("set_text")
         return record, SHOWING in bits
+
+    def action_names(self, node):
+        """Non-localized action names (Chromium leaves the localized ones empty)."""
+        count = self.get(node, "org.a11y.atspi.Action", "NActions")
+        return [
+            self.call(node, "org.a11y.atspi.Action", "GetName", "i", (i,))[0]
+            for i in range(count)
+        ]
+
+    def parse(self, node_id):
+        match = NODE.fullmatch(node_id) if isinstance(node_id, str) else None
+        if not match:
+            raise ValueError("Unknown UI node identifier")
+        return match.groups()
+
+    def focus(self, node_id, timeout=1):
+        """Grab focus and wait until the node reports it."""
+        node = self.parse(node_id)
+        self.call(node, "org.a11y.atspi.Component", "GrabFocus")
+        deadline = time.monotonic() + timeout
+        while "focused" not in self.describe(node)[0]["states"]:
+            if time.monotonic() >= deadline:
+                raise AccessibilityError("The element did not take focus")
+            time.sleep(0.02)
 
     def children(self, node):
         return [tuple(c) for c in self.call(node, ACCESSIBLE, "GetChildren")[0]]
@@ -128,7 +162,7 @@ class Accessibility:
             keep = not (
                 record["role"] in CONTAINERS
                 and not record["name"]
-                and not record.get("actions")
+                and set(record.get("actions", ())) <= {"doDefault"}
             )
             if keep:
                 nodes.append({**record, "depth": depth})
@@ -155,22 +189,22 @@ class Accessibility:
         return {"nodes": nodes, "truncated": truncated}
 
     def act(self, node_id, action, text=None):
-        match = NODE.fullmatch(node_id) if isinstance(node_id, str) else None
-        if not match:
-            raise ValueError("Unknown UI node identifier")
-        node = match.groups()
+        node = self.parse(node_id)
         if action == "focus":
             done = self.call(node, "org.a11y.atspi.Component", "GrabFocus")[0]
         elif action == "set_text":
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("set_text needs text of at most 10000 characters")
-            done = self.call(
-                node, "org.a11y.atspi.EditableText", "SetTextContents", "s", (text,)
-            )[0]
+            try:
+                done = self.call(
+                    node, "org.a11y.atspi.EditableText", "SetTextContents", "s", (text,)
+                )[0]
+            except AccessibilityError as error:
+                if "UnknownMethod" in str(error) or "NotSupported" in str(error):
+                    raise Unsupported(str(error)) from None
+                raise
         else:
-            names = [
-                a[0] for a in self.call(node, "org.a11y.atspi.Action", "GetActions")[0]
-            ]
+            names = self.action_names(node)
             folded = [n.lower() for n in names]
             wanted = [action.lower()] if action != "press" else list(PRESS_ACTIONS)
             index = next((folded.index(n) for n in wanted if n in folded), None)

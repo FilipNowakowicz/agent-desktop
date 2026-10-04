@@ -33,7 +33,17 @@ label without press action and malformed ids are refused; filters and the node
 limit; a session without a registry reports the missing runtime. Full suite with
 accessibility on: 53 tests OK, 7 skipped. CI installs `at-spi2-core`.
 
-Not verified: Qt and Chromium trees, LibreOffice, large trees' latency.
+Chromium (153, Nix) registered nothing with `--force-renderer-accessibility`
+alone; it also needs `ACCESSIBILITY_ENABLED=1`, now set in accessible sessions.
+Its localized action names are empty, so names come from `GetName`; every node
+offers `showContextMenu` (hidden) and `doDefault` (does not keep a container).
+It lacks `SetTextContents`, so `set_text` falls back to GrabFocus, waiting for
+the `focused` state, Ctrl+A and typing with the session keyboard (reported as
+`method: keyboard`). A local form: 29 nodes listed in 338 ms; the Email field was
+filled, "Sign in" pressed and the page title confirmed the value.
+`tests/test_ui.py` now includes that Chromium flow; 3/3 runs.
+
+Not verified: Qt trees, LibreOffice, latency of large trees.
 
 ## 2026-10-04 — Partial and scaled screenshots
 

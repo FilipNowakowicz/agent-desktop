@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_runtime import wait_for
+from test_runtime import CHROMIUM, wait_for
 
 from agent_desktop import core
 from agent_desktop.worker import find_registryd, owned_processes
@@ -109,6 +109,63 @@ class UITests(UISessionTest):
         )
         with self.assertRaises(core.DesktopError):
             core.request(self.session, "ui", max_nodes=0)
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon"))
+    and CHROMIUM
+    and find_registryd(),
+    "desktop tools, Chromium or at-spi2-core unavailable",
+)
+class ChromiumUITests(UISessionTest):
+    def test_web_form_without_coordinates(self):
+        root = Path(self.temporary.name)
+        page = root / "form.html"
+        page.write_text(
+            "<!doctype html><title>Login form</title>"
+            "<label>Email <input></label>"
+            "<button onclick=\"document.title='Sent '+"
+            "document.querySelector('input').value\">Sign in</button>"
+        )
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={root / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--force-renderer-accessibility",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        app = core.request(self.session, "launch", argv=[*argv, page.as_uri()])
+        found = core.wait(self.session, title="Login form", timeout=30)
+        if (
+            not found["satisfied"]
+            and "No usable sandbox" in Path(app["logs"]).read_text()
+        ):
+            self.skipTest("Chromium sandbox unavailable in this environment")
+
+        def node(name):
+            nodes = core.request(self.session, "ui")["nodes"]
+            return next((n for n in nodes if n["name"] == name), None)
+
+        field = wait_for(lambda: node("Email"), timeout=30)
+        self.assertIn("editable", field["states"])
+        result = core.request(
+            self.session,
+            "ui_action",
+            node=field["id"],
+            action="set_text",
+            text="ada@example.com",
+        )
+        # Chromium lacks SetTextContents; the field is focused, checked, then typed.
+        self.assertEqual(result["method"], "keyboard")
+        core.request(
+            self.session, "ui_action", node=node("Sign in")["id"], action="press"
+        )
+        sent = core.wait(self.session, title="Sent ada@example.com", timeout=10)
+        self.assertTrue(sent["satisfied"], sent)
 
 
 @unittest.skipUnless(

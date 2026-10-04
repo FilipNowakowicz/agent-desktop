@@ -17,7 +17,8 @@ The working foundation uses Python/uv and private labwc sessions. Runtime depend
 
 Next priorities:
 
-1. Benchmarks (M4): `scripts/benchmark.py` (20 tasks, Claude Code, independent checks) passes 20/20 (docs/BENCHMARK.md). The suite has saturated. Add harder multi-application and longer tasks, compare baselines and models, and use measured failures to choose extensions. Human takeover/action ownership is not implemented.
+1. Benchmarks (M4): standard suite 20/20 (twice) and hard suite 10/10 (once) with Claude Code; see docs/BENCHMARK.md. Pass rate no longer separates results for this model. Next: efficiency comparisons, other models, and baselines. The user's Claude Pro usage is limited: validate with `--dry-run` first, run agents sparingly and commit after each run. Human takeover/action ownership is not implemented.
+   Later (user request): compare cost, tool design and approach with public projects such as Cua, and adopt what they do better.
 2. Compatibility (#6): larger daily-use applications (editors, file choosers/portals, clipboard), desktop installs beyond CI containers. Investigate #17 with the uploaded CI artifacts when it recurs.
 Known visible-mode property: a focused nested window also receives host keyboard input.
 

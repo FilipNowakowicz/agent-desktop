@@ -19,7 +19,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import owned_processes  # noqa: E402
+from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS  # noqa: E402
+
+SUITES = {"standard": TASKS, "hard": HARD_TASKS}
 
 PROMPT = """You control a private Linux desktop through the private-desktop tools.
 Use session {session}; it already exists and the application is already open.
@@ -36,15 +39,20 @@ class Context:
         self.session = session
         self.directory = directory
         self.application = None
+        self.applications = []
+        self.wait_windows = None
 
     def windows(self):
         return core.request(self.session, "windows")["windows"]
 
-    def application_status(self):
+    def status_of(self, application):
         for entry in core.request(self.session, "status")["applications"]:
-            if entry["pid"] == self.application["pid"]:
+            if entry["pid"] == application["pid"]:
                 return entry
         return None
+
+    def application_status(self):
+        return self.status_of(self.application)
 
     def application_output(self):
         return Path(self.application["logs"]).read_text(errors="replace")
@@ -133,10 +141,16 @@ def run_task(task, root, budget, model, dry_run=False):
     context = Context(session, directory)
     try:
         argv, goal = task.setup(context)
+        # A task may launch several applications; the last one holds its answer.
+        commands = argv if isinstance(argv[0], list) else [argv]
         before = {w["id"] for w in context.windows()}
-        context.application = core.request(session, "launch", argv=argv)
+        for command in commands:
+            context.applications.append(core.request(session, "launch", argv=command))
+            time.sleep(0.5)  # keep the window stacking order deterministic
+        context.application = context.applications[-1]
+        expected = context.wait_windows or len(commands)
         deadline = time.monotonic() + 30
-        while not {w["id"] for w in context.windows()} - before:
+        while len({w["id"] for w in context.windows()} - before) < expected:
             if time.monotonic() > deadline:
                 raise RuntimeError("Application window did not appear")
             time.sleep(0.2)
@@ -166,6 +180,7 @@ def run_task(task, root, budget, model, dry_run=False):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--suite", choices=SUITES, default="standard")
     parser.add_argument("--only", nargs="*", help="task names")
     parser.add_argument("--budget", type=float, default=1.0, help="USD per task")
     parser.add_argument("--model")
@@ -180,7 +195,7 @@ def main():
     root.mkdir(parents=True, mode=0o700)
     os.environ["AGENT_DESKTOP_STATE_DIR"] = str((root / "state").resolve())
     records = []
-    for task in TASKS:
+    for task in SUITES[args.suite]:
         if args.only and task.name not in args.only:
             continue
         missing = [r for r in task.requires if not shutil.which(r)]

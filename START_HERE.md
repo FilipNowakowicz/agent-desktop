@@ -1,7 +1,7 @@
 # Continue development in a new chat
 
-Updated: 2026-10-04. The persistent runtime, MCP tools and read-only observer are
-implemented. Continue from the current status rather than repeating completed work.
+Updated: 2026-10-04 (after PR #16). The hardened runtime, MCP tools and read-only
+observer are implemented. Continue from the current status rather than repeating completed work.
 
 Open `/home/user/private-agent-desktop` as the workspace and paste the following:
 
@@ -13,14 +13,14 @@ Read `AGENTS.md`, `PROJECT_PLAN.md`, `DEVELOPMENT_LOG.md`, `README.md` and `docs
 
 The chosen goal is general computer use by existing agents, starting with a private headless Linux desktop that does not interfere with my physical desktop. Develop on Linux and test on my NixOS + Hyprland machine; keep the core usable on other Linux distributions. Do not pivot this into a standalone debugging/testing product or attempt the future Windows/macOS platform now.
 
-The working foundation uses Python/uv and private labwc sessions. Persistent lifecycle, CLI input/screenshots/logs, stdio MCP image blocks, visible nested testing and a read-only viewer exist. Five stage PRs (#1, #2, #3, #4, #8) are merged. Ubuntu CI and a disposable native Wayland Chromium form task passed. Do not restart M0 unless a concrete failure justifies it.
+The working foundation uses Python/uv and private labwc sessions. Runtime dependencies are labwc, grim and dbus-daemon (optional: xwayland, wayvnc). The worker owns its process tree as a child subreaper with a guardian and a private bus. Input, window listing and focus use small built-in Wayland clients (virtual pointer/keyboard, foreign-toplevel). Screenshots return observation tokens that protect input against stale screenshots. M1 hardening (#5) is closed. CI runs on Ubuntu, Fedora and Arch. Chromium, xterm/Xwayland and GTK/Qt dialogs pass. Do not restart M0 unless a concrete failure justifies it.
 
 Next priorities:
 
-1. Runtime hardening (#5): input readiness, stronger ownership/cleanup for daemonizing applications, drag and repeated sessions under load. Visible mode has received an extra input character; its cause is unproven.
-2. Interactive client integration (#7): MCP transport works, but no actual interactive client is configured. Determine the intended client before changing its persistent configuration; validate images and a real GUI task. Human takeover/action ownership is not implemented.
-3. Compatibility (#6): more applications, Xwayland, keyboard layouts, resizing/scaling and Linux setup coverage. Terminal and Chromium fixture results do not establish universal support.
-4. Benchmarks (M4): measure real task completion, cleanup failures and required human intervention once the core is dependable.
+1. Interactive client integration (#7): MCP transport works, but no interactive client is configured. Ask which client to configure before changing its persistent configuration. Then validate images and a real GUI task. Human takeover/action ownership is not implemented.
+2. Compatibility (#6): larger daily-use applications (editors, file choosers/portals, clipboard), desktop installs beyond CI containers. Investigate #17 with the uploaded CI artifacts when it recurs.
+3. Benchmarks (M4): measure real task completion, cleanup failures and required human intervention, once an agent client is integrated.
+Known visible-mode property: a focused nested window also receives host keyboard input.
 
 Continue autonomously with project-local implementation and testing. Use stage branches and PRs, integrate successful stages after required checks, and keep the repo private. Update the plan and development log with completed work, validation, failures and next work. Notify me when my input is needed.
 

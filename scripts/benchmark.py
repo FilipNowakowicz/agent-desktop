@@ -144,6 +144,8 @@ def run_agent(
         "tools": {n: names.count(n) for n in sorted(set(names))},
         "reply": (result.get("result") or "")[-500:],
         "cost_usd": result.get("total_cost_usd"),
+        "usage": result.get("usage", {}),
+        "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
     }
 

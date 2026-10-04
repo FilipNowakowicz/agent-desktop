@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-04 — Paired browser baseline pilot
+
+Container pilot `20261004-151945-3d34` passed the same code-and-drag fixture
+as native `20261004-151912-01e9`, seed 41027, claude-opus-5-5, $1/task cap.
+Cua: 7 calls, 0 errors, 12.2 s, $0.1037486 API-equivalent; native: 7 calls,
+0 errors, 13.0 s, $0.0803638. Both use 3 screenshots, 2 clicks, 1 type and
+1 drag. Final screenshots and independent title verifiers agree; no model
+shell/file/launch tools are exposed. All owned containers were removed.
+
+The Cua image startup took 16.2 s with cached image/VFS storage; native startup
+was not timed. Source preparation, native result and container result were
+committed separately. Usage remains the previously authorized testing client's
+Pro allowance, not a newly configured API account. Future records now retain
+raw token usage and per-model accounting. A single pair with different desktop,
+browser, resource caps, screenshot scaling and cache counters establishes no
+performance winner; exact differences and counters are in docs/BENCHMARK.md.
+
 ## 2026-10-04 — Local container baseline preparation
 
 Added a GUI-only, fixed-local-target stdio adapter and a fresh-container harness

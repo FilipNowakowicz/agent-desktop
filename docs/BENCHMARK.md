@@ -204,3 +204,23 @@ limited to 2 CPUs/2 GB and runs its browser as guest root with `--no-sandbox`
 inside rootless host Podman. The native runtime has no matching resource cap.
 A small pilot can compare observed outcomes and tool usage; these differences
 and model variability prevent attributing timing or cost to tool design alone.
+
+Paired pilot, 2026-10-04, seed 41027, claude-opus-5-5, $1/task cap:
+
+| Interface | Run | Verified | Calls / errors | Agent time | API-equivalent usage |
+| --- | --- | --- | --- | --- | --- |
+| Native private desktop | `20261004-151912-01e9` | 1/1 | 7 / 0 | 13.0 s | $0.0803638 |
+| GUI-only Cua | `20261004-151945-3d34` | 1/1 | 7 / 0 | 12.2 s | $0.1037486 |
+
+Both used three screenshots, two clicks, one type and one drag. Saved transcripts
+show the intended GUI actions; final screenshots and independent title checks
+agree. Generated pages are identical, and both sessions/containers were removed.
+Container startup took 16.2 s with a cached image and VFS storage; native startup
+was not timed. Agent time excludes fixture startup and final harness checks.
+
+Transcript token counters (input / cache creation / cache read / output) were
+native `8 / 7495 / 30659 / 712` and Cua `8 / 11080 / 24183 / 512`. Future records
+retain raw usage and per-model accounting. Differences in caching, schemas,
+images, desktop environment and one stochastic run prevent attributing the
+cost difference to any single component. This sample establishes comparable
+completion and equal tool calls; it does not establish a performance winner.

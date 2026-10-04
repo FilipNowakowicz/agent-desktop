@@ -1,5 +1,48 @@
 # Development log
 
+## 2026-10-04 — M1 physical key codes (found by the agent benchmark)
+
+**Outcome:** the virtual keyboard now uses a US layout on real evdev codes.
+Before, keycodes were assigned in order of first use. In the first benchmark run
+(next entry) Claude Code typed `private desktop` into Chromium and got
+`privatdesktop`. It reported that "space acts like Backspace" and worked around
+it with `KP_Space`. The cause: in that session, space was assigned evdev code 14,
+which is the physical Backspace key, and Chromium interprets some keys by
+physical code. Any character could collide with a physical Tab, Enter, arrow or
+function key the same way.
+
+### Design
+
+- ASCII on its US physical key, with Shift as a modifier for level 2. Named keys
+  (Return, BackSpace, Tab, Escape, arrows, Home/End/PageUp/PageDown,
+  Insert/Delete, F1–F12, keypad Enter, Menu, Print, modifier keys) use their real
+  codes. Modifier keys keep the `modifier_map` entries Xwayland requires.
+- Other keysyms use a pool of 19 spare codes, remapped on demand with
+  least-recently-used reuse. Codes still needed by unsent keys are pinned; if the
+  pool runs out, pending keys are sent first, then the keymap is replaced.
+- The pool was chosen by measurement. Typing one Greek letter per candidate code into
+  Chromium showed that events from codes 84 and 195 (no defined key) were dropped
+  (the first attempt lost `é` this way). Codes 86, 89, 117, 121, 124, 179, 180
+  and 183–194 delivered their characters.
+- `key` accepts `repeat` (1–100). In the benchmark the agent pressed Right 32 times,
+  one tool call each, to move a slider.
+
+### Validation
+
+- New `xev` test (Xwayland): `a` and `A` arrive on keycode 38 (A shifted),
+  space on 65, BackSpace on 22, and `λ` on a pool code.
+- New Chromium test: `Browser café: ` + 25 distinct Greek letters + ` ok!`
+  (more than the pool, so codes are reused) arrives exactly. It failed with code
+  84 restored to the pool and passed 3/3 with the final pool. Runs on NixOS
+  and is added to Fedora/Arch CI. Containers run as root, so the test adds
+  `--no-sandbox` only when the effective user is root.
+- The keyboard test now types `XY`, then sends BackSpace with `repeat=2`.
+- Full suite 22 tests, 1 skipped. Keyboard, Xwayland, physical-code, toolkit and
+  focus tests together 5/5. Chromium smoke 3/3.
+- The focus test's third terminal now runs `sh`. With the user's default zsh and an
+  empty private home, zsh's first-run setup prompt could intercept the Ctrl+D used
+  to close it (1 failure in 4 runs; 15/15 after the change).
+
 ## 2026-10-04 — M2 Claude Code client integration
 
 **Outcome:** a real interactive client, Claude Code, completed a GUI task

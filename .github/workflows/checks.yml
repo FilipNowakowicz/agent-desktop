@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install desktop runtime
-        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity fonts-dejavu-core
+        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity x11-utils fonts-dejavu-core
       - name: Record runtime versions
         run: dpkg-query -W labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity
       - run: uv sync --locked --managed-python
@@ -47,13 +47,13 @@ jobs:
             install: >-
               dnf install -y --setopt=install_weak_deps=False git tar gzip
               labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland
-              xterm zenity dejavu-sans-fonts dejavu-sans-mono-fonts
+              xterm xev zenity chromium dejavu-sans-fonts dejavu-sans-mono-fonts
             versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity
           - name: arch
             image: archlinux:latest
             install: >-
               pacman -Syu --noconfirm git labwc foot grim wayvnc wlr-randr dbus
-              xorg-xwayland xterm zenity ttf-dejavu
+              xorg-xwayland xterm xorg-xev zenity chromium ttf-dejavu
             versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity
     name: runtime (${{ matrix.name }})
     container: ${{ matrix.image }}

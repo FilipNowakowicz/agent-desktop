@@ -1,0 +1,15 @@
+--- a/xwayland/xwm.c
++++ b/xwayland/xwm.c
+@@ -1237,6 +1237,12 @@
+ 	}
+ 
+ 	wl_signal_emit_mutable(&xsurface->events.associate, NULL);
++
++	/* The Wayland buffer may arrive before the X11 association. */
++	if (wlr_surface_has_buffer(surface)) {
++		wlr_log(WLR_DEBUG, "Mapping buffered Xwayland surface at association");
++		wlr_surface_map(surface);
++	}
+ }
+ 
+ static void xwm_handle_create_notify(struct wlr_xwm *xwm,

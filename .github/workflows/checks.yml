@@ -77,6 +77,7 @@ jobs:
             install: >-
               pacman -Syu --noconfirm git labwc foot grim wayvnc wlr-randr dbus
               xorg-xwayland xterm xorg-xev xorg-xprop xorg-xwininfo zenity mousepad chromium libreoffice-fresh ttf-dejavu
+              base-devel meson ninja curl patchelf glslang vulkan-headers hwdata
             versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity mousepad libreoffice-fresh
     name: runtime (${{ matrix.name }})
     container: ${{ matrix.image }}
@@ -94,25 +95,46 @@ jobs:
         with:
           python-version: '3.12'
       - run: uv sync --locked --managed-python
+      - name: Build a private Xwayland mapping repair on Arch
+        if: matrix.name == 'arch'
+        run: |
+          sh scripts/build_xwayland_runtime.sh "$RUNNER_TEMP/private-runtime"
+          ldd "$RUNNER_TEMP/private-runtime/install/bin/labwc" | grep "$RUNNER_TEMP/private-runtime/install/lib/libwlroots-0.20.so"
+          echo "$RUNNER_TEMP/private-runtime/install/bin" >> "$GITHUB_PATH"
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
         env:
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
-      - name: Repeat Xwayland mapping and input
+      - name: Repeat Xwayland mapping and input (Arch under CPU load)
         run: |
           uv run python - <<'PY'
+          import os
+          import subprocess
           import sys
           import unittest
           sys.path.insert(0, "tests")
           name = "test_runtime.RuntimeTests.test_xwayland_application_receives_input"
+          arch = os.environ["TEST_DISTRIBUTION"] == "arch"
           suite = unittest.TestSuite(
-              unittest.defaultTestLoader.loadTestsFromName(name) for _ in range(10)
+              unittest.defaultTestLoader.loadTestsFromName(name)
+              for _ in range(100 if arch else 10)
           )
-          result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
+          load = []
+          try:
+              if arch:
+                  for _ in range(4):
+                      load.append(subprocess.Popen([sys.executable, "-c", "while True: pass"]))
+              result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
+          finally:
+              for child in load:
+                  child.terminate()
+              for child in load:
+                  child.wait()
           sys.exit(not result.wasSuccessful())
           PY
         env:
+          TEST_DISTRIBUTION: ${{ matrix.name }}
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure

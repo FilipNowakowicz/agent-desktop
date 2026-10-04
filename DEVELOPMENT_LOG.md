@@ -1,5 +1,36 @@
 # Development log
 
+## 2026-10-04 — X11 buffer-before-association repair
+
+Latest PR #28 head `5e24a10`, CI `37211305391`: Ubuntu/Fedora passed;
+Arch passed the full suite but failed its first X11 repetition. Retained root
+properties show a live XWM and X11 fixture window, but `_NET_ACTIVE_WINDOW=0`,
+no `_NET_CLIENT_LIST`, and no foreign-toplevel. Checks remain required.
+
+A project-local X11 readiness/EWMH probe did not resolve mapping: four-CPU-load
+runs passed 33 then failed on session 34, and passed 54 then failed on session 55.
+The latter retained `WAYLAND_DEBUG=server` traffic. Moving the private pointer
+and opening a native foot window did not release the stuck Xterm. The trace
+shows the Xwayland surface buffer commit before association. Removed the
+unsuccessful readiness implementation; its source and diagnostics remain under
+ignored artifacts/x11-readiness-experiment and artifacts/x11-map-probe.
+
+wlroots 0.20.2 attaches its commit listener during association and maps only on
+subsequent commits. Added a six-line patch checking an already committed buffer
+after the association event. A project-local Nix build of patched wlroots and
+labwc 0.20.2 passed 150/150 Xterm sessions with four busy CPU processes in
+185.860 s; one log explicitly hit buffered-at-association mapping and then
+received exact Unicode text and a click. All test desktops were destroyed.
+Artifacts: artifacts/x11-patched-load and x11-readiness-experiment/repeat-patched.log.
+This demonstrates the diagnosed ordering is recoverable, not universal reliability.
+
+Added an optional portable runtime build script (pinned source archive SHA-256,
+new project-local output, copied labwc with a private library path) and configured
+Arch CI to use it. Ubuntu/Fedora stay on stock packages. No Python linker paths,
+host configuration, activation, profiles or permissions were changed. The
+comparison remains complete at $1.0474778; no more paid trials were run.
+Full-suite, warm-XWM repetitions and repaired distribution CI remain pending.
+
 ## 2026-10-04 — Repeated comparison complete within budget
 
 Second container set `20261004-154321-3049`, seed 41028, claude-opus-5-5,

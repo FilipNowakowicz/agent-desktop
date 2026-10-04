@@ -16,10 +16,23 @@ nix shell nixpkgs#labwc nixpkgs#grim nixpkgs#foot nixpkgs#xwayland nixpkgs#xterm
   --command uv run scripts/benchmark.py            # all tasks (uses your Claude account)
 uv run scripts/benchmark.py --dry-run               # setup + checks, no agent
 uv run scripts/benchmark.py --only zenity-scale     # selected tasks
+uv run scripts/benchmark.py --suite office --dry-run # two office tasks, no account use
 ```
 
 `--dry-run` is the negative control: every check must fail when no agent acts.
 It did for all 20 tasks (apps launched, windows appeared, cleanup clean).
+
+The office suite adds Writer document creation and Calc formula entry. It checks
+the saved ODT paragraphs and the ODS formula, value and preserved inputs using the
+same independent verifiers as the real-application smoke tests. Its negative
+control failed both checks with no errors or cleanup failures
+(`20261004-144149-180e`). The workflows include first-run dialogs for the agent
+to handle; successful scripted smoke tests do not establish agent completion.
+
+New runs explicitly disable desktop create, destroy and launch tools: applications
+are already loaded by the harness, and tasks must use GUI input to change them.
+Earlier recorded runs used the broader MCP tool set, so compare tool access as
+well as model, application versions and task definitions when measuring changes.
 
 ## Tasks
 
@@ -137,3 +150,19 @@ These tasks also did not separate pass from fail for this model. Future
 benchmark work should measure efficiency (calls, time, cost) and compare
 baselines or weaker models, rather than only adding difficulty. One run per task;
 no repeatability claim.
+
+## Office tasks
+
+Run `20261004-144403-9eec` (LibreOffice 26.8.0.3, claude-opus-5-5): 2/2 passed,
+20 tool calls, no tool errors, 37.5 agent seconds and $0.264 API-equivalent usage
+against the existing Pro allowance. No cleanup failures. This run explicitly
+disabled desktop create/destroy/launch tools and used a $1 cap per task.
+
+| Task | Result | Tool calls | Seconds | API-equivalent USD |
+| --- | --- | ---: | ---: | ---: |
+| office-writer-document | pass | 13 | 22.8 | 0.181 |
+| office-calc-budget | pass | 7 | 14.7 | 0.083 |
+
+The agent handled the first-run UI and saved files that passed independent checks.
+This is one run of two small tasks, not a broad office-application reliability
+claim or a comparison with another runtime.

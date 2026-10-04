@@ -288,7 +288,16 @@ class XtermTitleCode(Task):
             "shown in the terminal's window title, with the extension .txt."
         )
         title = f"Code {context.secret}"
-        return ["xterm", "-u8", "-T", title, "-e", "sh"], prompt
+        return [
+            "xterm",
+            "-u8",
+            "-fa",
+            "DejaVu Sans Mono",
+            "-T",
+            title,
+            "-e",
+            "sh",
+        ], prompt
 
     def check(self, context):
         expected = context.target / f"{context.secret}.txt"

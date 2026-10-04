@@ -1,5 +1,45 @@
 # Development log
 
+## 2026-10-04 — Xwayland fixture diagnostics and repetition
+
+PR #27 CI run `37206984363`: Ubuntu and Arch passed; Fedora's existing
+Xwayland test found no mapped window. Its retained `windows.json` is empty
+and screenshot is black; xterm stderr warns that the default fixed bitmap font
+is missing. This is evidence of the failure, not proof of its cause.
+
+Select installed DejaVu Sans Mono explicitly in the test and Xterm benchmark
+fixture, and retain full session status alongside window state and screenshot
+on failure. CI now repeats Xwayland mapping/input ten times on all three
+distributions. Local repeat: 10/10 passed in 10.465 s with xterm 411 and
+Xwayland 24.1.13. Ruff lint/format passed. Final CI is pending.
+
+## 2026-10-04 — M4 office benchmark preparation
+
+Added an office suite with Writer document creation and Calc SUM entry checked
+from saved files. It reuses the independently validated office verifiers, starts
+fresh private profiles, and leaves first-run dialogs for the agent to handle.
+Integrated CLI dry run `20261004-144149-180e`: 0/2 passes as intended, no setup
+errors or cleanup failures. Earlier direct-harness negative control:
+`artifacts/office-benchmark-dry/6773c191a324/report.json`.
+
+One sparing model run with the existing $1/task cap, `20261004-144403-9eec`:
+claude-opus-5-5 passed both tasks. Writer: 13 calls, 22.8 s, $0.181 API-equivalent;
+Calc: 7 calls, 14.7 s, $0.083. Total 20 calls, 37.5 s, $0.264; no tool errors or
+cleanup failures. First-run prompts were handled through the GUI. Usage came
+from the previously authorized testing client's Pro allowance; no new paid API
+account was configured. Committed preparation before the run and results after it.
+
+Benchmark tools now explicitly exclude session creation, destruction and process
+launch: the harness owns those, and tasks already have their applications open.
+This also prevents substituting a launched script for the requested GUI edits.
+The installed CLI's help confirms the `--disallowedTools` option. Earlier task
+runs had broader tool access; this policy difference must be reported in any
+comparison. Ruff lint/format and diff checks passed.
+
+PR #26 passed Ubuntu, Fedora and Arch CI in run `37206326007` after the explicit
+Calc Name Box selection, and was merged. Rapid arrow navigation remains an
+observed limitation, with no proven cause; the stricter file verifier was kept.
+
 ## 2026-10-04 — M3 LibreOffice Writer and Calc
 
 Added `scripts/office_smoke.py` and two real-application integration tests. Writer

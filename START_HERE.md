@@ -1,6 +1,6 @@
 # Continue development in a new chat
 
-Updated: 2026-10-04 (after PR #27; local baseline PR #28 awaiting checks). The hardened runtime, MCP tools and read-only
+Updated: 2026-10-04 (PR #28 repeated comparison complete; see its final checks). The hardened runtime, MCP tools and read-only
 observer are implemented. Continue from the current status rather than repeating completed work.
 
 Open `/home/user/private-agent-desktop` as the workspace and paste the following:
@@ -17,7 +17,7 @@ The working foundation uses Python/uv and private labwc sessions. Runtime depend
 
 Next priorities:
 
-1. Benchmarks (M4): standard suite 20/20 (twice) and hard suite 10/10 (once) with Claude Code; see docs/BENCHMARK.md. Pass rate no longer separates results for this model. Office suite passed 2/2. A paired native/Cua GUI-only code-and-drag pilot passed 1/1 each with seven calls, but has unmatched environments and only one sample. `scripts/cua_benchmark.py` uses fresh local containers and a fixed-target GUI adapter. Next: repeated comparisons with matched environments, other models, and human takeover. The user's Claude Pro usage is limited: validate with `--dry-run` first, run agents sparingly and commit after each run. Human takeover/action ownership is not implemented.
+1. Benchmarks (M4): standard suite 20/20 (twice) and hard suite 10/10 (once) with Claude Code; see docs/BENCHMARK.md. Pass rate no longer separates results for this model. Office suite passed 2/2. Native/Cua GUI-only comparisons passed 6/6 each across two sets of three browser tasks, using 46/49 calls and $0.518/$0.529 API-equivalent usage ($1.047 of the user-authorized $5 total). Environments and caching differ, so this establishes no performance winner. Metrics are committed under `benchmarks/results`. `scripts/cua_benchmark.py` uses fresh local containers and a fixed-target GUI adapter. Next: repeated comparisons with matched environments, other models, and human takeover. The user's Claude Pro usage is limited: validate with `--dry-run` first, run agents sparingly and commit after each run. Human takeover/action ownership is not implemented.
    Later (user request): compare cost, tool design and approach with public projects such as Cua, and adopt what they do better.
 2. Compatibility (#6): Mousepad Unicode file dialogs/private clipboards and Writer/Calc saved-file checks pass on all three CI distributions (#25–26). Remaining: broader applications, clipboard retention/images, widget readiness, desktop installs beyond CI containers. Xwayland failure diagnostics and ten repetitions per distribution pass (#27); its intermittent missing-window cause is unproven. Investigate #17 with the uploaded CI artifacts when it recurs.
 Known visible-mode property: a focused nested window also receives host keyboard input.

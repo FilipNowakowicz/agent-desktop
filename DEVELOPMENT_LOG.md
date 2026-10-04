@@ -1,5 +1,27 @@
 # Development log
 
+## 2026-10-04 — Repeated comparison complete within budget
+
+Second container set `20261004-154321-3049`, seed 41028, claude-opus-5-5,
+$0.40/task cap: code-and-drag passed (7 calls, 11.4 s, $0.069611); form
+passed (11 calls, 15.7 s, $0.0924884); confirmation passed (7 calls, 16.7 s,
+$0.0916244). No tool/setup/cleanup errors. Committed after this final batch.
+
+Across two sets of three tasks: native 6/6, 46 calls, 104.7 s, $0.5183458;
+Cua 6/6, 49 calls, 84.0 s, $0.529132. Combined $1.0474778, below the user
+limit of $5 including the initial pair. Saved compact per-trial metrics in
+benchmarks/results/2026-10-04-browser-comparison.json; all six matched page
+pairs have equal hashes. Screenshot dimensions and token/caching counters are
+preserved. All trial sessions/containers were removed.
+
+Inspected Cua confirmation observations 2 and 3: a dimmed page before the
+prompt is drawn, then the visible prompt. Extra screenshots account for its
+additional calls; there is no repeated deletion action. Both API error counts
+are zero, which does not establish semantic UI/frame readiness. Costs are nearly
+equal, and unmatched environments, resource caps, cache and sample size prevent
+a causal performance claim. No additional account-using runs are needed for
+this comparison. PR #28 final checks are pending.
+
 ## 2026-10-04 — Second native comparison set
 
 Run `20261004-154125-494e`, seed 41028, claude-opus-5-5, $0.40/task cap:

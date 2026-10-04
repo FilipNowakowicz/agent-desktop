@@ -14,7 +14,7 @@ update this status and the development log with completed work and remaining gap
 | M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
 | M2 | MCP, read-only observer and Claude Code integration (5/5 end-to-end GUI task) | Human takeover / action ownership |
 | M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm, GTK/Qt dialogs, Mousepad file/clipboard tasks and Writer/Calc saved-file workflows pass (#25–#26) | Broader office tasks, desktop installs on other distributions, widget readiness, #17, intermittent Arch Xwayland activation and rapid Calc arrow navigation |
-| M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); paired native/container code-and-drag pilot 1/1 each, both 7 calls (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models; human takeover |
+| M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); two sets of three native/container browser tasks: 6/6 each, 46/49 calls, nearly equal usage (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models; human takeover |
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

@@ -225,3 +225,7 @@ own viewer window):
 ```sh
 uv run scripts/viewer_smoke.py
 ```
+
+See [the benchmark report](docs/BENCHMARK.md) for verified GUI tasks and a
+restricted local-container comparison. Its optional harness uses an existing
+local runtime and performs no host installation or configuration.

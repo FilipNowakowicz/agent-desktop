@@ -224,3 +224,40 @@ retain raw usage and per-model accounting. Differences in caching, schemas,
 images, desktop environment and one stochastic run prevent attributing the
 cost difference to any single component. This sample establishes comparable
 completion and equal tool calls; it does not establish a performance winner.
+
+## Repeated three-task comparison
+
+The user authorized up to $5 API-equivalent total, including the first pair.
+Two sets cover code-and-drag, form filling and confirmation on each runtime;
+the second code uses seed 41028 (first: 41027). The ten additional task runs
+used $0.40 caps. Actual total was **$1.0474778**. All six native/container page
+pairs match byte for byte. Three-task negative controls failed every check
+without setup/cleanup errors (`20261004-153446-bedd`, `20261004-153700-9597`).
+
+| Interface | Verified trials | Calls / tool errors | Agent time total | API-equivalent usage |
+| --- | --- | --- | --- | --- |
+| Native private desktop | 6/6 | 46 / 0 | 104.7 s | $0.5183458 |
+| GUI-only Cua | 6/6 | 49 / 0 | 84.0 s | $0.5291320 |
+
+[Committed metrics](../benchmarks/results/2026-10-04-browser-comparison.json)
+retain per-trial outcomes, tool counts, usage counters, screenshot dimensions,
+page hashes, seeds, caps and source artifact IDs. The later batches are native
+`20261004-153647-ba09`, Cua `20261004-153931-af37`, native
+`20261004-154125-494e` and Cua `20261004-154321-3049`. All trials cleaned up.
+Source preparation and each batch's results were committed separately.
+
+Code-and-drag uses 7 calls and form filling 11 on both interfaces in both sets.
+Confirmation uses 5 calls natively and 6/7 in Cua. Both perform the intended
+single confirmation; Cua takes extra screenshots while the dialog and completed
+page render. In the second Cua trial, observation 2 is dimmed with no drawn
+prompt, observation 3 shows the prompt, and a later observation confirms the
+completed title. The original images were inspected. Extra observations are
+not tool API errors or repeated deletion actions.
+
+Observed costs are nearly equal. Tool counts match except for confirmation
+observations; timing varies even at identical call counts. Only three fixtures,
+two trials each, different environments and cache counters are covered. Native's
+first form/confirmation batch also overlapped container dry setup. These results
+support neither a general performance winner nor a decision to replace the
+runtime. Widget/frame readiness and broader daily-use tasks need measurements
+before choosing further interaction extensions.

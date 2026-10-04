@@ -101,6 +101,46 @@ def desktop_actions(
 
 
 @mcp.tool()
+def desktop_ui(
+    session: str,
+    app: str | None = None,
+    window: str | None = None,
+    max_nodes: int = 300,
+) -> dict:
+    """List visible UI elements through accessibility: role, name, states, text,
+    value and available actions, as a flat list with depth.
+
+    Filter by application name and/or window title substring. Usually much
+    smaller than a screenshot and exact about labels and field contents. Some
+    applications expose little (e.g. Chromium needs --force-renderer-accessibility).
+    """
+    return core.request(session, "ui", app=app, window=window, max_nodes=max_nodes)
+
+
+@mcp.tool()
+def desktop_ui_action(
+    session: str,
+    node: str,
+    action: str,
+    text: str | None = None,
+    observation: str | None = None,
+) -> dict:
+    """Act on a desktop_ui node: "press" (click/activate/toggle), "focus",
+    "set_text" (replace an editable field's text) or a listed action name.
+
+    Works without coordinates. Verify the result with desktop_ui or a screenshot.
+    """
+    return core.request(
+        session,
+        "ui_action",
+        node=node,
+        action=action,
+        text=text,
+        observation=observation,
+    )
+
+
+@mcp.tool()
 def desktop_focus(session: str, window: str) -> dict:
     """Activate a private window and wait for its activated state (up to 2 seconds).
 

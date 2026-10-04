@@ -835,12 +835,20 @@ class RuntimeTests(unittest.TestCase):
         text = "Browser café: " + "".join(chr(0x3B1 + i) for i in range(25)) + " ok!"
         core.request(session, "type", text=text)
         expected = json.dumps(text, ensure_ascii=False)
-        wait_for(
-            lambda: any(
-                w["title"].startswith(expected)
-                for w in core.request(session, "windows")["windows"]
+        try:
+            wait_for(
+                lambda: any(
+                    w["title"].startswith(expected)
+                    for w in core.request(session, "windows")["windows"]
+                )
             )
-        )
+        except AssertionError:
+            # The page title shows what actually arrived (seen once on Fedora).
+            titles = [w["title"] for w in core.request(session, "windows")["windows"]]
+            self.failure_diagnostics(session, self.root / "diagnostics")
+            raise AssertionError(
+                f"Expected title {expected}; windows: {titles}"
+            ) from None
 
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()

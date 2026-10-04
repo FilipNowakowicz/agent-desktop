@@ -363,7 +363,17 @@ def wait(
     return result(True, "ok", matches)
 
 
-SEQUENCE_ACTIONS = ("click", "move", "drag", "scroll", "type", "key", "focus", "wait")
+SEQUENCE_ACTIONS = (
+    "click",
+    "move",
+    "drag",
+    "scroll",
+    "type",
+    "key",
+    "ui_action",
+    "focus",
+    "wait",
+)
 
 
 def run_actions(session, actions, observation=None):

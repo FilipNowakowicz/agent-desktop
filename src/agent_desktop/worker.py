@@ -16,6 +16,7 @@ import time
 import uuid
 from pathlib import Path
 
+from .atspi import Accessibility, Unsupported
 from .wayland import (
     BUTTONS,
     Keysyms,
@@ -151,6 +152,8 @@ class Worker:
         self.takeover = None
         self.control = {"owner": "agent", "epoch": 0, "request": None, "last": None}
         self.needs_screenshot = False
+        self.registry = None
+        self.atspi = None
         self.frames = {}  # recent raw frames for change detection, oldest first
         self.virtual_pointer = None
         self.virtual_keyboard = None
@@ -270,7 +273,10 @@ class Worker:
                 self.env["WAYLAND_DISPLAY"] = str(display)
                 self.info["wayland_display"] = str(display)
                 # Activated services get the private display, never the host's.
+                registryd = self.prepare_accessibility()
                 self.start_bus()
+                if registryd:
+                    self.start_registry(registryd)
                 # Create the pointer before applications so its seat capability is stable.
                 self.virtual_pointer = VirtualPointer(display)
                 self.virtual_keyboard = VirtualKeyboard(display, self.root)
@@ -296,6 +302,45 @@ class Worker:
         if value:
             self.env["DISPLAY"] = value
         self.info["x_display"] = value or None
+
+    def prepare_accessibility(self):
+        """Enable AT-SPI for this session when at-spi2-core is installed."""
+        registryd = find_registryd()
+        self.info["accessibility"] = registryd is not None
+        if not registryd:
+            return None
+        # Hosts may disable accessibility globally; enable it for this session only.
+        for key in ("NO_AT_BRIDGE", "GTK_A11Y"):
+            self.env.pop(key, None)
+        self.env["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] = "1"
+        self.env["ACCESSIBILITY_ENABLED"] = "1"  # Chromium/Electron
+        # Let the private bus activate the matching bus launcher (e.g. from Nix).
+        share = Path(registryd).resolve().parent.parent / "share"
+        if (share / "dbus-1/services/org.a11y.Bus.service").is_file():
+            current = self.env.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share")
+            self.env["XDG_DATA_DIRS"] = f"{share}:{current}"
+        return registryd
+
+    def start_registry(self, registryd):
+        # D-Bus activation of the registry fails without a systemd user session.
+        with (self.root / "accessibility.log").open("ab") as log:
+            self.registry = subprocess.Popen(
+                [registryd],
+                env=self.env,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+            )
+
+    def accessibility(self):
+        if not self.info.get("accessibility"):
+            raise RuntimeError(
+                "Accessibility unavailable: install at-spi2-core or set "
+                "AGENT_DESKTOP_AT_SPI_REGISTRYD"
+            )
+        if self.atspi is None:
+            self.atspi = Accessibility(self.env["DBUS_SESSION_BUS_ADDRESS"])
+        return self.atspi
 
     def start_bus(self):
         # A child bus keeps D-Bus-activated services inside this worker's tree.
@@ -325,6 +370,7 @@ class Worker:
     def tracked(self):
         processes = [
             self.bus,
+            self.registry,
             self.compositor,
             self.viewer,
             self.takeover,
@@ -615,6 +661,7 @@ class Worker:
                 "session": self.info["id"],
                 "mode": self.info["mode"],
                 "status": "ready",
+                "accessibility": self.info.get("accessibility", False),
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
@@ -653,7 +700,11 @@ class Worker:
                 "A person has control of this private desktop; nothing was sent. "
                 "Wait with desktop_control until control returns to the agent."
             )
-        if self.needs_screenshot and operation in (*INPUT_OPERATIONS, "focus"):
+        if self.needs_screenshot and operation in (
+            *INPUT_OPERATIONS,
+            "focus",
+            "ui_action",
+        ):
             raise StaleObservation(
                 "A person used this desktop since your last screenshot; "
                 "no input was sent. Take a new screenshot."
@@ -702,6 +753,32 @@ class Worker:
             }
         if operation == "screenshot":
             return self.screenshot(request.get("region"), request.get("scale"))
+        if operation == "ui":
+            max_nodes = request.get("max_nodes", 300)
+            if not isinstance(max_nodes, int) or not 1 <= max_nodes <= 2000:
+                raise ValueError("max_nodes must be an integer from 1 to 2000")
+            return self.accessibility().tree(
+                request.get("app"), request.get("window"), max_nodes
+            )
+        if operation == "ui_action":
+            if request.get("observation") is not None:
+                self.check_observation(request["observation"])
+            accessibility = self.accessibility()
+            try:
+                return accessibility.act(
+                    request.get("node"), request.get("action"), request.get("text")
+                )
+            except Unsupported:
+                # e.g. Chromium: focus the field, verify, then replace by typing.
+                accessibility.focus(request["node"])
+                self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)
+                self.keyboard().type(request["text"])
+                return {
+                    "node": request["node"],
+                    "action": "set_text",
+                    "delivered": True,
+                    "method": "keyboard",
+                }
         if operation == "observe":
             return {"observation": self.observation()}
         if operation == "frame":
@@ -856,7 +933,12 @@ class Worker:
     def cleanup(self):
         if self.toplevels and self.compositor and self.compositor.poll() is None:
             self.stop_applications()
-        for device in (self.virtual_pointer, self.virtual_keyboard, self.toplevels):
+        for device in (
+            self.virtual_pointer,
+            self.virtual_keyboard,
+            self.toplevels,
+            self.atspi,
+        ):
             if device:
                 device.close()
         if self.compositor and self.compositor.poll() is None:
@@ -923,6 +1005,20 @@ def changed_box(before, after, width, height):
         left = min(left, first_difference(a, b) // 3)
         right = max(right, width - 1 - first_difference(a[::-1], b[::-1]) // 3)
     return [left, top, right - left + 1, bottom - top + 1]
+
+
+REGISTRYD_PATHS = (
+    "/usr/libexec/at-spi2-registryd",
+    "/usr/lib/at-spi2-registryd",
+    "/usr/lib/at-spi2-core/at-spi2-registryd",
+    "/usr/libexec/at-spi2-core/at-spi2-registryd",
+)
+
+
+def find_registryd():
+    override = os.environ.get("AGENT_DESKTOP_AT_SPI_REGISTRYD")
+    candidates = [override] if override else list(REGISTRYD_PATHS)
+    return next((c for c in candidates if c and os.access(c, os.X_OK)), None)
 
 
 def command_name(pid):

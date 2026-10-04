@@ -614,12 +614,19 @@ class RuntimeTests(unittest.TestCase):
             ],
         )
         wait_for(directory.joinpath("ready").exists, timeout=20)
-        wait_for(
-            lambda: any(
-                w["title"] == "X11 fixture" and "activated" in w["states"]
-                for w in core.request(session, "windows")["windows"]
+        try:
+            wait_for(
+                lambda: any(
+                    w["title"] == "X11 fixture" and "activated" in w["states"]
+                    for w in core.request(session, "windows")["windows"]
+                )
             )
-        )
+        except AssertionError:
+            directory.joinpath("windows.json").write_text(
+                json.dumps(core.request(session, "windows"), indent=2)
+            )
+            core.request(session, "screenshot")
+            raise
         core.request(session, "type", text="x11 café λ")
         core.request(session, "key", key="Return")
         wait_for(directory.joinpath("mouse-ready").exists)

@@ -19,7 +19,12 @@ Local validation (Mousepad 0.7.0, labwc 0.20.2): both tasks passed five repetiti
 each (10 tests in 31.415 s). Full suite: 29 tests in 41.321 s, 28 passed and visible
 mode skipped. Ruff lint/format and diff checks passed. Existing runtime binaries
 were supplied through command-local PATH. CI now installs Mousepad on Ubuntu,
-Fedora and Arch; results are pending. No personal profiles or host changes used.
+Fedora and Arch. In run `37203685617`, the new editor tasks passed on all three;
+Ubuntu/Fedora jobs passed, but Arch's existing Xwayland test timed out waiting
+for its terminal's activated state. Its child had reached the ready marker;
+retained logs showed a missing fixed-font warning but did not establish cause.
+The test now retains window state and a screenshot at this timeout. Full-stage
+CI is being rerun before integration. No personal profiles or host changes used.
 
 ## 2026-10-04 — Wait for guardian exit in crash-cleanup test
 

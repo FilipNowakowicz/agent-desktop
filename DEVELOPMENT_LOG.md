@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-04 — Waiting for UI elements (verified outcomes)
+
+Plan extension A ("verified outcomes"): `wait` / `desktop_wait` accept `element`
+(accessible-name substring), `role` (exact) and `text` (substring of text or
+value), polling `ui` every 0.2 s after any window condition and before
+`stable_ms`; `gone` applies to the element when no window condition is given.
+Results include up to five matching elements. Usable as a `wait` step in action
+sequences. Test: a zenity entry set via `set_text` is found by role and text,
+an absent element times out with `no element`, and after pressing OK the button
+is reported gone. The race this exposed (tree read during window close) is fixed
+in the semantic UI branch. During this work a local `git checkout --theirs .`
+discarded uncommitted changes; they were restored from the dangling stash commit.
+
 ## 2026-10-04 — Semantic UI through a private AT-SPI registry
 
 Plan extension A ("semantic UI"). Spike first (scratch script, jeepney): the

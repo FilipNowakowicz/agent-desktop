@@ -17,6 +17,7 @@ Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
 | NixOS, persistent virtual keyboard into foot | Typing immediately after the window becomes active, 300+ distinct CJK characters (keymap reset), repeats, Ctrl modifier and invalid-key rejection: 10/10 idle, 10/10 with 12 busy processes; no wtype installed |
 | NixOS, Xwayland 24.1.13 + xterm 411 | X11 terminal receives `x11 café λ` and a mouse click: 10/10 idle, 10/10 with 12 busy processes |
 | NixOS, zenity 4.2.2 (GTK) and kdialog 26.08.1 (Qt 6), each on native Wayland and X11 | Entry dialogs receive Unicode text and Return; exact stdout checked: 5/5 idle, 5/5 loaded |
+| NixOS, Mousepad 0.7.0, native Wayland with `--disable-server` and session-private HOME/D-Bus | Open, edit, save and Save As with spaces/Unicode in paths; two simultaneous sessions retain distinct Unicode copy/paste contents: 5/5 repetitions of both tasks |
 | NixOS, wlr-randr 0.5.0 on headless output | Mode change to 1024×768 updates coordinate bounds; scale 2 is rejected |
 | NixOS, supervisor crash | SIGKILL of the worker: guardian stopped all processes including a token-less daemon, removed the runtime and marked the session failed. SIGKILL of worker and guardian: `destroy` recovered by token |
 | NixOS, terminal fixture plus daemonizing child, repeated lifecycle | Final code: 20/20 create/type/destroy cycles with 12 busy CPU processes on 12 cores; 40/40 earlier branch cycles (20 idle, 20 loaded). No token, daemon or runtime leftovers |
@@ -26,6 +27,14 @@ Headless rendering uses pixman, one output and scale 1. Tested text includes ASC
 `café`, Greek lambda and 300 CJK ideographs. Typed text uses a generated per-character
 keymap, so it is layout-independent; key chords use keysym names. Input methods (IME),
 dead keys and applications that interpret physical layouts are not covered.
+
+The Mousepad file-dialog test waits 200 ms after requesting the location field
+and 300 ms after typing a path, because GTK creates and validates these widgets
+asynchronously. These fixture delays are not a readiness guarantee for arbitrary
+applications or load. Window activation and successful input delivery alone do
+not establish widget readiness. Clipboard coverage is application-to-application
+within each session; clipboard APIs, images and retention after owner exit remain
+untested.
 
 Ubuntu checks skip visible testing because the runner has no physical Wayland host.
 Do not infer general support for browsers beyond the one tested fixture, GTK/Qt

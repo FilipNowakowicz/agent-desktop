@@ -498,6 +498,97 @@ class RuntimeTests(unittest.TestCase):
 
             wait_for(received)
 
+    @unittest.skipUnless(shutil.which("mousepad"), "mousepad unavailable")
+    def test_editor_file_dialogs_and_save_as(self):
+        session = self.new_session()
+        folder = self.root / "project with spaces"
+        folder.mkdir()
+        source = folder / "source café.txt"
+        source.write_text("Original draft\n")
+        target = folder / "saved λ.txt"
+        core.request(session, "launch", argv=["mousepad", "--disable-server"])
+
+        def active():
+            return next(
+                (
+                    w
+                    for w in core.request(session, "windows")["windows"]
+                    if "activated" in w["states"]
+                ),
+                None,
+            )
+
+        wait_for(active)
+        core.request(session, "key", key="o", modifiers=["ctrl"])
+        wait_for(lambda: (w := active()) and "Open" in w["title"])
+        core.request(session, "screenshot")
+        core.request(session, "key", key="l", modifiers=["ctrl"])
+        # GTK creates the location entry asynchronously inside the same window;
+        # activated toplevel state alone does not imply widget readiness.
+        time.sleep(0.2)
+        core.request(session, "type", text=str(source))
+        # The chooser validates the typed path before enabling its Open action.
+        time.sleep(0.3)
+        core.request(session, "key", key="Return")
+        core.request(session, "screenshot")
+        wait_for(lambda: (w := active()) and source.name in w["title"])
+        before = core.request(session, "screenshot")
+        core.request(session, "key", key="a", modifiers=["ctrl"])
+        text = "Plan for Q3\nStatus: FINAL\nOwner: café λ\nBudget: 4200\n"
+        core.request(session, "type", text=text)
+        core.request(session, "key", key="s", modifiers=["ctrl"])
+        wait_for(lambda: source.read_text() == text)
+        core.request(session, "key", key="s", modifiers=["ctrl", "shift"])
+        wait_for(lambda: (w := active()) and "Save" in w["title"])
+        core.request(session, "screenshot")
+        core.request(session, "key", key="a", modifiers=["ctrl"])
+        core.request(session, "type", text=str(target))
+        time.sleep(0.3)
+        core.request(session, "key", key="Return")
+        wait_for(lambda: target.exists() and target.read_text() == text)
+        self.assertEqual(source.read_text(), text)
+        wait_for(lambda: (w := active()) and target.name in w["title"])
+        after = core.request(session, "screenshot")
+        self.assertNotEqual(
+            Path(before["path"]).read_bytes(), Path(after["path"]).read_bytes()
+        )
+
+    @unittest.skipUnless(shutil.which("mousepad"), "mousepad unavailable")
+    def test_editor_clipboards_are_private_to_each_session(self):
+        sessions = [self.new_session(), self.new_session()]
+        messages = ["First session café λ", "Second session résumé Ω"]
+        files = [self.root / "first.txt", self.root / "second.txt"]
+        for session, text, path in zip(sessions, messages, files, strict=True):
+            path.write_text(text)
+            core.request(
+                session,
+                "launch",
+                argv=["mousepad", "--disable-server", str(path)],
+            )
+            window = wait_for(
+                lambda session=session, path=path: next(
+                    (
+                        w
+                        for w in core.request(session, "windows")["windows"]
+                        if path.name in w["title"] and "activated" in w["states"]
+                    ),
+                    None,
+                )
+            )
+            core.request(session, "focus", window=window["id"])
+            core.request(session, "key", key="a", modifiers=["ctrl"])
+            core.request(session, "key", key="c", modifiers=["ctrl"])
+            core.request(session, "key", key="BackSpace")
+            core.request(session, "key", key="s", modifiers=["ctrl"])
+            wait_for(lambda path=path: path.read_text() == "")
+        # Both clipboards have owners before either paste: leaked sharing would
+        # replace the first message with the second one.
+        for session, text, path in zip(sessions, messages, files, strict=True):
+            core.request(session, "key", key="v", modifiers=["ctrl"])
+            core.request(session, "key", key="s", modifiers=["ctrl"])
+            wait_for(lambda path=path, text=text: path.read_text() == text)
+            core.request(session, "screenshot")
+
     @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
     def test_xwayland_application_receives_input(self):
         session = self.new_session()
@@ -523,12 +614,19 @@ class RuntimeTests(unittest.TestCase):
             ],
         )
         wait_for(directory.joinpath("ready").exists, timeout=20)
-        wait_for(
-            lambda: any(
-                w["title"] == "X11 fixture" and "activated" in w["states"]
-                for w in core.request(session, "windows")["windows"]
+        try:
+            wait_for(
+                lambda: any(
+                    w["title"] == "X11 fixture" and "activated" in w["states"]
+                    for w in core.request(session, "windows")["windows"]
+                )
             )
-        )
+        except AssertionError:
+            directory.joinpath("windows.json").write_text(
+                json.dumps(core.request(session, "windows"), indent=2)
+            )
+            core.request(session, "screenshot")
+            raise
         core.request(session, "type", text="x11 café λ")
         core.request(session, "key", key="Return")
         wait_for(directory.joinpath("mouse-ready").exists)

@@ -26,6 +26,7 @@ jobs:
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
         env:
+          DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Repeat focus switching, Xwayland input and supervisor crash cleanup
         run: |
@@ -46,6 +47,7 @@ jobs:
           sys.exit(not result.wasSuccessful())
           PY
         env:
+          DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure
         if: failure()
@@ -67,14 +69,14 @@ jobs:
             install: >-
               dnf install -y --setopt=install_weak_deps=False git tar gzip
               labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland
-              xterm xev zenity mousepad chromium libreoffice-writer libreoffice-calc
+              xterm xev xprop xwininfo zenity mousepad chromium libreoffice-writer libreoffice-calc
               libreoffice-gtk3 dejavu-sans-fonts dejavu-sans-mono-fonts
             versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
           - name: arch
             image: archlinux:latest
             install: >-
               pacman -Syu --noconfirm git labwc foot grim wayvnc wlr-randr dbus
-              xorg-xwayland xterm xorg-xev zenity mousepad chromium libreoffice-fresh ttf-dejavu
+              xorg-xwayland xterm xorg-xev xorg-xprop xorg-xwininfo zenity mousepad chromium libreoffice-fresh ttf-dejavu
             versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity mousepad libreoffice-fresh
     name: runtime (${{ matrix.name }})
     container: ${{ matrix.image }}
@@ -95,6 +97,7 @@ jobs:
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
         env:
+          DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Repeat Xwayland mapping and input
         run: |
@@ -110,6 +113,7 @@ jobs:
           sys.exit(not result.wasSuccessful())
           PY
         env:
+          DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure
         if: failure()

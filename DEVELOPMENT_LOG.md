@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-04 — X11 mapping failure recurs during baseline CI
+
+PR #28 runs `37209103464` and `37209247332`: Ubuntu/Fedora passed, Arch failed.
+The latter retained xterm status: application and Xwayland alive, display :0,
+no mapped foreign-toplevel window. A GTK/X11 dialog also failed activation.
+The explicit installed terminal font produces no missing-font warning, so it
+did not resolve the mapping failure. Native Wayland and office tasks passed.
+No root cause established; issue #17 remains open and checks are not waived.
+
+CI test sessions now start labwc with debug logs and failed X11/dialog tests
+retain scoped X11 root properties/window trees, status, windows and screenshot.
+Diagnostic commands run only through the explicit private session environment;
+errors are recorded without masking the original failure. Production runtime
+behavior and assertions are unchanged. User selected broader comparisons with
+up to $5 API-equivalent total; the existing paired pilot uses $0.1841124 of it.
+
 ## 2026-10-04 — Paired browser baseline pilot
 
 Container pilot `20261004-151945-3d34` passed the same code-and-drag fixture

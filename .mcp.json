@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "private-desktop": {
+      "command": "uv",
+      "args": ["run", "agent-desktop-mcp"]
+    }
+  }
+}

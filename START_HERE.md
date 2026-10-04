@@ -17,9 +17,8 @@ The working foundation uses Python/uv and private labwc sessions. Runtime depend
 
 Next priorities:
 
-1. Interactive client integration (#7): MCP transport works, but no interactive client is configured. Ask which client to configure before changing its persistent configuration. Then validate images and a real GUI task. Human takeover/action ownership is not implemented.
+1. Benchmarks (M4): Claude Code works through the project `.mcp.json` (`scripts/claude_code_task.py` passed 5/5). Build the ~20-task suite and measure completion, interventions, time and cost. Human takeover/action ownership is not implemented.
 2. Compatibility (#6): larger daily-use applications (editors, file choosers/portals, clipboard), desktop installs beyond CI containers. Investigate #17 with the uploaded CI artifacts when it recurs.
-3. Benchmarks (M4): measure real task completion, cleanup failures and required human intervention, once an agent client is integrated.
 Known visible-mode property: a focused nested window also receives host keyboard input.
 
 Continue autonomously with project-local implementation and testing. Use stage branches and PRs, integrate successful stages after required checks, and keep the repo private. Update the plan and development log with completed work, validation, failures and next work. Notify me when my input is needed.

@@ -127,10 +127,24 @@ A generic client configuration looks like:
 
 The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
 visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
-`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the client's environment.
-The protocol is tested with the official Python SDK's stdio client, including
-actual image blocks and observed GUI input. Individual client applications have
-not yet been configured or validated.
+`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the
+client's environment. The protocol is also tested with the official Python SDK's
+stdio client.
+
+### Claude Code
+
+This repository includes a project-scoped `.mcp.json` declaring the
+`private-desktop` server. Start `claude` in the repository and approve the project
+server when asked; the desktop tools then appear as `mcp__private-desktop__*`.
+The server inherits Claude Code's environment, so the runtime tools must be on
+its PATH (on NixOS, for example, start `claude` inside the `nix shell` shown below).
+
+`scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
+non-interactively, with no built-in tools and only this MCP server. The agent must
+create a session, launch Chromium on a local page, read a code that exists only
+in the rendered screenshot, type it, drag a box into a target and submit. The
+harness then verifies the page state itself, records host focus and pointer
+(Hyprland only), and destroys the session. It uses your Claude Code account.
 
 ## Run the experiment
 

@@ -1,6 +1,6 @@
 # Continue development in a new chat
 
-Updated: 2026-10-04 (human takeover for logins added after #25–28). The hardened runtime, MCP tools and read-only
+Updated: 2026-10-04 (human takeover #29 and login profiles #30 merged; #17 closed). The hardened runtime, MCP tools and read-only
 observer are implemented. Continue from the current status rather than repeating completed work.
 
 Open `/home/user/private-agent-desktop` as the workspace and paste the following:

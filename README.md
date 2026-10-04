@@ -156,6 +156,8 @@ on Ubuntu; passing unit-only checks must not be described as a desktop validatio
 Run the stdio server with `uv run agent-desktop-mcp`. It exposes session lifecycle,
 launch, windows, PNG images with dimensions, input and logs through the same core.
 Desktop sessions persist when an MCP client disconnects; destroy them explicitly.
+The server sends instructions to the client describing the screenshot/act/verify
+loop and the login handoff (`desktop_request_human`, `desktop_control`, profiles).
 
 A generic client configuration looks like:
 

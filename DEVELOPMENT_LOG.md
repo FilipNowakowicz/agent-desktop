@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-04 — Takeover and profiles integrated; agent instructions
+
+#29 (takeover) passed CI `37222504707` on Ubuntu, Fedora (wayvnc 0.9.1) and Arch
+(wayvnc 0.10.2), including `test_takeover`, and was merged. #30 (profiles) passed
+CI `37223010959` on all three and was merged. Graceful teardown lengthened the full
+suite by about 20–25 s on Ubuntu and Arch (applications that do not close within
+3 s now wait up to 2 s more after SIGTERM); Arch's 100 loaded X11 repetitions took
+6 min versus 4 min in the previous run, within earlier variation (272–367 s).
+
+Issue #17 was closed: no Ubuntu recurrence in 18 `runtime` jobs since #23, each
+running the focus test 11 times. The original cause remains unproven.
+
+The MCP server now sends instructions (shown to clients such as Claude Code)
+covering the screenshot/act/verify loop, the login handoff and profiles; the MCP
+test checks they arrive through the stdio transport. Not yet observed with a real
+agent run, to save the user's limited usage.
+
 ## 2026-10-04 — Persistent login profiles
 
 Stacked on the takeover branch. `create --profile NAME` / `desktop_create(profile=)`

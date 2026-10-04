@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -114,9 +115,53 @@ class RuntimeTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def new_session(self, mode="headless"):
-        session = core.create(mode)["session"]
+        tools = None
+        if os.environ.get("DESKTOP_TEST_DEBUG"):
+            wrapper = self.root / "debug-labwc"
+            wrapper.write_text(
+                "#!/bin/sh\nexec " + shlex.quote(shutil.which("labwc")) + ' -d "$@"\n'
+            )
+            wrapper.chmod(0o700)
+            tools = {"labwc": str(wrapper)}
+        session = core.create(mode, tools=tools)["session"]
         self.created.append(session)
         return session
+
+    def failure_diagnostics(self, session, directory):
+        """Observe a failed private session without hiding the original assertion."""
+        directory.mkdir(exist_ok=True)
+        errors = []
+        for operation in ("windows", "status", "screenshot"):
+            try:
+                result = core.request(session, operation)
+                (directory / (operation + ".json")).write_text(
+                    json.dumps(result, indent=2)
+                )
+            except Exception as error:
+                errors.append(f"{operation}: {error}")
+        for program, arguments in (
+            ("xprop", ["-root"]),
+            ("xwininfo", ["-root", "-tree"]),
+        ):
+            if not shutil.which(program):
+                errors.append(f"{program}: executable unavailable")
+                continue
+            try:
+                app = core.request(session, "launch", argv=[program, *arguments])
+
+                def exited(app=app):
+                    return any(
+                        entry["pid"] == app["pid"] and entry["exit_code"] is not None
+                        for entry in core.request(session, "status")["applications"]
+                    )
+
+                wait_for(exited, timeout=3)
+                (directory / (program + ".txt")).write_text(
+                    Path(app["logs"]).read_text()
+                )
+            except Exception as error:
+                errors.append(f"{program}: {error}")
+        (directory / "diagnostic-errors.json").write_text(json.dumps(errors, indent=2))
 
     def fixture(self, session):
         directory = self.root / session
@@ -648,13 +693,7 @@ class RuntimeTests(unittest.TestCase):
                 )
             )
         except AssertionError:
-            directory.joinpath("windows.json").write_text(
-                json.dumps(core.request(session, "windows"), indent=2)
-            )
-            directory.joinpath("status.json").write_text(
-                json.dumps(core.request(session, "status"), indent=2)
-            )
-            core.request(session, "screenshot")
+            self.failure_diagnostics(session, directory)
             raise
         core.request(session, "type", text="x11 café λ")
         core.request(session, "key", key="Return")
@@ -697,7 +736,11 @@ class RuntimeTests(unittest.TestCase):
                         for w in core.request(session, "windows")["windows"]
                     )
 
-                wait_for(active, timeout=20)
+                try:
+                    wait_for(active, timeout=20)
+                except AssertionError:
+                    self.failure_diagnostics(session, self.root / case)
+                    raise
                 text = f"{case} café λ"
                 core.request(session, "type", text=text)
                 core.request(session, "key", key="Return")

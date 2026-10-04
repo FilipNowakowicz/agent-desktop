@@ -1,0 +1,405 @@
+{
+  "date": "2026-10-04",
+  "model": "claude-opus-5-5",
+  "authorized_total_usd": 5,
+  "actual_total_usd": 1.0474778,
+  "limitations": [
+    "Only three fixtures and two trials each; no general reliability or causal performance claim.",
+    "Native Chromium 153/Wayland/labwc versus Chromium 154/X11/XFCE in a rootless container.",
+    "Container has 2 CPUs/2GB; native has no matching cap. Screenshot dimensions differ.",
+    "Caching and provider latency vary. Native first form/confirmation batch overlapped container dry setup.",
+    "Agent time excludes startup and final harness checks. Interfaces are restricted to GUI controls."
+  ],
+  "summary": {
+    "native": {
+      "verified": 6,
+      "trials": 6,
+      "tool_calls": 46,
+      "tool_errors": 0,
+      "agent_seconds": 104.7,
+      "api_equivalent_usd": 0.5183458
+    },
+    "container": {
+      "verified": 6,
+      "trials": 6,
+      "tool_calls": 49,
+      "tool_errors": 0,
+      "agent_seconds": 84.0,
+      "api_equivalent_usd": 0.529132
+    }
+  },
+  "trials": [
+    {
+      "interface": "native",
+      "run": "20261004-151912-01e9",
+      "task": "chromium-canvas-code-drag",
+      "seed": 41027,
+      "budget_cap_usd": 1,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 2,
+        "desktop_drag": 1,
+        "desktop_screenshot": 3,
+        "desktop_type": 1
+      },
+      "agent_seconds": 13.0,
+      "api_equivalent_usd": 0.0803638,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 7495,
+        "cache_read_input_tokens": 30659,
+        "output_tokens": 712
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "e52bdec38db452283b87a44e4ff5f56a51ad067cde374f43145563522e249bb6",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "native",
+      "run": "20261004-153647-ba09",
+      "task": "chromium-form",
+      "seed": 41027,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 6,
+        "desktop_screenshot": 4,
+        "desktop_type": 1
+      },
+      "agent_seconds": 25.2,
+      "api_equivalent_usd": 0.107764,
+      "usage": {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 9521,
+        "cache_read_input_tokens": 52140,
+        "output_tokens": 1056
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "2117e922be88565b97847da0f7835052d5dce979fef2992360e3a5c815eb7038",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "native",
+      "run": "20261004-153647-ba09",
+      "task": "chromium-confirm-dialog",
+      "seed": 41027,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 2,
+        "desktop_screenshot": 3
+      },
+      "agent_seconds": 12.6,
+      "api_equivalent_usd": 0.0719224,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 7072,
+        "cache_read_input_tokens": 30172,
+        "output_tokens": 464
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "1ae1b016f409b117df8102ffa747c0c0ef1a2c1bdf062b3b84d5bef4e314d363",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "native",
+      "run": "20261004-154125-494e",
+      "task": "chromium-canvas-code-drag",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 2,
+        "desktop_drag": 1,
+        "desktop_screenshot": 3,
+        "desktop_type": 1
+      },
+      "agent_seconds": 23.0,
+      "api_equivalent_usd": 0.0800196,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 7458,
+        "cache_read_input_tokens": 30518,
+        "output_tokens": 711
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "60c80233cf22aa5ae6ed5bab0494c738dcf8879725d262c0041602cf0ce122d5",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "native",
+      "run": "20261004-154125-494e",
+      "task": "chromium-form",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 6,
+        "desktop_screenshot": 4,
+        "desktop_type": 1
+      },
+      "agent_seconds": 17.5,
+      "api_equivalent_usd": 0.1061416,
+      "usage": {
+        "input_tokens": 10,
+        "cache_creation_input_tokens": 9485,
+        "cache_read_input_tokens": 43408,
+        "output_tokens": 1077
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "2117e922be88565b97847da0f7835052d5dce979fef2992360e3a5c815eb7038",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "native",
+      "run": "20261004-154125-494e",
+      "task": "chromium-confirm-dialog",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 5,
+      "tool_errors": 0,
+      "tools": {
+        "desktop_click": 2,
+        "desktop_screenshot": 3
+      },
+      "agent_seconds": 13.4,
+      "api_equivalent_usd": 0.0721344,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 7079,
+        "cache_read_input_tokens": 30152,
+        "output_tokens": 472
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1280,
+        720
+      ],
+      "page_sha256": "1ae1b016f409b117df8102ffa747c0c0ef1a2c1bdf062b3b84d5bef4e314d363",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-151945-3d34",
+      "task": "chromium-canvas-code-drag",
+      "seed": 41027,
+      "budget_cap_usd": 1,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 2,
+        "computer_drag": 1,
+        "computer_screenshot": 3,
+        "computer_type": 1
+      },
+      "agent_seconds": 12.2,
+      "api_equivalent_usd": 0.1037486,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 11080,
+        "cache_read_input_tokens": 24183,
+        "output_tokens": 512
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "e52bdec38db452283b87a44e4ff5f56a51ad067cde374f43145563522e249bb6",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-153931-af37",
+      "task": "chromium-form",
+      "seed": 41027,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 6,
+        "computer_screenshot": 4,
+        "computer_type": 1
+      },
+      "agent_seconds": 15.7,
+      "api_equivalent_usd": 0.09256280000000001,
+      "usage": {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 8519,
+        "cache_read_input_tokens": 48214,
+        "output_tokens": 736
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "2117e922be88565b97847da0f7835052d5dce979fef2992360e3a5c815eb7038",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-153931-af37",
+      "task": "chromium-confirm-dialog",
+      "seed": 41027,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 6,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 2,
+        "computer_screenshot": 4
+      },
+      "agent_seconds": 12.3,
+      "api_equivalent_usd": 0.0790968,
+      "usage": {
+        "input_tokens": 10,
+        "cache_creation_input_tokens": 7798,
+        "cache_read_input_tokens": 38964,
+        "output_tokens": 444
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "1ae1b016f409b117df8102ffa747c0c0ef1a2c1bdf062b3b84d5bef4e314d363",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-154321-3049",
+      "task": "chromium-canvas-code-drag",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 2,
+        "computer_drag": 1,
+        "computer_screenshot": 3,
+        "computer_type": 1
+      },
+      "agent_seconds": 11.4,
+      "api_equivalent_usd": 0.069611,
+      "usage": {
+        "input_tokens": 8,
+        "cache_creation_input_tokens": 6725,
+        "cache_read_input_tokens": 28395,
+        "output_tokens": 505
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "60c80233cf22aa5ae6ed5bab0494c738dcf8879725d262c0041602cf0ce122d5",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-154321-3049",
+      "task": "chromium-form",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 11,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 6,
+        "computer_screenshot": 4,
+        "computer_type": 1
+      },
+      "agent_seconds": 15.7,
+      "api_equivalent_usd": 0.0924884,
+      "usage": {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 8501,
+        "cache_read_input_tokens": 48162,
+        "output_tokens": 740
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "2117e922be88565b97847da0f7835052d5dce979fef2992360e3a5c815eb7038",
+      "cost_basis": "list"
+    },
+    {
+      "interface": "container",
+      "run": "20261004-154321-3049",
+      "task": "chromium-confirm-dialog",
+      "seed": 41028,
+      "budget_cap_usd": 0.4,
+      "model": "claude-opus-5-5",
+      "passed": true,
+      "tool_calls": 7,
+      "tool_errors": 0,
+      "tools": {
+        "computer_click": 2,
+        "computer_screenshot": 5
+      },
+      "agent_seconds": 16.7,
+      "api_equivalent_usd": 0.09162440000000001,
+      "usage": {
+        "input_tokens": 12,
+        "cache_creation_input_tokens": 9027,
+        "cache_read_input_tokens": 50802,
+        "output_tokens": 460
+      },
+      "clean_teardown": true,
+      "screenshot_dimensions": [
+        1200,
+        750
+      ],
+      "page_sha256": "1ae1b016f409b117df8102ffa747c0c0ef1a2c1bdf062b3b84d5bef4e314d363",
+      "cost_basis": "list"
+    }
+  ]
+}

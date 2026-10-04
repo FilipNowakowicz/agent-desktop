@@ -24,6 +24,17 @@ Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
 | NixOS, supervisor crash | SIGKILL of the worker: guardian stopped all processes including a token-less daemon, removed the runtime and marked the session failed. SIGKILL of worker and guardian: `destroy` recovered by token |
 | NixOS, terminal fixture plus daemonizing child, repeated lifecycle | Final code: 20/20 create/type/destroy cycles with 12 busy CPU processes on 12 cores; 40/40 earlier branch cycles (20 idle, 20 loaded). No token, daemon or runtime leftovers |
 
+Stock wlroots 0.20.2 and Fedora wlroots 0.19.3 have a reproduced intermittent X11 mapping failure
+(Arch CI 37211305391 and Fedora CI 37214999497). A project-local wlroots repair passed 150 loaded
+Xterm sessions on NixOS, including one buffer-before-association recovery.
+Repaired Arch CI 37214448862 passed its full 33-test suite, 100 loaded Xterm
+repetitions and lifecycle stress. Ubuntu/Fedora passed with stock packages in
+the same run, but Fedora subsequently failed mapping on repetition five in
+37214999497. Both private repair versions passed CI 37215643286: full suites, 100 loaded
+Xterm repetitions each on Fedora and Arch, and lifecycle stress. Earlier
+stock 0.19.3/0.20.2 passes do not establish reliable mapping. See [runtime repair](../runtime/README.md) and
+the development log. Native Wayland comparison tasks remain independently valid.
+
 The fixture is a native Wayland foot 1.28.0 terminal on the initial machine.
 Headless rendering uses pixman, one output and scale 1. Tested text includes ASCII,
 `café`, Greek lambda and 300 CJK ideographs. Typed text uses a generated per-character

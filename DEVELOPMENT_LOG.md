@@ -1,5 +1,258 @@
 # Development log
 
+## 2026-10-04 — Both repaired runtime versions pass
+
+Source head `7766302`, CI `37215643286`: Ubuntu/Fedora/Arch all passed.
+Fedora's private wlroots 0.19.3: full 33-test suite in 41.784 s (visible skip),
+100/100 Xterm Unicode and mouse trials with four CPU-load processes in 141.146 s,
+then lifecycle stress. Arch's private wlroots 0.20.2: full 33-test suite in
+62.149 s (visible skip), 100/100 loaded Xterm trials in 367.224 s, then lifecycle
+stress. Both copied compositors resolve the intended project-local library;
+source checksums and patch application were verified. Ubuntu retains stock
+runtime and passed its suite, focus/crash/input repetitions and lifecycle stress.
+
+The completed comparison used $1.0474778 of the authorized $5, with 6/6 browser
+tasks passed per runtime; no further model trials were run during the repair.
+Stock wlroots 0.19.3/0.20.2 remain affected. The repair must be explicitly selected,
+is not upstreamed, and has not been validated in visible mode or arbitrary X11
+applications. Historical successful stock runs remain evidence of those runs,
+not a guarantee. Human takeover/action ownership is the next implementation stage.
+
+## 2026-10-04 — Extend mapping repair to Fedora's wlroots 0.19.3
+
+Final documentation head `441ff30`, CI `37214999497`: stock Fedora passed
+its full suite, then failed X11 mapping on repetition five (four passed).
+Retained root properties match Arch: X11 fixture in the stacking list, no
+mapped client list, active window zero and no foreign-toplevel. Fedora uses
+labwc 0.9.6 / wlroots0.19 0.19.3, whose association/commit logic has the same
+missing existing-buffer check. Thus earlier Fedora stock passes do not establish
+that this failure is limited to 0.20.2. Artifacts: artifacts/ci-37214999497.
+
+Extended the private runtime script to select only the explicitly pinned
+0.19.3 or 0.20.2 source based on the installed labwc library ABI, and verify
+its development package version. SHA-256 for 0.19.3:
+`a6ff89b64ea15e424d1b0db4a22145fccf5ec2ff2e7b8af0fa35e2ac8975986f`.
+The identical patch applies to 0.19.3 without fuzz (48-line offset). Fedora CI
+now builds its matching private repair and runs 100 X11 repetitions with four
+busy processes, as on Arch. Ubuntu retains stock runtime. No retries, assertion
+changes or host loader/configuration changes. The first Fedora build (`37215444164`) stopped during Meson configuration:
+`pkgconfig(xwayland)` was missing despite the executable being installed. Added
+Fedora's `xorg-x11-server-Xwayland-devel`, which provides xwayland.pc; kept X11
+support required rather than allowing a silent disabled build. Checks are pending.
+
+## 2026-10-04 — Repaired runtime passes distribution validation
+
+Source head `c63b109`, CI `37214448862`: Ubuntu, Fedora and Arch all passed.
+Arch built the pinned patched wlroots 0.20.2 from source and verified the copied
+labwc resolves its private library. Full suite: 33 tests, 50.304 s, visible skip.
+Then 100/100 Xterm Unicode/mouse sessions passed with four busy CPU processes in
+272.115 s, followed by lifecycle stress. Ubuntu/Fedora retained stock packages
+and passed their full suite/repetitions/lifecycle checks. Local patched runtime
+passed 150 loaded sessions (one buffered-at-association recovery), 100 warmed-XWM
+loaded sessions, and the full suite. A final scan of 274 retained local manifests
+found every session stopped/failed, no surviving runtime paths or process tokens.
+All helpers/containers used for this stage are stopped; the comparison image was
+removed. No additional model runs: total remains $1.0474778 of $5 authorized.
+
+The patch is an optional runtime build, not a silent host installation or an
+upstream fix. Stock 0.20.2 remains affected. Visible-mode repair behavior and
+broader X11 applications are unverified; issue #17's earlier Ubuntu focus
+failure may have a separate cause. Next implementation priority is explicit
+human takeover/action ownership, followed by broader application coverage and
+matched-environment comparisons. More account-using trials need a new scoped
+budget if they go beyond this completed comparison.
+
+## 2026-10-04 — X11 buffer-before-association repair
+
+Latest PR #28 head `5e24a10`, CI `37211305391`: Ubuntu/Fedora passed;
+Arch passed the full suite but failed its first X11 repetition. Retained root
+properties show a live XWM and X11 fixture window, but `_NET_ACTIVE_WINDOW=0`,
+no `_NET_CLIENT_LIST`, and no foreign-toplevel. Checks remain required.
+
+A project-local X11 readiness/EWMH probe did not resolve mapping: four-CPU-load
+runs passed 33 then failed on session 34, and passed 54 then failed on session 55.
+The latter retained `WAYLAND_DEBUG=server` traffic. Moving the private pointer
+and opening a native foot window did not release the stuck Xterm. The trace
+shows the Xwayland surface buffer commit before association. Removed the
+unsuccessful readiness implementation; its source and diagnostics remain under
+ignored artifacts/x11-readiness-experiment and artifacts/x11-map-probe.
+
+wlroots 0.20.2 attaches its commit listener during association and maps only on
+subsequent commits. Added a six-line patch checking an already committed buffer
+after the association event. A project-local Nix build of patched wlroots and
+labwc 0.20.2 passed 150/150 Xterm sessions with four busy CPU processes in
+185.860 s; one log explicitly hit buffered-at-association mapping and then
+received exact Unicode text and a click. All test desktops were destroyed.
+Artifacts: artifacts/x11-patched-load and x11-readiness-experiment/repeat-patched.log.
+This demonstrates the diagnosed ordering is recoverable, not universal reliability.
+
+Added an optional portable runtime build script (pinned source archive SHA-256,
+new project-local output, copied labwc with a private library path) and configured
+Arch CI to use it. Ubuntu/Fedora stay on stock packages. No Python linker paths,
+host configuration, activation, profiles or permissions were changed. The
+comparison remains complete at $1.0474778; no more paid trials were run.
+Patched full suite: 33 tests in 61.067 s, all applicable checks passed, visible
+mode skipped. Additional warm-XWM experiment: private `xprop -root -spy` stayed
+connected before each Xterm launch; 100/100 loaded sessions passed in 123.715 s
+with protocol logging. No buffered-at-association events occurred in that set;
+the initial 150-session set contains the observed recovery. Two initial helper
+runs stopped before any application trial (missing import path / xprop executable)
+and were corrected without changing the runtime. Test cleanup and load-helper
+termination completed. First portable-build CI `37214209581` compiled/installed the patched library,
+but the loader check failed before desktop tests. Its exact-path grep failed
+because `$ORIGIN/../lib` retains `bin/../lib` in ldd output (confirmed with a
+local copied binary). The check now prints dependencies and compares canonical
+paths; it still requires the private library, rather than removing verification.
+Repaired distribution CI remains pending at this commit.
+
+## 2026-10-04 — Repeated comparison complete within budget
+
+Second container set `20261004-154321-3049`, seed 41028, claude-opus-5-5,
+$0.40/task cap: code-and-drag passed (7 calls, 11.4 s, $0.069611); form
+passed (11 calls, 15.7 s, $0.0924884); confirmation passed (7 calls, 16.7 s,
+$0.0916244). No tool/setup/cleanup errors. Committed after this final batch.
+
+Across two sets of three tasks: native 6/6, 46 calls, 104.7 s, $0.5183458;
+Cua 6/6, 49 calls, 84.0 s, $0.529132. Combined $1.0474778, below the user
+limit of $5 including the initial pair. Saved compact per-trial metrics in
+benchmarks/results/2026-10-04-browser-comparison.json; all six matched page
+pairs have equal hashes. Screenshot dimensions and token/caching counters are
+preserved. All trial sessions/containers were removed.
+
+Inspected Cua confirmation observations 2 and 3: a dimmed page before the
+prompt is drawn, then the visible prompt. Extra screenshots account for its
+additional calls; there is no repeated deletion action. Both API error counts
+are zero, which does not establish semantic UI/frame readiness. Costs are nearly
+equal, and unmatched environments, resource caps, cache and sample size prevent
+a causal performance claim. No additional account-using runs are needed for
+this comparison. Removed the exact pinned image again after the last trial,
+leaving 184 KiB of project VFS metadata, and stopped only the matching API
+process; it exited successfully. No trial containers remain. PR #28 final
+checks passed on Ubuntu, Fedora and Arch at `1f6b417` in run
+`37210945368`, including the full 33-test suite (visible skip), repeated X11
+input and Ubuntu focus/crash/lifecycle checks.
+
+## 2026-10-04 — Second native comparison set
+
+Run `20261004-154125-494e`, seed 41028, claude-opus-5-5, $0.40/task cap:
+code-and-drag passed (7 calls, 23.0 s, $0.0800196); form passed (11 calls,
+17.5 s, $0.1061416); confirmation passed (5 calls, 13.4 s, $0.0721344).
+No tool/setup/cleanup errors. Native has 6/6 verified trials across two sets;
+comparison cumulative usage is $0.793754. Committed after this batch before
+the second container set. Time varies even with identical tool counts.
+
+## 2026-10-04 — Container form/confirmation comparison results
+
+Run `20261004-153931-af37`, seed 41027, claude-opus-5-5, $0.40/task cap:
+form passed (11 calls, 15.7 s, $0.0925628); confirmation passed (6 calls,
+12.3 s, $0.0790968). No tool/setup/cleanup errors. Comparison cumulative
+usage is $0.5354584; committed after this batch. First set: each runtime
+passes all three tasks. A second set remains; timing is still confounded by
+runtime, browser, resource and cache differences.
+
+## 2026-10-04 — Native form/confirmation comparison results
+
+Run `20261004-153647-ba09`, seed 41027, claude-opus-5-5, $0.40/task cap:
+form passed (11 calls, 25.2 s, $0.107764); confirmation passed (5 calls,
+12.6 s, $0.0719224). No tool/setup/cleanup errors. Comparison cumulative
+usage is $0.3637988 including the original pair; committed after this batch.
+Container dry setup overlapped this batch; do not infer isolated timing.
+
+Source CI `37209785159` passed on Ubuntu, Fedora and Arch: full 33-test suite
+(visible skip), repeated X11 input, and Ubuntu focus/crash/lifecycle checks.
+Debug logging is enabled for test sessions. This does not prove the intermittent
+X11 mapping cause is fixed; assertions remain and diagnostics capture recurrence.
+
+## 2026-10-04 — Broader comparison budget and controls
+
+User selected broader comparison with a $5 API-equivalent total limit.
+Include the existing $0.1841124 pair. Plan code-and-drag, form and confirmation
+on each runtime twice: ten additional task runs at a $0.40 cap give $4.1841124
+including the pilot, leaving a buffer for final-response budget overshoot.
+Keep seed 41027 for the first set and 41028 for the second randomized code.
+Track actual cumulative usage after each batch; no new account is configured.
+
+Native three-task negative control `20261004-153446-bedd`: all checks fail
+as intended, no setup/cleanup failures. The existing X11 mapping failure is
+not in these Wayland browser fixtures; diagnostics are running in CI, with
+assertions preserved. Container three-task negative control `20261004-153700-9597`: all checks
+fail as intended, no setup/cleanup errors. Generated pages match the native
+negative-control pages byte for byte. Broader model results follow below.
+
+## 2026-10-04 — X11 mapping failure recurs during baseline CI
+
+PR #28 runs `37209103464` and `37209247332`: Ubuntu/Fedora passed, Arch failed.
+The latter retained xterm status: application and Xwayland alive, display :0,
+no mapped foreign-toplevel window. A GTK/X11 dialog also failed activation.
+The explicit installed terminal font produces no missing-font warning, so it
+did not resolve the mapping failure. Native Wayland and office tasks passed.
+No root cause established; issue #17 remains open and checks are not waived.
+
+CI test sessions now start labwc with debug logs and failed X11/dialog tests
+retain scoped X11 root properties/window trees, status, windows and screenshot.
+Diagnostic commands run only through the explicit private session environment;
+errors are recorded without masking the original failure. Production runtime
+behavior and assertions are unchanged. User selected broader comparisons with
+up to $5 API-equivalent total; the existing paired pilot uses $0.1841124 of it.
+
+## 2026-10-04 — Paired browser baseline pilot
+
+Container pilot `20261004-151945-3d34` passed the same code-and-drag fixture
+as native `20261004-151912-01e9`, seed 41027, claude-opus-5-5, $1/task cap.
+Cua: 7 calls, 0 errors, 12.2 s, $0.1037486 API-equivalent; native: 7 calls,
+0 errors, 13.0 s, $0.0803638. Both use 3 screenshots, 2 clicks, 1 type and
+1 drag. Final screenshots and independent title verifiers agree; no model
+shell/file/launch tools are exposed. All owned containers were removed.
+After deleting local:baseline-probe, an actual stdio type call returned a
+not_found error. Removed the exact pinned image from the project-only store,
+reducing its VFS footprint from roughly 41 GiB to 184 KiB, then stopped only
+the API process whose argv matched the project root and Unix endpoint. The
+service exited successfully. Screenshot/report artifacts remain; future runs
+must pull the pinned image again using their configured policy.
+
+The Cua image startup took 16.2 s with cached image/VFS storage; native startup
+was not timed. Source preparation, native result and container result were
+committed separately. Usage remains the previously authorized testing client's
+Pro allowance, not a newly configured API account. Future records now retain
+raw token usage and per-model accounting. A single pair with different desktop,
+browser, resource caps, screenshot scaling and cache counters establishes no
+performance winner; exact differences and counters are in docs/BENCHMARK.md.
+
+## 2026-10-04 — Local container baseline preparation
+
+Added a GUI-only, fixed-local-target stdio adapter and a fresh-container harness
+for three existing browser fixtures. Routing tests reject target overrides and
+shell/file/launch/accessibility/session tools, preserving upstream results.
+Both code-and-drag dry runs fail verification with no errors or leftovers:
+native `20261004-151706-01ca`, container `20261004-151705-1f13` (29.1 s startup).
+Both use seed 41027 and identical generated pages.
+Native pilot `20261004-151912-01e9`, claude-opus-5-5, $1 cap: passed,
+7 tool calls, no errors, 13.0 s, $0.0803638 API-equivalent, clean teardown.
+Committed after this run before the corresponding container model run.
+
+Project-local Podman 5.8.7 rootless VFS storage and its Unix API socket work with
+existing user namespaces; no host permissions/configuration changed. Fetched
+Podman and slirp4netns runtime tools using Nix without profile installation.
+Downloaded Cua CLI 0.3.1 from its public release, checked SHA-256
+`c5b3de47a8fca33e6f943c682dd3f243d7696a795d7f267119f2625617e46be3`
+against the release manifest; the installer was reviewed, not executed.
+All state is under ignored `artifacts/container-probe`; DO_NOT_TRACK=1.
+
+Cua create initially failed because Podman had no default signature policy.
+A project XDG_CONFIG_HOME policy did not change that lookup, and the global
+--signature-policy flag is unsupported. Explicit `podman pull --signature-policy
+<project-policy> <pinned-digest>` succeeded; Cua then used the cached image.
+The policy rejects all images except the exact ghcr.io/trycua/linux repository;
+TLS verification remains enabled. No user/system policy was written.
+
+Actual adapter round trip on local:baseline-probe: image blocks received,
+Unicode `café λ 123` typed and submitted; final screenshot and X11 title show
+Task - complete. An attempted host target override returns an error. Host
+active-window address and cursor snapshots match before/after; transient host
+changes are not covered. The smoke container was deleted. The environments and
+restricted tool access differ and are documented in docs/BENCHMARK.md; no
+performance or superiority conclusion is established.
+
 ## 2026-10-04 — Xwayland fixture diagnostics and repetition
 
 PR #27 CI run `37206984363`: Ubuntu and Arch passed; Fedora's existing
@@ -11,7 +264,9 @@ Select installed DejaVu Sans Mono explicitly in the test and Xterm benchmark
 fixture, and retain full session status alongside window state and screenshot
 on failure. CI now repeats Xwayland mapping/input ten times on all three
 distributions. Local repeat: 10/10 passed in 10.465 s with xterm 411 and
-Xwayland 24.1.13. Ruff lint/format passed. Final CI is pending.
+Xwayland 24.1.13. Ruff lint/format passed. Final CI run `37207779152` passed on Ubuntu,
+Fedora and Arch, including all ten Xwayland repetitions per distribution.
+PR #27 was squash-merged at `1ad27ae`; the failure cause remains unproven.
 
 ## 2026-10-04 — M4 office benchmark preparation
 

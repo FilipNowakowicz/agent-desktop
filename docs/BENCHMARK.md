@@ -166,3 +166,98 @@ disabled desktop create/destroy/launch tools and used a $1 cap per task.
 The agent handled the first-run UI and saved files that passed independent checks.
 This is one run of two small tasks, not a broad office-application reliability
 claim or a comparison with another runtime.
+
+## Local container baseline
+
+`scripts/cua_benchmark.py` reuses the canvas-code/drag, form and confirmation
+fixtures in fresh local Cua containers. Install Cua and provide an already
+configured Docker-compatible local Unix socket. The harness does not install a
+runtime, alter host configuration, open a viewer or use a cloud account. It
+pins the Linux image digest in source; a rootless Podman pilot used CLI 0.3.1.
+See [Cua local runtimes](https://cua.ai/docs/cua-sdk/guides/local-runtimes).
+
+```sh
+# DOCKER_HOST must identify the intended local engine's Unix socket.
+# --engine must connect to that same engine/storage; it copies fixtures and verifies titles.
+uv run scripts/cua_benchmark.py --cua /path/to/cua --engine podman \
+  --state-dir artifacts/cua-state --only chromium-canvas-code-drag --seed 41027 --dry-run
+uv run scripts/benchmark.py --only chromium-canvas-code-drag --seed 41027 --dry-run
+```
+
+Replace `--dry-run` with an explicit `--model` and `--budget` for account-using
+runs. The native and container pilot negative controls both failed their check
+with no setup/cleanup errors: `20261004-151706-01ca` and `20261004-151705-1f13`.
+Their generated page hashes match. Native summary records the randomized seed.
+
+The container's model interface passes through `scripts/cua_gui_mcp.py`, which
+allows only 18 GUI tools and forces an explicit `local:<name>` target. Shell,
+file operations, launch, accessibility and session management are absent;
+caller-supplied target overrides are rejected. Tool content/errors pass through.
+This is a restricted Cua interface, not its full capability set. The harness
+checks task-set titles directly through the guest's X11 properties, independently
+of model replies and MCP window metadata, then verifies container deletion.
+
+The environments differ: native labwc/Wayland with Chromium 153.0.8010.52;
+Cua's Ubuntu 24.04.5/XFCE/Xvfb container has Chromium 154.0.8037.92. Its screenshot
+is capped at a 1200 px long edge; the native image is 1280x720. The container is
+limited to 2 CPUs/2 GB and runs its browser as guest root with `--no-sandbox`
+inside rootless host Podman. The native runtime has no matching resource cap.
+A small pilot can compare observed outcomes and tool usage; these differences
+and model variability prevent attributing timing or cost to tool design alone.
+
+Paired pilot, 2026-10-04, seed 41027, claude-opus-5-5, $1/task cap:
+
+| Interface | Run | Verified | Calls / errors | Agent time | API-equivalent usage |
+| --- | --- | --- | --- | --- | --- |
+| Native private desktop | `20261004-151912-01e9` | 1/1 | 7 / 0 | 13.0 s | $0.0803638 |
+| GUI-only Cua | `20261004-151945-3d34` | 1/1 | 7 / 0 | 12.2 s | $0.1037486 |
+
+Both used three screenshots, two clicks, one type and one drag. Saved transcripts
+show the intended GUI actions; final screenshots and independent title checks
+agree. Generated pages are identical, and both sessions/containers were removed.
+Container startup took 16.2 s with a cached image and VFS storage; native startup
+was not timed. Agent time excludes fixture startup and final harness checks.
+
+Transcript token counters (input / cache creation / cache read / output) were
+native `8 / 7495 / 30659 / 712` and Cua `8 / 11080 / 24183 / 512`. Future records
+retain raw usage and per-model accounting. Differences in caching, schemas,
+images, desktop environment and one stochastic run prevent attributing the
+cost difference to any single component. This sample establishes comparable
+completion and equal tool calls; it does not establish a performance winner.
+
+## Repeated three-task comparison
+
+The user authorized up to $5 API-equivalent total, including the first pair.
+Two sets cover code-and-drag, form filling and confirmation on each runtime;
+the second code uses seed 41028 (first: 41027). The ten additional task runs
+used $0.40 caps. Actual total was **$1.0474778**. All six native/container page
+pairs match byte for byte. Three-task negative controls failed every check
+without setup/cleanup errors (`20261004-153446-bedd`, `20261004-153700-9597`).
+
+| Interface | Verified trials | Calls / tool errors | Agent time total | API-equivalent usage |
+| --- | --- | --- | --- | --- |
+| Native private desktop | 6/6 | 46 / 0 | 104.7 s | $0.5183458 |
+| GUI-only Cua | 6/6 | 49 / 0 | 84.0 s | $0.5291320 |
+
+[Committed metrics](../benchmarks/results/2026-10-04-browser-comparison.json)
+retain per-trial outcomes, tool counts, usage counters, screenshot dimensions,
+page hashes, seeds, caps and source artifact IDs. The later batches are native
+`20261004-153647-ba09`, Cua `20261004-153931-af37`, native
+`20261004-154125-494e` and Cua `20261004-154321-3049`. All trials cleaned up.
+Source preparation and each batch's results were committed separately.
+
+Code-and-drag uses 7 calls and form filling 11 on both interfaces in both sets.
+Confirmation uses 5 calls natively and 6/7 in Cua. Both perform the intended
+single confirmation; Cua takes extra screenshots while the dialog and completed
+page render. In the second Cua trial, observation 2 is dimmed with no drawn
+prompt, observation 3 shows the prompt, and a later observation confirms the
+completed title. The original images were inspected. Extra observations are
+not tool API errors or repeated deletion actions.
+
+Observed costs are nearly equal. Tool counts match except for confirmation
+observations; timing varies even at identical call counts. Only three fixtures,
+two trials each, different environments and cache counters are covered. Native's
+first form/confirmation batch also overlapped container dry setup. These results
+support neither a general performance winner nor a decision to replace the
+runtime. Widget/frame readiness and broader daily-use tasks need measurements
+before choosing further interaction extensions.

@@ -8,6 +8,7 @@ verifies the outcome independently, then destroys the session and checks cleanup
 import argparse
 import json
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -59,22 +60,32 @@ class Context:
         return Path(self.application["logs"]).read_text(errors="replace")
 
 
-def run_agent(prompt, artifact, budget, model):
+def run_agent(
+    prompt,
+    artifact,
+    budget,
+    model,
+    *,
+    mcp_config=".mcp.json",
+    server="private-desktop",
+    disallowed=None,
+):
+    if disallowed is None:
+        disallowed = [
+            f"mcp__{server}__desktop_{name}" for name in ("create", "destroy", "launch")
+        ]
     command = [
         "claude",
         "-p",
         prompt,
         "--mcp-config",
-        ".mcp.json",
+        mcp_config,
         "--strict-mcp-config",
         "--tools",
         "",
         "--allowedTools",
-        "mcp__private-desktop",
-        "--disallowedTools",
-        "mcp__private-desktop__desktop_create",
-        "mcp__private-desktop__desktop_destroy",
-        "mcp__private-desktop__desktop_launch",
+        f"mcp__{server}",
+        *(["--disallowedTools", *disallowed] if disallowed else []),
         "--output-format",
         "stream-json",
         "--verbose",
@@ -122,7 +133,7 @@ def run_agent(prompt, artifact, budget, model):
     ]
     result = next((e for e in reversed(events) if e.get("type") == "result"), {})
     init = next((e for e in events if e.get("subtype") == "init"), {})
-    names = [c["name"].removeprefix("mcp__private-desktop__") for c in calls]
+    names = [c["name"].removeprefix(f"mcp__{server}__") for c in calls]
     return {
         "model": init.get("model"),
         "exit_code": exit_code,
@@ -133,6 +144,8 @@ def run_agent(prompt, artifact, budget, model):
         "tools": {n: names.count(n) for n in sorted(set(names))},
         "reply": (result.get("result") or "")[-500:],
         "cost_usd": result.get("total_cost_usd"),
+        "usage": result.get("usage", {}),
+        "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
     }
 
@@ -189,10 +202,12 @@ def main():
     parser.add_argument("--only", nargs="*", help="task names")
     parser.add_argument("--budget", type=float, default=1.0, help="USD per task")
     parser.add_argument("--model")
+    parser.add_argument("--seed", type=int, help="Reproduce randomized fixture inputs")
     parser.add_argument(
         "--dry-run", action="store_true", help="set up and check without an agent"
     )
     args = parser.parse_args()
+    random.seed(args.seed)
     if not args.dry_run and not shutil.which("claude"):
         raise SystemExit("Requires the claude CLI")
     root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
@@ -230,6 +245,7 @@ def main():
         )
     ran = [r for r in records if "skipped" not in r]
     summary = {
+        "seed": args.seed,
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),
         "skipped": [r["task"] for r in records if "skipped" in r],

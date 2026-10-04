@@ -24,7 +24,9 @@ the exact `of:=SUM([.B2:.B3])` formula and cached value `20`. LibreOffice was fe
 with `nix build --no-link --print-out-paths nixpkgs#libreoffice` as a runtime tool
 (513.5 MiB download, no profile install or host activation); Python still uses uv.
 Full local suite: 31 tests in 54.455 s, 30 passed and visible mode skipped.
-Ruff lint/format and compileall passed. Office CI validation is pending.
+Ruff lint/format and compileall passed. Both office tests also passed three
+repetitions each with four busy CPU processes (6 tests in 51.296 s). Office CI
+validation is pending.
 
 PR #25 passed Ubuntu, Fedora and Arch on its final source commit (run
 `37205271460`) and was merged. Its earlier Arch Xwayland activation timeout

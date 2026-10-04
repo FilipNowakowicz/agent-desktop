@@ -17,7 +17,7 @@ The working foundation uses Python/uv and private labwc sessions. Runtime depend
 
 Next priorities:
 
-1. Benchmarks (M4): Claude Code works through the project `.mcp.json` (`scripts/claude_code_task.py` passed 5/5). Build the ~20-task suite and measure completion, interventions, time and cost. Human takeover/action ownership is not implemented.
+1. Benchmarks (M4): `scripts/benchmark.py` (20 tasks, Claude Code, independent checks) passes 20/20 (docs/BENCHMARK.md). The suite has saturated. Add harder multi-application and longer tasks, compare baselines and models, and use measured failures to choose extensions. Human takeover/action ownership is not implemented.
 2. Compatibility (#6): larger daily-use applications (editors, file choosers/portals, clipboard), desktop installs beyond CI containers. Investigate #17 with the uploaded CI artifacts when it recurs.
 Known visible-mode property: a focused nested window also receives host keyboard input.
 

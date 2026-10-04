@@ -20,9 +20,9 @@ jobs:
       - run: uv sync --locked --managed-python
       - name: Check Python source
         run: |
-          uv run ruff check src scripts tests
-          uv run ruff format --check src scripts tests
-          uv run python -m compileall -q src scripts tests
+          uv run ruff check src scripts tests benchmarks
+          uv run ruff format --check src scripts tests benchmarks
+          uv run python -m compileall -q src scripts tests benchmarks
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
         env:

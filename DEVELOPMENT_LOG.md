@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-04 — M4 initial benchmark suite
+
+**Outcome:** 20 representative GUI tasks across Chromium, foot, xterm/Xwayland,
+mousepad, zenity and kdialog, run by Claude Code with only the desktop MCP tools
+and verified independently. Run 1: 19/20, 233 tool calls, $2.24. After two fixes
+it found, runs 2 and 3: 20/20 each, 149 and 154 calls, $1.78 and $1.81. No tool
+errors or cleanup failures. Details, per-task calls and limits are in
+`docs/BENCHMARK.md`. A dry run with no agent failed all 20 checks, as intended.
+
+Measured findings that changed the product: the keycode collision (PR #20) and
+the missing key repeat. One run-1 failure came from a fixture bug: `id=name` is
+shadowed by `window.name`. The suite has now saturated, so harder tasks are the
+next M4 step.
+
+PR #20 passed Ubuntu, Fedora and Arch CI (run `37166510790`). Chromium tests ran
+on Fedora and Arch and skipped on Ubuntu, where AppArmor blocks the Chromium
+sandbox. Merged.
+
 ## 2026-10-04 — M1 physical key codes (found by the agent benchmark)
 
 **Outcome:** the virtual keyboard now uses a US layout on real evdev codes.

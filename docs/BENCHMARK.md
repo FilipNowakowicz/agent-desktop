@@ -95,7 +95,8 @@ signs in with claude.ai), so each task is first validated with `--dry-run`.
 
 Status checklist (update after each step):
 
-- [ ] Task definitions in `benchmarks/hard.py`, selectable with `--suite hard`
-- [ ] Dry run: every hard check fails with no agent, apps launch, cleanup clean
+- [x] Task definitions in `benchmarks/hard.py` (10 tasks), selectable with `--suite hard`
+- [x] Dry run: all 10 hard checks fail with no agent, apps launch, cleanup clean
+  (`20261004-023751-0e0c`); all 17 fixture page scripts pass `node --check`
 - [ ] Agent run of the hard suite (once), results recorded here
 - [ ] Failures analysed; fixes or tool changes proposed

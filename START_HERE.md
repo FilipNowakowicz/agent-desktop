@@ -18,6 +18,7 @@ The working foundation uses Python/uv and private labwc sessions. Runtime depend
 Next priorities:
 
 1. Benchmarks (M4), in progress on branch `m4-harder-tasks`: the 20-task suite passes 20/20 (docs/BENCHMARK.md) and has saturated. Add ~10 harder tasks in `benchmarks/hard.py` (multi-app workflows, multi-page local web app, mid-task interruptions, file-chooser/terminal file work, visual-only information). Validate each with `scripts/benchmark.py --dry-run` (no agent, no usage) before any agent run. The user's Claude Pro usage is limited: run agent passes sparingly (one task or one pass at a time) and commit results after each run. Progress checklist: docs/BENCHMARK.md "Hard tasks" section. Human takeover/action ownership is not implemented.
+   Later (user request): compare cost, tool design and approach with public projects such as Cua, and adopt what they do better.
 2. Compatibility (#6): larger daily-use applications (editors, file choosers/portals, clipboard), desktop installs beyond CI containers. Investigate #17 with the uploaded CI artifacts when it recurs.
 Known visible-mode property: a focused nested window also receives host keyboard input.
 

@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-10-04 — Wait for guardian exit in crash-cleanup test
+
+Downloaded and inspected `desktop-tests-runtime-0` from failed Ubuntu run
+`37168329845`. The unexpected token-bearing PID, 4177, exactly matches
+`guardian_pid` in the retained session manifest. The guardian had stopped its
+children and published failure but had not exited when the assertion ran. The
+test now waits (with the existing ten-second deadline) for that specific guardian
+to stop, then still requires zero token-bearing processes. It continues checking
+the token-less child immediately after failure publication, so child cleanup is
+not excused by this wait. Ubuntu CI repeats both the focus and guardian-crash
+tests ten times and preserves the first failure. Runtime code is unchanged.
+
+Local validation: Ruff lint/format and diff checks passed; ten repetitions of
+`test_killed_supervisor_is_cleaned_up_by_guardian` passed in 5.412 seconds on
+NixOS with labwc 0.20.2. CI passed on Ubuntu, Fedora and Arch in run
+`37202851514`, including ten Ubuntu guardian crashes and 200 focus switches.
+
+PR #23 passed Ubuntu, Fedora and Arch CI in run `37202636884` and was merged.
+Ubuntu's ten repetitions verified 200 immediate focus/type switches. Issue #17
+remains open because its original failure's cause is unproven.
+
 ## 2026-10-04 — Verify focus before reporting success
 
 `focus` previously confirmed only that the compositor processed an activation
@@ -18,8 +39,8 @@ also cover delayed activation, refused activation, a closing target and unknown
 targets. Ubuntu CI repeats the real-terminal test ten times (200 focus switches).
 
 Issue #17 remains open: its original Ubuntu failure has no proven cause, and
-observed activation does not establish that this change fixes it. CI results for
-this stage are pending. No model-account usage or physical desktop interaction
+observed activation does not establish that this change fixes it. CI passed on
+all three distributions in run `37202636884`. No model-account usage or physical desktop interaction
 was needed.
 
 Recent-history review also found a separate Ubuntu failure on main in run

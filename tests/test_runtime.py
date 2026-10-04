@@ -746,6 +746,9 @@ class RuntimeTests(unittest.TestCase):
         wait_for(lambda: core.manifest(session)["status"] == "failed")
         self.assertIn("Supervisor", core.manifest(session)["error"])
         self.assertEqual(sleeping(duration), [])
+        # The guardian publishes failure after cleaning its children, then exits.
+        # It still carries the token during that short interval.
+        wait_for(lambda: not running(info["guardian_pid"]))
         self.assertEqual(owned_processes(info["token"]), [])
         self.assertFalse(Path(info["runtime"]).exists())
         with self.assertRaises(core.DesktopError):

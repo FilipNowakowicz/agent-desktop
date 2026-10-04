@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-10-04 — Partial and scaled screenshots
+
+First step of plan extension A ("adaptive observation": crops and full images on
+demand). `screenshot` accepts `region` [x, y, w, h] (validated against the current
+output) and `scale` 0.1–1, passed to grim as `-g` and `-s`; results include both.
+The observation token is unchanged by cropping. `tests/test_capture.py` checks
+image sizes for region, scale, both and a 1×1 corner, identical tokens, and nine
+invalid arguments. Token savings for agents are not measured yet.
+
 ## 2026-10-04 — Bounded action sequences
 
 Plan extension A ("bounded action sequences"). `core.run_actions` /

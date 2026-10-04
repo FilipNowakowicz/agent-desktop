@@ -332,14 +332,49 @@ class Worker:
         ]
         return {p.pid for p in processes if p}
 
-    def screenshot(self):
+    def screenshot(self, region=None, scale=None):
+        self.virtual_pointer.connection.roundtrip()
+        output = self.virtual_pointer.output
+        arguments = []
+        if region is not None:
+            if (
+                not isinstance(region, list)
+                or len(region) != 4
+                or not all(
+                    isinstance(v, int) and not isinstance(v, bool) for v in region
+                )
+            ):
+                raise ValueError("Region must be [x, y, width, height] integers")
+            x, y, width, height = region
+            if (
+                x < 0
+                or y < 0
+                or width < 1
+                or height < 1
+                or x + width > output["width"]
+                or y + height > output["height"]
+            ):
+                raise ValueError(
+                    f"Region must lie within the {output['width']}x{output['height']} desktop"
+                )
+            arguments += ["-g", f"{x},{y} {width}x{height}"]
+        else:
+            region = [0, 0, output["width"], output["height"]]
+        if scale is not None:
+            if (
+                not isinstance(scale, (int, float))
+                or isinstance(scale, bool)
+                or not 0.1 <= scale <= 1
+            ):
+                raise ValueError("Scale must be between 0.1 and 1")
+            arguments += ["-s", str(scale)]
         directory = self.root / "screenshots"
         directory.mkdir(exist_ok=True, mode=0o700)
         path = directory / (uuid.uuid4().hex + ".png")
         # Retry so the token describes the layout the image actually shows.
         for _ in range(3):
             before = self.observation()
-            self.command("grim", path)
+            self.command("grim", *arguments, path)
             if self.observation() == before:
                 break
         self.needs_screenshot = False
@@ -352,6 +387,8 @@ class Worker:
             "path": str(path),
             "width": width,
             "height": height,
+            "region": region,
+            "scale": scale or 1,
             "observation": before,
         }
 
@@ -664,7 +701,7 @@ class Worker:
                 "window": focused,
             }
         if operation == "screenshot":
-            return self.screenshot()
+            return self.screenshot(request.get("region"), request.get("scale"))
         if operation == "observe":
             return {"observation": self.observation()}
         if operation == "frame":

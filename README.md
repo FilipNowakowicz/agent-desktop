@@ -60,6 +60,14 @@ or `--gone` for its disappearance), then until the screen has not changed for
 `--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
 returns `satisfied: false` at the timeout instead of failing.
 
+### Partial and scaled screenshots
+
+`screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,
+scale=...)`) captures part of the desktop and/or shrinks it (0.1–1) to save image
+tokens. The result reports `region` and `scale`; desktop coordinates are the region
+origin plus image coordinates divided by the scale. The observation token always
+describes the whole desktop.
+
 ### Action sequences
 
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)

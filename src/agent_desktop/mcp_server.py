@@ -65,6 +65,25 @@ def desktop_windows(session: str) -> dict:
 
 
 @mcp.tool()
+def desktop_wait(
+    session: str,
+    title: str | None = None,
+    app_id: str | None = None,
+    gone: bool = False,
+    stable_ms: int = 0,
+    timeout: float = 10,
+) -> dict:
+    """Wait instead of polling with screenshots.
+
+    With title (substring) and/or app_id (exact), wait for a matching window, or
+    for none to remain if gone is true. With stable_ms, then wait until the screen
+    has not changed for that long (a blinking caret is ignored). Returns
+    satisfied=false at the timeout (at most 120 s). Take a screenshot afterwards.
+    """
+    return core.wait(session, title, app_id, gone, stable_ms, timeout)
+
+
+@mcp.tool()
 def desktop_focus(session: str, window: str) -> dict:
     """Activate a private window and wait for its activated state (up to 2 seconds).
 

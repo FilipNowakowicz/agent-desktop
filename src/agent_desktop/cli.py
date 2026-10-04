@@ -10,6 +10,7 @@ from .core import (
     profiles,
     request,
     sessions,
+    wait,
 )
 from .viewer import take, view
 
@@ -36,6 +37,13 @@ def main():
         observer.add_argument("session")
         observer.add_argument("--wayvnc")
         observer.add_argument("--viewer")
+    waiter = sub.add_parser("wait", help="wait for a window and/or a settled screen")
+    waiter.add_argument("session")
+    waiter.add_argument("--title")
+    waiter.add_argument("--app-id")
+    waiter.add_argument("--gone", action="store_true")
+    waiter.add_argument("--stable-ms", type=int, default=0)
+    waiter.add_argument("--timeout", type=float, default=10)
     waiting = sub.add_parser("request-human", help="ask a person to take control")
     waiting.add_argument("session")
     waiting.add_argument("reason")
@@ -106,6 +114,8 @@ def main():
             result = destroy(args["session"])
         elif command == "view":
             result = view(**args)
+        elif command == "wait":
+            result = wait(**args)
         elif command == "take":
             result = take(**args)
         elif command == "request-human":

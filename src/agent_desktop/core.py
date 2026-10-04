@@ -302,6 +302,67 @@ def recover(session, info):
     }
 
 
+# A blinking text caret changes a thin box; a loading spinner is larger.
+QUIET_AREA = 400
+
+
+def wait(
+    session,
+    title=None,
+    app_id=None,
+    gone=False,
+    stable_ms=0,
+    timeout=10,
+):
+    """Wait for a window to appear (or disappear), then for the screen to settle.
+
+    Changes covering at most QUIET_AREA square pixels, such as a blinking caret,
+    count as settled. Returns whether every condition held before the deadline.
+    """
+    if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 120:
+        raise DesktopError("Timeout must be between 0 and 120 seconds")
+    if not isinstance(stable_ms, int) or not 0 <= stable_ms <= 30000:
+        raise DesktopError("stable_ms must be an integer from 0 to 30000")
+    started = time.monotonic()
+    deadline = started + timeout
+
+    def result(satisfied, reason, matches=None):
+        return {
+            "satisfied": satisfied,
+            "reason": reason,
+            "elapsed_ms": round((time.monotonic() - started) * 1000),
+            "windows": matches or [],
+        }
+
+    matches = []
+    if title is not None or app_id is not None:
+        while True:
+            windows = request(session, "windows")["windows"]
+            matches = [
+                w
+                for w in windows
+                if (title is None or title in w["title"])
+                and (app_id is None or w["app_id"] == app_id)
+            ]
+            if bool(matches) != gone:
+                break
+            if time.monotonic() >= deadline:
+                return result(False, "window still present" if gone else "no window")
+            time.sleep(0.05)
+    if stable_ms:
+        quiet_since = time.monotonic()
+        frame = request(session, "frame")["frame"]
+        while time.monotonic() - quiet_since < stable_ms / 1000:
+            if time.monotonic() >= deadline:
+                return result(False, "screen still changing", matches)
+            time.sleep(0.05)
+            latest = request(session, "frame", since=frame)
+            frame, box = latest["frame"], latest["changed"]
+            if box == "unknown" or (box and box[2] * box[3] > QUIET_AREA):
+                quiet_since = time.monotonic()
+    return result(True, "ok", matches)
+
+
 def wait_for_agent_control(session, timeout):
     """Wait until no person holds or has been asked to take the session."""
     deadline = time.monotonic() + max(0, min(timeout, 600))

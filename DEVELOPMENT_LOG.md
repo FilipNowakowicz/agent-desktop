@@ -1,5 +1,29 @@
 # Development log
 
+## 2026-10-04 — Event-aware waiting
+
+Plan extension A ("event-aware waiting"). New worker operation `frame` captures
+raw RGB through `grim -t ppm -` (no file) and returns the bounding box changed
+since an earlier frame (four kept in memory). `core.wait` / `desktop_wait` /
+`agent-desktop wait` wait for a window by title substring and/or exact app_id (or
+for none, `gone`), then optionally for `stable_ms` without changes larger than
+400 px², so a blinking caret does not prevent settling. Timeout at most 120 s;
+it returns `satisfied: false` with a reason rather than failing. Waiting runs in
+the client, so the single-threaded worker stays responsive (e.g. to `take`), and
+it is refused while a person has control.
+
+### Validation
+
+- `tests/test_wait.py`: changed-box unit cases; window appear/settle/`gone` after
+  Alt-F4; a continuously printing terminal never settles (returns within the
+  timeout); frame regions; argument validation; Chromium focused input with a
+  blinking caret settles (observed caret box 1×33 px). Frame capture took about
+  62 ms at 1280×720 locally.
+- Full suite: 44 tests OK, 8 skipped (Nix labwc/foot/wayvnc/dbus/xwayland/xterm).
+
+Not measured: whether agents use fewer calls or less time with it (needs model
+runs; deferred to save the user's usage).
+
 ## 2026-10-04 — Takeover and profiles integrated; agent instructions
 
 #29 (takeover) passed CI `37222504707` on Ubuntu, Fedora (wayvnc 0.9.1) and Arch

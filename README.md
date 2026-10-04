@@ -52,6 +52,14 @@ TigerVNC's graphical client needs a host X11 display or Xwayland; the applicatio
 inside the private desktop remain native Wayland. Override optional tools with
 `--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
 
+### Waiting
+
+`agent-desktop wait SESSION --title Settings --stable-ms 500 --timeout 10` (MCP:
+`desktop_wait`) waits for a window whose title contains the text (or `--app-id`,
+or `--gone` for its disappearance), then until the screen has not changed for
+`--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
+returns `satisfied: false` at the timeout instead of failing.
+
 ### Taking control (logins, 2FA, CAPTCHAs)
 
 An agent that reaches a login page calls `desktop_request_human` with a reason

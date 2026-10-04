@@ -240,7 +240,7 @@ Use the measured failure distribution to choose extensions. Do not interpret a l
 | Bounded action sequences | Fill fields, click, then wait for an explicit condition; stop on surprises | Lower latency/model calls without a lower completion rate; no blind retries of non-idempotent actions |
 | Adaptive observation | Filtered accessibility state, changed elements, crops and full images on demand | Lower actual model usage without missing task-critical changes |
 | Semantic UI | AT-SPI names, roles, states and actions, with visual fallback | Better supported-app completion rate; no claims that semantic success proves visual correctness |
-| Event-aware waiting | Wait for relevant window, UI or process changes with deadlines | Less unnecessary polling and fewer premature actions |
+| Event-aware waiting (window and settled-screen waits implemented) | Wait for relevant window, UI or process changes with deadlines | Less unnecessary polling and fewer premature actions |
 | Verified outcomes | Separate action delivery from an observed postcondition | Fewer false success reports |
 
 ### B. Shared desktop experience

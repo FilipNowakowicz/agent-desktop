@@ -71,6 +71,26 @@ with `desktop_control(session, wait_seconds=...)`; only you can release control.
 Clipboard transfer stays disabled in both directions, and the session keymap is US,
 so characters missing from that layout may not reach the session.
 
+### Saved logins (profiles)
+
+By default everything in a session is deleted at `destroy`. To keep a login, create
+the session with a named profile:
+
+```sh
+uv run agent-desktop create --profile github     # MCP: desktop_create(profile="github")
+uv run agent-desktop profiles                    # list, size, whether in use
+uv run agent-desktop delete-profile github       # permanently remove saved logins
+```
+
+The profile becomes the session's `HOME` (and so its XDG config, cache and data),
+stored under `$XDG_STATE_HOME/agent-desktop/profiles/NAME/home` with mode 0700.
+Only one session can use a profile at a time. Teardown first closes every window
+as a person would and waits briefly, so browsers write cookies before the
+compositor stops; applications still open after that are terminated. Profiles
+hold login cookies and tokens on disk, readable by any process running as your
+user and by any agent given that profile; they are never your personal browser
+profile. Deleting a profile is CLI-only.
+
 Each session has private display sockets, D-Bus, configuration and application
 profiles. The session supervisor is a child subreaper and starts the private bus
 itself, so daemonizing applications and D-Bus-activated services remain in its

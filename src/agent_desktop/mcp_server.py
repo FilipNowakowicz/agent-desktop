@@ -11,9 +11,20 @@ mcp = FastMCP("Private desktop")
 
 
 @mcp.tool()
-def desktop_create(mode: str = "headless") -> dict:
-    """Create a private Linux desktop. Visible mode opens a nested host Wayland window."""
-    return core.create(mode)
+def desktop_create(mode: str = "headless", profile: str | None = None) -> dict:
+    """Create a private Linux desktop. Visible mode opens a nested host Wayland window.
+
+    A named profile keeps the session's home directory (browser logins, app
+    settings) for later sessions; one session can use a profile at a time.
+    Without a profile, everything is deleted at destroy.
+    """
+    return core.create(mode, profile=profile)
+
+
+@mcp.tool()
+def desktop_profiles() -> list[dict]:
+    """List saved profiles and whether a session is using them."""
+    return core.profiles()
 
 
 @mcp.tool()

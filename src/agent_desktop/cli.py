@@ -1,7 +1,16 @@
 import argparse
 import json
 
-from .core import DesktopError, create, destroy, logs, request, sessions
+from .core import (
+    DesktopError,
+    create,
+    delete_profile,
+    destroy,
+    logs,
+    profiles,
+    request,
+    sessions,
+)
 from .viewer import take, view
 
 
@@ -10,9 +19,15 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     new = sub.add_parser("create")
     new.add_argument("--mode", choices=("headless", "visible"), default="headless")
+    new.add_argument(
+        "--profile", help="keep this named home (e.g. browser logins) across sessions"
+    )
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
+    sub.add_parser("profiles")
+    removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
+    removal.add_argument("profile")
     for name, text in (
         ("view", "watch a session read-only"),
         ("take", "control a session yourself; closing the viewer hands it back"),
@@ -77,10 +92,14 @@ def main():
     command = args.pop("command")
     try:
         if command == "create":
-            mode = args.pop("mode")
-            result = create(mode, tools=args)
+            mode, profile = args.pop("mode"), args.pop("profile")
+            result = create(mode, tools=args, profile=profile)
         elif command == "list":
             result = sessions()
+        elif command == "profiles":
+            result = profiles()
+        elif command == "delete-profile":
+            result = delete_profile(args["profile"])
         elif command == "logs":
             result = logs(args["session"])
         elif command == "destroy":

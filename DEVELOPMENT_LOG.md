@@ -1,5 +1,34 @@
 # Development log
 
+## 2026-10-04 — Persistent login profiles
+
+Stacked on the takeover branch. `create --profile NAME` / `desktop_create(profile=)`
+uses `profiles/NAME/home` as `HOME` instead of a per-session directory, which
+teardown does not remove. The worker holds an exclusive `flock` on the profile for
+the session's lifetime (released by the kernel if it dies); `create` also checks it
+first for a clear error. `profiles` lists them; `delete-profile` refuses one in use.
+
+The first Chromium cookie test failed: the cookie never reached the profile's
+`Cookies` database, and a dangling `SingletonCookie` showed an unclean exit.
+Causes, found by instrumenting teardown: the compositor was stopped before
+applications, and a first fix sent SIGTERM to the process group, stopping
+Chromium's zygote first. Fix: teardown now closes every window through
+foreign-toplevel `close` (before the worker's own Wayland clients are closed),
+waits up to 3 s, then sends SIGTERM to the launched process only and waits up to
+2 s before the existing compositor/process cleanup. After it, the cookie row
+existed (encrypted with the basic store) and a second session sent it.
+
+### Validation
+
+- `tests/test_profiles.py` 3/3 runs: invalid names; marker file persists into a
+  second session; concurrent use and deletion refused; unprofiled session cannot
+  see it; delete; Chromium persistent cookie set in one session is sent by the
+  next (local HTTP server, mode 0700 home).
+- Full suite: 39 tests OK, 8 skipped (Nix labwc/foot/wayvnc/dbus/xwayland/xterm).
+
+Not verified: real third-party logins (deliberately not attempted); other
+browsers; applications that store absolute runtime paths in their profile.
+
 ## 2026-10-04 — Human takeover for logins
 
 The user chose takeover as the way to handle logins, 2FA and CAPTCHAs. Sessions

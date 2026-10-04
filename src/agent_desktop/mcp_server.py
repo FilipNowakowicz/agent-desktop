@@ -75,6 +75,7 @@ def desktop_wait(
     element: str | None = None,
     role: str | None = None,
     text: str | None = None,
+    seconds: float = 0,
 ) -> dict:
     """Wait instead of polling with screenshots.
 
@@ -84,10 +85,11 @@ def desktop_wait(
     value), wait for a matching UI element, e.g. a "Saved" label, or for it to
     disappear when gone is true and no window is given. With stable_ms, then wait
     until the screen has not changed for that long (a blinking caret is ignored).
+    seconds (up to 30) pauses first, for changes no condition describes.
     Returns satisfied=false at the timeout (at most 120 s).
     """
     return core.wait(
-        session, title, app_id, gone, stable_ms, timeout, element, role, text
+        session, title, app_id, gone, stable_ms, timeout, element, role, text, seconds
     )
 
 
@@ -98,8 +100,9 @@ def desktop_actions(
     """Run up to 50 steps in one call, e.g. click a field, type, press Return.
 
     Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
-    drag, scroll, type, key, focus or wait. Pass the observation token of the
-    screenshot you planned from. Input is sent only while windows and focus are
+    drag, scroll, type, key, ui_action, focus or wait (e.g. {"action": "wait",
+    "seconds": 1}). Pass the observation token of the screenshot you planned
+    from; coordinates in every step are then in that screenshot's image. Input is sent only while windows and focus are
     as they were after the previous step; otherwise the run stops and reports
     which step and why. Insert a wait step where you expect a window to open or
     close. Popups and changes inside a window are not detected, so take a
@@ -167,7 +170,8 @@ def desktop_screenshot(
     Pass the observation token to input tools to refuse input if windows, focus
     or the output changed since this screenshot. To save image tokens, region
     [x, y, width, height] captures part of the desktop and scale (0.1-1) shrinks
-    the image; desktop coordinates are region x/y plus image coordinates / scale.
+    the image. Input tools given this screenshot's observation interpret x/y as
+    coordinates in this image; without an observation they are desktop pixels.
     """
     capture = core.request(session, "screenshot", region=region, scale=scale)
     return [
@@ -206,7 +210,8 @@ def desktop_key(
 def desktop_click(
     session: str, x: int, y: int, button: str = "left", observation: str | None = None
 ) -> dict:
-    """Click private screenshot coordinates at scale 1; fails outside the desktop."""
+    """Click at x/y: coordinates in the screenshot whose observation is passed,
+    otherwise desktop pixels. Fails outside the desktop."""
     return core.request(
         session, "click", x=x, y=y, button=button, observation=observation
     )
@@ -214,7 +219,7 @@ def desktop_click(
 
 @mcp.tool()
 def desktop_move(session: str, x: int, y: int, observation: str | None = None) -> dict:
-    """Move only the private desktop pointer to screenshot coordinates."""
+    """Move only the private desktop pointer (coordinates as for desktop_click)."""
     return core.request(session, "move", x=x, y=y, observation=observation)
 
 
@@ -228,7 +233,8 @@ def desktop_drag(
     button: str = "left",
     observation: str | None = None,
 ) -> dict:
-    """Press at (x, y), move in steps to (to_x, to_y) and release, in the private desktop."""
+    """Press at (x, y), move in steps to (to_x, to_y) and release (coordinates as
+    for desktop_click)."""
     return core.request(
         session,
         "drag",

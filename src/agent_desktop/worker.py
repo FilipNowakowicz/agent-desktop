@@ -16,7 +16,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .atspi import Accessibility, Unsupported
+from .atspi import Accessibility, Unsupported, wait_for_registry
 from .wayland import (
     BUTTONS,
     Keysyms,
@@ -331,6 +331,7 @@ class Worker:
                 stdout=log,
                 stderr=log,
             )
+        wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
 
     def accessibility(self):
         if not self.info.get("accessibility"):
@@ -435,7 +436,7 @@ class Worker:
             "height": height,
             "region": region,
             "scale": scale or 1,
-            "observation": before,
+            "observation": image_token(before, region, scale),
         }
 
     def capture_pixels(self):
@@ -510,7 +511,7 @@ class Worker:
     def check_observation(self, token):
         if not isinstance(token, str):
             raise ValueError("Observation must be a token from screenshot")
-        if token != self.observation():
+        if token.partition("@")[0] != self.observation():
             raise StaleObservation(
                 "Windows, focus or output changed since that screenshot; "
                 "no input was sent. Take a new screenshot."
@@ -798,8 +799,14 @@ class Worker:
                 for v in values
             ):
                 raise ValueError("Coordinates must be finite numbers")
+            # A cropped or scaled screenshot's token makes x/y image coordinates.
+            origin_x, origin_y, factor = token_mapping(request.get("observation"))
             points = [
-                (int(values[i]), int(values[i + 1])) for i in (0, len(values) - 2)
+                (
+                    round(origin_x + values[i] / factor),
+                    round(origin_y + values[i + 1] / factor),
+                )
+                for i in (0, len(values) - 2)
             ]
             pointer = self.pointer()
             for point in points:
@@ -973,6 +980,28 @@ def remove_session_files(root, runtime):
     shutil.rmtree(runtime, ignore_errors=True)
     for name in ("home", "config"):
         shutil.rmtree(root / name, ignore_errors=True)
+
+
+def image_token(layout, region, scale):
+    """Observation token; cropped or scaled captures append their mapping."""
+    x, y = region[:2]
+    if (x, y) == (0, 0) and not scale:
+        return layout
+    return f"{layout}@{x},{y},{scale or 1}"
+
+
+def token_mapping(token):
+    """(origin x, origin y, scale) for image coordinates relative to a token."""
+    if not isinstance(token, str) or "@" not in token:
+        return 0, 0, 1
+    try:
+        x, y, scale = token.partition("@")[2].split(",")
+        mapping = int(x), int(y), float(scale)
+    except ValueError:
+        raise ValueError("Malformed observation token") from None
+    if not 0.1 <= mapping[2] <= 1:
+        raise ValueError("Malformed observation token")
+    return mapping
 
 
 def first_difference(a, b):

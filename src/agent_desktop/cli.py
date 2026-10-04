@@ -50,6 +50,7 @@ def main():
     waiter.add_argument("--app-id")
     waiter.add_argument("--gone", action="store_true")
     waiter.add_argument("--stable-ms", type=int, default=0)
+    waiter.add_argument("--seconds", type=float, default=0, help="pause first")
     waiter.add_argument("--timeout", type=float, default=10)
     waiter.add_argument("--element", help="accessible name substring")
     waiter.add_argument("--role")

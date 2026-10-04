@@ -6,8 +6,11 @@ Added a GUI-only, fixed-local-target stdio adapter and a fresh-container harness
 for three existing browser fixtures. Routing tests reject target overrides and
 shell/file/launch/accessibility/session tools, preserving upstream results.
 Both code-and-drag dry runs fail verification with no errors or leftovers:
-native `20261004-151706-01ca`, container `20261004-151705-1f13` (39.4 s startup).
-Both use seed 41027 and identical generated pages; model runs are pending.
+native `20261004-151706-01ca`, container `20261004-151705-1f13` (29.1 s startup).
+Both use seed 41027 and identical generated pages.
+Native pilot `20261004-151912-01e9`, claude-opus-5-5, $1 cap: passed,
+7 tool calls, no errors, 13.0 s, $0.0803638 API-equivalent, clean teardown.
+Committed after this run before the corresponding container model run.
 
 Project-local Podman 5.8.7 rootless VFS storage and its Unix API socket work with
 existing user namespaces; no host permissions/configuration changed. Fetched

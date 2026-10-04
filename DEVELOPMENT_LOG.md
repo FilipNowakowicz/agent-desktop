@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-10-04 — Second native comparison set
+
+Run `20261004-154125-494e`, seed 41028, claude-opus-5-5, $0.40/task cap:
+code-and-drag passed (7 calls, 23.0 s, $0.0800196); form passed (11 calls,
+17.5 s, $0.1061416); confirmation passed (5 calls, 13.4 s, $0.0721344).
+No tool/setup/cleanup errors. Native has 6/6 verified trials across two sets;
+comparison cumulative usage is $0.793754. Committed after this batch before
+the second container set. Time varies even with identical tool counts.
+
 ## 2026-10-04 — Container form/confirmation comparison results
 
 Run `20261004-153931-af37`, seed 41027, claude-opus-5-5, $0.40/task cap:

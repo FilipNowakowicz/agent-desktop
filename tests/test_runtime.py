@@ -15,6 +15,7 @@ from pathlib import Path
 from agent_desktop import core
 from agent_desktop.wayland import POOL
 from agent_desktop.worker import owned_processes
+from scripts import office_smoke
 
 
 def wait_for(predicate, timeout=10):
@@ -588,6 +589,29 @@ class RuntimeTests(unittest.TestCase):
             core.request(session, "key", key="s", modifiers=["ctrl"])
             wait_for(lambda path=path, text=text: path.read_text() == text)
             core.request(session, "screenshot")
+
+    @unittest.skipUnless(shutil.which("libreoffice"), "LibreOffice unavailable")
+    def test_writer_saves_unicode_document(self):
+        session = self.new_session()
+        result = office_smoke.writer(session, self.root)
+        self.assertTrue(office_smoke.writer_matches(Path(result["file"])))
+        self.assertNotEqual(
+            Path(result["before"]["path"]).read_bytes(),
+            Path(result["after"]["path"]).read_bytes(),
+        )
+
+    @unittest.skipUnless(shutil.which("libreoffice"), "LibreOffice unavailable")
+    def test_calc_saves_formula_and_calculated_value(self):
+        session = self.new_session()
+        seed = self.root / "seed.ods"
+        office_smoke.spreadsheet(seed)
+        self.assertFalse(office_smoke.calc_matches(seed))
+        result = office_smoke.calc(session, self.root)
+        self.assertTrue(office_smoke.calc_matches(Path(result["file"])))
+        self.assertNotEqual(
+            Path(result["before"]["path"]).read_bytes(),
+            Path(result["after"]["path"]).read_bytes(),
+        )
 
     @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
     def test_xwayland_application_receives_input(self):

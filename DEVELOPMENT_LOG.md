@@ -1,5 +1,35 @@
 # Development log
 
+## 2026-10-04 — M3 LibreOffice Writer and Calc
+
+Added `scripts/office_smoke.py` and two real-application integration tests. Writer
+creates Unicode text and saves it through the GTK dialog to a Unicode ODT path;
+the verifier reads the saved OpenDocument paragraphs. Calc opens a small seeded
+ODS, enters `=SUM(B2:B3)` in B4 through keyboard input, and saves it; the verifier
+requires both the stored formula and calculated value 20, with the original
+labels and amounts intact. The seed without the formula must fail verification.
+Both workflows capture before/after screenshots and check session cleanup.
+
+Applications are forced to native Wayland with the GTK3 backend and get an
+explicit per-session UserInstallation profile. Initial probes typed into the
+splash/first-run dialog rather than a ready document. The harness now waits for
+the actual document, handles known Welcome/Tip dialogs during a three-second
+startup observation period, and checks document focus. This finite startup
+observation and the 300 ms file-path validation delay are fixture assumptions,
+not universal widget-readiness guarantees. Unknown modals lead to failed checks.
+
+Local smoke: both workflows passed with LibreOffice 26.8.0.3 and labwc 0.20.2,
+report `artifacts/office/46d5cf42811b/report.json`. A separate Calc probe verified
+the exact `of:=SUM([.B2:.B3])` formula and cached value `20`. LibreOffice was fetched
+with `nix build --no-link --print-out-paths nixpkgs#libreoffice` as a runtime tool
+(513.5 MiB download, no profile install or host activation); Python still uses uv.
+Full local suite: 31 tests in 54.455 s, 30 passed and visible mode skipped.
+Ruff lint/format and compileall passed. Office CI validation is pending.
+
+PR #25 passed Ubuntu, Fedora and Arch on its final source commit (run
+`37205271460`) and was merged. Its earlier Arch Xwayland activation timeout
+did not recur; no cause is established. Timeout diagnostics remain in the test.
+
 ## 2026-10-04 — M3 editor file dialogs and private clipboards
 
 Added real Mousepad tasks to the compositor suite: open a Unicode filename in a

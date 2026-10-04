@@ -177,8 +177,8 @@ uv run agent-desktop create
 
 Runtime executable paths can be supplied with `--labwc` and `--grim` (the M0
 script also accepts `--foot`, `--wtype` and `--wlrctl`). The tested NixOS invocation is
-in the development log. Beyond the Ubuntu CI runner, other Linux distributions
-have not yet been tested.
+in the development log. Headless CI also runs in Fedora and Arch containers;
+desktop installs on those distributions remain untested.
 
 The experiment creates a temporary headless labwc session with software rendering,
 a private runtime directory, disposable home/configuration and a separate D-Bus
@@ -196,8 +196,7 @@ sandbox. Applications still run as your user with host filesystem and network ac
 
 ## Next
 
-Harden session ownership and input readiness, expand application coverage, and
-validate an interactive MCP client. See [the compatibility matrix](docs/COMPATIBILITY.md)
+Expand application coverage and measure baseline efficiency. See [the compatibility matrix](docs/COMPATIBILITY.md)
 for tested configurations and [the roadmap](PROJECT_PLAN.md) for remaining stages.
 
 For a scripted Chromium GUI task with a disposable profile and local HTML fixture:
@@ -205,6 +204,20 @@ For a scripted Chromium GUI task with a disposable profile and local HTML fixtur
 ```sh
 uv run scripts/browser_smoke.py
 ```
+
+For Writer document creation and a Calc formula/save workflow, install optional
+LibreOffice Writer, Calc and GTK3 integration, then run:
+
+```sh
+uv run scripts/office_smoke.py
+uv run scripts/office_smoke.py --component writer
+```
+
+The script uses native Wayland, separate disposable office profiles, and validates
+the saved ODT paragraphs and ODS formula/result. It handles known first-run
+Welcome/Tip dialogs, checks session cleanup and writes artifacts under
+`artifacts/office/`. File-dialog validation includes a short fixture delay;
+this does not establish general application widget readiness.
 
 For an optional graphical observer smoke test on Hyprland (opens and closes its
 own viewer window):

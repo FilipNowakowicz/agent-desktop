@@ -39,7 +39,8 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 stdio_client(params) as (read, write),
                 ClientSession(read, write) as client,
             ):
-                await client.initialize()
+                initialized = await client.initialize()
+                self.assertIn("desktop_request_human", initialized.instructions)
                 tools = await client.list_tools()
                 names = {tool.name for tool in tools.tools}
                 self.assertIn("desktop_screenshot", names)

@@ -7,7 +7,20 @@ from mcp.types import TextContent
 
 from . import core
 
-mcp = FastMCP("Private desktop")
+INSTRUCTIONS = """\
+Private Linux desktops that do not touch the user's own screen. Create a session,
+launch applications, take a screenshot, act using its observation token, verify
+with another screenshot, and destroy the session when finished.
+
+Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
+passwords or codes in chat and never type guessed credentials. Call
+desktop_request_human with a short reason, tell the user that reason and the
+returned take_command, then wait with desktop_control. While the user has control,
+your input and screenshots are refused. When control returns, take a new screenshot
+before acting. To keep a login for later tasks, create sessions with the same
+profile name (one session per profile at a time)."""
+
+mcp = FastMCP("Private desktop", instructions=INSTRUCTIONS)
 
 
 @mcp.tool()

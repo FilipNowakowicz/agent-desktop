@@ -261,3 +261,25 @@ first form/confirmation batch also overlapped container dry setup. These results
 support neither a general performance winner nor a decision to replace the
 runtime. Widget/frame readiness and broader daily-use tasks need measurements
 before choosing further interaction extensions.
+
+## Tool profile comparison, 2026-10-04 (claude-opus-5-5, accessibility on in both)
+
+`--tools basic` disables wait, actions and semantic UI; `--tools full` allows them.
+Two rounds, seeds 7 and 8. Results: `benchmarks/results/2026-10-04-tool-profiles.json`.
+
+| Suite / profile | Passed | Tool calls | Cost (USD) | Total tokens |
+| --- | --- | --- | --- | --- |
+| hard basic | 10, 10 | 126, 125 | 1.13, 1.13 | 0.78 M, 0.78 M |
+| hard full | 10, 10 | 79, 80 | 1.09, 1.06 | 0.91 M, 0.88 M |
+| standard basic | 20, 19 | 157, 143 | 1.50, 1.48 | 0.94 M, 0.85 M |
+| standard full | 19, 20 | 128, 120 | 1.62, 1.58 | 1.29 M, 1.25 M |
+
+Full tools cut calls by ~37% (hard) and 15-18% (standard). Standard cost rose 5-9%:
+Chromium UI listings were 10-13 K characters and stayed in context. Fixes after
+round 1/2: registry readiness before `ready` (an app launched immediately was
+invisible), coordinates follow scaled/cropped screenshot tokens (the round-1
+full failure clicked image coordinates on a half-scale screenshot), `wait`
+accepts `seconds`, and listings became compact text with short ids (3176 -> 1419
+characters for a form page). Round 3 (seed 9) measuring the compact output is
+INVALID: the Claude session limit was hit after 6 tasks (HTTP 429). Re-run
+`--suite standard --seed 9 --tools full` and `--suite hard --seed 9 --tools full`.

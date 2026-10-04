@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-10-04 — Tool profile comparison
+
+See docs/BENCHMARK.md (tool profile comparison). Fixes found by it are on branch
+`m4/tool-comparison`. Round 3 was cut off by the Claude usage limit; re-run it.
+
 ## 2026-10-04 — Waiting for UI elements (verified outcomes)
 
 Plan extension A ("verified outcomes"): `wait` / `desktop_wait` accept `element`

@@ -15,13 +15,18 @@ READ_ONLY = [
     "-SendPrimary=0",
     "-SetPrimary=0",
 ]
-# Takeover still keeps the host and private clipboards apart.
-INTERACTIVE = [
-    "-AcceptClipboard=0",
-    "-SendClipboard=0",
-    "-SendPrimary=0",
-    "-SetPrimary=0",
-]
+
+
+# Takeover never copies the private clipboard to the host. With paste, the
+# host clipboard (not the primary selection) is sent in, e.g. from a password
+# manager; the session clipboard is cleared when control returns.
+def interactive_flags(paste=False):
+    return [
+        "-AcceptClipboard=0",
+        f"-SendClipboard={int(paste)}",
+        "-SendPrimary=0",
+        "-SetPrimary=0",
+    ]
 
 
 def run_viewer(executable, endpoint, flags):
@@ -84,7 +89,7 @@ def view(session, wayvnc=None, viewer=None):
     }
 
 
-def take(session, wayvnc=None, viewer=None):
+def take(session, wayvnc=None, viewer=None, paste=False):
     """Hold control of a session in an interactive viewer; closing it hands back."""
     executable = viewer_executable(viewer)
     server = request(
@@ -93,7 +98,7 @@ def take(session, wayvnc=None, viewer=None):
         wayvnc=wayvnc or os.environ.get("AGENT_DESKTOP_WAYVNC", "wayvnc"),
     )
     try:
-        code = run_viewer(executable, server["socket"], INTERACTIVE)
+        code = run_viewer(executable, server["socket"], interactive_flags(paste))
     finally:
         try:
             state = request(session, "release")

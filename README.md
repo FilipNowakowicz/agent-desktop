@@ -76,8 +76,12 @@ so it cannot watch what you type. Closing the viewer (or `agent-desktop release
 SESSION`) hands control back; the agent must then take a new screenshot before any
 input, and all earlier observation tokens are stale. The agent can wait for this
 with `desktop_control(session, wait_seconds=...)`; only you can release control.
-Clipboard transfer stays disabled in both directions, and the session keymap is US,
-so characters missing from that layout may not reach the session.
+The session's clipboard is never copied to your host. `take --paste` sends your
+host clipboard into the session (e.g. a password from your password manager);
+without it nothing is transferred. Whenever control returns, the session's
+clipboard and primary selection are cleared, so a pasted secret is not left for
+the agent. The session keymap is US, so characters missing from that layout may
+not reach the session when typed (pasting avoids this).
 
 ### Saved logins (profiles)
 

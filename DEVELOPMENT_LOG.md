@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-04 — Paste into a takeover; clear the clipboard on release
+
+`agent-desktop take --paste` starts TigerVNC with `-SendClipboard=1` (primary
+selection still off; the session clipboard is never accepted by the host). On
+every release the worker clears the clipboard and primary selection through
+`ext_data_control_manager_v1` or `zwlr_data_control_manager_v1`
+(`set_selection(null)`), logging rather than failing if unavailable.
+
+The first test passed even with clearing disabled: the pasted text is owned by
+wayvnc's data-control source and vanishes when the takeover server exits anyway.
+Clearing matters when an application copied the text again. The test now has a
+`wl-copy --foreground` owner during takeover, checks `wl-paste` before and after
+release, and fails with clearing disabled (`'copied-secret' != ''`). A separate
+test sends RFB ClientCutText and pastes with Ctrl+Shift+V into the foot fixture.
+CI installs `wl-clipboard` on all three distributions.
+
 ## 2026-10-04 — Event-aware waiting
 
 Plan extension A ("event-aware waiting"). New worker operation `frame` captures

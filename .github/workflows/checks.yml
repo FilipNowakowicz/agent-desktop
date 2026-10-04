@@ -27,7 +27,7 @@ jobs:
         run: uv run python -m unittest discover -s tests -v
         env:
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
-      - name: Repeat focus switching and supervisor crash cleanup
+      - name: Repeat focus switching, Xwayland input and supervisor crash cleanup
         run: |
           uv run python - <<'PY'
           import sys
@@ -36,6 +36,7 @@ jobs:
           names = [
               "test_runtime.RuntimeTests.test_immediate_typing_after_repeated_focus_switches",
               "test_runtime.RuntimeTests.test_killed_supervisor_is_cleaned_up_by_guardian",
+              "test_runtime.RuntimeTests.test_xwayland_application_receives_input",
           ]
           suite = unittest.TestSuite(
               unittest.defaultTestLoader.loadTestsFromName(name)
@@ -93,6 +94,21 @@ jobs:
       - run: uv sync --locked --managed-python
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
+        env:
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
+      - name: Repeat Xwayland mapping and input
+        run: |
+          uv run python - <<'PY'
+          import sys
+          import unittest
+          sys.path.insert(0, "tests")
+          name = "test_runtime.RuntimeTests.test_xwayland_application_receives_input"
+          suite = unittest.TestSuite(
+              unittest.defaultTestLoader.loadTestsFromName(name) for _ in range(10)
+          )
+          result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
+          sys.exit(not result.wasSuccessful())
+          PY
         env:
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure

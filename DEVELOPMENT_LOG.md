@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-04 — Xwayland fixture diagnostics and repetition
+
+PR #27 CI run `37206984363`: Ubuntu and Arch passed; Fedora's existing
+Xwayland test found no mapped window. Its retained `windows.json` is empty
+and screenshot is black; xterm stderr warns that the default fixed bitmap font
+is missing. This is evidence of the failure, not proof of its cause.
+
+Select installed DejaVu Sans Mono explicitly in the test and Xterm benchmark
+fixture, and retain full session status alongside window state and screenshot
+on failure. CI now repeats Xwayland mapping/input ten times on all three
+distributions. Local repeat: 10/10 passed in 10.465 s with xterm 411 and
+Xwayland 24.1.13. Ruff lint/format passed. Final CI is pending.
+
 ## 2026-10-04 — M4 office benchmark preparation
 
 Added an office suite with Writer document creation and Calc SUM entry checked

@@ -629,6 +629,8 @@ class RuntimeTests(unittest.TestCase):
             argv=[
                 "xterm",
                 "-u8",
+                "-fa",
+                "DejaVu Sans Mono",
                 "-title",
                 "X11 fixture",
                 "-e",
@@ -648,6 +650,9 @@ class RuntimeTests(unittest.TestCase):
         except AssertionError:
             directory.joinpath("windows.json").write_text(
                 json.dumps(core.request(session, "windows"), indent=2)
+            )
+            directory.joinpath("status.json").write_text(
+                json.dumps(core.request(session, "status"), indent=2)
             )
             core.request(session, "screenshot")
             raise

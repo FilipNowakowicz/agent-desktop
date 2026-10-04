@@ -72,7 +72,7 @@ jobs:
               xterm xev xprop xwininfo zenity mousepad chromium libreoffice-writer libreoffice-calc
               libreoffice-gtk3 dejavu-sans-fonts dejavu-sans-mono-fonts
               wlroots0.19-devel gcc gcc-c++ meson ninja-build curl-minimal patchelf patch
-              glslang glslang-devel wayland-protocols-devel hwdata-devel
+              glslang glslang-devel wayland-protocols-devel hwdata-devel xorg-x11-server-Xwayland-devel
             versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
           - name: arch
             image: archlinux:latest

@@ -17,7 +17,10 @@ its development package version. SHA-256 for 0.19.3:
 The identical patch applies to 0.19.3 without fuzz (48-line offset). Fedora CI
 now builds its matching private repair and runs 100 X11 repetitions with four
 busy processes, as on Arch. Ubuntu retains stock runtime. No retries, assertion
-changes or host loader/configuration changes. Distribution checks are pending.
+changes or host loader/configuration changes. The first Fedora build (`37215444164`) stopped during Meson configuration:
+`pkgconfig(xwayland)` was missing despite the executable being installed. Added
+Fedora's `xorg-x11-server-Xwayland-devel`, which provides xwayland.pc; kept X11
+support required rather than allowing a silent disabled build. Checks are pending.
 
 ## 2026-10-04 — Repaired runtime passes distribution validation
 

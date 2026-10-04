@@ -20,6 +20,7 @@ Fedora with wlroots0.19-devel 0.19.3 and labwc 0.9.6:
 # Arch: base-devel meson ninja curl patchelf glslang vulkan-headers hwdata
 # Fedora: wlroots0.19-devel gcc gcc-c++ meson ninja-build curl-minimal
 #         patchelf patch glslang glslang-devel wayland-protocols-devel hwdata-devel
+#         xorg-x11-server-Xwayland-devel
 sh scripts/build_xwayland_runtime.sh artifacts/patched-runtime
 PATH="$PWD/artifacts/patched-runtime/install/bin:$PATH" uv run agent-desktop create
 ```

@@ -7,7 +7,14 @@ from saved files. It reuses the independently validated office verifiers, starts
 fresh private profiles, and leaves first-run dialogs for the agent to handle.
 Integrated CLI dry run `20261004-144149-180e`: 0/2 passes as intended, no setup
 errors or cleanup failures. Earlier direct-harness negative control:
-`artifacts/office-benchmark-dry/6773c191a324/report.json`. No model run yet.
+`artifacts/office-benchmark-dry/6773c191a324/report.json`.
+
+One sparing model run with the existing $1/task cap, `20261004-144403-9eec`:
+claude-opus-5-5 passed both tasks. Writer: 13 calls, 22.8 s, $0.181 API-equivalent;
+Calc: 7 calls, 14.7 s, $0.083. Total 20 calls, 37.5 s, $0.264; no tool errors or
+cleanup failures. First-run prompts were handled through the GUI. Usage came
+from the previously authorized testing client's Pro allowance; no new paid API
+account was configured. Committed preparation before the run and results after it.
 
 Benchmark tools now explicitly exclude session creation, destruction and process
 launch: the harness owns those, and tasks already have their applications open.

@@ -150,3 +150,19 @@ These tasks also did not separate pass from fail for this model. Future
 benchmark work should measure efficiency (calls, time, cost) and compare
 baselines or weaker models, rather than only adding difficulty. One run per task;
 no repeatability claim.
+
+## Office tasks
+
+Run `20261004-144403-9eec` (LibreOffice 26.8.0.3, claude-opus-5-5): 2/2 passed,
+20 tool calls, no tool errors, 37.5 agent seconds and $0.264 API-equivalent usage
+against the existing Pro allowance. No cleanup failures. This run explicitly
+disabled desktop create/destroy/launch tools and used a $1 cap per task.
+
+| Task | Result | Tool calls | Seconds | API-equivalent USD |
+| --- | --- | ---: | ---: | ---: |
+| office-writer-document | pass | 13 | 22.8 | 0.181 |
+| office-calc-budget | pass | 7 | 14.7 | 0.083 |
+
+The agent handled the first-run UI and saved files that passed independent checks.
+This is one run of two small tasks, not a broad office-application reliability
+claim or a comparison with another runtime.

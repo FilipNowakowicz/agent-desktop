@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-04 — Handoff after M1 hardening and M3 coverage
+
+Updated the plan status and starter prompt after PRs #10–#16. PR #16 passed
+Ubuntu, Fedora and Arch CI (run on its final commit) and was merged. The next
+step, configuring an interactive agent client (#7), changes the user's persistent
+client configuration and waits for their choice. This documentation change adds
+no runtime validation claims.
+
 ## 2026-10-04 — M3 Fedora and Arch Linux CI
 
 **Outcome:** the full headless suite (20 tests, visible mode skipped) and stress

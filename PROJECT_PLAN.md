@@ -1,6 +1,6 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-03. Status: M0, initial M1, MCP and the independent observer are integrated with passing Ubuntu CI. A scripted Chromium GUI task passed locally. Interactive nested mode remains sensitive to concurrent input; ownership, input readiness and broader compatibility remain open. See `DEVELOPMENT_LOG.md`.
+Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. X11, GTK and Qt applications are covered. CI passes on Ubuntu, Fedora and Arch. Open: an interactive client (#7, needs a user decision), larger daily-use applications (#6), the intermittent Ubuntu focus failure (#17) and M4 benchmarks. See `DEVELOPMENT_LOG.md`.
 
 ## Development status
 
@@ -11,9 +11,9 @@ update this status and the development log with completed work and remaining gap
 | Stage | State | Remaining work |
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
-| M1 | Core integrated; subreaper ownership, private bus, persistent virtual pointer/keyboard, drag, safe compositor bindings | Hardening items in #5 addressed; open: in-window change detection, IME, Xwayland (M3) |
+| M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
 | M2 | MCP and read-only observer integrated with Ubuntu CI | Integration in the user's chosen client; issue #7 |
-| M3 | Ubuntu CI; Chromium, Xwayland/xterm and GTK/Qt dialogs (Wayland and X11) pass locally | Larger applications, another desktop distribution install and daily-use tasks |
+| M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm and GTK/Qt dialogs pass | Larger applications, desktop installs on other distributions, daily-use tasks, #17 |
 | M4 | Not started | Representative task benchmarks and measured improvements |
 
 Visible mode is an explicitly requested testing option: a nested labwc window on

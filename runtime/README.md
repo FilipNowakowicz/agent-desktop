@@ -29,7 +29,8 @@ changed. Keep the output directory while using its runtime; deleting it removes
 the repair. Choose this runtime explicitly on `PATH` or through `core.create`'s
 `tools` argument. Python dependencies and the core remain portable.
 
-Arch CI tests this private repair. Ubuntu/Fedora continue using their stock
+Arch CI 37214448862 passed its full suite, 100 loaded Xterm sessions and
+lifecycle stress using this private repair. Ubuntu/Fedora continue using their stock
 runtime packages. The patched local runtime passed 150 loaded Xterm sessions (one logged repair),
 100 loaded sessions with an already-running XWM, and the full 33-test suite
 with visible mode skipped. Other build environments, versions and visible-mode behavior

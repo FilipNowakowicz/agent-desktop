@@ -1,5 +1,27 @@
 # Development log
 
+## 2026-10-04 — Repaired runtime passes distribution validation
+
+Source head `c63b109`, CI `37214448862`: Ubuntu, Fedora and Arch all passed.
+Arch built the pinned patched wlroots 0.20.2 from source and verified the copied
+labwc resolves its private library. Full suite: 33 tests, 50.304 s, visible skip.
+Then 100/100 Xterm Unicode/mouse sessions passed with four busy CPU processes in
+272.115 s, followed by lifecycle stress. Ubuntu/Fedora retained stock packages
+and passed their full suite/repetitions/lifecycle checks. Local patched runtime
+passed 150 loaded sessions (one buffered-at-association recovery), 100 warmed-XWM
+loaded sessions, and the full suite. A final scan of 274 retained local manifests
+found every session stopped/failed, no surviving runtime paths or process tokens.
+All helpers/containers used for this stage are stopped; the comparison image was
+removed. No additional model runs: total remains $1.0474778 of $5 authorized.
+
+The patch is an optional runtime build, not a silent host installation or an
+upstream fix. Stock 0.20.2 remains affected. Visible-mode repair behavior and
+broader X11 applications are unverified; issue #17's earlier Ubuntu focus
+failure may have a separate cause. Next implementation priority is explicit
+human takeover/action ownership, followed by broader application coverage and
+matched-environment comparisons. More account-using trials need a new scoped
+budget if they go beyond this completed comparison.
+
 ## 2026-10-04 — X11 buffer-before-association repair
 
 Latest PR #28 head `5e24a10`, CI `37211305391`: Ubuntu/Fedora passed;

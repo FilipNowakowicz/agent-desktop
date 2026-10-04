@@ -280,6 +280,17 @@ round 1/2: registry readiness before `ready` (an app launched immediately was
 invisible), coordinates follow scaled/cropped screenshot tokens (the round-1
 full failure clicked image coordinates on a half-scale screenshot), `wait`
 accepts `seconds`, and listings became compact text with short ids (3176 -> 1419
-characters for a form page). Round 3 (seed 9) measuring the compact output is
-INVALID: the Claude session limit was hit after 6 tasks (HTTP 429). Re-run
-`--suite standard --seed 9 --tools full` and `--suite hard --seed 9 --tools full`.
+characters for a form page).
+
+Round 3 (seed 9, full tools only, after the fixes and compact listings; the
+first attempt hit the Claude session limit and was discarded):
+
+| Suite | Passed | Tool calls | Cost (USD) | Total tokens | Run |
+| --- | --- | --- | --- | --- | --- |
+| standard full | 20/20 | 129 | 1.41 | 1.19 M | `20261005-000847-8fe7` |
+| hard full | 10/10 | 81 | 0.89 | 0.78 M | `20261005-001522-1b6f` |
+
+Against the basic rounds, full tools now cost about 5% less on the standard
+suite (previously 5-9% more) and about 21% less on the hard suite, with 10-35%
+fewer tool calls. One round per configuration after the fixes; differences of a
+few percent are within the variation seen between rounds.

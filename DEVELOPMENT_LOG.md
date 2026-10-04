@@ -6,7 +6,13 @@ See docs/BENCHMARK.md (tool profile comparison). Fixes found by it are on branch
 `m4/tool-comparison`. Round 3 was first cut off by the Claude usage limit and
 re-run on 2026-10-05: standard 20/20 at $1.41 and hard 10/10 at $0.89 with full
 tools, cheaper than the basic profile on both suites. CI for the branch passed on
-all three distributions.
+all three distributions. A later docs-only push failed Fedora
+`test_actions.test_steps_run_in_order` (CI `37243415314`): text '' but Return
+delivered, the same symptom as closed #17. Likely cause: typing began before the
+new foot window had keyboard focus (keys before `wl_keyboard.enter` are dropped)
+because the fixture waited only for its process plus 0.4 s. The fixture now waits
+for the window's `activated` state; 5/5 local runs. Agents are less exposed since
+they act from screenshot tokens, which include activation state.
 
 ## 2026-10-04 — Waiting for UI elements (verified outcomes)
 

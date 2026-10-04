@@ -25,6 +25,15 @@ jobs:
           uv run python -m compileall -q src scripts tests
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
+        env:
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
+      - name: Keep test desktops on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-tests-${{ github.job }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/desktop-tests
+          retention-days: 7
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2
   distributions:
@@ -60,5 +69,14 @@ jobs:
       - run: uv sync --locked --managed-python
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
+        env:
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
+      - name: Keep test desktops on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-tests-${{ github.job }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/desktop-tests
+          retention-days: 7
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2

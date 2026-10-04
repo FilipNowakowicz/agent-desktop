@@ -25,6 +25,15 @@ def wait_for(predicate, timeout=10):
     raise AssertionError("Timed out waiting for an observed result")
 
 
+def running(pid):
+    # Zombies count as stopped: a container's PID 1 may never reap orphans.
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return False
+    return stat[stat.rindex(")") + 2] not in "ZX"
+
+
 def unique_duration():
     # A unique sleep duration identifies test processes without name matching.
     return f"{time.time_ns() % 10**6 + 10**6}.5"
@@ -86,6 +95,16 @@ class RuntimeTests(unittest.TestCase):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        keep = os.environ.get("DESKTOP_TEST_ARTIFACTS")
+        if keep:
+            # Screenshots, logs and fixture output for diagnosing CI failures.
+            shutil.copytree(
+                self.root,
+                Path(keep) / self.id(),
+                ignore=lambda d, names: [n for n in names if (Path(d) / n).is_socket()],
+                symlinks=True,
+                dirs_exist_ok=True,
+            )
         self.temporary.cleanup()
 
     def new_session(self, mode="headless"):
@@ -398,6 +417,7 @@ class RuntimeTests(unittest.TestCase):
         core.request(session, "type", text="fresh", observation=token)
         core.request(session, "key", key="Return", observation=token)
         wait_for(first.joinpath("typed.txt").exists)
+        core.request(session, "screenshot")  # evidence if the text went elsewhere
         self.assertEqual(first.joinpath("typed.txt").read_text(), "fresh")
         self.assertFalse(second.joinpath("typed.txt").exists())
         # A newly mapped window also invalidates the token.
@@ -596,7 +616,7 @@ class RuntimeTests(unittest.TestCase):
         result = core.destroy(session)
         self.assertTrue(result["recovered"])
         self.assertTrue(result["runtime_removed"])
-        wait_for(lambda: not Path(f"/proc/{compositor}").exists(), timeout=5)
+        wait_for(lambda: not running(compositor), timeout=5)
         self.assertEqual(owned_processes(info["token"]), [])
         self.assertEqual(core.manifest(session)["status"], "stopped")
 

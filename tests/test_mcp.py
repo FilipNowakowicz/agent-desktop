@@ -41,7 +41,13 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
             ):
                 await client.initialize()
                 tools = await client.list_tools()
-                self.assertIn("desktop_screenshot", {tool.name for tool in tools.tools})
+                names = {tool.name for tool in tools.tools}
+                self.assertIn("desktop_screenshot", names)
+                self.assertLessEqual(
+                    {"desktop_request_human", "desktop_control"}, names
+                )
+                # Only the person can hand control back.
+                self.assertNotIn("desktop_release", names)
                 unknown = await client.call_tool(
                     "desktop_type", {"session": "0" * 12, "text": "never delivered"}
                 )

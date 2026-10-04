@@ -125,6 +125,10 @@ class StaleObservation(RuntimeError):
     pass
 
 
+class HumanControl(RuntimeError):
+    pass
+
+
 class Worker:
     def __init__(self, root):
         self.root = root
@@ -134,6 +138,11 @@ class Worker:
         self.compositor = None
         self.apps = {}
         self.viewer = None
+        # A person may take control through an interactive VNC server; agent
+        # operations are refused until control returns and a new screenshot is taken.
+        self.takeover = None
+        self.control = {"owner": "agent", "epoch": 0, "request": None, "last": None}
+        self.needs_screenshot = False
         self.virtual_pointer = None
         self.virtual_keyboard = None
         self.toplevels = None
@@ -295,7 +304,13 @@ class Worker:
         self.env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={bus}"
 
     def tracked(self):
-        processes = [self.bus, self.compositor, self.viewer, *self.apps.values()]
+        processes = [
+            self.bus,
+            self.compositor,
+            self.viewer,
+            self.takeover,
+            *self.apps.values(),
+        ]
         return {p.pid for p in processes if p}
 
     def screenshot(self):
@@ -308,6 +323,7 @@ class Worker:
             self.command("grim", path)
             if self.observation() == before:
                 break
+        self.needs_screenshot = False
         with path.open("rb") as stream:
             header = stream.read(24)
         if not header.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -331,7 +347,14 @@ class Worker:
             (w["id"], w["app_id"], w["states"], w["parent"])
             for w in self.toplevels.current()
         )
-        layout = [output["width"], output["height"], output["scale"], windows]
+        # The control epoch makes every token stale after a person had control.
+        layout = [
+            output["width"],
+            output["height"],
+            output["scale"],
+            windows,
+            self.control["epoch"],
+        ]
         return hashlib.sha256(json.dumps(layout).encode()).hexdigest()[:16]
 
     def check_observation(self, token):
@@ -342,6 +365,106 @@ class Worker:
                 "Windows, focus or output changed since that screenshot; "
                 "no input was sent. Take a new screenshot."
             )
+
+    def control_state(self):
+        return {
+            "session": self.info["id"],
+            **self.control,
+            "needs_screenshot": self.needs_screenshot,
+            "take_command": f"agent-desktop take {self.info['id']}",
+        }
+
+    def save_control(self):
+        self.info["control"] = {
+            "owner": self.control["owner"],
+            "request": self.control["request"],
+        }
+        write_manifest(self.root, self.info)
+
+    def start_vnc(self, wayvnc, endpoint, control_socket, interactive=False):
+        executable = shutil.which(wayvnc, path=self.env.get("PATH"))
+        if not executable:
+            raise ValueError("Missing optional viewer dependency: wayvnc")
+        endpoint.unlink(missing_ok=True)
+        help_result = subprocess.run(
+            [executable, "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3,
+        )
+        flags = [
+            "-u",
+            "-C",
+            "/dev/null",
+            "-f",
+            "30" if interactive else "10",
+            "-S",
+            str(Path(self.info["runtime"]) / control_socket),
+        ]
+        if not interactive:
+            flags.append("-d")
+        elif "--exit-on-disconnect" in help_result.stdout:
+            # The server exits with its client, which returns control.
+            flags.append("-e")
+        if "--disable-resizing" in help_result.stdout:
+            flags.append("-R")
+        if "--name" in help_result.stdout:
+            role = "you have control" if interactive else "view only"
+            flags += ["-n", f"Agent desktop {self.info['id']} ({role})"]
+        log_path = self.root / ("takeover.log" if interactive else "viewer.log")
+        with log_path.open("ab") as log:
+            process = subprocess.Popen(
+                [executable, *flags, str(endpoint)],
+                env=self.env,
+                stdout=log,
+                stderr=log,
+            )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                detail = log_path.read_text()[-4096:]
+                raise RuntimeError(f"Viewer server failed; see {log_path}\n{detail}")
+            if endpoint.is_socket():
+                return process
+            time.sleep(0.05)
+        process.terminate()
+        process.wait(timeout=3)
+        raise TimeoutError("Viewer socket did not appear")
+
+    def take(self, wayvnc):
+        endpoint = Path(self.info["runtime"]) / "takeover.sock"
+        if self.control["owner"] != "human":
+            self.takeover = self.start_vnc(
+                wayvnc, endpoint, "takeover-control.sock", interactive=True
+            )
+            self.control.update(owner="human", since=time.time())
+            self.control["epoch"] += 1
+            self.save_control()
+            print("Control taken by a person", file=sys.stderr, flush=True)
+        return {**self.control_state(), "socket": str(endpoint)}
+
+    def release(self, how):
+        if self.control["owner"] == "human":
+            if self.takeover and self.takeover.poll() is None:
+                self.takeover.terminate()
+                try:
+                    self.takeover.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    self.takeover.kill()
+                    self.takeover.wait()
+            Path(self.info["runtime"], "takeover.sock").unlink(missing_ok=True)
+            self.control.update(
+                owner="agent",
+                request=None,
+                last={"released_at": time.time(), "how": how},
+            )
+            self.control.pop("since", None)
+            self.control["epoch"] += 1
+            self.needs_screenshot = True
+            self.save_control()
+            print(f"Control returned to the agent: {how}", file=sys.stderr, flush=True)
+        return self.control_state()
 
     def pointer(self):
         if self.compositor.poll() is not None:
@@ -383,6 +506,8 @@ class Worker:
                 "mode": self.info["mode"],
                 "status": "ready",
                 "x_display": self.info.get("x_display"),
+                "control": self.control["owner"],
+                "human_requested": self.control["request"] is not None,
                 "applications": [
                     {"pid": p.pid, "exit_code": p.poll()} for p in self.apps.values()
                 ],
@@ -391,6 +516,38 @@ class Worker:
                     for pid in session_processes(self.info["token"])
                 ],
             }
+        if operation == "viewer_start":
+            endpoint = Path(self.info["runtime"]) / "vnc.sock"
+            if not (self.viewer and self.viewer.poll() is None):
+                self.viewer = self.start_vnc(
+                    request.get("wayvnc", "wayvnc"), endpoint, "vnc-control.sock"
+                )
+            return {"socket": str(endpoint), "read_only": True}
+        if operation == "control":
+            return self.control_state()
+        if operation == "request_human":
+            reason = request.get("reason")
+            if not isinstance(reason, str) or not 0 < len(reason.strip()) <= 500:
+                raise ValueError(
+                    "Reason must be a nonempty string of at most 500 characters"
+                )
+            self.control["request"] = {"reason": reason.strip(), "at": time.time()}
+            self.save_control()
+            return self.control_state()
+        if operation == "take":
+            return self.take(request.get("wayvnc", "wayvnc"))
+        if operation == "release":
+            return self.release("released by the user")
+        if self.control["owner"] == "human":
+            raise HumanControl(
+                "A person has control of this private desktop; nothing was sent. "
+                "Wait with desktop_control until control returns to the agent."
+            )
+        if self.needs_screenshot and operation in (*INPUT_OPERATIONS, "focus"):
+            raise StaleObservation(
+                "A person used this desktop since your last screenshot; "
+                "no input was sent. Take a new screenshot."
+            )
         if operation == "launch":
             argv = request.get("argv")
             if (
@@ -435,55 +592,6 @@ class Worker:
             }
         if operation == "screenshot":
             return self.screenshot()
-        if operation == "viewer_start":
-            endpoint = Path(self.info["runtime"]) / "vnc.sock"
-            if self.viewer and self.viewer.poll() is None:
-                return {"socket": str(endpoint), "read_only": True}
-            executable = shutil.which(
-                request.get("wayvnc", "wayvnc"), path=self.env.get("PATH")
-            )
-            if not executable:
-                raise ValueError("Missing optional viewer dependency: wayvnc")
-            endpoint.unlink(missing_ok=True)
-            help_result = subprocess.run(
-                [executable, "--help"],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=3,
-            )
-            flags = [
-                "-u",
-                "-d",
-                "-C",
-                "/dev/null",
-                "-f",
-                "10",
-                "-S",
-                str(Path(self.info["runtime"]) / "vnc-control.sock"),
-            ]
-            if "--disable-resizing" in help_result.stdout:
-                flags.append("-R")
-            with (self.root / "viewer.log").open("ab") as log:
-                self.viewer = subprocess.Popen(
-                    [executable, *flags, str(endpoint)],
-                    env=self.env,
-                    stdout=log,
-                    stderr=log,
-                )
-            deadline = time.monotonic() + 5
-            while time.monotonic() < deadline:
-                if self.viewer.poll() is not None:
-                    detail = (self.root / "viewer.log").read_text()[-4096:]
-                    raise RuntimeError(
-                        f"Viewer server failed; see {self.root / 'viewer.log'}\n{detail}"
-                    )
-                if endpoint.is_socket():
-                    return {"socket": str(endpoint), "read_only": True}
-                time.sleep(0.05)
-            self.viewer.terminate()
-            self.viewer.wait(timeout=3)
-            raise TimeoutError("Viewer socket did not appear")
         if operation in INPUT_OPERATIONS and request.get("observation") is not None:
             self.check_observation(request["observation"])
         if operation in ("click", "move", "drag"):
@@ -564,6 +672,12 @@ class Worker:
                 reap_orphans(self.tracked())
                 if self.compositor.poll() is not None:
                     raise RuntimeError("Private compositor crashed")
+                if (
+                    self.control["owner"] == "human"
+                    and self.takeover
+                    and self.takeover.poll() is not None
+                ):
+                    self.release("viewer disconnected")
                 try:
                     connection, _ = server.accept()
                 except TimeoutError:
@@ -612,7 +726,7 @@ class Worker:
             spare = [self.bus.pid] if self.bus else []
             cleanup_processes(self.info["token"], self.tracked(), spare)
         finally:
-            for process in (self.bus, self.compositor, self.viewer):
+            for process in (self.bus, self.compositor, self.viewer, self.takeover):
                 if process:
                     process.poll()
             for process in self.apps.values():

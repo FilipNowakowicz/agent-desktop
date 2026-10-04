@@ -138,6 +138,27 @@ def desktop_scroll(
 
 
 @mcp.tool()
+def desktop_request_human(session: str, reason: str) -> dict:
+    """Ask the user to take control, e.g. to log in, enter a 2FA code or pass a CAPTCHA.
+
+    Do not ask the user for passwords or codes. Tell them the reason and the
+    returned take_command, then wait with desktop_control. While they have
+    control, input and screenshots are refused; afterwards take a new screenshot.
+    """
+    return core.request(session, "request_human", reason=reason)
+
+
+@mcp.tool()
+def desktop_control(session: str, wait_seconds: int = 0) -> dict:
+    """Report who controls the session and any pending request for the user.
+
+    With wait_seconds (up to 600), wait until the user has finished and control
+    is back with the agent; call again if it is still pending.
+    """
+    return core.wait_for_agent_control(session, wait_seconds)
+
+
+@mcp.tool()
 def desktop_logs(session: str) -> dict:
     """Read bounded compositor and application log tails, including stopped sessions."""
     return core.logs(session)

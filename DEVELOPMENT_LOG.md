@@ -1,5 +1,34 @@
 # Development log
 
+## 2026-10-04 — Human takeover for logins
+
+The user chose takeover as the way to handle logins, 2FA and CAPTCHAs. Sessions
+now have a control owner. `desktop_request_human` (MCP) or `request-human` (CLI)
+records a reason that `list` shows. `agent-desktop take SESSION` starts a second,
+input-enabled wayvnc on `takeover.sock` (the observer keeps `-d`) and opens
+TigerVNC without `-ViewOnly`; clipboard transfer stays disabled. While a person holds
+control the worker refuses input, focus, launch, window listing and screenshots.
+Release (closing the viewer, the server exiting via `-e` when supported, or
+`release`) increments the control epoch, which is part of every observation token,
+and requires a new screenshot before input or focus. MCP has no release tool.
+
+### Validation
+
+Nix `labwc 0.20.2`, `wayvnc 0.10.1`, `foot`, `dbus`, `xwayland`, `xterm`:
+
+- `tests/test_takeover.py` 5/5 runs: refused agent operations, a raw RFB client
+  typing into the fixture, automatic release on disconnect, stale old token,
+  required screenshot, mouse delivery, then agent Unicode typing with its own
+  keymap after wayvnc's keyboard was used; destroy during takeover; validation.
+- Real TigerVNC 1.16.2 viewer run inside a second private session (so nothing
+  appeared on the host): its typing reached session A, closing it returned control
+  (`viewer disconnected`), both sessions stopped with runtime removed.
+- Full suite: 36 tests OK, 8 skipped (visible, Chromium, office/editor tools absent).
+
+Not verified: Ubuntu's older wayvnc without `--exit-on-disconnect` relies on the
+CLI's explicit release (CI will show); non-US host layouts; visible mode, where the
+nested window already accepts host input regardless of owner.
+
 ## 2026-10-04 — Both repaired runtime versions pass
 
 Source head `7766302`, CI `37215643286`: Ubuntu/Fedora/Arch all passed.

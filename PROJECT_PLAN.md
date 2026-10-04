@@ -1,6 +1,6 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. Focus now waits for observed activation before reporting success (#23, CI passed on Ubuntu, Fedora and Arch). X11, GTK and Qt applications are covered. Claude Code integration and initial benchmarks are complete. The guardian-exit test race is fixed (#24, CI passed on all three distributions). Open: larger daily-use applications (#6), the intermittent Ubuntu focus failure (#17), human takeover and comparisons with matched environments. Two sets of browser baseline tasks passed 6/6 per runtime within the $5 allowance. The reproduced wlroots 0.20.2 buffer-before-association race has a project-local repair (150 loaded sessions passed); repaired CI passed on all three distributions (37214448862), including 100 loaded Arch repetitions. Stock Fedora wlroots 0.19.3 subsequently failed X11 mapping in 37214999497; both matching repairs passed CI 37215643286, including 100 loaded X11 repetitions each on Fedora and Arch. Stock 0.19.3/0.20.2 remain affected. See `DEVELOPMENT_LOG.md`.
+Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. Focus now waits for observed activation before reporting success (#23, CI passed on Ubuntu, Fedora and Arch). X11, GTK and Qt applications are covered. Claude Code integration and initial benchmarks are complete. The guardian-exit test race is fixed (#24, CI passed on all three distributions). Human takeover for logins is implemented. Open: persistent login profiles, larger daily-use applications (#6), the intermittent Ubuntu focus failure (#17) and comparisons with matched environments. Two sets of browser baseline tasks passed 6/6 per runtime within the $5 allowance. The reproduced wlroots 0.20.2 buffer-before-association race has a project-local repair (150 loaded sessions passed); repaired CI passed on all three distributions (37214448862), including 100 loaded Arch repetitions. Stock Fedora wlroots 0.19.3 subsequently failed X11 mapping in 37214999497; both matching repairs passed CI 37215643286, including 100 loaded X11 repetitions each on Fedora and Arch. Stock 0.19.3/0.20.2 remain affected. See `DEVELOPMENT_LOG.md`.
 
 ## Development status
 
@@ -12,9 +12,9 @@ update this status and the development log with completed work and remaining gap
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
 | M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
-| M2 | MCP, read-only observer and Claude Code integration (5/5 end-to-end GUI task) | Human takeover / action ownership |
+| M2 | MCP, read-only observer, Claude Code integration (5/5 end-to-end GUI task), human takeover for logins (request/take/release) | Persistent login profiles; takeover clipboard and non-US layouts |
 | M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm, GTK/Qt dialogs, Mousepad file/clipboard tasks and Writer/Calc saved-file workflows pass (#25–#26) | Broader office tasks, desktop installs on other distributions, widget readiness, #17, broader validation of the wlroots 0.20.2 mapping repair and rapid Calc arrow navigation |
-| M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); two sets of three native/container browser tasks: 6/6 each, 46/49 calls, nearly equal usage (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models; human takeover |
+| M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); two sets of three native/container browser tasks: 6/6 each, 46/49 calls, nearly equal usage (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models |
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
@@ -53,7 +53,7 @@ Example intended experience:
 
 > Set up this project, launch it, configure it through its settings window, and show me the working result.
 
-The private desktop avoids stealing the user's focus, mouse, keyboard or visible workspace. An optional viewer allows observation and eventually human takeover.
+The private desktop avoids stealing the user's focus, mouse, keyboard or visible workspace. An optional viewer allows observation, and `take` lets the user control a session (e.g. for logins).
 
 ### Important corrections to preserve
 
@@ -162,7 +162,7 @@ Select the simplest backend that passes the complete capture/input/isolation exp
 - Track owned processes and descendants. Destroy only resources belonging to that session; avoid broad process-name kills.
 - Capture application stdout/stderr and compositor errors from the start, with bounded retention.
 - Keep screenshot coordinate space explicit, including dimensions and scaling. Reject invalid coordinates and unknown sessions.
-- Serialize input per session. Future human takeover must revoke agent input ownership and discard queued/stale actions.
+- Serialize input per session. Human takeover revokes agent input ownership and makes earlier observations stale.
 - Bind any viewer/control endpoint locally by default; do not introduce remote access merely for the MVP.
 
 ### Illustrative interface, not a frozen specification

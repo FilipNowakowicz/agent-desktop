@@ -564,3 +564,15 @@ class Toplevels:
             if time.monotonic() >= deadline:
                 raise WaylandError(f"Window activation timed out: {window_id}")
             time.sleep(0.01)
+
+    def close_all(self, timeout):
+        """Ask every window to close, as a person would; True if all closed."""
+        self.connection.roundtrip()
+        for handle in list(self.windows):
+            self.connection.send(handle, 5)  # close
+        deadline = time.monotonic() + timeout
+        while self.current():
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+        return True

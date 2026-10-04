@@ -36,6 +36,62 @@ def session_path(session):
     return root
 
 
+PROFILE_NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
+
+
+def profile_path(name):
+    """A persistent home that survives sessions, e.g. to keep a browser login."""
+    if not isinstance(name, str) or not PROFILE_NAME.fullmatch(name):
+        raise DesktopError(
+            "Profile names use 1-32 lowercase letters, digits, '-' or '_'"
+        )
+    return state_root() / "profiles" / name
+
+
+def profile_in_use(path):
+    import fcntl
+
+    try:
+        with (path / "lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    except FileNotFoundError:
+        return False
+    return False
+
+
+def profiles():
+    root = state_root() / "profiles"
+    results = []
+    for path in sorted(root.glob("*/home")):
+        profile = path.parent
+        size = sum(
+            f.stat().st_size
+            for f in path.rglob("*")
+            if f.is_file() and not f.is_symlink()
+        )
+        results.append(
+            {
+                "profile": profile.name,
+                "in_use": profile_in_use(profile),
+                "bytes": size,
+                "path": str(path),
+            }
+        )
+    return results
+
+
+def delete_profile(name):
+    path = profile_path(name)
+    if not (path / "home").is_dir() or path.is_symlink():
+        raise DesktopError(f"Unknown profile: {name}")
+    if profile_in_use(path):
+        raise DesktopError(f"Profile {name} is in use by a session")
+    shutil.rmtree(path)
+    return {"profile": name, "deleted": True}
+
+
 def manifest(session):
     try:
         return json.loads((session_path(session) / "session.json").read_text())
@@ -67,9 +123,17 @@ def request(session, operation, **arguments):
     return reply["result"]
 
 
-def create(mode="headless", tools=None):
+def create(mode="headless", tools=None, profile=None):
     if mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
+    home = None
+    if profile is not None:
+        home = profile_path(profile) / "home"
+        home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if home.parent.is_symlink() or home.is_symlink():
+            raise DesktopError("Unsafe profile directory")
+        if profile_in_use(home.parent):
+            raise DesktopError(f"Profile {profile} is in use by another session")
     paths = {}
     for tool in ("labwc", "grim", "dbus-daemon"):
         executable = (tools or {}).get(tool) or os.environ.get(
@@ -114,6 +178,8 @@ def create(mode="headless", tools=None):
         "runtime": str(runtime),
         "control_socket": endpoint,
         "parent_wayland": parent,
+        "profile": profile,
+        "home": str(home) if home else None,
         "token": uuid.uuid4().hex,
         "status": "starting",
         "created_at": time.time(),
@@ -143,6 +209,7 @@ def create(mode="headless", tools=None):
             return {
                 "session": session,
                 "mode": mode,
+                "profile": profile,
                 "status": "ready",
                 "logs": str(root / "session.log"),
             }

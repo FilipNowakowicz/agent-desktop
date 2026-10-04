@@ -1,6 +1,7 @@
 """One supervisor, private D-Bus and compositor per session."""
 
 import ctypes
+import fcntl
 import hashlib
 import json
 import math
@@ -148,6 +149,7 @@ class Worker:
         self.toplevels = None
         self.keysyms = None
         self.stop = False
+        self.profile_lock = None
 
     def save(self, status, **values):
         self.info.update(status=status, **values)
@@ -186,8 +188,17 @@ class Worker:
             "DBUS_SESSION_BUS_PID",
         ):
             self.env.pop(key, None)
-        home = self.root / "home"
-        home.mkdir(mode=0o700)
+        if self.info.get("home"):
+            home = Path(self.info["home"])
+            # Held for the session's lifetime; released by the kernel if it dies.
+            self.profile_lock = (home.parent / "lock").open("a")
+            try:
+                fcntl.flock(self.profile_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise RuntimeError("Profile is in use by another session") from None
+        else:
+            home = self.root / "home"
+            home.mkdir(mode=0o700)
         config = self.root / "config"
         config.mkdir(mode=0o700)
         # Explicit window bindings only: labwc's defaults include Execute actions
@@ -711,7 +722,37 @@ class Worker:
                     stream.write(tail)
                     stream.truncate()
 
+    def stop_applications(self, timeout=3):
+        """Ask launched applications to exit while their display still exists.
+
+        Browsers save state such as cookies when their windows close, but exit
+        abruptly when the compositor disappears first.
+        """
+        running = [p for p in self.apps.values() if p.poll() is None]
+        if not running:
+            return
+        try:
+            # Closing windows lets applications shut down as if a person quit them;
+            # one waiting on a dialog (e.g. unsaved changes) is terminated below.
+            self.toplevels.close_all(timeout=3)
+        except (OSError, RuntimeError):
+            pass
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline and any(p.poll() is None for p in running):
+            reap_orphans(self.tracked())
+            time.sleep(0.05)
+        # Only the launched process: signalling its whole group would stop helpers
+        # (e.g. Chromium's zygote) that it needs for an orderly shutdown.
+        for process in running:
+            process.terminate()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and any(p.poll() is None for p in running):
+            reap_orphans(self.tracked())
+            time.sleep(0.05)
+
     def cleanup(self):
+        if self.toplevels and self.compositor and self.compositor.poll() is None:
+            self.stop_applications()
         for device in (self.virtual_pointer, self.virtual_keyboard, self.toplevels):
             if device:
                 device.close()

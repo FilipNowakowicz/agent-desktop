@@ -27,6 +27,21 @@ jobs:
         run: uv run python -m unittest discover -s tests -v
         env:
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
+      - name: Repeat immediate typing after focus switches
+        run: |
+          uv run python - <<'PY'
+          import sys
+          import unittest
+          sys.path.insert(0, "tests")
+          name = "test_runtime.RuntimeTests.test_immediate_typing_after_repeated_focus_switches"
+          suite = unittest.TestSuite(
+              unittest.defaultTestLoader.loadTestsFromName(name) for _ in range(10)
+          )
+          result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
+          sys.exit(not result.wasSuccessful())
+          PY
+        env:
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure
         if: failure()
         uses: actions/upload-artifact@v4

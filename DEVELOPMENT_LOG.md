@@ -1,5 +1,33 @@
 # Development log
 
+## 2026-10-04 — Verify focus before reporting success
+
+`focus` previously confirmed only that the compositor processed an activation
+request. It now waits for the requested window's `activated` state, returns the
+observed window, and fails if the window closes or activation is not observed
+within a two-second polling deadline. This confirms compositor state, not
+application input readiness; focus can still change after the response.
+
+Validation on NixOS, labwc 0.20.2: `uv sync --locked --managed-python`, Ruff lint
+and formatting, and the full headless unittest suite: 27 tests, 26 passed, one
+visible-mode test skipped. Runtime binaries were supplied from existing Nix store
+paths through the command's PATH; no packages or host configuration were changed.
+The new real-terminal test switches focus 20 times and immediately types ASCII
+and Unicode text; each terminal received exactly its ten intended lines. Tests
+also cover delayed activation, refused activation, a closing target and unknown
+targets. Ubuntu CI repeats the real-terminal test ten times (200 focus switches).
+
+Issue #17 remains open: its original Ubuntu failure has no proven cause, and
+observed activation does not establish that this change fixes it. CI results for
+this stage are pending. No model-account usage or physical desktop interaction
+was needed.
+
+Recent-history review also found a separate Ubuntu failure on main in run
+`37168329845`: `test_killed_supervisor_is_cleaned_up_by_guardian` observed one
+token-bearing PID after the manifest became `failed`. The next main run passed.
+This needs separate investigation of cleanup completion versus status publication;
+it is outside this focus stage and was not reproduced locally.
+
 ## 2026-10-04 — M4 hard benchmark tasks
 
 Added 10 harder tasks (`benchmarks/hard.py`). They cover multiple applications per

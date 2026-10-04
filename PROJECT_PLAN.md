@@ -1,6 +1,6 @@
 # Private Linux desktop for AI agents — development handoff
 
-Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. X11, GTK and Qt applications are covered. CI passes on Ubuntu, Fedora and Arch. Open: an interactive client (#7, needs a user decision), larger daily-use applications (#6), the intermittent Ubuntu focus failure (#17) and M4 benchmarks. See `DEVELOPMENT_LOG.md`.
+Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. Focus now waits for observed activation before reporting success. X11, GTK and Qt applications are covered. CI has passed on Ubuntu, Fedora and Arch; the focus-verification stage is awaiting CI. Claude Code integration and initial benchmarks are complete. Open: larger daily-use applications (#6), the intermittent Ubuntu focus failure (#17), human takeover and M4 baseline comparisons. See `DEVELOPMENT_LOG.md`.
 
 ## Development status
 

@@ -42,7 +42,11 @@ def desktop_windows(session: str) -> dict:
 
 @mcp.tool()
 def desktop_focus(session: str, window: str) -> dict:
-    """Activate a private desktop window by the id from desktop_windows."""
+    """Activate a private window and wait for its activated state (up to 2 seconds).
+
+    Returns the observed window; fails if it closes or activation is not observed.
+    Focus can still change afterward, so use screenshot observations for input.
+    """
     return core.request(session, "focus", window=window)
 
 

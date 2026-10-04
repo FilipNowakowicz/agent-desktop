@@ -426,11 +426,12 @@ class Worker:
             window = request.get("window")
             if not isinstance(window, str):
                 raise ValueError("Focus requires a window identifier")
-            self.toplevels.activate(window)
+            focused = self.toplevels.activate(window)
             return {
                 "session": self.info["id"],
                 "operation": operation,
                 "delivered": True,
+                "window": focused,
             }
         if operation == "screenshot":
             return self.screenshot()

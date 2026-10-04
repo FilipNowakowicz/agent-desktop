@@ -50,6 +50,12 @@ Reading the tree while a window closed failed with `No such interface ... Access
 (found by an element-wait test); vanished elements and applications are now
 skipped instead of failing the whole listing.
 
+CI `37232451508` (commit adding `ACCESSIBILITY_ENABLED`): Fedora failed
+`test_chromium_receives_every_character` once (title never showed the typed
+text); the next two runs passed on all distributions and 10/10 local runs with
+accessibility on passed. Cause unknown; the test now reports the window titles
+and saves diagnostics on failure.
+
 Not verified: LibreOffice, Electron apps, latency of large trees.
 
 ## 2026-10-04 — Partial and scaled screenshots

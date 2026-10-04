@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -12,6 +13,7 @@ import unittest
 from pathlib import Path
 
 from agent_desktop import core
+from agent_desktop.wayland import POOL
 from agent_desktop.worker import owned_processes
 
 
@@ -23,6 +25,9 @@ def wait_for(predicate, timeout=10):
             return value
         time.sleep(0.05)
     raise AssertionError("Timed out waiting for an observed result")
+
+
+CHROMIUM = shutil.which("chromium") or shutil.which("chromium-browser")
 
 
 def running(pid):
@@ -367,7 +372,8 @@ class RuntimeTests(unittest.TestCase):
         # More distinct characters than one keymap holds, plus repeats.
         wide = "".join(chr(0x4E00 + i) for i in range(300))
         text = f"aa café λ {wide} zz"
-        core.request(session, "type", text=text)
+        core.request(session, "type", text=text + "XY")
+        core.request(session, "key", key="BackSpace", repeat=2)
         core.request(session, "key", key="Return")
         wait_for(directory.joinpath("typed.txt").exists)
         self.assertEqual(directory.joinpath("typed.txt").read_text(), text)
@@ -421,7 +427,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(first.joinpath("typed.txt").read_text(), "fresh")
         self.assertFalse(second.joinpath("typed.txt").exists())
         # A newly mapped window also invalidates the token.
-        core.request(session, "launch", argv=["foot", "--config=/dev/null"])
+        core.request(session, "launch", argv=["foot", "--config=/dev/null", "sh"])
         wait_for(lambda: len(core.request(session, "windows")["windows"]) == 3)
         with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
             core.request(session, "click", x=5, y=5, observation=token)
@@ -521,6 +527,93 @@ class RuntimeTests(unittest.TestCase):
                 wait_for(exit_code)
                 output = Path(app["logs"]).read_text().splitlines()
                 self.assertIn(text, output)
+
+    @unittest.skipUnless(shutil.which("xev"), "xev unavailable")
+    def test_keys_use_physical_us_codes(self):
+        # Applications such as Chromium act on physical codes: a character must
+        # never land on another key's code (space on Backspace's code deleted text).
+        session = self.new_session()
+        if not core.request(session, "status")["x_display"]:
+            self.skipTest("compositor has no Xwayland support")
+        app = core.request(
+            session, "launch", argv=["xev", "-event", "keyboard", "-event", "focus"]
+        )
+        wait_for(
+            lambda: any(
+                "activated" in w["states"]
+                for w in core.request(session, "windows")["windows"]
+            ),
+            timeout=20,
+        )
+        core.request(session, "type", text="a Aλ")
+        core.request(session, "key", key="BackSpace")
+
+        def presses():
+            log = Path(app["logs"]).read_text()
+            found = re.findall(
+                r"KeyPress event.*?state (0x[0-9a-f]+), keycode (\d+) "
+                r"\(keysym 0x([0-9a-f]+)",
+                log,
+                re.S,
+            )
+            return found if len(found) >= 5 else None
+
+        events = [(int(m, 16), int(c), int(k, 16)) for m, c, k in wait_for(presses)]
+        by_keysym = {k: (c, m) for m, c, k in events}
+        self.assertEqual(by_keysym[0x61], (38, 0))  # a on KEY_A, unshifted
+        self.assertEqual(by_keysym[0x20][0], 65)  # space on KEY_SPACE
+        self.assertEqual(by_keysym[0x41][0], 38)  # A on KEY_A
+        self.assertTrue(by_keysym[0x41][1] & 1)  # with Shift
+        self.assertEqual(by_keysym[0xFF08][0], 22)  # BackSpace on KEY_BACKSPACE
+        self.assertIn(by_keysym[0x10003BB][0] - 8, POOL)  # λ on a spare code
+
+    @unittest.skipUnless(CHROMIUM, "chromium unavailable")
+    def test_chromium_receives_every_character(self):
+        session = self.new_session()
+        page = self.root / "input.html"
+        page.write_text(
+            '<!doctype html><meta charset="utf-8"><title>t</title><input id=i '
+            'autofocus oninput="document.title=JSON.stringify(i.value)">'
+        )
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={self.root / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--password-store=basic",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        app = core.request(session, "launch", argv=[*argv, page.as_uri()])
+
+        def ready():
+            if any(
+                w["title"].startswith("t") and "activated" in w["states"]
+                for w in core.request(session, "windows")["windows"]
+            ):
+                return True
+            status = core.request(session, "status")["applications"]
+            if any(
+                a["pid"] == app["pid"] and a["exit_code"] is not None for a in status
+            ):
+                if "No usable sandbox" in Path(app["logs"]).read_text():
+                    # e.g. Ubuntu 24.04 AppArmor; the sandbox is not disabled for users.
+                    self.skipTest("Chromium sandbox unavailable in this environment")
+                raise AssertionError(Path(app["logs"]).read_text()[-2000:])
+            return False
+
+        wait_for(ready, timeout=30)
+        # More distinct non-US characters than spare keys, so keys are reused.
+        text = "Browser café: " + "".join(chr(0x3B1 + i) for i in range(25)) + " ok!"
+        core.request(session, "type", text=text)
+        expected = json.dumps(text, ensure_ascii=False)
+        wait_for(
+            lambda: any(
+                w["title"].startswith(expected)
+                for w in core.request(session, "windows")["windows"]
+            )
+        )
 
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()

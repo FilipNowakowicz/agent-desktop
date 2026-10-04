@@ -53,6 +53,7 @@ def main():
             operation.add_argument(
                 "--modifier", action="append", dest="modifiers", default=[]
             )
+            operation.add_argument("--repeat", type=int, default=1)
         elif command == "scroll":
             operation.add_argument("dy", type=int)
             operation.add_argument("--dx", type=int, default=0)

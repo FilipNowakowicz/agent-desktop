@@ -82,9 +82,11 @@ Pointer input uses one persistent wlroots virtual pointer per session with absol
 coordinates in screenshot pixels. Output mode changes are tracked; anything other
 than one output at scale 1 is rejected.
 
-Keyboard input uses one persistent virtual keyboard per session. Typed text gets a
-generated keymap with one key per character, so it does not depend on a keyboard
-layout; up to 10000 characters per request, without fixed delays. `key` accepts
+Keyboard input uses one persistent virtual keyboard per session with a US layout
+on real key codes (Shift for capitals and symbols). Characters a US keyboard lacks
+(accents, Greek, CJK) are mapped on demand to spare keys, so any Unicode text can
+be typed regardless of layout: up to 10000 characters per request, without fixed
+delays. `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
 XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
 modifiers. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
 default bindings, which execute host commands such as `brightnessctl`, are not loaded.

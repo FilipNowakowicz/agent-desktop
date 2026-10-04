@@ -218,18 +218,105 @@ class VirtualPointer:
 
 MODIFIERS = {"shift": 1, "ctrl": 4, "alt": 8, "logo": 64}
 CONTROL_KEYSYMS = {"\n": 0xFF0D, "\t": 0xFF09, "\b": 0xFF08, "\x1b": 0xFF1B}
-# Fixed modifier keys (evdev codes 1-5). Xwayland rejects a keymap without
-# virtual-modifier mappings and silently falls back to its default layout.
-MODIFIER_KEYS = (
-    ("LFSH", "Shift_L", "Shift"),
-    ("LCTL", "Control_L", "Control"),
-    ("LALT", "Alt_L", "Mod1"),
-    ("LWIN", "Super_L", "Mod4"),
-    ("NMLK", "Num_Lock", "Mod2"),
-)
-FIRST_CHARACTER_CODE = len(MODIFIER_KEYS) + 1
-# X11 clients cannot use keycodes above 255; xkb keycode = evdev code + 8.
-MAX_KEYS = 255 - 8 - len(MODIFIER_KEYS)
+SHIFT = MODIFIERS["shift"]
+
+# A US keyboard layout on real evdev codes. Applications such as Chromium also
+# interpret physical codes (e.g. 14 is Backspace), so characters must not land
+# on codes that mean something else.
+US_ROWS = {
+    2: "1!",
+    3: "2@",
+    4: "3#",
+    5: "4$",
+    6: "5%",
+    7: "6^",
+    8: "7&",
+    9: "8*",
+    10: "9(",
+    11: "0)",
+    12: "-_",
+    13: "=+",
+    16: "qQ",
+    17: "wW",
+    18: "eE",
+    19: "rR",
+    20: "tT",
+    21: "yY",
+    22: "uU",
+    23: "iI",
+    24: "oO",
+    25: "pP",
+    26: "[{",
+    27: "]}",
+    30: "aA",
+    31: "sS",
+    32: "dD",
+    33: "fF",
+    34: "gG",
+    35: "hH",
+    36: "jJ",
+    37: "kK",
+    38: "lL",
+    39: ";:",
+    40: "'\"",
+    41: "`~",
+    43: "\\|",
+    44: "zZ",
+    45: "xX",
+    46: "cC",
+    47: "vV",
+    48: "bB",
+    49: "nN",
+    50: "mM",
+    51: ",<",
+    52: ".>",
+    53: "/?",
+    57: "  ",
+}
+# Function and modifier keys on their physical codes: keysym -> code.
+NAMED_KEYS = {
+    0xFF1B: 1,
+    0xFF08: 14,
+    0xFF09: 15,
+    0xFF0D: 28,
+    0xFFE3: 29,
+    0xFFE1: 42,
+    0xFFE9: 56,
+    0xFFE5: 58,
+    0xFF7F: 69,
+    0xFF8D: 96,
+    0xFF61: 99,
+    0xFF50: 102,
+    0xFF52: 103,
+    0xFF55: 104,
+    0xFF51: 105,
+    0xFF53: 106,
+    0xFF57: 107,
+    0xFF54: 108,
+    0xFF56: 109,
+    0xFF63: 110,
+    0xFFFF: 111,
+    0xFFEB: 125,
+    0xFF67: 127,
+    0xFFE4: 97,
+    0xFFE2: 54,
+    0xFFEA: 100,
+    **{0xFFBE + i: 59 + i for i in range(10)},  # F1-F10
+    0xFFC8: 87,
+    0xFFC9: 88,  # F11, F12
+}
+# Xwayland rejects a keymap without virtual-modifier mappings.
+MODIFIER_MAP = {"Shift": 42, "Control": 29, "Mod1": 56, "Mod2": 69, "Mod4": 125}
+# Codes no US layout uses but that applications still accept (102nd key, Ro,
+# keypad =/,, Yen, keypad parentheses, F13-F24) carry every other keysym,
+# remapped on demand. Chromium drops events from codes without a defined key
+# (e.g. 84, 195), so those are excluded.
+POOL = (86, 89, 117, 121, 124, 179, 180, *range(183, 195))
+FIXED = {}
+for _code, _pair in US_ROWS.items():
+    for _level, _char in enumerate(_pair):
+        FIXED.setdefault(ord(_char), (_code, _level))
+FIXED.update({keysym: (code, 0) for keysym, code in NAMED_KEYS.items()})
 
 
 def char_keysym(character):
@@ -269,7 +356,7 @@ class Keysyms:
 
 
 class VirtualKeyboard:
-    """A persistent virtual keyboard with a cumulative one-key-per-keysym keymap.
+    """A persistent virtual keyboard with a US layout plus on-demand extra keys.
 
     Keymap uploads and key events share one ordered connection, so a client
     always receives the keymap before the keys that need it.
@@ -282,8 +369,10 @@ class VirtualKeyboard:
         manager = self.connection.bind("zwp_virtual_keyboard_manager_v1", 1)
         self.id = self.connection.new_id()
         self.connection.send(manager, 0, struct.pack("=II", seat, self.id))
-        self.keys = []
-        self.uploaded = None
+        self.extra = {}  # pool code -> keysym
+        self.recent = list(POOL)  # least recently used first
+        self.pinned = set()  # pool codes needed by keys not yet sent
+        self.dirty = True
         self.upload()
         self.connection.roundtrip()
 
@@ -291,21 +380,28 @@ class VirtualKeyboard:
         self.connection.close()
 
     def keymap(self):
-        first = FIRST_CHARACTER_CODE + 8
-        last = first + max(1, len(self.keys)) - 1
+        symbols = {}
+        for code, pair in US_ROWS.items():
+            symbols[code] = [ord(pair[0]), ord(pair[1])]
+        for keysym, code in NAMED_KEYS.items():
+            symbols[code] = [keysym]
+        for code, keysym in self.extra.items():
+            symbols[code] = [keysym]
+        codes = sorted(symbols)
         lines = [
             "xkb_keymap {",
             'xkb_keycodes "(unnamed)" {',
-            f"minimum = 8; maximum = {last};",
-            *(f"<{name}> = {i + 9};" for i, (name, _, _) in enumerate(MODIFIER_KEYS)),
-            *(f"<K{code}> = {code};" for code in range(first, last + 1)),
+            f"minimum = 8; maximum = {max(codes) + 8};",
+            *(f"<K{c}> = {c + 8};" for c in codes),
             "};",
             'xkb_types "(unnamed)" { include "complete" };',
             'xkb_compatibility "(unnamed)" { include "complete" };',
             'xkb_symbols "(unnamed)" {',
-            *(f"key <{name}> {{[{sym}]}};" for name, sym, _ in MODIFIER_KEYS),
-            *(f"modifier_map {mod} {{ <{name}> }};" for name, _, mod in MODIFIER_KEYS),
-            *(f"key <K{first + i}> {{[0x{k:x}]}};" for i, k in enumerate(self.keys)),
+            *(
+                f"key <K{c}> {{[{', '.join(f'0x{k:x}' for k in symbols[c])}]}};"
+                for c in codes
+            ),
+            *(f"modifier_map {m} {{ <K{c}> }};" for m, c in MODIFIER_MAP.items()),
             "};",
             "};",
         ]
@@ -321,20 +417,37 @@ class VirtualKeyboard:
                 self.id, 0, struct.pack("=II", 1, len(data)), fd=stream.fileno()
             )
             self.connection.roundtrip()
-        self.uploaded = list(self.keys)
+        self.dirty = False
 
-    def codes(self, keysyms):
-        """Evdev codes for keysyms, uploading a new keymap only when needed."""
-        missing = [k for k in dict.fromkeys(keysyms) if k not in self.keys]
-        if missing:
-            if len(self.keys) + len(missing) > MAX_KEYS:
-                self.keys = list(dict.fromkeys(keysyms))
-                if len(self.keys) > MAX_KEYS:
-                    raise ValueError("Too many distinct characters in one chunk")
-            else:
-                self.keys += missing
+    def lookup(self, keysym):
+        """(code, shifted) for a keysym, or None if the extra pool is exhausted."""
+        if keysym in FIXED:
+            return FIXED[keysym][0], FIXED[keysym][1] == 1
+        code = next((c for c, k in self.extra.items() if k == keysym), None)
+        if code is None:
+            free = [c for c in self.recent if c not in self.pinned]
+            if not free:
+                return None
+            code = free[0]
+            self.extra[code] = keysym
+            self.dirty = True
+        self.recent.remove(code)
+        self.recent.append(code)
+        self.pinned.add(code)
+        return code, False
+
+    def send(self, keys, mask=0, repeat=1):
+        if self.dirty:
             self.upload()
-        return [self.keys.index(k) + FIRST_CHARACTER_CODE for k in keysyms]
+        for code, shifted in keys:
+            state = mask | (SHIFT if shifted else 0)
+            if state:
+                self.modifiers(state)
+            for _ in range(repeat):
+                self.tap(code)
+            if state:
+                self.modifiers(0)
+        self.pinned.clear()
 
     def tap(self, code):
         self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 1))
@@ -344,22 +457,23 @@ class VirtualKeyboard:
         self.connection.send(self.id, 2, struct.pack("=IIII", mask, 0, 0, 0))
 
     def type(self, text):
-        keysyms = [char_keysym(c) for c in text]
-        for start in range(0, len(keysyms), MAX_KEYS):
-            for code in self.codes(keysyms[start : start + MAX_KEYS]):
-                self.tap(code)
+        pending = []
+        for keysym in [char_keysym(c) for c in text]:
+            key = self.lookup(keysym)
+            if key is None:
+                # Every extra key is in use by pending keys: send them first.
+                self.send(pending)
+                pending = []
+                key = self.lookup(keysym)
+            pending.append(key)
+        self.send(pending)
         self.connection.roundtrip()
 
-    def key(self, keysym, modifiers=()):
-        (code,) = self.codes([keysym])
+    def key(self, keysym, modifiers=(), repeat=1):
         mask = 0
         for name in modifiers:
             mask |= MODIFIERS[name]
-        if mask:
-            self.modifiers(mask)
-        self.tap(code)
-        if mask:
-            self.modifiers(0)
+        self.send([self.lookup(keysym)], mask, repeat)
         self.connection.roundtrip()
 
 

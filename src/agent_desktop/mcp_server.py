@@ -71,11 +71,18 @@ def desktop_key(
     session: str,
     key: str,
     modifiers: list[str] | None = None,
+    repeat: int = 1,
     observation: str | None = None,
 ) -> dict:
-    """Send a keysym such as Return with optional ctrl/alt/shift/logo modifiers."""
+    """Send a keysym such as Return or Right, optionally with ctrl/alt/shift/logo
+    modifiers and repeated up to 100 times."""
     return core.request(
-        session, "key", key=key, modifiers=modifiers or [], observation=observation
+        session,
+        "key",
+        key=key,
+        modifiers=modifiers or [],
+        repeat=repeat,
+        observation=observation,
     )
 
 

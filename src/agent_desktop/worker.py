@@ -527,7 +527,14 @@ class Worker:
                 m not in ("ctrl", "alt", "shift", "logo") for m in modifiers
             ):
                 raise ValueError("Modifiers must be ctrl, alt, shift or logo")
-            self.keyboard().key(self.keysyms.resolve(key), modifiers)
+            repeat = request.get("repeat", 1)
+            if (
+                not isinstance(repeat, int)
+                or isinstance(repeat, bool)
+                or not (1 <= repeat <= 100)
+            ):
+                raise ValueError("Repeat must be an integer from 1 to 100")
+            self.keyboard().key(self.keysyms.resolve(key), modifiers, repeat)
         elif operation == "scroll":
             dx, dy = request.get("dx", 0), request.get("dy", 0)
             if not all(

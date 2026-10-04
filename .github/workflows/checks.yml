@@ -27,3 +27,38 @@ jobs:
         run: uv run python -m unittest discover -s tests -v
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2
+  distributions:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fedora
+            image: fedora:latest
+            install: >-
+              dnf install -y --setopt=install_weak_deps=False git tar gzip
+              labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland
+              xterm zenity dejavu-sans-fonts dejavu-sans-mono-fonts
+            versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity
+          - name: arch
+            image: archlinux:latest
+            install: >-
+              pacman -Syu --noconfirm git labwc foot grim wayvnc wlr-randr dbus
+              xorg-xwayland xterm zenity ttf-dejavu
+            versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity
+    name: runtime (${{ matrix.name }})
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install desktop runtime
+        run: ${{ matrix.install }}
+      - name: Record runtime versions
+        run: ${{ matrix.versions }}
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --managed-python
+      - name: Run routing and headless compositor tests
+        run: uv run python -m unittest discover -s tests -v
+      - name: Repeat lifecycle under CPU load
+        run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2

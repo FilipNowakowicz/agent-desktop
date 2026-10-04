@@ -57,7 +57,11 @@ jobs:
             versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity
     name: runtime (${{ matrix.name }})
     container: ${{ matrix.image }}
+    env:
+      XDG_RUNTIME_DIR: /tmp/runtime
     steps:
+      - name: Create a user runtime directory
+        run: mkdir -m 700 -p /tmp/runtime
       - name: Install desktop runtime
         run: ${{ matrix.install }}
       - name: Record runtime versions

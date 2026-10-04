@@ -25,7 +25,9 @@ Track actual cumulative usage after each batch; no new account is configured.
 Native three-task negative control `20261004-153446-bedd`: all checks fail
 as intended, no setup/cleanup failures. The existing X11 mapping failure is
 not in these Wayland browser fixtures; diagnostics are running in CI, with
-assertions preserved. Broader model results are pending.
+assertions preserved. Container three-task negative control `20261004-153700-9597`: all checks
+fail as intended, no setup/cleanup errors. Generated pages match the native
+negative-control pages byte for byte. Broader model results follow below.
 
 ## 2026-10-04 — X11 mapping failure recurs during baseline CI
 

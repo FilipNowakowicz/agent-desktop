@@ -237,7 +237,7 @@ Use the measured failure distribution to choose extensions. Do not interpret a l
 | Extension | Concrete behavior | How to establish value |
 | --- | --- | --- |
 | Stale-observation protection | Associate actions with observations; check target/layout changes and request a fresh observation when necessary | Fewer wrong actions under delayed dialogs, moving windows and loading states; acknowledge unavoidable races |
-| Bounded action sequences | Fill fields, click, then wait for an explicit condition; stop on surprises | Lower latency/model calls without a lower completion rate; no blind retries of non-idempotent actions |
+| Bounded action sequences (implemented, stops on layout changes) | Fill fields, click, then wait for an explicit condition; stop on surprises | Lower latency/model calls without a lower completion rate; no blind retries of non-idempotent actions |
 | Adaptive observation | Filtered accessibility state, changed elements, crops and full images on demand | Lower actual model usage without missing task-critical changes |
 | Semantic UI | AT-SPI names, roles, states and actions, with visual fallback | Better supported-app completion rate; no claims that semantic success proves visual correctness |
 | Event-aware waiting (window and settled-screen waits implemented) | Wait for relevant window, UI or process changes with deadlines | Less unnecessary polling and fewer premature actions |

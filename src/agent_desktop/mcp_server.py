@@ -84,6 +84,23 @@ def desktop_wait(
 
 
 @mcp.tool()
+def desktop_actions(
+    session: str, actions: list[dict], observation: str | None = None
+) -> dict:
+    """Run up to 50 steps in one call, e.g. click a field, type, press Return.
+
+    Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
+    drag, scroll, type, key, focus or wait. Pass the observation token of the
+    screenshot you planned from. Input is sent only while windows and focus are
+    as they were after the previous step; otherwise the run stops and reports
+    which step and why. Insert a wait step where you expect a window to open or
+    close. Popups and changes inside a window are not detected, so take a
+    screenshot afterwards to verify the result.
+    """
+    return core.run_actions(session, actions, observation)
+
+
+@mcp.tool()
 def desktop_focus(session: str, window: str) -> dict:
     """Activate a private window and wait for its activated state (up to 2 seconds).
 

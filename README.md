@@ -60,6 +60,17 @@ or `--gone` for its disappearance), then until the screen has not changed for
 `--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
 returns `satisfied: false` at the timeout instead of failing.
 
+### Action sequences
+
+`desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)
+runs up to 50 steps such as `{"action": "click", "x": 10, "y": 20}`,
+`{"action": "type", "text": "hello"}` or `{"action": "wait", "title": "Saved"}`.
+Each input step is sent only while windows, focus and output match the state right
+after the previous step (or the given screenshot token); otherwise the run stops
+and reports the step and reason. `wait` and `focus` steps expect a change and take
+a new baseline. Popups and changes inside a window are not detected, and the
+result carries no observation token, so take a screenshot to verify.
+
 ### Taking control (logins, 2FA, CAPTCHAs)
 
 An agent that reaches a login page calls `desktop_request_human` with a reason

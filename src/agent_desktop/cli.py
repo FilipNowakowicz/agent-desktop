@@ -9,6 +9,7 @@ from .core import (
     logs,
     profiles,
     request,
+    run_actions,
     sessions,
     wait,
 )
@@ -50,6 +51,12 @@ def main():
     waiter.add_argument("--gone", action="store_true")
     waiter.add_argument("--stable-ms", type=int, default=0)
     waiter.add_argument("--timeout", type=float, default=10)
+    steps = sub.add_parser(
+        "actions", help="run a JSON list of steps, stopping on surprises"
+    )
+    steps.add_argument("session")
+    steps.add_argument("actions", type=json.loads)
+    steps.add_argument("--observation")
     waiting = sub.add_parser("request-human", help="ask a person to take control")
     waiting.add_argument("session")
     waiting.add_argument("reason")
@@ -120,6 +127,8 @@ def main():
             result = destroy(args["session"])
         elif command == "view":
             result = view(**args)
+        elif command == "actions":
+            result = run_actions(**args)
         elif command == "wait":
             result = wait(**args)
         elif command == "take":

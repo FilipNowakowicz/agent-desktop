@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-10-04 — Bounded action sequences
+
+Plan extension A ("bounded action sequences"). `core.run_actions` /
+`desktop_actions` / `agent-desktop actions` run up to 50 click, move, drag, scroll,
+type, key, focus and wait steps. A new worker `observe` operation returns the
+layout token without capturing an image; each input step is sent with the token
+observed right after the previous step (the caller's screenshot token for the
+first), so the worker refuses it if windows, focus or output changed. `wait` and
+`focus` re-baseline. The run stops at the first failure and reports
+`{completed, total, stopped: {step, reason}}`. No token is returned, so agents
+still need a screenshot before acting on new state. Remaining race: a change
+between the check and delivery of one step; popups (not toplevels) and in-window
+changes are invisible to the check.
+
+### Validation
+
+`tests/test_actions.py` 3 tests: ordered typing with Unicode; a wait step for a
+window launched just before the call, then typing into it; stale first token,
+failing wait and unknown focus target all stop before input (no text reached
+either fixture); argument validation. Agent call savings not measured yet.
+
 ## 2026-10-04 — Paste into a takeover; clear the clipboard on release
 
 `agent-desktop take --paste` starts TigerVNC with `-SendClipboard=1` (primary

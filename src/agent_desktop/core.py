@@ -363,6 +363,53 @@ def wait(
     return result(True, "ok", matches)
 
 
+SEQUENCE_ACTIONS = ("click", "move", "drag", "scroll", "type", "key", "focus", "wait")
+
+
+def run_actions(session, actions, observation=None):
+    """Run up to 50 actions, stopping at the first surprise.
+
+    Each input action is sent only if windows, focus and output are as they were
+    right after the previous action (or as in `observation` for the first). A
+    `wait` or `focus` step expects a change and takes a new baseline. Popups and
+    in-window changes are not detected; take a screenshot afterwards.
+    """
+    if not isinstance(actions, list) or not 1 <= len(actions) <= 50:
+        raise DesktopError("Actions must be a list of 1 to 50 steps")
+    for index, step in enumerate(actions):
+        if not isinstance(step, dict) or step.get("action") not in SEQUENCE_ACTIONS:
+            raise DesktopError(
+                f"Step {index} needs an action: {', '.join(SEQUENCE_ACTIONS)}"
+            )
+        if "observation" in step or "session" in step:
+            raise DesktopError(f"Step {index} must not set observation or session")
+    baseline = observation or request(session, "observe")["observation"]
+    for index, step in enumerate(actions):
+        arguments = {k: v for k, v in step.items() if k != "action"}
+        action = step["action"]
+        try:
+            if action == "wait":
+                waited = wait(session, **arguments)
+                if not waited["satisfied"]:
+                    return stopped(index, len(actions), f"wait: {waited['reason']}")
+            elif action == "focus":
+                request(session, "focus", **arguments)
+            else:
+                request(session, action, observation=baseline, **arguments)
+        except (DesktopError, TypeError) as error:
+            return stopped(index, len(actions), str(error))
+        baseline = request(session, "observe")["observation"]
+    return {"completed": len(actions), "total": len(actions), "stopped": None}
+
+
+def stopped(index, total, reason):
+    return {
+        "completed": index,
+        "total": total,
+        "stopped": {"step": index, "reason": reason},
+    }
+
+
 def wait_for_agent_control(session, timeout):
     """Wait until no person holds or has been asked to take the session."""
     deadline = time.monotonic() + max(0, min(timeout, 600))

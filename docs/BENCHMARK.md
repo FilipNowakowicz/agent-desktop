@@ -86,3 +86,16 @@ Between runs 1 and 2:
   not test the agent's own launch decisions (`scripts/claude_code_task.py` covers
   create and launch).
 - No baseline comparison with other computer-use runtimes has been run yet.
+
+## Hard tasks (in progress)
+
+Goal: tasks the current suite cannot express, to measure where the agent and
+runtime still fail. Agent runs use the user's Claude Pro allowance (`claude -p`
+signs in with claude.ai), so each task is first validated with `--dry-run`.
+
+Status checklist (update after each step):
+
+- [ ] Task definitions in `benchmarks/hard.py`, selectable with `--suite hard`
+- [ ] Dry run: every hard check fails with no agent, apps launch, cleanup clean
+- [ ] Agent run of the hard suite (once), results recorded here
+- [ ] Failures analysed; fixes or tool changes proposed

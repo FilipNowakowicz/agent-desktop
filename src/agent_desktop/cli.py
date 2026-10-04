@@ -2,7 +2,7 @@ import argparse
 import json
 
 from .core import DesktopError, create, destroy, logs, request, sessions
-from .viewer import view
+from .viewer import take, view
 
 
 def main():
@@ -13,10 +13,17 @@ def main():
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
-    observer = sub.add_parser("view")
-    observer.add_argument("session")
-    observer.add_argument("--wayvnc")
-    observer.add_argument("--viewer")
+    for name, text in (
+        ("view", "watch a session read-only"),
+        ("take", "control a session yourself; closing the viewer hands it back"),
+    ):
+        observer = sub.add_parser(name, help=text)
+        observer.add_argument("session")
+        observer.add_argument("--wayvnc")
+        observer.add_argument("--viewer")
+    waiting = sub.add_parser("request-human", help="ask a person to take control")
+    waiting.add_argument("session")
+    waiting.add_argument("reason")
     for command in (
         "status",
         "windows",
@@ -31,6 +38,8 @@ def main():
         "type",
         "key",
         "scroll",
+        "control",
+        "release",
     ):
         operation = sub.add_parser(command)
         operation.add_argument("session")
@@ -78,6 +87,10 @@ def main():
             result = destroy(args["session"])
         elif command == "view":
             result = view(**args)
+        elif command == "take":
+            result = take(**args)
+        elif command == "request-human":
+            result = request(args["session"], "request_human", reason=args["reason"])
         else:
             session = args.pop("session")
             if command == "launch" and args["argv"][:1] == ["--"]:

@@ -170,8 +170,15 @@ def sessions():
                     request(info["id"], "status")
                 except DesktopError:
                     status = "unavailable"
+            control = info.get("control") or {}
             results.append(
-                {"session": info["id"], "mode": info["mode"], "status": status}
+                {
+                    "session": info["id"],
+                    "mode": info["mode"],
+                    "status": status,
+                    "control": control.get("owner", "agent"),
+                    "human_request": (control.get("request") or {}).get("reason"),
+                }
             )
         except (OSError, ValueError, KeyError):
             continue
@@ -226,6 +233,18 @@ def recover(session, info):
         "recovered": True,
         "runtime_removed": not runtime.exists(),
     }
+
+
+def wait_for_agent_control(session, timeout):
+    """Wait until no person holds or has been asked to take the session."""
+    deadline = time.monotonic() + max(0, min(timeout, 600))
+    while True:
+        state = request(session, "control")
+        if state["owner"] == "agent" and not state["request"]:
+            return state
+        if time.monotonic() >= deadline:
+            return state
+        time.sleep(0.5)
 
 
 def destroy(session):

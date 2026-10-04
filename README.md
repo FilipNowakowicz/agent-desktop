@@ -52,6 +52,25 @@ TigerVNC's graphical client needs a host X11 display or Xwayland; the applicatio
 inside the private desktop remain native Wayland. Override optional tools with
 `--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
 
+### Taking control (logins, 2FA, CAPTCHAs)
+
+An agent that reaches a login page calls `desktop_request_human` with a reason
+instead of asking for your password. `agent-desktop list` shows the pending request.
+Take the session yourself:
+
+```sh
+uv run agent-desktop take SESSION
+```
+
+This opens an interactive viewer on a separate Unix socket. While you hold control,
+the session refuses the agent's input, focus, launch, window listing and screenshots,
+so it cannot watch what you type. Closing the viewer (or `agent-desktop release
+SESSION`) hands control back; the agent must then take a new screenshot before any
+input, and all earlier observation tokens are stale. The agent can wait for this
+with `desktop_control(session, wait_seconds=...)`; only you can release control.
+Clipboard transfer stays disabled in both directions, and the session keymap is US,
+so characters missing from that layout may not reach the session.
+
 Each session has private display sockets, D-Bus, configuration and application
 profiles. The session supervisor is a child subreaper and starts the private bus
 itself, so daemonizing applications and D-Bus-activated services remain in its

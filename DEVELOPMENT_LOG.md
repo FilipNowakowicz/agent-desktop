@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-10-04 — Broader comparison budget and controls
+
+User selected broader comparison with a $5 API-equivalent total limit.
+Include the existing $0.1841124 pair. Plan code-and-drag, form and confirmation
+on each runtime twice: ten additional task runs at a $0.40 cap give $4.1841124
+including the pilot, leaving a buffer for final-response budget overshoot.
+Keep seed 41027 for the first set and 41028 for the second randomized code.
+Track actual cumulative usage after each batch; no new account is configured.
+
+Native three-task negative control `20261004-153446-bedd`: all checks fail
+as intended, no setup/cleanup failures. The existing X11 mapping failure is
+not in these Wayland browser fixtures; diagnostics are running in CI, with
+assertions preserved. Broader model results are pending.
+
 ## 2026-10-04 — X11 mapping failure recurs during baseline CI
 
 PR #28 runs `37209103464` and `37209247332`: Ubuntu/Fedora passed, Arch failed.

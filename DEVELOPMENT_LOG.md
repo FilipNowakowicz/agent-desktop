@@ -23,7 +23,9 @@ a causal performance claim. No additional account-using runs are needed for
 this comparison. Removed the exact pinned image again after the last trial,
 leaving 184 KiB of project VFS metadata, and stopped only the matching API
 process; it exited successfully. No trial containers remain. PR #28 final
-checks are pending.
+checks passed on Ubuntu, Fedora and Arch at `1f6b417` in run
+`37210945368`, including the full 33-test suite (visible skip), repeated X11
+input and Ubuntu focus/crash/lifecycle checks.
 
 ## 2026-10-04 — Second native comparison set
 

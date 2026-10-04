@@ -665,6 +665,8 @@ class Worker:
             }
         if operation == "screenshot":
             return self.screenshot()
+        if operation == "observe":
+            return {"observation": self.observation()}
         if operation == "frame":
             return self.frame(request.get("since"))
         if operation in INPUT_OPERATIONS and request.get("observation") is not None:

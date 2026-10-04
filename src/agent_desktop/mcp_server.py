@@ -117,15 +117,17 @@ def desktop_ui(
     app: str | None = None,
     window: str | None = None,
     max_nodes: int = 300,
-) -> dict:
-    """List visible UI elements through accessibility: role, name, states, text,
-    value and available actions, as a flat list with depth.
+) -> str:
+    """List visible UI elements through accessibility, one indented line each:
+    id (for desktop_ui_action), role, name, states, text, value and actions.
 
     Filter by application name and/or window title substring. Usually much
     smaller than a screenshot and exact about labels and field contents. Some
     applications expose little (e.g. Chromium needs --force-renderer-accessibility).
     """
-    return core.request(session, "ui", app=app, window=window, max_nodes=max_nodes)
+    return core.render_tree(
+        core.request(session, "ui", app=app, window=window, max_nodes=max_nodes)
+    )
 
 
 @mcp.tool()

@@ -17,12 +17,10 @@ STATES = {
     1: "active",
     4: "checked",
     7: "editable",
-    8: "enabled",
     10: "expanded",
     12: "focused",
     20: "pressed",
     23: "selected",
-    25: "showing",
     36: "invalid",
     43: "read-only",
 }

@@ -154,6 +154,7 @@ class Worker:
         self.needs_screenshot = False
         self.registry = None
         self.atspi = None
+        self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.frames = {}  # recent raw frames for change detection, oldest first
         self.virtual_pointer = None
         self.virtual_keyboard = None
@@ -332,6 +333,17 @@ class Worker:
                 stderr=log,
             )
         wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
+
+    def short_id(self, node):
+        """Short, stable identifiers for UI nodes, to keep listings small."""
+        if node not in self.ui_names:
+            if len(self.ui_ids) >= 50000:
+                self.ui_ids.clear()
+                self.ui_names.clear()
+            short = f"n{len(self.ui_ids) + 1}"
+            self.ui_ids[short] = node
+            self.ui_names[node] = short
+        return self.ui_names[node]
 
     def accessibility(self):
         if not self.info.get("accessibility"):
@@ -758,20 +770,27 @@ class Worker:
             max_nodes = request.get("max_nodes", 300)
             if not isinstance(max_nodes, int) or not 1 <= max_nodes <= 2000:
                 raise ValueError("max_nodes must be an integer from 1 to 2000")
-            return self.accessibility().tree(
+            tree = self.accessibility().tree(
                 request.get("app"), request.get("window"), max_nodes
             )
+            for node in tree["nodes"]:
+                node["id"] = self.short_id(node["id"])
+            return tree
         if operation == "ui_action":
             if request.get("observation") is not None:
                 self.check_observation(request["observation"])
             accessibility = self.accessibility()
+            node = self.ui_ids.get(request.get("node"), request.get("node"))
             try:
-                return accessibility.act(
-                    request.get("node"), request.get("action"), request.get("text")
-                )
+                return {
+                    **accessibility.act(
+                        node, request.get("action"), request.get("text")
+                    ),
+                    "node": request["node"],
+                }
             except Unsupported:
                 # e.g. Chromium: focus the field, verify, then replace by typing.
-                accessibility.focus(request["node"])
+                accessibility.focus(node)
                 self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)
                 self.keyboard().type(request["text"])
                 return {

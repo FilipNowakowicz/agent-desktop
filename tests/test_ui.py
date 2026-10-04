@@ -116,6 +116,26 @@ class UITests(UISessionTest):
         closed = core.wait(self.session, element="OK", gone=True, timeout=10)
         self.assertTrue(closed["satisfied"], closed)
 
+    def test_compact_listing(self):
+        core.request(
+            self.session,
+            "launch",
+            argv=["zenity", "--entry", "--title=Compact", "--text=Code"],
+        )
+        field = self.find(lambda n: "editable" in n["states"])
+        self.assertRegex(field["id"], r"^n[0-9]+$")
+        tree = core.request(self.session, "ui", app="zenity")
+        text = core.render_tree(tree)
+        self.assertIn(f"{field['id']} {field['role']} 'Code' [editable", text)
+        self.assertNotIn("showing", text)
+        # Short ids stay stable across listings and work for actions.
+        again = core.request(self.session, "ui", app="zenity")["nodes"]
+        self.assertIn(field["id"], {n["id"] for n in again})
+        core.request(
+            self.session, "ui_action", node=field["id"], action="set_text", text="42"
+        )
+        self.find(lambda n: n["id"] == field["id"] and n.get("text") == "42")
+
     def test_tree_filters_and_limits(self):
         core.request(
             self.session,

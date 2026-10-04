@@ -466,6 +466,30 @@ def stopped(index, total, reason):
     }
 
 
+def render_tree(tree):
+    """Compact text for agents: one indented line per UI element."""
+    lines = []
+    for node in tree["nodes"]:
+        line = "  " * node["depth"] + f"{node['id']} {node['role']}"
+        if node["name"]:
+            line += f" {node['name']!r}"
+        if node["states"]:
+            line += f" [{','.join(node['states'])}]"
+        if node.get("text") is not None:
+            text = node["text"]
+            line += f" text={text[:200]!r}" + ("…" if len(text) > 200 else "")
+        if "value" in node:
+            line += f" value={node['value']:g}"
+        # Chromium offers doDefault everywhere; "press" still falls back to it.
+        actions = [a for a in node.get("actions", ()) if a != "doDefault"]
+        if actions:
+            line += f" actions={','.join(actions)}"
+        lines.append(line)
+    if tree["truncated"]:
+        lines.append("… truncated: filter by app or window, or raise max_nodes")
+    return "\n".join(lines) or "(no accessible elements)"
+
+
 def wait_for_agent_control(session, timeout):
     """Wait until no person holds or has been asked to take the session."""
     deadline = time.monotonic() + max(0, min(timeout, 600))

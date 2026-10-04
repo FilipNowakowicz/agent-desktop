@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-04 — M4 hard benchmark tasks
+
+Added 10 harder tasks (`benchmarks/hard.py`). They cover multiple applications per
+session, a multi-page admin site, an interrupting modal, a delayed result, chart
+reading, the GTK open dialog, a shell batch rename, comparing two editor windows,
+a focus-stealing warning and validation recovery. The runner now launches
+several applications per task. Validation: dry run with every check failing
+(`20261004-023751-0e0c`), and `node --check` on all 17 fixture scripts. The run-1
+fixture bug had caused an impossible task, so this was checked first. One agent run:
+10/10, 121 tool calls, $1.24 API-equivalent (`20261004-023853-8b72`). The user's
+Claude Pro allowance is limited, so only one pass was made. The user asked for a
+later comparison with public projects such as Cua; it is recorded in START_HERE.md.
+
+PR #21 passed CI on all three distributions (run `37168203876`) and was merged.
+
 ## 2026-10-04 — M4 initial benchmark suite
 
 **Outcome:** 20 representative GUI tasks across Chromium, foot, xterm/Xwayland,

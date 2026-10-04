@@ -46,6 +46,10 @@ filled, "Sign in" pressed and the page title confirmed the value.
 Qt 6 kdialog 26.08.1 (Wayland): input dialog tree read, `set_text` and OK press
 worked natively; added as a test.
 
+Reading the tree while a window closed failed with `No such interface ... Accessible`
+(found by an element-wait test); vanished elements and applications are now
+skipped instead of failing the whole listing.
+
 Not verified: LibreOffice, Electron apps, latency of large trees.
 
 ## 2026-10-04 — Partial and scaled screenshots

@@ -154,7 +154,12 @@ class Accessibility:
             if len(nodes) >= max_nodes:
                 truncated = True
                 return
-            record, showing = self.describe(node)
+            try:
+                record, showing = self.describe(node)
+                children = self.children(node)
+            except (AccessibilityError, TimeoutError):
+                # Elements disappear while the tree is read (e.g. a closing window).
+                return
             if depth > 0 and not showing:
                 return
             if top and window and depth == 1 and window not in record["name"]:
@@ -166,11 +171,15 @@ class Accessibility:
             )
             if keep:
                 nodes.append({**record, "depth": depth})
-            for child in self.children(node):
+            for child in children:
                 visit(child, depth + 1 if keep else depth, top)
 
         for application in self.children(REGISTRY):
-            name = self.get(application, ACCESSIBLE, "Name")
+            try:
+                name = self.get(application, ACCESSIBLE, "Name")
+                windows = self.children(application)
+            except (AccessibilityError, TimeoutError):
+                continue
             if app and app.lower() not in name.lower():
                 continue
             if name == "xdg-desktop-portal-gtk" and not app:
@@ -184,7 +193,7 @@ class Accessibility:
                     "depth": 0,
                 }
             )
-            for child in self.children(application):
+            for child in windows:
                 visit(child, 1, application)
         return {"nodes": nodes, "truncated": truncated}
 

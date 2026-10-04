@@ -144,6 +144,7 @@ class Worker:
         self.takeover = None
         self.control = {"owner": "agent", "epoch": 0, "request": None, "last": None}
         self.needs_screenshot = False
+        self.frames = {}  # recent raw frames for change detection, oldest first
         self.virtual_pointer = None
         self.virtual_keyboard = None
         self.toplevels = None
@@ -346,6 +347,54 @@ class Worker:
             "height": height,
             "observation": before,
         }
+
+    def capture_pixels(self):
+        """Capture the output as raw RGB without writing a file."""
+        if self.compositor.poll() is not None:
+            raise RuntimeError("Private compositor has exited")
+        result = subprocess.run(
+            [self.info["tools"]["grim"], "-t", "ppm", "-"],
+            env=self.env,
+            capture_output=True,
+            timeout=10,
+        )
+        if result.returncode:
+            raise RuntimeError(f"grim failed: {result.stderr.decode(errors='replace')}")
+        data = result.stdout
+        # Binary PPM: "P6", width, height, maxval, then one whitespace byte.
+        fields, offset = [], 0
+        while len(fields) < 4:
+            while data[offset : offset + 1].isspace():
+                offset += 1
+            end = offset
+            while not data[end : end + 1].isspace():
+                end += 1
+            fields.append(data[offset:end])
+            offset = end
+        if fields[0] != b"P6" or fields[3] != b"255":
+            raise RuntimeError("Capture did not produce an 8-bit PPM")
+        width, height = int(fields[1]), int(fields[2])
+        pixels = data[offset + 1 :]
+        if len(pixels) != width * height * 3:
+            raise RuntimeError("Truncated capture")
+        return width, height, pixels
+
+    def frame(self, since):
+        """Capture a frame and report the bounding box changed since another one."""
+        width, height, pixels = self.capture_pixels()
+        token = uuid.uuid4().hex[:12]
+        previous = self.frames.get(since) if isinstance(since, str) else None
+        self.frames[token] = (width, height, pixels)
+        while len(self.frames) > 4:
+            self.frames.pop(next(iter(self.frames)))
+        result = {"frame": token, "width": width, "height": height}
+        if previous is None:
+            result["changed"] = None if since is None else "unknown"
+        elif previous[:2] != (width, height):
+            result["changed"] = [0, 0, width, height]
+        else:
+            result["changed"] = changed_box(previous[2], pixels, width, height)
+        return result
 
     def observation(self):
         """Token for the window layout: output, windows, focus and states.
@@ -603,6 +652,8 @@ class Worker:
             }
         if operation == "screenshot":
             return self.screenshot()
+        if operation == "frame":
+            return self.frame(request.get("since"))
         if operation in INPUT_OPERATIONS and request.get("observation") is not None:
             self.check_observation(request["observation"])
         if operation in ("click", "move", "drag"):
@@ -788,6 +839,38 @@ def remove_session_files(root, runtime):
     shutil.rmtree(runtime, ignore_errors=True)
     for name in ("home", "config"):
         shutil.rmtree(root / name, ignore_errors=True)
+
+
+def first_difference(a, b):
+    """Index of the first differing byte of equal-length bytes (binary search)."""
+    low, high = 0, len(a)
+    while high - low > 1:
+        middle = (low + high) // 2
+        if a[low:middle] != b[low:middle]:
+            high = middle
+        else:
+            low = middle
+    return low
+
+
+def changed_box(before, after, width, height):
+    """[x, y, width, height] around every changed pixel, or False if identical."""
+    if before == after:
+        return False
+    stride = width * 3
+    top = bottom = None
+    left, right = width, -1
+    for row in range(height):
+        start = row * stride
+        a, b = before[start : start + stride], after[start : start + stride]
+        if a == b:
+            continue
+        if top is None:
+            top = row
+        bottom = row
+        left = min(left, first_difference(a, b) // 3)
+        right = max(right, width - 1 - first_difference(a[::-1], b[::-1]) // 3)
+    return [left, top, right - left + 1, bottom - top + 1]
 
 
 def command_name(pid):

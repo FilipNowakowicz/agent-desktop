@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-04 — Native form/confirmation comparison results
+
+Run `20261004-153647-ba09`, seed 41027, claude-opus-5-5, $0.40/task cap:
+form passed (11 calls, 25.2 s, $0.107764); confirmation passed (5 calls,
+12.6 s, $0.0719224). No tool/setup/cleanup errors. Comparison cumulative
+usage is $0.3637988 including the original pair; committed after this batch.
+Container dry setup overlapped this batch; do not infer isolated timing.
+
+Source CI `37209785159` passed on Ubuntu, Fedora and Arch: full 33-test suite
+(visible skip), repeated X11 input, and Ubuntu focus/crash/lifecycle checks.
+Debug logging is enabled for test sessions. This does not prove the intermittent
+X11 mapping cause is fixed; assertions remain and diagnostics capture recurrence.
+
 ## 2026-10-04 — Broader comparison budget and controls
 
 User selected broader comparison with a $5 API-equivalent total limit.

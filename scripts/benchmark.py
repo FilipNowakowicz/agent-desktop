@@ -20,9 +20,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import owned_processes  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
+from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS  # noqa: E402
 
-SUITES = {"standard": TASKS, "hard": HARD_TASKS}
+SUITES = {"standard": TASKS, "hard": HARD_TASKS, "office": OFFICE_TASKS}
 
 PROMPT = """You control a private Linux desktop through the private-desktop tools.
 Use session {session}; it already exists and the application is already open.
@@ -70,6 +71,10 @@ def run_agent(prompt, artifact, budget, model):
         "",
         "--allowedTools",
         "mcp__private-desktop",
+        "--disallowedTools",
+        "mcp__private-desktop__desktop_create",
+        "mcp__private-desktop__desktop_destroy",
+        "mcp__private-desktop__desktop_launch",
         "--output-format",
         "stream-json",
         "--verbose",

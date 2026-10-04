@@ -1,5 +1,58 @@
 # Development log
 
+## 2026-10-04 — M3 Xwayland, GTK and Qt coverage
+
+**Outcome:** X11 applications work inside sessions, and GTK and Qt dialogs work
+on both native Wayland and X11.
+
+### Xwayland display
+
+labwc starts Xwayland lazily and sets `DISPLAY` only in its own process.
+Applications are launched by the worker, so they never saw it. labwc's
+`autostart` script inherits the variable, so it now writes `$DISPLAY` to the
+private runtime directory. The worker accepts only an `:N` value and passes it to
+applications. `status` reports `x_display`. The host's `DISPLAY` (`:0` here) is
+still removed; the session got `:1`.
+
+### Xwayland ignored the generated keymap (fixed)
+
+xterm received no usable text. `xev` showed keycode 9 arriving as Escape, and
+`xkbcomp -xkb :1` dumped the default evdev keymap. Wayland protocol tracing
+showed that Xwayland did receive the 1470-byte keymap. Xwayland 24.1.13
+`XkbCompileKeymapFromString` requires key names, types, compat, symbols **and
+virtual modifiers**. Otherwise it silently falls back to defaults, which explains
+the unrelated `<FK23>` xkbcomp warnings. wtype's keymap layout has the same
+problem. The keymap now reserves evdev codes 1–5 for Shift_L, Control_L, Alt_L,
+Super_L and Num_Lock with `modifier_map` entries. Characters start at code 6
+(242 per keymap). After this, xev showed `a`, `b`, `c` on the first keypress.
+
+### Foreign-toplevel destroy opcode (fixed)
+
+Closing a window made every later `windows` call fail with a broken pipe. On
+`closed` the client sent opcode 6 (`set_rectangle`) instead of `destroy` (7).
+labwc rejected it as a protocol error and disconnected the tracker. The
+focus/observation test now closes a window and checks the listing.
+
+### Validation
+
+Executables came from `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#xwayland
+nixpkgs#xterm nixpkgs#zenity nixpkgs#kdePackages.kdialog nixpkgs#wayvnc nixpkgs#wlr-randr`.
+
+- Full suite: 20 tests, 1 skipped (visible).
+- xterm (`-u8`) running the terminal fixture: exact `x11 café λ`, a mouse click,
+  and Xwayland among the session's processes. 10/10 idle and 10/10 with 12 busy processes
+  (together with the keyboard test).
+- zenity 4.2.2 and kdialog 26.08.1, each with `GDK_BACKEND`/`QT_QPA_PLATFORM`
+  set to Wayland and X11: type `<case> café λ`, press Return, and check the exact stdout
+  line after the dialog exits. 5/5 idle, 5/5 loaded.
+- CI now installs xwayland, xterm and zenity; kdialog is local only.
+
+### Remaining
+
+- Only simple dialogs and terminals are covered; larger GTK/Qt applications,
+  portals/file choosers, clipboard and drag-and-drop between windows are not.
+- No X11 access control was added; Xwayland behaves as on an ordinary desktop.
+
 ## 2026-10-04 — M1 structured windows, focus and stale-observation protection
 
 **Outcome:** `wlrctl` is no longer a runtime dependency. A persistent
@@ -41,6 +94,8 @@ nixpkgs#wlr-randr nixpkgs#chromium`, with no wlrctl or wtype on PATH.
   a newly mapped window makes the token stale. 10/10 repeated runs.
 - Chromium smoke 3/3 using structured window titles, including the 427 px drag.
 - Lifecycle stress 10/10 with 12 busy processes.
+
+PR #14 passed Ubuntu CI (run `37163297968`) and was merged.
 
 ## 2026-10-04 — M1 supervisor crash recovery
 

@@ -218,8 +218,18 @@ class VirtualPointer:
 
 MODIFIERS = {"shift": 1, "ctrl": 4, "alt": 8, "logo": 64}
 CONTROL_KEYSYMS = {"\n": 0xFF0D, "\t": 0xFF09, "\b": 0xFF08, "\x1b": 0xFF1B}
+# Fixed modifier keys (evdev codes 1-5). Xwayland rejects a keymap without
+# virtual-modifier mappings and silently falls back to its default layout.
+MODIFIER_KEYS = (
+    ("LFSH", "Shift_L", "Shift"),
+    ("LCTL", "Control_L", "Control"),
+    ("LALT", "Alt_L", "Mod1"),
+    ("LWIN", "Super_L", "Mod4"),
+    ("NMLK", "Num_Lock", "Mod2"),
+)
+FIRST_CHARACTER_CODE = len(MODIFIER_KEYS) + 1
 # X11 clients cannot use keycodes above 255; xkb keycode = evdev code + 8.
-MAX_KEYS = 255 - 8
+MAX_KEYS = 255 - 8 - len(MODIFIER_KEYS)
 
 
 def char_keysym(character):
@@ -281,17 +291,21 @@ class VirtualKeyboard:
         self.connection.close()
 
     def keymap(self):
-        count = max(1, len(self.keys))
+        first = FIRST_CHARACTER_CODE + 8
+        last = first + max(1, len(self.keys)) - 1
         lines = [
             "xkb_keymap {",
             'xkb_keycodes "(unnamed)" {',
-            f"minimum = 8; maximum = {count + 8};",
-            *(f"<K{i}> = {i + 8};" for i in range(1, count + 1)),
+            f"minimum = 8; maximum = {last};",
+            *(f"<{name}> = {i + 9};" for i, (name, _, _) in enumerate(MODIFIER_KEYS)),
+            *(f"<K{code}> = {code};" for code in range(first, last + 1)),
             "};",
             'xkb_types "(unnamed)" { include "complete" };',
             'xkb_compatibility "(unnamed)" { include "complete" };',
             'xkb_symbols "(unnamed)" {',
-            *(f"key <K{i}> {{[0x{k:x}]}};" for i, k in enumerate(self.keys, 1)),
+            *(f"key <{name}> {{[{sym}]}};" for name, sym, _ in MODIFIER_KEYS),
+            *(f"modifier_map {mod} {{ <{name}> }};" for name, _, mod in MODIFIER_KEYS),
+            *(f"key <K{first + i}> {{[0x{k:x}]}};" for i, k in enumerate(self.keys)),
             "};",
             "};",
         ]
@@ -320,7 +334,7 @@ class VirtualKeyboard:
             else:
                 self.keys += missing
             self.upload()
-        return [self.keys.index(k) + 1 for k in keysyms]
+        return [self.keys.index(k) + FIRST_CHARACTER_CODE for k in keysyms]
 
     def tap(self, code):
         self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 1))
@@ -402,7 +416,7 @@ class Toplevels:
             elif opcode == 6:  # closed
                 self.windows.pop(handle, None)
                 self.connection.listeners.pop(handle, None)
-                self.connection.send(handle, 6)  # destroy
+                self.connection.send(handle, 7)  # destroy
             elif opcode == 7:
                 (parent,) = struct.unpack_from("=I", payload)
                 pending["parent"] = parent or None

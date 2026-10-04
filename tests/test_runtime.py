@@ -73,6 +73,7 @@ class RuntimeTests(unittest.TestCase):
             (self.root / "run").mkdir(mode=0o700)
             os.environ["XDG_RUNTIME_DIR"] = str(self.root / "run")
         self.created = []
+        self.previous_display = os.environ.get("DISPLAY")
 
     def tearDown(self):
         for session in self.created:
@@ -404,6 +405,102 @@ class RuntimeTests(unittest.TestCase):
         wait_for(lambda: len(core.request(session, "windows")["windows"]) == 3)
         with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
             core.request(session, "click", x=5, y=5, observation=token)
+        # Closing a window must keep the window list working.
+        third = next(
+            w
+            for w in core.request(session, "windows")["windows"]
+            if w["title"] not in ("Session fixture", "Second fixture")
+        )
+        core.request(session, "focus", window=third["id"])
+        core.request(session, "key", key="d", modifiers=["ctrl"])
+        wait_for(lambda: len(core.request(session, "windows")["windows"]) == 2)
+
+    @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
+    def test_xwayland_application_receives_input(self):
+        session = self.new_session()
+        x_display = core.request(session, "status")["x_display"]
+        if not x_display:
+            self.skipTest("compositor has no Xwayland support")
+        self.assertNotEqual(x_display, self.previous_display)
+        directory = self.root / f"x11-{session}"
+        directory.mkdir()
+        script = Path(__file__).resolve().parents[1] / "scripts/m0_terminal.py"
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "xterm",
+                "-u8",
+                "-title",
+                "X11 fixture",
+                "-e",
+                sys.executable,
+                str(script),
+                str(directory),
+            ],
+        )
+        wait_for(directory.joinpath("ready").exists, timeout=20)
+        wait_for(
+            lambda: any(
+                w["title"] == "X11 fixture" and "activated" in w["states"]
+                for w in core.request(session, "windows")["windows"]
+            )
+        )
+        core.request(session, "type", text="x11 café λ")
+        core.request(session, "key", key="Return")
+        wait_for(directory.joinpath("mouse-ready").exists)
+        self.assertEqual(directory.joinpath("typed.txt").read_text(), "x11 café λ")
+        capture = core.request(session, "screenshot")
+        core.request(
+            session, "click", x=capture["width"] // 2, y=capture["height"] // 2
+        )
+        wait_for(directory.joinpath("mouse.json").exists)
+        processes = {p["command"] for p in core.request(session, "status")["processes"]}
+        self.assertIn("Xwayland", processes)
+
+    def test_toolkit_dialogs_receive_text(self):
+        cases = {
+            "gtk-wayland": ("zenity", "GDK_BACKEND=wayland"),
+            "gtk-x11": ("zenity", "GDK_BACKEND=x11"),
+            "qt-wayland": ("kdialog", "QT_QPA_PLATFORM=wayland"),
+            "qt-x11": ("kdialog", "QT_QPA_PLATFORM=xcb"),
+        }
+        available = {k: v for k, v in cases.items() if shutil.which(v[0])}
+        if not available:
+            self.skipTest("zenity and kdialog unavailable")
+        session = self.new_session()
+        x11 = core.request(session, "status")["x_display"]
+        for case, (program, backend) in available.items():
+            if backend.endswith(("x11", "xcb")) and not x11:
+                continue
+            with self.subTest(case=case):
+                title = f"Toolkit {case}"
+                if program == "zenity":
+                    dialog = ["zenity", "--entry", f"--title={title}", "--text=Message"]
+                else:
+                    dialog = ["kdialog", "--title", title, "--inputbox", "Message"]
+                app = core.request(session, "launch", argv=["env", backend, *dialog])
+
+                def active(title=title):
+                    return any(
+                        w["title"] == title and "activated" in w["states"]
+                        for w in core.request(session, "windows")["windows"]
+                    )
+
+                wait_for(active, timeout=20)
+                text = f"{case} café λ"
+                core.request(session, "type", text=text)
+                core.request(session, "key", key="Return")
+
+                def exit_code(app=app):
+                    for entry in core.request(session, "status")["applications"]:
+                        if entry["pid"] == app["pid"]:
+                            return entry["exit_code"] is not None
+                    return False
+
+                wait_for(exit_code)
+                output = Path(app["logs"]).read_text().splitlines()
+                self.assertIn(text, output)
 
     def test_daemonizing_application_without_token_is_cleaned_up(self):
         session = self.new_session()

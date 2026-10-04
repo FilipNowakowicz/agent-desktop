@@ -65,6 +65,10 @@ Screenshots and bounded log tails remain in
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
 verify its outcome using screenshots or application evidence.
 
+X11 applications run through the private compositor's own Xwayland when labwc
+supports it (install `xwayland`); `status` reports its `x_display`. The host's
+`DISPLAY` is never passed to applications.
+
 `windows` lists each window's id, title, app_id, states (`activated`, `maximized`,
 `minimized`, `fullscreen`) and parent; `focus` activates one by id. Each screenshot
 returns an `observation` token describing the output and windows (ids, app ids,

@@ -11,6 +11,8 @@ Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
 | NixOS / Chromium 153.0.8010.52, native Wayland, disposable profile | Local HTML form task passed with Unicode text, submitted-title verification, changed screenshot and no owned processes remaining; with `--password-store=basic` after the private-bus fix (3/3 runs, 23 owned processes including crashpad, portals and mako) |
 | NixOS, pointer fixture in foot and Chromium DOM pointer events | Absolute clicks repeat on the same cell; drag delivers press, held-button motion and release (pointer test 10/10 idle, 10/10 with 12 busy processes); Chromium drag 3/3 at the exact requested 427 px distance |
 | NixOS, persistent virtual keyboard into foot | Typing immediately after the window becomes active, 300+ distinct CJK characters (keymap reset), repeats, Ctrl modifier and invalid-key rejection: 10/10 idle, 10/10 with 12 busy processes; no wtype installed |
+| NixOS, Xwayland 24.1.13 + xterm 411 | X11 terminal receives `x11 café λ` and a mouse click: 10/10 idle, 10/10 with 12 busy processes |
+| NixOS, zenity 4.2.2 (GTK) and kdialog 26.08.1 (Qt 6), each on native Wayland and X11 | Entry dialogs receive Unicode text and Return; exact stdout checked: 5/5 idle, 5/5 loaded |
 | NixOS, wlr-randr 0.5.0 on headless output | Mode change to 1024×768 updates coordinate bounds; scale 2 is rejected |
 | NixOS, supervisor crash | SIGKILL of the worker: guardian stopped all processes including a token-less daemon, removed the runtime and marked the session failed. SIGKILL of worker and guardian: `destroy` recovered by token |
 | NixOS, terminal fixture plus daemonizing child, repeated lifecycle | Final code: 20/20 create/type/destroy cycles with 12 busy CPU processes on 12 cores; 40/40 earlier branch cycles (20 idle, 20 loaded). No token, daemon or runtime leftovers |
@@ -22,7 +24,7 @@ keymap, so it is layout-independent; key chords use keysym names. Input methods 
 dead keys and applications that interpret physical layouts are not covered.
 
 Ubuntu checks skip visible testing because the runner has no physical Wayland host.
-Do not infer general support for Xwayland, browsers beyond the one tested fixture,
-GTK/Qt applications, or processes started by host services outside the session
-tree. General applications need explicit profile separation and task-specific
+Do not infer general support for browsers beyond the one tested fixture, GTK/Qt
+applications beyond simple dialogs, X11 applications beyond xterm and the dialogs,
+or processes started by host services outside the session tree. General applications need explicit profile separation and task-specific
 outcome checks.

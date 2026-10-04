@@ -20,7 +20,10 @@ additional calls; there is no repeated deletion action. Both API error counts
 are zero, which does not establish semantic UI/frame readiness. Costs are nearly
 equal, and unmatched environments, resource caps, cache and sample size prevent
 a causal performance claim. No additional account-using runs are needed for
-this comparison. PR #28 final checks are pending.
+this comparison. Removed the exact pinned image again after the last trial,
+leaving 184 KiB of project VFS metadata, and stopped only the matching API
+process; it exited successfully. No trial containers remain. PR #28 final
+checks are pending.
 
 ## 2026-10-04 — Second native comparison set
 

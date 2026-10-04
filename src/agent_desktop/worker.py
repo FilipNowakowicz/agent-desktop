@@ -16,7 +16,14 @@ import time
 import uuid
 from pathlib import Path
 
-from .wayland import BUTTONS, Keysyms, Toplevels, VirtualKeyboard, VirtualPointer
+from .wayland import (
+    BUTTONS,
+    Keysyms,
+    Toplevels,
+    VirtualKeyboard,
+    VirtualPointer,
+    clear_selection,
+)
 
 PR_SET_CHILD_SUBREAPER = 36
 
@@ -514,6 +521,12 @@ class Worker:
                     self.takeover.kill()
                     self.takeover.wait()
             Path(self.info["runtime"], "takeover.sock").unlink(missing_ok=True)
+            try:
+                # Anything the person pasted (e.g. a password) must not stay
+                # available to the agent.
+                clear_selection(self.info["wayland_display"])
+            except (OSError, RuntimeError) as error:
+                print(f"Clipboard not cleared: {error}", file=sys.stderr, flush=True)
             self.control.update(
                 owner="agent",
                 request=None,

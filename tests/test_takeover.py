@@ -203,6 +203,60 @@ class TakeoverTests(unittest.TestCase):
         self.assertGreaterEqual(time.monotonic() - started, 0.9)
         self.assertEqual(state["request"]["reason"], "Enter a code")
 
+    def test_pasted_text_reaches_the_session(self):
+        fixture = self.fixture()
+        taken = core.request(self.session, "take")
+        connection = connect(taken["socket"])
+        try:
+            # ClientCutText, as TigerVNC sends with -SendClipboard=1 (--paste).
+            secret = b"pasted-secret"
+            connection.sendall(struct.pack(">B3xI", 6, len(secret)) + secret)
+            time.sleep(0.5)
+            for keysym in (0xFFE3, 0xFFE1):  # Control_L, Shift_L down
+                connection.sendall(struct.pack(">BBHI", 4, 1, 0, keysym))
+            press(connection, ord("V"))
+            for keysym in (0xFFE1, 0xFFE3):
+                connection.sendall(struct.pack(">BBHI", 4, 0, 0, keysym))
+            press(connection, 0xFF0D)
+            wait_for((fixture / "typed.txt").exists)
+        finally:
+            connection.close()
+        self.assertEqual((fixture / "typed.txt").read_text(), "pasted-secret")
+
+    @unittest.skipUnless(
+        shutil.which("wl-copy") and shutil.which("wl-paste"), "wl-clipboard unavailable"
+    )
+    def test_clipboard_is_cleared_when_control_returns(self):
+        environment = {
+            **os.environ,
+            "WAYLAND_DISPLAY": core.manifest(self.session)["wayland_display"],
+        }
+
+        def paste():
+            return subprocess.run(
+                ["wl-paste", "--no-newline"],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout
+
+        core.request(self.session, "take")
+        # Stands in for an application that copied what the person pasted; it
+        # keeps owning the selection after the takeover server exits.
+        owner = subprocess.Popen(
+            ["wl-copy", "--foreground", "copied-secret"], env=environment
+        )
+        try:
+            wait_for(lambda: paste() == "copied-secret")
+            core.request(self.session, "release")
+            self.assertEqual(paste(), "")
+        finally:
+            owner.terminate()
+            owner.wait(timeout=5)
+        log = core.logs(self.session)["session.log"]
+        self.assertNotIn("Clipboard not cleared", log)
+
     def test_destroy_during_takeover_stops_the_server(self):
         self.assertEqual(core.request(self.session, "take")["owner"], "human")
         core.destroy(self.session)

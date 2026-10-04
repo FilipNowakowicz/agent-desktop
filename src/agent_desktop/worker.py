@@ -190,8 +190,15 @@ class Worker:
             '<keybind key="A-F4"><action name="Close"/></keybind>'
             "</keyboard></labwc_config>\n"
         )
-        for name in ("environment", "autostart", "shutdown"):
+        for name in ("environment", "shutdown"):
             (config / name).write_text("")
+        # labwc sets DISPLAY for its lazily started Xwayland only in its own
+        # process; autostart inherits it, so record it for applications.
+        display_file = Path(self.info["runtime"]) / "x-display"
+        (config / "autostart").write_text(
+            f'printf "%s" "${{DISPLAY:-}}" > "{display_file}.tmp" && '
+            f'mv "{display_file}.tmp" "{display_file}"\n'
+        )
         self.env.update(
             {
                 "HOME": str(home),
@@ -241,9 +248,26 @@ class Worker:
                 self.virtual_keyboard = VirtualKeyboard(display, self.root)
                 self.keysyms = Keysyms(self.compositor.pid)
                 self.toplevels = Toplevels(display)
+                self.start_xwayland_environment(
+                    display_file_deadline=time.monotonic() + 5
+                )
                 return
             time.sleep(0.05)
         raise TimeoutError("Private compositor socket did not appear")
+
+    def start_xwayland_environment(self, display_file_deadline):
+        path = Path(self.info["runtime"]) / "x-display"
+        while not path.exists():
+            if time.monotonic() > display_file_deadline:
+                raise TimeoutError("labwc autostart did not report its X display")
+            time.sleep(0.02)
+        value = path.read_text().strip()
+        # Only accept the display labwc created for this session.
+        if value and not value.startswith(":"):
+            raise RuntimeError(f"Unexpected X display from compositor: {value!r}")
+        if value:
+            self.env["DISPLAY"] = value
+        self.info["x_display"] = value or None
 
     def start_bus(self):
         # A child bus keeps D-Bus-activated services inside this worker's tree.
@@ -358,6 +382,7 @@ class Worker:
                 "session": self.info["id"],
                 "mode": self.info["mode"],
                 "status": "ready",
+                "x_display": self.info.get("x_display"),
                 "applications": [
                     {"pid": p.pid, "exit_code": p.poll()} for p in self.apps.values()
                 ],

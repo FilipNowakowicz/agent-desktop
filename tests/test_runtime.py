@@ -412,8 +412,8 @@ class RuntimeTests(unittest.TestCase):
 
         token = core.request(session, "screenshot")["observation"]
         core.request(session, "move", x=5, y=5, observation=token)
-        core.request(session, "focus", window=listed["Session fixture"]["id"])
-        wait_for(lambda: "activated" in windows()["Session fixture"]["states"])
+        focused = core.request(session, "focus", window=listed["Session fixture"]["id"])
+        self.assertIn("activated", focused["window"]["states"])
         # Focus changed after the screenshot: refuse, and send nothing.
         with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
             core.request(session, "type", text="stale", observation=token)
@@ -440,6 +440,63 @@ class RuntimeTests(unittest.TestCase):
         core.request(session, "focus", window=third["id"])
         core.request(session, "key", key="d", modifiers=["ctrl"])
         wait_for(lambda: len(core.request(session, "windows")["windows"]) == 2)
+
+    def test_immediate_typing_after_repeated_focus_switches(self):
+        session = self.new_session()
+        script = self.root / "receive.py"
+        script.write_text(
+            "import json, pathlib, sys\n"
+            "directory = pathlib.Path(sys.argv[1])\n"
+            "directory.joinpath('ready').touch()\n"
+            "lines = []\n"
+            "for line in sys.stdin:\n"
+            "    lines.append(line.rstrip('\\n'))\n"
+            "    directory.joinpath('lines.json').write_text(json.dumps(lines))\n"
+        )
+        directories = [self.root / "left", self.root / "right"]
+        for directory in directories:
+            directory.mkdir()
+            core.request(
+                session,
+                "launch",
+                argv=[
+                    "foot",
+                    "--config=/dev/null",
+                    f"--title={directory.name}",
+                    sys.executable,
+                    str(script),
+                    str(directory),
+                ],
+            )
+            wait_for(directory.joinpath("ready").exists)
+
+        def two_windows():
+            ws = core.request(session, "windows")["windows"]
+            return ws if len(ws) == 2 else None
+
+        listed = wait_for(two_windows)
+        ids = {w["title"]: w["id"] for w in listed}
+        expected = {d.name: [] for d in directories}
+        for index in range(20):
+            directory = directories[index % 2]
+            result = core.request(session, "focus", window=ids[directory.name])
+            self.assertEqual(result["window"]["id"], ids[directory.name])
+            self.assertIn("activated", result["window"]["states"])
+            text = f"{directory.name}-{index} café λ"
+            # No external focus polling or sleep between focus and input.
+            core.request(session, "type", text=text)
+            core.request(session, "key", key="Return")
+            expected[directory.name].append(text)
+        for directory in directories:
+            path = directory / "lines.json"
+
+            def received(path=path, directory=directory):
+                try:
+                    return json.loads(path.read_text()) == expected[directory.name]
+                except (OSError, ValueError):
+                    return False
+
+            wait_for(received)
 
     @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
     def test_xwayland_application_receives_input(self):

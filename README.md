@@ -70,7 +70,11 @@ supports it (install `xwayland`); `status` reports its `x_display`. The host's
 `DISPLAY` is never passed to applications.
 
 `windows` lists each window's id, title, app_id, states (`activated`, `maximized`,
-`minimized`, `fullscreen`) and parent; `focus` activates one by id. Each screenshot
+`minimized`, `fullscreen`) and parent; `focus` activates one by id and returns its
+observed window state. It waits up to two seconds for the compositor to report
+`activated`, failing if the window closes or activation is not observed. Focus
+can change again afterward; this does not prove the application received input.
+Each screenshot
 returns an `observation` token describing the output and windows (ids, app ids,
 states, parents; not titles). Pass it with `--observation` (CLI) or `observation`
 (MCP) to input requests: if a window appeared, closed or changed focus/state, or

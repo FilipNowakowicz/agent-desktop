@@ -549,6 +549,18 @@ class Toplevels:
         for handle, window in self.windows.items():
             if window["id"] == window_id:
                 self.connection.send(handle, 4, struct.pack("=I", self.seat))
-                self.connection.roundtrip()
-                return
-        raise ValueError(f"Unknown window: {window_id}")
+                break
+        else:
+            raise ValueError(f"Unknown window: {window_id}")
+        # A sync confirms request processing, not that activation was accepted.
+        # Observe the compositor's state before allowing the caller to type.
+        deadline = time.monotonic() + 2
+        while True:
+            target = next((w for w in self.current() if w["id"] == window_id), None)
+            if target is None:
+                raise WaylandError(f"Window closed during activation: {window_id}")
+            if "activated" in target["states"]:
+                return target
+            if time.monotonic() >= deadline:
+                raise WaylandError(f"Window activation timed out: {window_id}")
+            time.sleep(0.01)

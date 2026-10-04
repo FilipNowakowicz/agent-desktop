@@ -1,5 +1,43 @@
 # Development log
 
+## 2026-10-04 — M2 Claude Code client integration
+
+**Outcome:** a real interactive client, Claude Code, completed a GUI task
+through the MCP server. On the user's instruction ("use this repo and claude code
+for testing"), the configuration is a project-scoped `.mcp.json`; the user's
+global Claude Code settings were not changed.
+
+`scripts/claude_code_task.py` runs `claude -p` with `--strict-mcp-config
+--mcp-config .mcp.json --tools "" --allowedTools mcp__private-desktop`, a $2
+budget cap and no session persistence. The agent therefore has no shell, file or
+web tools. The task page draws a random 6-character code on a canvas. The agent
+must create a session, launch the given Chromium argument list, read the code
+from screenshots, type it, drag a box into a dashed target and press Submit, then
+leave the session running. Afterwards the harness checks the window title through
+the core API, takes its own screenshot and destroys the session. When `hyprctl`
+exists, it also compares the host's active window and cursor before and after.
+
+### Results (Claude Code 2.1.288, model claude-opus-5-5, Chromium 153)
+
+| Run | Passed | Tool calls | Seconds | Cost (USD) | Host unchanged |
+| --- | --- | ---: | ---: | ---: | --- |
+| `573a7a2e55f2` | yes | 12 | 21.5 | 0.152 | not recorded |
+| `ad28947d55d8` | yes | 11 | 27.0 | 0.108 | yes |
+| `e03eb2e9cef0` | yes | 11 | 24.7 | 0.107 | yes |
+| `6b72b1854598` | yes | 12 | 22.5 | 0.113 | yes |
+| `2be85c3fad05` | yes | 10 | 21.4 | 0.092 | yes |
+
+Screenshot tool results contained real image blocks (3 per run in the first
+transcript); the code existed only in the rendered canvas. The final screenshot
+was inspected: correct code in the field, box inside the target, title
+`Agent task - complete`. Each session outlived the `claude` process and was still
+`ready` when the harness checked it, so the session survives client disconnect.
+
+This is one task type with one model. It shows the client integration works;
+it is not a benchmark. Interactive (TTY) Claude Code uses the same `.mcp.json`
+after the user approves the project server. That approval step was not exercised
+here. Human takeover and action ownership are still unimplemented.
+
 ## 2026-10-04 — Handoff after M1 hardening and M3 coverage
 
 Updated the plan status and starter prompt after PRs #10–#16. PR #16 passed

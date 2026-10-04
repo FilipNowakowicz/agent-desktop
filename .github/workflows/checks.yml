@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install desktop runtime
-        run: sudo apt-get update && sudo apt-get install -y labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity mousepad x11-utils fonts-dejavu-core
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc libreoffice-gtk3 x11-utils xfonts-base fonts-dejavu-core
       - name: Record runtime versions
-        run: dpkg-query -W labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity mousepad
+        run: dpkg-query -W labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
       - run: uv sync --locked --managed-python
       - name: Check Python source
         run: |
@@ -66,14 +66,15 @@ jobs:
             install: >-
               dnf install -y --setopt=install_weak_deps=False git tar gzip
               labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland
-              xterm xev zenity mousepad chromium dejavu-sans-fonts dejavu-sans-mono-fonts
-            versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity mousepad
+              xterm xev zenity mousepad chromium libreoffice-writer libreoffice-calc
+              libreoffice-gtk3 dejavu-sans-fonts dejavu-sans-mono-fonts
+            versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
           - name: arch
             image: archlinux:latest
             install: >-
               pacman -Syu --noconfirm git labwc foot grim wayvnc wlr-randr dbus
-              xorg-xwayland xterm xorg-xev zenity mousepad chromium ttf-dejavu
-            versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity mousepad
+              xorg-xwayland xterm xorg-xev zenity mousepad chromium libreoffice-fresh ttf-dejavu
+            versions: pacman -Q labwc foot grim wayvnc wlr-randr dbus xorg-xwayland xterm zenity mousepad libreoffice-fresh
     name: runtime (${{ matrix.name }})
     container: ${{ matrix.image }}
     env:

@@ -34,8 +34,9 @@ the repair. Choose this runtime explicitly on `PATH` or through `core.create`'s
 `tools` argument. Python dependencies and the core remain portable.
 
 Arch CI 37214448862 passed its full suite, 100 loaded Xterm sessions and
-lifecycle stress using this private repair. Fedora now also builds the matching repair (validation pending); Ubuntu
-continues using its stock runtime packages. The patched local runtime passed 150 loaded Xterm sessions (one logged repair),
+lifecycle stress using this private repair. Both matching private repairs passed CI 37215643286: full suites, 100 loaded
+Xterm repetitions per distribution, and lifecycle stress. Ubuntu continues
+using its stock runtime packages. The patched local runtime passed 150 loaded Xterm sessions (one logged repair),
 100 loaded sessions with an already-running XWM, and the full 33-test suite
 with visible mode skipped. Other build environments, versions and visible-mode behavior
 of the repair require separate validation. On NixOS the same patch was tested

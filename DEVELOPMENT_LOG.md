@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-04 — Both repaired runtime versions pass
+
+Source head `7766302`, CI `37215643286`: Ubuntu/Fedora/Arch all passed.
+Fedora's private wlroots 0.19.3: full 33-test suite in 41.784 s (visible skip),
+100/100 Xterm Unicode and mouse trials with four CPU-load processes in 141.146 s,
+then lifecycle stress. Arch's private wlroots 0.20.2: full 33-test suite in
+62.149 s (visible skip), 100/100 loaded Xterm trials in 367.224 s, then lifecycle
+stress. Both copied compositors resolve the intended project-local library;
+source checksums and patch application were verified. Ubuntu retains stock
+runtime and passed its suite, focus/crash/input repetitions and lifecycle stress.
+
+The completed comparison used $1.0474778 of the authorized $5, with 6/6 browser
+tasks passed per runtime; no further model trials were run during the repair.
+Stock wlroots 0.19.3/0.20.2 remain affected. The repair must be explicitly selected,
+is not upstreamed, and has not been validated in visible mode or arbitrary X11
+applications. Historical successful stock runs remain evidence of those runs,
+not a guarantee. Human takeover/action ownership is the next implementation stage.
+
 ## 2026-10-04 — Extend mapping repair to Fedora's wlroots 0.19.3
 
 Final documentation head `441ff30`, CI `37214999497`: stock Fedora passed

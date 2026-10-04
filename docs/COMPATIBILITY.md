@@ -30,7 +30,8 @@ Xterm sessions on NixOS, including one buffer-before-association recovery.
 Repaired Arch CI 37214448862 passed its full 33-test suite, 100 loaded Xterm
 repetitions and lifecycle stress. Ubuntu/Fedora passed with stock packages in
 the same run, but Fedora subsequently failed mapping on repetition five in
-37214999497. Its matching private repair is now undergoing validation. Earlier
+37214999497. Both private repair versions passed CI 37215643286: full suites, 100 loaded
+Xterm repetitions each on Fedora and Arch, and lifecycle stress. Earlier
 stock 0.19.3/0.20.2 passes do not establish reliable mapping. See [runtime repair](../runtime/README.md) and
 the development log. Native Wayland comparison tasks remain independently valid.
 

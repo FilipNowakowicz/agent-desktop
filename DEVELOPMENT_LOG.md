@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-10-04 — M3 editor file dialogs and private clipboards
+
+Added real Mousepad tasks to the compositor suite: open a Unicode filename in a
+directory with spaces through the GTK chooser, replace the document, save, and
+Save As to another Unicode filename; independently verify both files. Two
+simultaneous sessions copy distinct Unicode text, clear/save their documents,
+then paste/save. Exact file contents demonstrate that the second session's copy
+does not replace the first session's clipboard. Screenshots retain visual
+evidence and normal lifecycle teardown checks owned processes.
+
+Initial Open attempts failed. Screenshots and a slower controlled experiment
+showed GTK's asynchronous location-entry creation and path validation. The test
+uses explicit 200/300 ms fixture delays at those transitions. Input APIs have
+not gained widget-readiness guarantees; semantic readiness remains open.
+
+Local validation (Mousepad 0.7.0, labwc 0.20.2): both tasks passed five repetitions
+each (10 tests in 31.415 s). Full suite: 29 tests in 41.321 s, 28 passed and visible
+mode skipped. Ruff lint/format and diff checks passed. Existing runtime binaries
+were supplied through command-local PATH. CI now installs Mousepad on Ubuntu,
+Fedora and Arch; results are pending. No personal profiles or host changes used.
+
 ## 2026-10-04 — Wait for guardian exit in crash-cleanup test
 
 Downloaded and inspected `desktop-tests-runtime-0` from failed Ubuntu run

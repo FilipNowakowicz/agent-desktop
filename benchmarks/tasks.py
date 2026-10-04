@@ -25,6 +25,8 @@ def chromium(context, page):
         "--disable-gpu",
         "--password-store=basic",
         "--window-size=1200,680",
+        # Web content in the accessibility tree (used by the semantic UI tools).
+        "--force-renderer-accessibility",
         path.as_uri(),
     ]
 

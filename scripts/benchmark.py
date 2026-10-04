@@ -19,12 +19,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_desktop import core  # noqa: E402
-from agent_desktop.worker import owned_processes  # noqa: E402
+from agent_desktop.worker import find_registryd, owned_processes  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS  # noqa: E402
 
 SUITES = {"standard": TASKS, "hard": HARD_TASKS, "office": OFFICE_TASKS}
+
+# Tool profiles for comparisons. "basic" is the tool set before waiting, action
+# sequences and semantic UI were added (screenshot region/scale arguments remain
+# available in both). Harness-owned lifecycle and launch are always disabled.
+LIFECYCLE = ["create", "destroy", "launch"]
+NEWER = [
+    "wait",
+    "actions",
+    "ui",
+    "ui_action",
+    "request_human",
+    "control",
+    "profiles",
+]
+TOOL_PROFILES = {"basic": LIFECYCLE + NEWER, "full": LIFECYCLE}
 
 PROMPT = """You control a private Linux desktop through the private-desktop tools.
 Use session {session}; it already exists and the application is already open.
@@ -32,8 +47,8 @@ Do not create or destroy sessions.
 
 Task: {task}
 
-Work by taking screenshots and using input tools. When finished, reply with one
-line starting with DONE, or FAILED with a short reason."""
+Use the available tools as you judge best. When finished, reply with one line
+starting with DONE, or FAILED with a short reason."""
 
 
 class Context:
@@ -150,7 +165,7 @@ def run_agent(
     }
 
 
-def run_task(task, root, budget, model, dry_run=False):
+def run_task(task, root, budget, model, dry_run=False, profile="full"):
     directory = (root / task.name).resolve()
     directory.mkdir(parents=True)
     record = {"task": task.name, "passed": False}
@@ -176,7 +191,14 @@ def run_task(task, root, budget, model, dry_run=False):
         if not dry_run:
             record.update(
                 run_agent(
-                    PROMPT.format(session=session, task=goal), directory, budget, model
+                    PROMPT.format(session=session, task=goal),
+                    directory,
+                    budget,
+                    model,
+                    disallowed=[
+                        f"mcp__private-desktop__desktop_{name}"
+                        for name in TOOL_PROFILES[profile]
+                    ],
                 )
             )
         time.sleep(0.5)
@@ -204,6 +226,12 @@ def main():
     parser.add_argument("--model")
     parser.add_argument("--seed", type=int, help="Reproduce randomized fixture inputs")
     parser.add_argument(
+        "--tools",
+        choices=TOOL_PROFILES,
+        default="full",
+        help="agent tool profile (basic: before wait/actions/semantic UI)",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="set up and check without an agent"
     )
     args = parser.parse_args()
@@ -222,7 +250,7 @@ def main():
         if missing:
             records.append({"task": task.name, "skipped": f"missing {missing}"})
             continue
-        record = run_task(task, root, args.budget, args.model, args.dry_run)
+        record = run_task(task, root, args.budget, args.model, args.dry_run, args.tools)
         records.append(record)
         print(
             json.dumps(
@@ -246,6 +274,8 @@ def main():
     ran = [r for r in records if "skipped" not in r]
     summary = {
         "seed": args.seed,
+        "tools": args.tools,
+        "accessibility": bool(find_registryd()),
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),
         "skipped": [r["task"] for r in records if "skipped" in r],

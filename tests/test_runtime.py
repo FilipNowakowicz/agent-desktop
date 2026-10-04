@@ -27,6 +27,9 @@ def wait_for(predicate, timeout=10):
     raise AssertionError("Timed out waiting for an observed result")
 
 
+CHROMIUM = shutil.which("chromium") or shutil.which("chromium-browser")
+
+
 def running(pid):
     # Zombies count as stopped: a container's PID 1 may never reap orphans.
     try:
@@ -564,7 +567,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(by_keysym[0xFF08][0], 22)  # BackSpace on KEY_BACKSPACE
         self.assertIn(by_keysym[0x10003BB][0] - 8, POOL)  # λ on a spare code
 
-    @unittest.skipUnless(shutil.which("chromium"), "chromium unavailable")
+    @unittest.skipUnless(CHROMIUM, "chromium unavailable")
     def test_chromium_receives_every_character(self):
         session = self.new_session()
         page = self.root / "input.html"
@@ -573,7 +576,7 @@ class RuntimeTests(unittest.TestCase):
             'autofocus oninput="document.title=JSON.stringify(i.value)">'
         )
         argv = [
-            "chromium",
+            CHROMIUM,
             f"--user-data-dir={self.root / 'chromium'}",
             "--no-first-run",
             "--ozone-platform=wayland",
@@ -582,14 +585,25 @@ class RuntimeTests(unittest.TestCase):
         ]
         if os.geteuid() == 0:  # CI containers; never used for real profiles
             argv.append("--no-sandbox")
-        core.request(session, "launch", argv=[*argv, page.as_uri()])
-        wait_for(
-            lambda: any(
+        app = core.request(session, "launch", argv=[*argv, page.as_uri()])
+
+        def ready():
+            if any(
                 w["title"].startswith("t") and "activated" in w["states"]
                 for w in core.request(session, "windows")["windows"]
-            ),
-            timeout=30,
-        )
+            ):
+                return True
+            status = core.request(session, "status")["applications"]
+            if any(
+                a["pid"] == app["pid"] and a["exit_code"] is not None for a in status
+            ):
+                if "No usable sandbox" in Path(app["logs"]).read_text():
+                    # e.g. Ubuntu 24.04 AppArmor; the sandbox is not disabled for users.
+                    self.skipTest("Chromium sandbox unavailable in this environment")
+                raise AssertionError(Path(app["logs"]).read_text()[-2000:])
+            return False
+
+        wait_for(ready, timeout=30)
         # More distinct non-US characters than spare keys, so keys are reused.
         text = "Browser café: " + "".join(chr(0x3B1 + i) for i in range(25)) + " ok!"
         core.request(session, "type", text=text)

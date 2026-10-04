@@ -230,6 +230,6 @@ See [the benchmark report](docs/BENCHMARK.md) for verified GUI tasks and a
 restricted local-container comparison. Its optional harness uses an existing
 local runtime and performs no host installation or configuration.
 
-For the reproduced X11 mapping race on labwc/wlroots 0.20.2, see the optional
+For the reproduced X11 mapping race on wlroots 0.19.3/0.20.2, see the optional
 [project-local runtime repair](runtime/README.md). Stock-package passes do not
 establish reliable X11 mapping on that version.

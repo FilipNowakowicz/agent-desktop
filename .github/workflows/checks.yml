@@ -71,6 +71,8 @@ jobs:
               labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland
               xterm xev xprop xwininfo zenity mousepad chromium libreoffice-writer libreoffice-calc
               libreoffice-gtk3 dejavu-sans-fonts dejavu-sans-mono-fonts
+              wlroots0.19-devel gcc gcc-c++ meson ninja-build curl-minimal patchelf patch
+              glslang glslang-devel wayland-protocols-devel hwdata-devel
             versions: rpm -q labwc foot grim wayvnc wlr-randr dbus-daemon xorg-x11-server-Xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
           - name: arch
             image: archlinux:latest
@@ -95,39 +97,35 @@ jobs:
         with:
           python-version: '3.12'
       - run: uv sync --locked --managed-python
-      - name: Build a private Xwayland mapping repair on Arch
-        if: matrix.name == 'arch'
+      - name: Build a private Xwayland mapping repair
         run: |
           sh scripts/build_xwayland_runtime.sh "$RUNNER_TEMP/private-runtime"
           ldd "$RUNNER_TEMP/private-runtime/install/bin/labwc" > "$RUNNER_TEMP/private-runtime/libraries.txt"
           cat "$RUNNER_TEMP/private-runtime/libraries.txt"
-          resolved=$(awk '$1 == "libwlroots-0.20.so" {print $3}' "$RUNNER_TEMP/private-runtime/libraries.txt")
-          test "$(realpath "$resolved")" = "$RUNNER_TEMP/private-runtime/install/lib/libwlroots-0.20.so"
+          resolved=$(awk '$1 ~ /^libwlroots-0\.(19|20)\.so$/ {print $3}' "$RUNNER_TEMP/private-runtime/libraries.txt")
+          test "$(dirname "$(realpath "$resolved")")" = "$RUNNER_TEMP/private-runtime/install/lib"
           echo "$RUNNER_TEMP/private-runtime/install/bin" >> "$GITHUB_PATH"
       - name: Run routing and headless compositor tests
         run: uv run python -m unittest discover -s tests -v
         env:
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
-      - name: Repeat Xwayland mapping and input (Arch under CPU load)
+      - name: Repeat Xwayland mapping and input under CPU load
         run: |
           uv run python - <<'PY'
-          import os
           import subprocess
           import sys
           import unittest
           sys.path.insert(0, "tests")
           name = "test_runtime.RuntimeTests.test_xwayland_application_receives_input"
-          arch = os.environ["TEST_DISTRIBUTION"] == "arch"
           suite = unittest.TestSuite(
               unittest.defaultTestLoader.loadTestsFromName(name)
-              for _ in range(100 if arch else 10)
+              for _ in range(100)
           )
           load = []
           try:
-              if arch:
-                  for _ in range(4):
-                      load.append(subprocess.Popen([sys.executable, "-c", "while True: pass"]))
+              for _ in range(4):
+                  load.append(subprocess.Popen([sys.executable, "-c", "while True: pass"]))
               result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
           finally:
               for child in load:
@@ -137,7 +135,6 @@ jobs:
           sys.exit(not result.wasSuccessful())
           PY
         env:
-          TEST_DISTRIBUTION: ${{ matrix.name }}
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Keep test desktops on failure

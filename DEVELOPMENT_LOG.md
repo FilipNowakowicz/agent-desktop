@@ -1,5 +1,24 @@
 # Development log
 
+## 2026-10-04 — Extend mapping repair to Fedora's wlroots 0.19.3
+
+Final documentation head `441ff30`, CI `37214999497`: stock Fedora passed
+its full suite, then failed X11 mapping on repetition five (four passed).
+Retained root properties match Arch: X11 fixture in the stacking list, no
+mapped client list, active window zero and no foreign-toplevel. Fedora uses
+labwc 0.9.6 / wlroots0.19 0.19.3, whose association/commit logic has the same
+missing existing-buffer check. Thus earlier Fedora stock passes do not establish
+that this failure is limited to 0.20.2. Artifacts: artifacts/ci-37214999497.
+
+Extended the private runtime script to select only the explicitly pinned
+0.19.3 or 0.20.2 source based on the installed labwc library ABI, and verify
+its development package version. SHA-256 for 0.19.3:
+`a6ff89b64ea15e424d1b0db4a22145fccf5ec2ff2e7b8af0fa35e2ac8975986f`.
+The identical patch applies to 0.19.3 without fuzz (48-line offset). Fedora CI
+now builds its matching private repair and runs 100 X11 repetitions with four
+busy processes, as on Arch. Ubuntu retains stock runtime. No retries, assertion
+changes or host loader/configuration changes. Distribution checks are pending.
+
 ## 2026-10-04 — Repaired runtime passes distribution validation
 
 Source head `c63b109`, CI `37214448862`: Ubuntu, Fedora and Arch all passed.

@@ -104,6 +104,13 @@ def main():
             operation.add_argument("--dx", type=int, default=0)
         elif command == "focus":
             operation.add_argument("window")
+        elif command == "screenshot":
+            operation.add_argument(
+                "--region",
+                type=lambda v: [int(n) for n in v.split(",")],
+                help="x,y,width,height in desktop coordinates",
+            )
+            operation.add_argument("--scale", type=float)
         if command in ("click", "move", "drag", "type", "key", "scroll"):
             operation.add_argument(
                 "--observation",

@@ -111,13 +111,17 @@ def desktop_focus(session: str, window: str) -> dict:
 
 
 @mcp.tool(structured_output=False)
-def desktop_screenshot(session: str) -> list:
+def desktop_screenshot(
+    session: str, region: list[int] | None = None, scale: float | None = None
+) -> list:
     """Return a private desktop PNG plus dimensions, artifact path and observation.
 
     Pass the observation token to input tools to refuse input if windows, focus
-    or the output changed since this screenshot.
+    or the output changed since this screenshot. To save image tokens, region
+    [x, y, width, height] captures part of the desktop and scale (0.1-1) shrinks
+    the image; desktop coordinates are region x/y plus image coordinates / scale.
     """
-    capture = core.request(session, "screenshot")
+    capture = core.request(session, "screenshot", region=region, scale=scale)
     return [
         TextContent(type="text", text=json.dumps(capture)),
         Image(path=capture["path"]),

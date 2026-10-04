@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-10-04 — Container form/confirmation comparison results
+
+Run `20261004-153931-af37`, seed 41027, claude-opus-5-5, $0.40/task cap:
+form passed (11 calls, 15.7 s, $0.0925628); confirmation passed (6 calls,
+12.3 s, $0.0790968). No tool/setup/cleanup errors. Comparison cumulative
+usage is $0.5354584; committed after this batch. First set: each runtime
+passes all three tasks. A second set remains; timing is still confounded by
+runtime, browser, resource and cache differences.
+
 ## 2026-10-04 — Native form/confirmation comparison results
 
 Run `20261004-153647-ba09`, seed 41027, claude-opus-5-5, $0.40/task cap:

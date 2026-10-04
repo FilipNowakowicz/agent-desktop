@@ -1,0 +1,234 @@
+"""Run the representative GUI task suite with Claude Code and record outcomes.
+
+Each task gets a fresh harness-created session with its application already
+launched. The agent receives only the private-desktop MCP tools; the harness
+verifies the outcome independently, then destroys the session and checks cleanup.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from agent_desktop import core  # noqa: E402
+from agent_desktop.worker import owned_processes  # noqa: E402
+from benchmarks.tasks import TASKS  # noqa: E402
+
+PROMPT = """You control a private Linux desktop through the private-desktop tools.
+Use session {session}; it already exists and the application is already open.
+Do not create or destroy sessions.
+
+Task: {task}
+
+Work by taking screenshots and using input tools. When finished, reply with one
+line starting with DONE, or FAILED with a short reason."""
+
+
+class Context:
+    def __init__(self, session, directory):
+        self.session = session
+        self.directory = directory
+        self.application = None
+
+    def windows(self):
+        return core.request(self.session, "windows")["windows"]
+
+    def application_status(self):
+        for entry in core.request(self.session, "status")["applications"]:
+            if entry["pid"] == self.application["pid"]:
+                return entry
+        return None
+
+    def application_output(self):
+        return Path(self.application["logs"]).read_text(errors="replace")
+
+
+def run_agent(prompt, artifact, budget, model):
+    command = [
+        "claude",
+        "-p",
+        prompt,
+        "--mcp-config",
+        ".mcp.json",
+        "--strict-mcp-config",
+        "--tools",
+        "",
+        "--allowedTools",
+        "mcp__private-desktop",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--no-session-persistence",
+        "--max-budget-usd",
+        str(budget),
+    ]
+    if model:
+        command += ["--model", model]
+    started = time.monotonic()
+    with (artifact / "transcript.jsonl").open("w") as transcript:
+        try:
+            process = subprocess.run(
+                command,
+                stdout=transcript,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=900,
+            )
+            exit_code, stderr = process.returncode, process.stderr[-2000:]
+        except subprocess.TimeoutExpired:
+            exit_code, stderr = None, "agent timed out after 900 s"
+    elapsed = round(time.monotonic() - started, 1)
+    events = []
+    for line in (artifact / "transcript.jsonl").read_text().splitlines():
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            pass
+    calls = [
+        block
+        for event in events
+        if event.get("type") == "assistant"
+        for block in event["message"]["content"]
+        if block.get("type") == "tool_use"
+    ]
+    errors = [
+        block
+        for event in events
+        if event.get("type") == "user"
+        for block in event["message"].get("content", [])
+        if isinstance(block, dict)
+        and block.get("type") == "tool_result"
+        and block.get("is_error")
+    ]
+    result = next((e for e in reversed(events) if e.get("type") == "result"), {})
+    init = next((e for e in events if e.get("subtype") == "init"), {})
+    names = [c["name"].removeprefix("mcp__private-desktop__") for c in calls]
+    return {
+        "model": init.get("model"),
+        "exit_code": exit_code,
+        "stderr": stderr,
+        "elapsed_seconds": elapsed,
+        "tool_calls": len(calls),
+        "tool_errors": len(errors),
+        "tools": {n: names.count(n) for n in sorted(set(names))},
+        "reply": (result.get("result") or "")[-500:],
+        "cost_usd": result.get("total_cost_usd"),
+        "turns": result.get("num_turns"),
+    }
+
+
+def run_task(task, root, budget, model, dry_run=False):
+    directory = (root / task.name).resolve()
+    directory.mkdir(parents=True)
+    record = {"task": task.name, "passed": False}
+    session = core.create()["session"]
+    info = core.manifest(session)
+    context = Context(session, directory)
+    try:
+        argv, goal = task.setup(context)
+        before = {w["id"] for w in context.windows()}
+        context.application = core.request(session, "launch", argv=argv)
+        deadline = time.monotonic() + 30
+        while not {w["id"] for w in context.windows()} - before:
+            if time.monotonic() > deadline:
+                raise RuntimeError("Application window did not appear")
+            time.sleep(0.2)
+        time.sleep(1)  # let the first frame render before the agent looks
+        if not dry_run:
+            record.update(
+                run_agent(
+                    PROMPT.format(session=session, task=goal), directory, budget, model
+                )
+            )
+        time.sleep(0.5)
+        passed, detail = task.check(context)
+        record["passed"] = bool(passed)
+        record["detail"] = detail
+        record["final_screenshot"] = core.request(session, "screenshot")["path"]
+    except Exception as error:
+        record["error"] = f"{type(error).__name__}: {error}"
+    finally:
+        try:
+            record["cleanup"] = core.destroy(session)
+        except core.DesktopError as error:
+            record["cleanup_error"] = str(error)
+        record["leftover_processes"] = owned_processes(info["token"])
+    (directory / "record.json").write_text(json.dumps(record, indent=2) + "\n")
+    return record
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--only", nargs="*", help="task names")
+    parser.add_argument("--budget", type=float, default=1.0, help="USD per task")
+    parser.add_argument("--model")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="set up and check without an agent"
+    )
+    args = parser.parse_args()
+    if not args.dry_run and not shutil.which("claude"):
+        raise SystemExit("Requires the claude CLI")
+    root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
+    root = root.with_name(root.name + "-" + uuid.uuid4().hex[:4])
+    root.mkdir(parents=True, mode=0o700)
+    os.environ["AGENT_DESKTOP_STATE_DIR"] = str((root / "state").resolve())
+    records = []
+    for task in TASKS:
+        if args.only and task.name not in args.only:
+            continue
+        missing = [r for r in task.requires if not shutil.which(r)]
+        if missing:
+            records.append({"task": task.name, "skipped": f"missing {missing}"})
+            continue
+        record = run_task(task, root, args.budget, args.model, args.dry_run)
+        records.append(record)
+        print(
+            json.dumps(
+                {
+                    k: record.get(k)
+                    for k in (
+                        "task",
+                        "passed",
+                        "tool_calls",
+                        "tool_errors",
+                        "elapsed_seconds",
+                        "cost_usd",
+                        "detail",
+                        "error",
+                    )
+                },
+                default=str,
+            ),
+            flush=True,
+        )
+    ran = [r for r in records if "skipped" not in r]
+    summary = {
+        "tasks": len(ran),
+        "passed": sum(r["passed"] for r in ran),
+        "skipped": [r["task"] for r in records if "skipped" in r],
+        "cleanup_failures": [
+            r["task"]
+            for r in ran
+            if r.get("cleanup_error") or r.get("leftover_processes")
+        ],
+        "total_cost_usd": round(sum(r.get("cost_usd") or 0 for r in ran), 3),
+        "total_seconds": round(sum(r.get("elapsed_seconds") or 0 for r in ran), 1),
+        "model": next((r.get("model") for r in ran if r.get("model")), None),
+    }
+    (root / "summary.json").write_text(
+        json.dumps({"summary": summary, "records": records}, indent=2, default=str)
+        + "\n"
+    )
+    print(json.dumps({"artifacts": str(root), **summary}, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

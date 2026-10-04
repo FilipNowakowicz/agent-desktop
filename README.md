@@ -147,6 +147,7 @@ create a session, launch Chromium on a local page, read a code that exists only
 in the rendered screenshot, type it, drag a box into a target and submit. The
 harness then verifies the page state itself, records host focus and pointer
 (Hyprland only), and destroys the session. It uses your Claude Code account.
+A 20-task suite and its results are in [docs/BENCHMARK.md](docs/BENCHMARK.md).
 
 ## Run the experiment
 

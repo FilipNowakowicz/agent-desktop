@@ -14,7 +14,7 @@ update this status and the development log with completed work and remaining gap
 | M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
 | M2 | MCP, read-only observer and Claude Code integration (5/5 end-to-end GUI task) | Human takeover / action ownership |
 | M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm and GTK/Qt dialogs pass | Larger applications, desktop installs on other distributions, daily-use tasks, #17 |
-| M4 | Not started | Representative task benchmarks and measured improvements |
+| M4 | 20-task suite with Claude Code: 19/20, then 20/20 twice after two measured fixes (docs/BENCHMARK.md) | Harder multi-app tasks, baselines, more models |
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

@@ -179,9 +179,15 @@ def calc(session, directory):
     spreadsheet(target)
     launch(session, "Calc", [target])
     before = core.request(session, "screenshot")
-    core.request(session, "key", key="Home", modifiers=["ctrl"])
-    core.request(session, "key", key="Down", repeat=3)
-    core.request(session, "key", key="Right")
+    # Explicit cell selection avoids relying on unobserved rapid arrow moves.
+    # Calc's documented Ctrl+Shift+F5 focuses the Name Box.
+    core.request(session, "key", key="F5", modifiers=["ctrl", "shift"])
+    time.sleep(0.2)
+    core.request(session, "key", key="a", modifiers=["ctrl"])
+    core.request(session, "type", text="B4")
+    core.request(session, "key", key="Return")
+    time.sleep(0.2)
+    core.request(session, "screenshot")
     core.request(session, "type", text="=SUM(B2:B3)")
     core.request(session, "key", key="Return")
     core.request(session, "key", key="s", modifiers=["ctrl"])

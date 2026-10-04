@@ -28,6 +28,14 @@ Ruff lint/format and compileall passed. Both office tests also passed three
 repetitions each with four busy CPU processes (6 tests in 51.296 s). Office CI
 validation is pending.
 
+First office CI (`37205919528`): Ubuntu and Arch passed; Fedora Writer passed,
+but Calc saved the formula in A2 rather than B4 and correctly failed the unchanged
+verifier. Its retained ODS proves wrong targeting; the cause of the lost/changed
+rapid arrow navigation is not established. The scripted workflow now selects B4
+explicitly through Calc's documented Name Box shortcut (`Ctrl+Shift+F5`) and
+records a screenshot before formula entry. Two 200 ms focus-transition fixture
+delays are explicit. Reference: [Calc keyboard shortcuts](https://books.libreoffice.org/en/CG262/CG26218-KeyboardShortcuts.html).
+
 PR #25 passed Ubuntu, Fedora and Arch on its final source commit (run
 `37205271460`) and was merged. Its earlier Arch Xwayland activation timeout
 did not recur; no cause is established. Timeout diagnostics remain in the test.

@@ -37,6 +37,12 @@ def main():
         observer.add_argument("session")
         observer.add_argument("--wayvnc")
         observer.add_argument("--viewer")
+        if name == "take":
+            observer.add_argument(
+                "--paste",
+                action="store_true",
+                help="send your clipboard in (cleared from the session on release)",
+            )
     waiter = sub.add_parser("wait", help="wait for a window and/or a settled screen")
     waiter.add_argument("session")
     waiter.add_argument("--title")

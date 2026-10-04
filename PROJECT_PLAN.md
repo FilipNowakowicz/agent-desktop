@@ -12,7 +12,7 @@ update this status and the development log with completed work and remaining gap
 | --- | --- | --- |
 | M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
 | M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
-| M2 | MCP, read-only observer, Claude Code integration (5/5 end-to-end GUI task), human takeover for logins (request/take/release), persistent named login profiles | Takeover clipboard and non-US layouts; real-site login validation |
+| M2 | MCP, read-only observer, Claude Code integration (5/5 end-to-end GUI task), human takeover for logins (request/take/release), persistent named login profiles | Non-US host layouts in takeover; real-site login validation |
 | M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm, GTK/Qt dialogs, Mousepad file/clipboard tasks and Writer/Calc saved-file workflows pass (#25–#26) | Broader office tasks, desktop installs on other distributions, widget readiness, broader validation of the wlroots 0.20.2 mapping repair and rapid Calc arrow navigation |
 | M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); two sets of three native/container browser tasks: 6/6 each, 46/49 calls, nearly equal usage (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models |
 

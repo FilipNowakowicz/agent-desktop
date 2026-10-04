@@ -576,3 +576,25 @@ class Toplevels:
                 return False
             time.sleep(0.05)
         return True
+
+
+def clear_selection(display_path):
+    """Clear the session's clipboard and primary selection through data-control."""
+    with Connection(display_path) as connection:
+        for interface in (
+            "ext_data_control_manager_v1",
+            "zwlr_data_control_manager_v1",
+        ):
+            if interface in connection.globals:
+                break
+        else:
+            raise WaylandError("Compositor provides no data-control protocol")
+        version = connection.globals[interface][0][1]
+        seat = connection.bind("wl_seat", 1)
+        manager = connection.bind(interface, 2)
+        device = connection.new_id()
+        connection.send(manager, 1, struct.pack("=II", device, seat))
+        connection.send(device, 0, struct.pack("=I", 0))  # set_selection(null)
+        if version >= 2 or interface.startswith("ext_"):
+            connection.send(device, 2, struct.pack("=I", 0))  # set_primary_selection
+        connection.roundtrip()

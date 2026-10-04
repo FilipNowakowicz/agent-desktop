@@ -1,5 +1,37 @@
 # Development log
 
+## 2026-10-04 — Local container baseline preparation
+
+Added a GUI-only, fixed-local-target stdio adapter and a fresh-container harness
+for three existing browser fixtures. Routing tests reject target overrides and
+shell/file/launch/accessibility/session tools, preserving upstream results.
+Both code-and-drag dry runs fail verification with no errors or leftovers:
+native `20261004-151706-01ca`, container `20261004-151705-1f13` (39.4 s startup).
+Both use seed 41027 and identical generated pages; model runs are pending.
+
+Project-local Podman 5.8.7 rootless VFS storage and its Unix API socket work with
+existing user namespaces; no host permissions/configuration changed. Fetched
+Podman and slirp4netns runtime tools using Nix without profile installation.
+Downloaded Cua CLI 0.3.1 from its public release, checked SHA-256
+`c5b3de47a8fca33e6f943c682dd3f243d7696a795d7f267119f2625617e46be3`
+against the release manifest; the installer was reviewed, not executed.
+All state is under ignored `artifacts/container-probe`; DO_NOT_TRACK=1.
+
+Cua create initially failed because Podman had no default signature policy.
+A project XDG_CONFIG_HOME policy did not change that lookup, and the global
+--signature-policy flag is unsupported. Explicit `podman pull --signature-policy
+<project-policy> <pinned-digest>` succeeded; Cua then used the cached image.
+The policy rejects all images except the exact ghcr.io/trycua/linux repository;
+TLS verification remains enabled. No user/system policy was written.
+
+Actual adapter round trip on local:baseline-probe: image blocks received,
+Unicode `café λ 123` typed and submitted; final screenshot and X11 title show
+Task - complete. An attempted host target override returns an error. Host
+active-window address and cursor snapshots match before/after; transient host
+changes are not covered. The smoke container was deleted. The environments and
+restricted tool access differ and are documented in docs/BENCHMARK.md; no
+performance or superiority conclusion is established.
+
 ## 2026-10-04 — Xwayland fixture diagnostics and repetition
 
 PR #27 CI run `37206984363`: Ubuntu and Arch passed; Fedora's existing
@@ -11,7 +43,9 @@ Select installed DejaVu Sans Mono explicitly in the test and Xterm benchmark
 fixture, and retain full session status alongside window state and screenshot
 on failure. CI now repeats Xwayland mapping/input ten times on all three
 distributions. Local repeat: 10/10 passed in 10.465 s with xterm 411 and
-Xwayland 24.1.13. Ruff lint/format passed. Final CI is pending.
+Xwayland 24.1.13. Ruff lint/format passed. Final CI run `37207779152` passed on Ubuntu,
+Fedora and Arch, including all ten Xwayland repetitions per distribution.
+PR #27 was squash-merged at `1ad27ae`; the failure cause remains unproven.
 
 ## 2026-10-04 — M4 office benchmark preparation
 

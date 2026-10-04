@@ -166,3 +166,41 @@ disabled desktop create/destroy/launch tools and used a $1 cap per task.
 The agent handled the first-run UI and saved files that passed independent checks.
 This is one run of two small tasks, not a broad office-application reliability
 claim or a comparison with another runtime.
+
+## Local container baseline
+
+`scripts/cua_benchmark.py` reuses the canvas-code/drag, form and confirmation
+fixtures in fresh local Cua containers. Install Cua and provide an already
+configured Docker-compatible local Unix socket. The harness does not install a
+runtime, alter host configuration, open a viewer or use a cloud account. It
+pins the Linux image digest in source; a rootless Podman pilot used CLI 0.3.1.
+See [Cua local runtimes](https://cua.ai/docs/cua-sdk/guides/local-runtimes).
+
+```sh
+# DOCKER_HOST must identify the intended local engine's Unix socket.
+# --engine must connect to that same engine/storage; it copies fixtures and verifies titles.
+uv run scripts/cua_benchmark.py --cua /path/to/cua --engine podman \
+  --state-dir artifacts/cua-state --only chromium-canvas-code-drag --seed 41027 --dry-run
+uv run scripts/benchmark.py --only chromium-canvas-code-drag --seed 41027 --dry-run
+```
+
+Replace `--dry-run` with an explicit `--model` and `--budget` for account-using
+runs. The native and container pilot negative controls both failed their check
+with no setup/cleanup errors: `20261004-151706-01ca` and `20261004-151705-1f13`.
+Their generated page hashes match. Native summary records the randomized seed.
+
+The container's model interface passes through `scripts/cua_gui_mcp.py`, which
+allows only 18 GUI tools and forces an explicit `local:<name>` target. Shell,
+file operations, launch, accessibility and session management are absent;
+caller-supplied target overrides are rejected. Tool content/errors pass through.
+This is a restricted Cua interface, not its full capability set. The harness
+checks task-set titles directly through the guest's X11 properties, independently
+of model replies and MCP window metadata, then verifies container deletion.
+
+The environments differ: native labwc/Wayland with Chromium 153.0.8010.52;
+Cua's Ubuntu 24.04.5/XFCE/Xvfb container has Chromium 154.0.8037.92. Its screenshot
+is capped at a 1200 px long edge; the native image is 1280x720. The container is
+limited to 2 CPUs/2 GB and runs its browser as guest root with `--no-sandbox`
+inside rootless host Podman. The native runtime has no matching resource cap.
+A small pilot can compare observed outcomes and tool usage; these differences
+and model variability prevent attributing timing or cost to tool design alone.

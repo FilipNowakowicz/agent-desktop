@@ -60,6 +60,23 @@ or `--gone` for its disappearance), then until the screen has not changed for
 `--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
 returns `satisfied: false` at the timeout instead of failing.
 
+### Semantic UI (accessibility)
+
+When `at-spi2-core` is installed, each session runs its own AT-SPI registry on its
+private bus and enables accessibility for its applications only (overriding host
+settings such as `NO_AT_BRIDGE` or `GTK_A11Y=none` inside the session). The
+registry is found in the usual libexec locations or through
+`AGENT_DESKTOP_AT_SPI_REGISTRYD`; `status` reports `accessibility`.
+
+`agent-desktop ui SESSION [--app NAME] [--window TITLE]` (MCP: `desktop_ui`) lists
+visible elements as a flat list with depth: role, name, states, text, value and
+actions; unnamed layout containers are omitted. `ui-action SESSION NODE press|focus|
+set_text --text ...` (MCP: `desktop_ui_action`, also usable as a `ui_action` step in
+action sequences) acts without coordinates, which Wayland does not provide to
+AT-SPI. Coverage depends on the toolkit: GTK 3/4 and Qt expose rich trees; Chromium
+needs `--force-renderer-accessibility`; X11-only and custom-drawn applications may
+expose little. Like other input, actions are refused while a person has control.
+
 ### Partial and scaled screenshots
 
 `screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,

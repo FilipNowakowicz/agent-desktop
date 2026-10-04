@@ -1,5 +1,40 @@
 # Development log
 
+## 2026-10-04 — Semantic UI through a private AT-SPI registry
+
+Plan extension A ("semantic UI"). Spike first (scratch script, jeepney): the
+session's private D-Bus activated `at-spi-bus-launcher`, giving an a11y bus inside
+the session runtime directory, but (1) applications registered nothing because the
+host sets `NO_AT_BRIDGE=1` and `GTK_A11Y=none`, inherited by sessions; and (2)
+activating `org.a11y.atspi.Registry` failed (`unit failed`) without a systemd user
+session. With the variables removed and `at-spi2-registryd` started by the
+session, zenity (GTK 4) and Mousepad (GTK 3) trees were readable. Extents are
+window-relative on Wayland, so actions use AT-SPI rather than coordinates.
+
+Implementation: `atspi.py` (pure-Python `jeepney`, new dependency) reads the tree
+(roles, names, selected states, text up to 500 characters, values, actions;
+hidden subtrees and unnamed containers skipped; max 2000 nodes) and performs
+press (case-insensitive click/press/activate/toggle/jump), focus (GrabFocus) and
+set_text (EditableText). The worker finds `at-spi2-registryd` (libexec paths or
+`AGENT_DESKTOP_AT_SPI_REGISTRYD`), removes the two variables and sets
+`QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` in the session only, adds the matching
+`share` directory to `XDG_DATA_DIRS` so the private bus can activate the bus
+launcher (needed for Nix), and owns the registry process. GTK 4 differences found
+while testing: object paths outside `/org/a11y/atspi/accessible`, capitalised
+action names, empty "generic" containers and many `clipboard.*` widget actions
+(hidden from listings, still callable).
+
+### Validation
+
+Nix at-spi2-core 2.60.6 via `AGENT_DESKTOP_AT_SPI_REGISTRYD`, zenity 4.2.2:
+`tests/test_ui.py` 3/3 runs — fill a zenity entry with `set_text` (Unicode),
+observe the text in the tree, press OK, and zenity prints the value and exits 0;
+label without press action and malformed ids are refused; filters and the node
+limit; a session without a registry reports the missing runtime. Full suite with
+accessibility on: 53 tests OK, 7 skipped. CI installs `at-spi2-core`.
+
+Not verified: Qt and Chromium trees, LibreOffice, large trees' latency.
+
 ## 2026-10-04 — Partial and scaled screenshots
 
 First step of plan extension A ("adaptive observation": crops and full images on

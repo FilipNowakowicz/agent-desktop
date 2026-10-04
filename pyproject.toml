@@ -4,6 +4,7 @@ version = "0.0.1"
 description = "Experiments for a private Linux desktop for existing agents"
 requires-python = ">=3.12"
 dependencies = [
+    "jeepney>=0.9.0",
     "mcp>=1,<2",
 ]
 

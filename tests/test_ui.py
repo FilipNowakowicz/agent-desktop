@@ -1,0 +1,128 @@
+"""Semantic UI: read and operate a GTK dialog through the session's AT-SPI bus."""
+
+import os
+import shutil
+import tempfile
+import unittest
+from pathlib import Path
+
+from test_runtime import wait_for
+
+from agent_desktop import core
+from agent_desktop.worker import find_registryd, owned_processes
+
+
+class UISessionTest(unittest.TestCase):
+    environment = {}
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="desktop-ui-")
+        root = Path(self.temporary.name)
+        keys = ("AGENT_DESKTOP_STATE_DIR", "XDG_RUNTIME_DIR", *self.environment)
+        self.previous = {k: os.environ.get(k) for k in keys}
+        (root / "runtime").mkdir(mode=0o700)
+        os.environ["AGENT_DESKTOP_STATE_DIR"] = str(root / "state")
+        os.environ["XDG_RUNTIME_DIR"] = str(root / "runtime")
+        os.environ.update(self.environment)
+        self.session = core.create()["session"]
+        self.token = core.manifest(self.session)["token"]
+
+    def tearDown(self):
+        core.destroy(self.session)
+        wait_for(lambda: not owned_processes(self.token))
+        for key, value in self.previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        self.temporary.cleanup()
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "zenity"))
+    and find_registryd(),
+    "desktop tools, zenity or at-spi2-core unavailable",
+)
+class UITests(UISessionTest):
+    def find(self, predicate):
+        def search():
+            nodes = core.request(self.session, "ui", app="zenity")["nodes"]
+            return next((n for n in nodes if predicate(n)), None)
+
+        return wait_for(search, timeout=20)
+
+    def test_fill_and_confirm_dialog_without_coordinates(self):
+        self.assertTrue(core.request(self.session, "status")["accessibility"])
+        app = core.request(
+            self.session,
+            "launch",
+            argv=["zenity", "--entry", "--title=UI test", "--text=Your name"],
+        )
+        field = self.find(lambda n: "editable" in n["states"])
+        self.assertIn("set_text", field["actions"])
+        observation = core.request(self.session, "screenshot")["observation"]
+        core.request(
+            self.session,
+            "ui_action",
+            node=field["id"],
+            action="set_text",
+            text="Ada Lovelace ✓",
+            observation=observation,
+        )
+        self.find(lambda n: n.get("text") == "Ada Lovelace ✓")
+        label = self.find(lambda n: n["role"] == "label" and not n.get("actions"))
+        with self.assertRaisesRegex(core.DesktopError, "AccessibilityError|no press"):
+            core.request(self.session, "ui_action", node=label["id"], action="press")
+        for bad in ("", "../x", ":1.2/elsewhere", None):
+            with self.subTest(node=bad), self.assertRaises(core.DesktopError):
+                core.request(self.session, "ui_action", node=bad, action="press")
+        button = self.find(lambda n: n["role"] == "button" and n["name"] == "OK")
+        core.request(self.session, "ui_action", node=button["id"], action="press")
+
+        def exited():
+            for entry in core.request(self.session, "status")["applications"]:
+                if entry["pid"] == app["pid"] and entry["exit_code"] is not None:
+                    return entry
+            return None
+
+        self.assertEqual(wait_for(exited)["exit_code"], 0)
+        # The log also holds stderr (GTK warnings); zenity prints the entry last.
+        lines = Path(app["logs"]).read_text().strip().splitlines()
+        self.assertEqual(lines[-1], "Ada Lovelace ✓")
+
+    def test_tree_filters_and_limits(self):
+        core.request(
+            self.session,
+            "launch",
+            argv=["zenity", "--info", "--title=Filter test", "--text=Hello"],
+        )
+        self.find(lambda n: n["role"] == "button")
+        limited = core.request(self.session, "ui", max_nodes=2)
+        self.assertEqual(len(limited["nodes"]), 2)
+        self.assertTrue(limited["truncated"])
+        self.assertEqual(
+            core.request(self.session, "ui", app="no-such-app")["nodes"], []
+        )
+        self.assertEqual(
+            core.request(self.session, "ui", window="No such window")["nodes"][1:],
+            [],
+        )
+        with self.assertRaises(core.DesktopError):
+            core.request(self.session, "ui", max_nodes=0)
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),
+    "desktop tools unavailable",
+)
+class NoAccessibilityTests(UISessionTest):
+    environment = {"AGENT_DESKTOP_AT_SPI_REGISTRYD": "/nonexistent/registryd"}
+
+    def test_ui_reports_missing_runtime(self):
+        self.assertFalse(core.request(self.session, "status")["accessibility"])
+        with self.assertRaisesRegex(core.DesktopError, "at-spi2-core"):
+            core.request(self.session, "ui")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -51,6 +51,17 @@ def main():
     waiter.add_argument("--gone", action="store_true")
     waiter.add_argument("--stable-ms", type=int, default=0)
     waiter.add_argument("--timeout", type=float, default=10)
+    tree = sub.add_parser("ui", help="list visible UI elements (accessibility)")
+    tree.add_argument("session")
+    tree.add_argument("--app")
+    tree.add_argument("--window")
+    tree.add_argument("--max-nodes", type=int, default=300)
+    act = sub.add_parser("ui-action", help="press, focus or set_text on a UI node")
+    act.add_argument("session")
+    act.add_argument("node")
+    act.add_argument("action")
+    act.add_argument("--text")
+    act.add_argument("--observation")
     steps = sub.add_parser(
         "actions", help="run a JSON list of steps, stopping on surprises"
     )
@@ -134,6 +145,9 @@ def main():
             result = destroy(args["session"])
         elif command == "view":
             result = view(**args)
+        elif command in ("ui", "ui-action"):
+            session = args.pop("session")
+            result = request(session, command.replace("-", "_"), **args)
         elif command == "actions":
             result = run_actions(**args)
         elif command == "wait":

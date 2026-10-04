@@ -1,5 +1,28 @@
 # Development log
 
+## 2026-10-04 — M3 Fedora and Arch Linux CI
+
+**Outcome:** the full headless suite (20 tests, visible mode skipped) and stress
+cycles pass in Fedora 44 and Arch Linux containers, using each distribution's own
+labwc, foot, grim, wayvnc, wlr-randr, dbus-daemon, Xwayland, xterm and zenity
+packages (run `37164358545`). labwc versions now covered: 0.7.1 (Ubuntu), 0.9.6
+(Fedora) and 0.20.2 (Arch, NixOS). Exact package versions are in
+`docs/COMPATIBILITY.md`. These are container runs on a CI host, not desktop
+installs; packaging and onboarding on those desktops remain untested.
+
+Findings:
+
+- In GitHub's job containers, PID 1 does not reap orphans. After a double
+  supervisor kill, the recovered compositor remained a zombie, and the test's
+  `/proc` existence check timed out. Tests now treat zombies as stopped.
+  Recovery itself worked.
+- Containers have no `XDG_RUNTIME_DIR`. The runtime correctly refuses to start
+  without one, so CI creates a 0700 directory.
+- Ubuntu failed `test_focus_and_stale_observations` once in 7 runs: the
+  focused window got an empty line instead of `fresh`. Not reproduced since (3 reruns
+  passed). Tracked as issue #17. CI now uploads each test's screenshots, logs and
+  fixture output when the test step fails.
+
 ## 2026-10-04 — M3 Xwayland, GTK and Qt coverage
 
 **Outcome:** X11 applications work inside sessions, and GTK and Qt dialogs work
@@ -46,6 +69,9 @@ nixpkgs#xterm nixpkgs#zenity nixpkgs#kdePackages.kdialog nixpkgs#wayvnc nixpkgs#
   set to Wayland and X11: type `<case> café λ`, press Return, and check the exact stdout
   line after the dialog exits. 5/5 idle, 5/5 loaded.
 - CI now installs xwayland, xterm and zenity; kdialog is local only.
+
+PR #15 passed Ubuntu CI (run `37163950418`; Xwayland and GTK tests ran there) and
+was merged.
 
 ### Remaining
 

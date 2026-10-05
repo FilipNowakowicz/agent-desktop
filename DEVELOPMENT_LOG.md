@@ -24,6 +24,25 @@ The worker now passes the `share/dbus-1/session.conf` shipped beside the daemon
 when there is one (identical to the default on conventional distributions).
 
 Local (Nix runtime + xterm/mousepad/zenity/xprop): `doctor --smoke` all ok, smoke
+0.67 s; full suite 85 tests OK, 6 skipped. Fresh Ubuntu 24.04 check: a QEMU/KVM VM from the
+official noble cloud image (SHA-256 verified), with an ssh login session, a
+checkout, and only the documented steps. uv 0.12.23; `install-ubuntu.sh` took
+2m02s and installed 186 packages (labwc 0.7.1, libwlroots12t64 0.17.1, grim 1.4.0,
+xwayland 23.2.6, wayvnc 0.7.2). `doctor --smoke` passed its smoke check (0.56 s capture). A CLI
+session typed `hello café λ 123` into foot, read back exactly from a file
+and the screenshot, then was destroyed with no leftover processes. Suite: 86 tests OK,
+19 skipped with documented packages only; 8 skipped after adding
+xterm/zenity/mousepad/x11-utils/wlr-randr (the remaining skips: Chromium, LibreOffice, kdialog,
+visible). X11 tests passed on stock wlroots 0.17. A cloud image with an ssh
+session, not a graphical Ubuntu desktop; view/take were not tested.
+
+The VM run found that `doctor` warned "could not determine the wlroots
+version": Ubuntu's labwc omits it, and the library is `libwlroots.so.12`. Pre-0.18
+sonames now map to versions (10/11/12 → 0.15/0.16/0.17); the old unit test
+had encoded exactly this case as unknown. INSTALL.md now covers uv, the clone,
+`--managed-python`, the expected doctor result, retained stopped sessions and test-only
+packages. The apt step runs noninteractively. README still needs a link to
+INSTALL.md (left for the documentation rewrite, #54).
 0.67 s; full suite 85 tests OK, 6 skipped. Not yet done: a fresh, non-CI Ubuntu
 desktop installation.
 ## 2026-10-05 — Decisions on the review questions

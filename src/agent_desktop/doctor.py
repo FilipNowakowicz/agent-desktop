@@ -40,6 +40,9 @@ def tool(name, required, hint):
     }
 
 
+SONAME_WLROOTS = {"10": "0.15", "11": "0.16", "12": "0.17"}
+
+
 def wlroots(labwc):
     """Which wlroots this labwc loads, and whether it is the project's repair."""
     _, output = run([labwc, "--version"])
@@ -52,6 +55,10 @@ def wlroots(labwc):
         # Older labwc releases omit wlroots from --version; use the library name.
         named = re.search(r"libwlroots-([0-9]+\.[0-9]+)", library.name)
         version = named.group(1) if named else None
+        # Before 0.18 the library was libwlroots.so.<soname> (Ubuntu 24.04: 12).
+        numbered = re.search(r"libwlroots\.so\.([0-9]+)", library.name)
+        if version is None and numbered:
+            version = SONAME_WLROOTS.get(numbered.group(1))
     repaired = bool(library and (library.parent / REPAIR_MARKER).exists())
     result = {"check": "wlroots", "version": version, "library": str(library)}
     if repaired:

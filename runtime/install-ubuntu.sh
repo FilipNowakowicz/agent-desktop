@@ -17,5 +17,5 @@ optional="wayvnc tigervnc-viewer wl-clipboard at-spi2-core foot"
 
 sudo apt-get update
 # shellcheck disable=SC2086
-sudo apt-get install -y --no-install-recommends $required $optional
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $required $optional
 dpkg-query -W $required $optional

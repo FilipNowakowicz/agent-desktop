@@ -55,11 +55,21 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result["status"], "warn")
         self.assertIn("patch level is unknown", result["detail"])
 
-    def test_unknown_version_is_explained(self):
+    def test_version_from_numbered_library_before_0_18(self):
         def fake_run(argv, timeout=5):
             if argv[1:] == ["--version"]:
                 return 0, "labwc 0.7.1"
             return 0, "\tlibwlroots.so.12 => /nonexistent/libwlroots.so.12 (0x0)"
+
+        with mock.patch.object(doctor, "run", fake_run):
+            result = doctor.wlroots("labwc")
+        self.assertEqual((result["version"], result["status"]), ("0.17", "ok"))
+
+    def test_unknown_version_is_explained(self):
+        def fake_run(argv, timeout=5):
+            if argv[1:] == ["--version"]:
+                return 0, "labwc 0.1.0"
+            return 0, "\tlibwlroots.so.99 => /nonexistent/libwlroots.so.99 (0x0)"
 
         with mock.patch.object(doctor, "run", fake_run):
             result = doctor.wlroots("labwc")

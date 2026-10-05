@@ -35,7 +35,9 @@ Only when the user asks you to act on their own screen (open an app there,
 navigate, click), call desktop_request_host with the reason. They confirm it;
 then use the returned session with the same tools. Their windows are real: act
 carefully, prefer reading before clicking, and never close their windows. If
-input is refused because they are using the computer, wait a few seconds. Call
+input is refused because they are using the computer, wait a few seconds. Their
+screen rarely stops changing, so wait for a window title or element rather than
+stable_ms. Call
 desktop_destroy on that session as soon as you are done; it never closes their
 applications. Use private sessions for everything else."""
 
@@ -322,7 +324,8 @@ def desktop_drag(
 def desktop_scroll(
     session: str, dy: int, dx: int = 0, observation: str | None = None
 ) -> dict:
-    """Scroll the private desktop at its current pointer location."""
+    """Scroll at the current pointer location by mouse-wheel notches: dy > 0
+    scrolls down, dx > 0 right (a notch is usually about three lines)."""
     return call(session, "scroll", dy=dy, dx=dx, observation=observation)
 
 

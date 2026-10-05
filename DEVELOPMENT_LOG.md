@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-05 — Host trial through MCP; wheel-notch scrolling
+
+After `/mcp` reconnect, `desktop_request_host` was approved by notification
+click and returned the session directly. Firefox opened the repository in a new
+window (window wait 0.7 s), and the start notification was visible in the screenshot.
+Two findings. (1) `stable_ms` waits never settled on the live desktop (a
+terminal spinner was animating), both standalone and as a sequence step. The docs and server
+instructions now say to wait for windows or elements on host sessions. (2) `scroll
+dy=10` had no visible effect: scroll used the finger source, whose values are
+pixels (copied from wlrctl in M0), so 10 meant 10 px. Page_Down worked. Scroll
+amounts are now wheel notches (wheel source, axis_discrete 15 units per notch,
+±100), documented in the MCP tool and CLI help. The runtime scroll test sends 3
+notches and still sees a wheel event in the terminal fixture. Not yet re-checked
+on Hyprland.
+
 ## 2026-10-05 — Real-screen trial; non-blocking host requests
 
 With the keysym fallback, the maintainer approved a host request (through the

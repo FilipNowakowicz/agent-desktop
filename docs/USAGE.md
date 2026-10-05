@@ -162,6 +162,8 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
   Ending the session never closes your windows.
 - **Not available:** takeover, viewers, `request_human` and semantic UI (the
   accessibility bus belongs to your desktop). Use a private session for those.
+- **Waiting:** a live desktop rarely stops changing (clocks, terminals, video),
+  so `stable_ms` waits usually time out. Wait for a window title or element.
 - **Screenshots** show your whole screen, including notifications and other
   windows, and the agent's model provider receives them.
 - **Requirements:** a wlroots-style Wayland desktop with virtual keyboard and

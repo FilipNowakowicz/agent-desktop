@@ -181,8 +181,8 @@ def main():
             )
             operation.add_argument("--repeat", type=int, default=1)
         elif command == "scroll":
-            operation.add_argument("dy", type=int)
-            operation.add_argument("--dx", type=int, default=0)
+            operation.add_argument("dy", type=int, help="wheel notches, > 0 down")
+            operation.add_argument("--dx", type=int, default=0, help="> 0 right")
         elif command == "focus":
             operation.add_argument("window")
         elif command == "release":

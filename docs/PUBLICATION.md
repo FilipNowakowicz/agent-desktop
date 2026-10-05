@@ -1,14 +1,16 @@
 # Publication preparation
 
 This is a preparation checklist, not authorization to publish. The repository
-remains private and documentation changes are reviewed through an unmerged PR.
+remains private until the maintainer authorizes publication.
 
 ## Presentation
 
-Reader-facing title: **Agent Desktop**. Keep the repository and Python package
-name `private-agent-desktop` during ongoing development so clone URLs, integrations
-and package identity stay consistent. A future rename needs coordinated URL and
-installation updates.
+Name: **Agent Desktop**; repository and Python package `agent-desktop` (renamed
+from `private-agent-desktop` on 2026-10-05); commands `agent-desktop` and
+`agent-desktop-mcp`. An unrelated project with the same title exists
+([lahfir/agent-desktop](https://github.com/lahfir/agent-desktop), a Rust
+accessibility-tree tool); the maintainer chose to keep the name. Say "Linux" and
+"separate session" early in descriptions so the two are easy to tell apart.
 
 Repository description:
 
@@ -24,17 +26,25 @@ credential security boundary. The README and user guide must retain that limit.
 
 - [x] MIT License approved by the maintainer; added [LICENSE](../LICENSE) and
       package license metadata.
-- [ ] Select supported runtime versions and document reproducible installation
-      on NixOS and at least one chosen non-Nix desktop.
+- [x] Supported installations: Nix runtime and Ubuntu 24.04
+      ([runtime/INSTALL.md](../runtime/INSTALL.md)), both in CI.
 - [ ] Complete representative daily-use and longer lifecycle trials; record
       failures as well as passes.
-- [ ] Decide the supported threat model for profiles and human takeover.
-- [ ] Review historical prompts, logs, trials, benchmark artifacts and Git history
-      for personal information, local paths and account-specific material before
-      publication. Historical evidence has been retained during this cleanup;
-      this pass is not a full disclosure audit.
-- [ ] Decide whether the current repository name should change and update clone
-      instructions and integration references together if it does.
+- [x] Threat model decided ([decisions](reviews/2026-10-05-project-review/decisions.md)):
+      cooperative same-user operation; takeover is not a confidentiality boundary.
+- [x] Disclosure scan (2026-10-05) of tracked files and all Git history: no
+      tokens, keys or passwords. The only personal data is local paths
+      (`/home/user/...`) and the author email, which the maintainer accepts. One
+      reference to the maintainer's private configuration repository
+      (`nixos-config#417`) remains in the development log. Repeat the scan just
+      before publishing.
+- [x] Repository name: `agent-desktop` (clone instructions and integration
+      references updated).
+- [x] Commit author email stays as is (maintainer decision, 2026-10-05).
+- [ ] At publication, move the internal planning records (`DEVELOPMENT_LOG.md`,
+      `PROJECT_PLAN.md`, `RESEARCH_FINDINGS.md`, `START_HERE.md`) under
+      `docs/project/`, updating links in AGENTS.md, CONTRIBUTING.md, the PR
+      template and current docs. Dated reviews keep their original references.
 - [ ] Obtain explicit maintainer authorization for the visibility change.
 
 Original prompt files were retired; their useful ideas are consolidated in the

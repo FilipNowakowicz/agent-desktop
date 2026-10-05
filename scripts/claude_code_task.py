@@ -1,6 +1,6 @@
 """Have Claude Code complete a GUI task through the project MCP server, then verify it.
 
-The agent gets no built-in tools: only the private-desktop MCP tools. The harness
+The agent gets no built-in tools: only the agent-desktop MCP tools. The harness
 checks the outcome itself and destroys the session afterwards.
 """
 
@@ -228,7 +228,7 @@ def main():
         "--tools",
         "",
         "--allowedTools",
-        "mcp__private-desktop",
+        "mcp__agent-desktop",
         "--output-format",
         "stream-json",
         "--verbose",

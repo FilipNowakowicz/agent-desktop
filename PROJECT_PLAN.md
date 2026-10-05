@@ -7,7 +7,7 @@ implemented features are not a claim of universal compatibility.
 
 ## Development status
 
-Repository: `FilipNowakowicz/private-agent-desktop` (private). Development stages use
+Repository: `FilipNowakowicz/agent-desktop` (private). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must
 update this status and the development log with completed work and remaining gaps.
 

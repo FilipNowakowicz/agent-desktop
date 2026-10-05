@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-10-05 — Pilot through MCP; UI actions in sequences
+
+After `/mcp` reconnect the MCP tools work with the auto-selected runtime. Pilot
+session 4 (kernel.org stable version, Chromium, MCP) completed with no keyring
+dialog. Session 5 (LibreOffice user name in Tools > Options, MCP) completed,
+with the name verified in `registrymodifications.xcu`, but it found a
+sequence defect: `desktop_actions` strips each step's `action` key (the step
+type), so a `ui_action` step could not name `set_text`/`press`. The worker then
+failed with `AttributeError: 'NoneType' object has no attribute 'lower'`.
+A `ui_action` step now passes its UI action as `name`, the worker rejects a
+missing name with a clear message, and the MCP and USAGE docs show the form.
+test_ui's element-wait test now sets the field through a sequence step and
+checks the unnamed-step error.
+
 ## 2026-10-05 — Takeover follows the person's keyboard layout
 
 The user's first real takeover (US Dvorak on Hyprland) typed QWERTY: the line

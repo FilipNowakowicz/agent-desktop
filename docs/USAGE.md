@@ -94,6 +94,8 @@ desktop.
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)
 runs up to 50 steps such as `{"action": "click", "x": 10, "y": 20}`,
 `{"action": "type", "text": "hello"}` or `{"action": "wait", "title": "Saved"}`.
+A `ui_action` step names its UI action as `name`, because `action` names the step:
+`{"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}`.
 Each input step is sent only while windows, focus and output match the state right
 after the previous step (or the given screenshot token); otherwise the run stops
 and reports the step and reason. `wait` and `focus` steps expect a change and take

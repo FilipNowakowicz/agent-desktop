@@ -103,9 +103,13 @@ class UITests(UISessionTest):
             [{"action": "wait", "element": "OK", "role": "button", "timeout": 10}],
         )
         self.assertIsNone(result["stopped"], result)
-        core.request(
-            self.session, "ui_action", node=field["id"], action="set_text", text="4711"
+        unnamed = core.run_actions(
+            self.session, [{"action": "ui_action", "node": field["id"]}]
         )
+        self.assertIn("needs an action name", unnamed["stopped"]["reason"])
+        step = {"node": field["id"], "name": "set_text", "text": "4711"}
+        result = core.run_actions(self.session, [{"action": "ui_action", **step}])
+        self.assertIsNone(result["stopped"], result)
         found = core.wait(self.session, role=field["role"], text="4711", timeout=10)
         self.assertTrue(found["satisfied"], found)
         self.assertEqual(found["elements"][0]["id"], field["id"])

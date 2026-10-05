@@ -1119,6 +1119,11 @@ class Worker:
         if operation == "ui_action":
             if request.get("observation") is not None:
                 self.check_observation(request["observation"])
+            if not isinstance(request.get("action"), str) or not request["action"]:
+                raise ValueError(
+                    "ui_action needs an action name: press, focus, set_text or a "
+                    "listed action"
+                )
             accessibility = self.accessibility()
             node = request.get("node")
             if isinstance(node, str) and re.fullmatch(r"n[0-9]+", node):

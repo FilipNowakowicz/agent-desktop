@@ -161,7 +161,8 @@ def desktop_actions(
 
     Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
     drag, scroll, type, key, ui_action, focus or wait (e.g. {"action": "wait",
-    "seconds": 1}). Pass the observation token of the screenshot you planned
+    "seconds": 1}). A ui_action step names its UI action as "name", e.g.
+    {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}. Pass the observation token of the screenshot you planned
     from; coordinates in every step are then in that screenshot's image. Input is sent only while windows and focus are
     as they were after the previous step; otherwise the run stops and reports
     which step and why. Insert a wait step where you expect a window to open or

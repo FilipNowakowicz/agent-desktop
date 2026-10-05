@@ -634,6 +634,9 @@ def run_steps(session, actions, observation, controller):
     for index, step in enumerate(actions):
         arguments = {k: v for k, v in step.items() if k != "action"}
         action = step["action"]
+        if action == "ui_action" and "name" in arguments:
+            # "action" names the step, so a UI action's own name travels as "name".
+            arguments["action"] = arguments.pop("name")
         try:
             if action == "wait":
                 waited = wait(session, **arguments, controller=controller)

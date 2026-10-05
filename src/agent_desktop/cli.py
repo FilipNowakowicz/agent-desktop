@@ -124,6 +124,12 @@ def main():
             operation.add_argument("--dx", type=int, default=0)
         elif command == "focus":
             operation.add_argument("window")
+        elif command == "release":
+            operation.add_argument(
+                "--force",
+                action="store_true",
+                help="return control even if the clipboard could not be cleared",
+            )
         elif command == "screenshot":
             operation.add_argument(
                 "--region",

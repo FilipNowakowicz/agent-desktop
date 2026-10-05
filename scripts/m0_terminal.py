@@ -9,11 +9,20 @@ import tty
 from pathlib import Path
 
 root = Path(sys.argv[1])
+
+
+def publish(path, text):
+    """Write then rename, so readers never see a created but empty file."""
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
+
+
 print("PRIVATE AGENT DESKTOP\nType a message:", flush=True)
 (root / "ready").touch()
 message = input()
 print(f"Received: {message}", flush=True)
-(root / "typed.txt").write_text(message)
+publish(root / "typed.txt", message)
 fd = sys.stdin.fileno()
 original = termios.tcgetattr(fd)
 try:
@@ -28,7 +37,7 @@ try:
             event = dict(
                 zip(("button", "column", "row"), map(int, match.groups()), strict=True)
             )
-            (root / "mouse.json").write_text(json.dumps(event))
+            publish(root / "mouse.json", json.dumps(event))
             break
 finally:
     print("\033[?1000l\033[?1006l", end="", flush=True)

@@ -48,16 +48,24 @@ def profile_path(name):
     return state_root() / "profiles" / name
 
 
+def profile_lock(path):
+    """Lock file beside (not inside) a profile, so deletion cannot remove it.
+
+    It is never deleted: unlinking a lock others may hold would let two
+    processes believe they own the profile.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return path.parent / f".{path.name}.lock"
+
+
 def profile_in_use(path):
     import fcntl
 
     try:
-        with (path / "lock").open("a") as lock:
+        with profile_lock(path).open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         return True
-    except FileNotFoundError:
-        return False
     return False
 
 
@@ -86,9 +94,16 @@ def delete_profile(name):
     path = profile_path(name)
     if not (path / "home").is_dir() or path.is_symlink():
         raise DesktopError(f"Unknown profile: {name}")
-    if profile_in_use(path):
-        raise DesktopError(f"Profile {name} is in use by a session")
-    shutil.rmtree(path)
+    import fcntl
+
+    # Hold the lock for the whole deletion: a session starting meanwhile waits
+    # for nothing and fails instead of using a half-deleted profile.
+    with profile_lock(path).open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise DesktopError(f"Profile {name} is in use by a session") from None
+        shutil.rmtree(path)
     return {"profile": name, "deleted": True}
 
 
@@ -181,6 +196,7 @@ def create(mode="headless", tools=None, profile=None, guard_host=False):
         "profile": profile,
         "guard_host": bool(guard_host),
         "home": str(home) if home else None,
+        "profile_lock": str(profile_lock(home.parent)) if home else None,
         "token": uuid.uuid4().hex,
         "status": "starting",
         "created_at": time.time(),

@@ -120,9 +120,11 @@ with `desktop_control(session, wait_seconds=...)`; only you can release control.
 The session's clipboard is never copied to your host. `take --paste` sends your
 host clipboard into the session (e.g. a password from your password manager);
 without it nothing is transferred. Whenever control returns, the session's
-clipboard and primary selection are cleared, so a pasted secret is not left for
-the agent. The session keymap is US, so characters missing from that layout may
-not reach the session when typed (pasting avoids this).
+clipboard and primary selection are cleared first, so a pasted secret is not left
+for the agent; if clearing fails, control stays with you and `release` reports
+the error (`release --force` hands back anyway). The session keymap is US, so
+characters missing from that layout may not reach the session when typed
+(pasting avoids this).
 
 ### Guarding the host
 

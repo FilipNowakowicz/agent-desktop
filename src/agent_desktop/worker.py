@@ -192,6 +192,33 @@ MUTATING_OPERATIONS = (
     "request_human",
 )
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
+# Requests recorded in the session's action trace (trace.jsonl).
+TRACED_OPERATIONS = (*MUTATING_OPERATIONS, "screenshot", "lease", "take", "release")
+TRACE_FIELDS = (
+    *("x", "y", "to_x", "to_y", "dx", "dy", "button", "repeat", "modifiers"),
+    *("window", "node", "action", "observation", "region", "scale", "force"),
+)
+TRACE_BYTES = 1024 * 1024
+
+
+def trace_arguments(request):
+    """What the trace keeps of a request: never typed text or command arguments.
+
+    Text and set_text values become their length; single-character key names
+    (which could spell a secret) become "<character>"; launch keeps only the
+    program name and argument count.
+    """
+    kept = {key: request[key] for key in TRACE_FIELDS if key in request}
+    if isinstance(request.get("text"), str):
+        kept["text_chars"] = len(request["text"])
+    key = request.get("key")
+    if isinstance(key, str):
+        kept["key"] = key if len(key) > 1 else "<character>"
+    argv = request.get("argv")
+    if isinstance(argv, list) and argv:
+        kept["program"] = Path(str(argv[0])).name
+        kept["argc"] = len(argv)
+    return kept
 
 
 class StaleObservation(RuntimeError):
@@ -1205,6 +1232,7 @@ class Worker:
                     connection, _ = server.accept()
                 except TimeoutError:
                     continue
+                trace = None
                 with connection:
                     connection.settimeout(5)
                     try:
@@ -1212,13 +1240,17 @@ class Worker:
                             line = stream.readline(262145)
                         if len(line) > 262144:
                             raise ValueError("Request too large")
-                        result = self.handle(json.loads(line))
+                        request = json.loads(line)
+                        trace = self.trace_start(request)
+                        result = self.handle(request)
                         reply = {"ok": True, "result": result}
                     except Exception as error:
                         reply = {
                             "ok": False,
                             "error": f"{type(error).__name__}: {error}",
                         }
+                    self.trace_finish(trace, reply)
+                    trace = None
                     encoded = (json.dumps(reply) + "\n").encode()
                     if len(encoded) > 262144:
                         # A clear error instead of a reply the client cannot read.
@@ -1236,6 +1268,60 @@ class Worker:
                         connection.sendall(encoded)
                     except OSError:
                         pass
+
+    def focused_window(self):
+        try:
+            for window in self.toplevels.current():
+                if "activated" in window["states"]:
+                    return {"id": window["id"], "app_id": window["app_id"]}
+        except Exception:  # the trace must never break a request
+            return "unknown"
+        return None
+
+    def trace_start(self, request):
+        """Begin a trace record (AGENT_DESKTOP_TRACE=0 disables the trace)."""
+        operation = request.get("operation") if isinstance(request, dict) else None
+        if (
+            operation not in TRACED_OPERATIONS
+            or os.environ.get("AGENT_DESKTOP_TRACE") == "0"
+            or self.toplevels is None
+        ):
+            return None
+        return {
+            "at": round(time.time(), 3),
+            "started": time.monotonic(),
+            "operation": operation,
+            "controller": request.get("controller"),
+            "owner": self.control["owner"],
+            "arguments": trace_arguments(request),
+            "focus_before": self.focused_window(),
+        }
+
+    def trace_finish(self, trace, reply):
+        if trace is None:
+            return
+        started = trace.pop("started")
+        trace["ms"] = round((time.monotonic() - started) * 1000, 1)
+        trace["focus_after"] = self.focused_window()
+        if reply["ok"]:
+            result = reply["result"] if isinstance(reply["result"], dict) else {}
+            trace["outcome"] = {
+                key: result[key]
+                for key in ("delivered", "observation", "path", "pid")
+                if key in result
+            }
+        else:
+            trace["error"] = reply["error"][:300]
+        path = self.root / "trace.jsonl"
+        try:
+            with path.open("a") as stream:
+                stream.write(json.dumps(trace) + "\n")
+            if path.stat().st_size > TRACE_BYTES:
+                # Keep the newer half, starting at a whole record.
+                data = path.read_bytes()[-TRACE_BYTES // 2 :]
+                path.write_bytes(data[data.find(b"\n") + 1 :])
+        except OSError:
+            pass
 
     def trim_logs(self):
         for path in self.root.glob("*.log"):

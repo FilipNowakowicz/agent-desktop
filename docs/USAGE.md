@@ -253,4 +253,20 @@ For the reproduced stock wlroots 0.19.3/0.20.2 X11 mapping failure, see the
 optional [project-local runtime repair](../runtime/README.md). If a window does
 not appear, inspect `status`, `windows` and `logs` before sending input.
 
+### Action trace
+
+Each session records its recent actions in `trace.jsonl`: input, launch, focus,
+UI actions, screenshots, leases and takeover changes. Each record holds the
+controller, the arguments, the focused window before and after, the duration, and
+the outcome or error. Typed text and `set_text` values are recorded only as their
+length, single-character keys as `<character>`, and launches as the program name
+and argument count. Input a person sends during takeover is never recorded. The
+file is kept under 1 MB and survives `destroy` until `prune`.
+
+```sh
+uv run agent-desktop trace SESSION --limit 20
+```
+
+Set `AGENT_DESKTOP_TRACE=0` before creating a session to turn it off.
+
 See the [compatibility matrix](COMPATIBILITY.md) for the scope of validation.

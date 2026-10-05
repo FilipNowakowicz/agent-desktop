@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-05 — Action trace
+
+Review F035 (and the diagnostics F006 asks for). Every session writes
+`trace.jsonl`: one record per input, launch, focus, ui_action, screenshot, lease,
+take and release request, with time, controller, control owner, redacted
+arguments (coordinates, keysym names, observation tokens, window/node ids), the
+activated window before and after, duration, and the outcome (delivered,
+observation, pid) or error. Typed and set_text values are kept only as lengths,
+single-character keys as `<character>`, and launches as program name plus
+argument count. The file is capped at 1 MB (trimmed to the newer half at a
+record boundary) and stays readable after destroy or a crash
+(`agent-desktop trace`). `AGENT_DESKTOP_TRACE=0` disables it. Tests:
+tests/test_trace.py: redaction unit test; a real terminal fixture receives
+"private words" while the trace holds only `text_chars: 14` with matching
+focus and token; a failed focus records its error; bounding; disabling.
+
 ## 2026-10-05 — Controller lease, harness cleanup, PID start times
 
 Review F011 (decisions 7 and 8). Each session has at most one controller. A

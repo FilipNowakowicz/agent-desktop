@@ -13,6 +13,7 @@ from .core import (
     request,
     run_actions,
     sessions,
+    trace,
     usage,
     use_runtime,
     wait,
@@ -113,6 +114,11 @@ def main():
     leasing.add_argument(
         "--force", action="store_true", help="release another controller's lease"
     )
+    tracing = sub.add_parser(
+        "trace", help="recent actions: target, focus and outcome, no typed text"
+    )
+    tracing.add_argument("session")
+    tracing.add_argument("--limit", type=int, default=50)
     waiting = sub.add_parser("request-human", help="ask a person to take control")
     waiting.add_argument("session")
     waiting.add_argument("reason")
@@ -202,6 +208,8 @@ def main():
             result = delete_profile(args["profile"])
         elif command == "logs":
             result = logs(args["session"])
+        elif command == "trace":
+            result = trace(args["session"], args["limit"])
         elif command == "destroy":
             result = destroy(args["session"])
         elif command == "view":

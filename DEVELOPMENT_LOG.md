@@ -47,7 +47,7 @@ only harmless probes (`systemctl --version`, `pkill -0` on a missing name). Full
 suite: 61 OK, 5 skipped (Nix runtime incl. mousepad, zenity, kdialog, Chromium).
 ## 2026-10-05 — First real-use trial: the user's desktop shell
 
-Independent review saved (untracked) in `reviews/2026-10-05-project-review/`;
+Independent review saved in `docs/reviews/2026-10-05-project-review/`;
 it recommends daily-use hardening before more features. As the first real task
 the user chose their waybar, control panel and launcher. Harness:
 `scripts/shell_trial/` (fake Hyprland IPC, logging stand-ins, trial copies under

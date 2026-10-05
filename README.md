@@ -86,9 +86,12 @@ X11-only and custom-drawn applications may expose little. Like other input, acti
 
 `screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,
 scale=...)`) captures part of the desktop and/or shrinks it (0.1–1) to save image
-tokens. The result reports `region` and `scale`; desktop coordinates are the region
-origin plus image coordinates divided by the scale. The observation token always
-describes the whole desktop.
+tokens. The result reports `region` and `scale`. Coordinates follow the token you
+pass: with this screenshot's `observation`, input tools (and every step of an
+action sequence) take x/y in this image and convert them; without a token, x/y
+are desktop pixels. Do not convert manually and also pass the token, or the
+scaling is applied twice. The token's layout part always describes the whole
+desktop.
 
 ### Action sequences
 
@@ -112,8 +115,12 @@ uv run agent-desktop take SESSION
 ```
 
 This opens an interactive viewer on a separate Unix socket. While you hold control,
-the session refuses the agent's input, focus, launch, window listing and screenshots,
-so it cannot watch what you type. Closing the viewer (or `agent-desktop release
+the session refuses the agent's desktop tools (input, focus, launch, window
+listing, screenshots and UI listing). This is cooperative routing, not a
+confidentiality boundary: a read-only observer that is already open keeps
+streaming, logs stay readable, and any process running as your user, including an
+agent with shell access, can reach the session's sockets or call `release`. Treat
+takeover as protection from the agent's tools, not from a hostile process. Closing the viewer (or `agent-desktop release
 SESSION`) hands control back; the agent must then take a new screenshot before any
 input, and all earlier observation tokens are stale. The agent can wait for this
 with `desktop_control(session, wait_seconds=...)`; only you can release control.
@@ -187,12 +194,13 @@ observed window state. It waits up to two seconds for the compositor to report
 `activated`, failing if the window closes or activation is not observed. Focus
 can change again afterward; this does not prove the application received input.
 Each screenshot
-returns an `observation` token describing the output and windows (ids, app ids,
-states, parents; not titles). Pass it with `--observation` (CLI) or `observation`
-(MCP) to input requests: if a window appeared, closed or changed focus/state, or
-the output changed, the request fails with `StaleObservation` and sends nothing.
-Changes inside a window are not detected, and a change between the check and the
-input is still possible.
+returns an `observation` token: a window-topology and focus guard describing the
+output and windows (ids, app ids, states, parents; not titles, positions or
+pixels). Pass it with `--observation` (CLI) or `observation` (MCP) to input
+requests: if a window appeared, closed or changed focus/state, or the output
+changed, the request fails with `StaleObservation` and sends nothing. A moved or
+resized window, changes inside a window and a change between the check and the
+input are not detected; verify outcomes explicitly.
 
 Pointer input uses one persistent wlroots virtual pointer per session with absolute
 coordinates in screenshot pixels. Output mode changes are tracked; anything other

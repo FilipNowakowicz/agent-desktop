@@ -8,13 +8,20 @@ Repository: `FilipNowakowicz/private-agent-desktop` (private). Development stage
 pull requests; successful stages may be integrated after checks. Every stage must
 update this status and the development log with completed work and remaining gaps.
 
-| Stage | State | Remaining work |
+| Stage | State (after the 2026-10-05 review) | Release gate still open |
 | --- | --- | --- |
-| M0 | Complete on the initial NixOS machine | Broader environments belong to M3 |
-| M1 | Complete (#5 closed): process tree ownership, crash recovery, persistent input devices, drag, focus, stale-observation checks | In-window change detection, IME/dead keys |
-| M2 | MCP, read-only observer, Claude Code integration (5/5 end-to-end GUI task), human takeover for logins (request/take/release), persistent named login profiles | Non-US host layouts in takeover; real-site login validation |
-| M3 | CI on Ubuntu 24.04, Fedora 44 and Arch; Chromium, Xwayland/xterm, GTK/Qt dialogs, Mousepad file/clipboard tasks and Writer/Calc saved-file workflows pass (#25–#26) | Broader office tasks, desktop installs on other distributions, widget readiness, broader validation of the wlroots 0.20.2 mapping repair and rapid Calc arrow navigation |
-| M4 | Standard suite 20/20 twice, hard multi-app suite 10/10, office saved-file suite 2/2 (#27); two sets of three native/container browser tasks: 6/6 each, 46/49 calls, nearly equal usage (docs/BENCHMARK.md) | Broader and repeated baseline comparison with matched environments; other models |
+| M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
+| M1 | Implemented and repeatedly tested; hardening continues | Retention limits, unexplained input symptoms, lifecycle edge cases (PID reuse) |
+| M2 | MCP and viewer tested; cooperative takeover and profiles implemented | Real login/resume by the user, keyboard layout; takeover is not a confidentiality boundary |
+| M3 | Partial: application fixtures, three CI distributions, first real-use trial (desktop shell, docs/trials/) | Reproducible supported-runtime installs (NixOS and one non-Nix desktop), sustained real work |
+| M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
+| Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
+| Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
+
+Next work follows the review's plan (docs/reviews/2026-10-05-project-review/plan.md):
+correctness fixes (#42-#44), then packaging for NixOS and one non-Nix distribution
+with a preflight check, bounded retention, and a personal-use pilot on tasks the
+user chooses. Extensions are added only when the pilot shows a need.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

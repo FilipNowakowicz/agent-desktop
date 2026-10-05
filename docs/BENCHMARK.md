@@ -290,7 +290,8 @@ first attempt hit the Claude session limit and was discarded):
 | standard full | 20/20 | 129 | 1.41 | 1.19 M | `20261005-000847-8fe7` |
 | hard full | 10/10 | 81 | 0.89 | 0.78 M | `20261005-001522-1b6f` |
 
-Against the basic rounds, full tools now cost about 5% less on the standard
-suite (previously 5-9% more) and about 21% less on the hard suite, with 10-35%
-fewer tool calls. One round per configuration after the fixes; differences of a
-few percent are within the variation seen between rounds.
+Fewer tool calls with full tools held in every round. Cost was higher with full
+tools in the matched seeds 7/8; the single post-fix full-only round (seed 9) cost
+less than the older basic rounds, but there is no contemporaneous basic seed-9
+run, code and listings changed in between, and differences of a few percent are
+within the variation seen between rounds. A net cost advantage is unconfirmed.

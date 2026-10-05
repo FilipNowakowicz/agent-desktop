@@ -1,0 +1,575 @@
+# Project review command log
+# Checkout: /home/user/private-agent-desktop; review date: 2026-10-05
+# Read-only review. No agent benchmarks, claude invocations, host input or personal profiles used.
+# Shell exit codes refer to the full command as submitted; read batches/pipelines can contain several commands.
+# Web tool operations have no POSIX exit code and are labeled accordingly.
+# Multiline commands are preserved verbatim; RESULT is one line. Probes intentionally confirm current defects.
+# Artifact write note: apply_patch rejected a combined delete/add on findings.jsonl without changing it; the recorded Python command performed the corrections.
+
+C001
+COMMAND:
+pwd
+EXIT: 0
+RESULT: Confirmed requested checkout.
+
+C002
+COMMAND:
+mkdir -p reviews/2026-10-05-project-review
+rg -n 'private-agent-desktop|M0|headless' /home/user/.codex/memories/MEMORY.md
+cat AGENTS.md
+wc -l PROJECT_PLAN.md DEVELOPMENT_LOG.md START_HERE.md README.md docs/BENCHMARK.md docs/COMPATIBILITY.md runtime/README.md RESEARCH_FINDINGS.md prompt1.txt prompt2.txt
+EXIT: 0
+RESULT: Created output directory, consulted historical memory and project instructions, measured required documents.
+
+C003
+COMMAND:
+tail -n 510 DEVELOPMENT_LOG.md
+EXIT: 0
+RESULT: Read source documents for intent, status and evidence claims.
+
+C004
+COMMAND:
+cat docs/BENCHMARK.md docs/COMPATIBILITY.md runtime/README.md RESEARCH_FINDINGS.md
+EXIT: 0
+RESULT: Read source documents for intent, status and evidence claims.
+
+C005
+COMMAND:
+cat prompt1.txt prompt2.txt
+EXIT: 0
+RESULT: Read source documents for intent, status and evidence claims.
+
+C006
+COMMAND:
+cat PROJECT_PLAN.md START_HERE.md README.md
+EXIT: 0
+RESULT: Read source documents for intent, status and evidence claims.
+
+C007
+COMMAND:
+nl -ba PROJECT_PLAN.md | sed -n '1,200p'; nl -ba START_HERE.md
+EXIT: 0
+RESULT: Inspected current status, numbered evidence and repository inventory.
+
+C008
+COMMAND:
+nl -ba DEVELOPMENT_LOG.md | sed -n '1,270p'
+EXIT: 0
+RESULT: Inspected current status, numbered evidence and repository inventory.
+
+C009
+COMMAND:
+nl -ba docs/BENCHMARK.md; nl -ba docs/COMPATIBILITY.md; nl -ba runtime/README.md
+EXIT: 0
+RESULT: Inspected current status, numbered evidence and repository inventory.
+
+C010
+COMMAND:
+rg --files src tests scripts benchmarks runtime .github; git status --short; git log --oneline -55
+EXIT: 0
+RESULT: Inspected current status, numbered evidence and repository inventory.
+
+C011
+COMMAND:
+wc -l src/agent_desktop/* tests/* scripts/* benchmarks/*.py; nl -ba DEVELOPMENT_LOG.md | head -n 205; sed -n '197,327p' PROJECT_PLAN.md; rg -n 'portable|NixOS|machine|isolation|install|agent|snapshot|permissions' prompt2.txt | head -n 65; rg -n 'private|headless|goal|user|desktop|packag' prompt1.txt | head -n 60
+EXIT: 0
+RESULT: Read newest log entries, acceptance criteria, original intent and code sizes.
+
+C012
+COMMAND:
+nl -ba src/agent_desktop/worker.py | sed -n '1,400p'
+EXIT: 0
+RESULT: Read implementation or live GitHub history.
+
+C013
+COMMAND:
+nl -ba src/agent_desktop/core.py
+EXIT: 0
+RESULT: Read implementation or live GitHub history.
+
+C014
+COMMAND:
+gh pr list --state all --limit 100 --json number,title,state,mergedAt,headRefName,baseRefName,url; gh issue list --state all --limit 100 --json number,title,state,body,url; gh run list --limit 100 --json databaseId,headSha,conclusion,status,createdAt,displayTitle,workflowName
+EXIT: 0
+RESULT: Read implementation or live GitHub history.
+
+C015
+COMMAND:
+nl -ba src/agent_desktop/core.py | sed -n '1,290p'
+EXIT: 0
+RESULT: Reviewed creation, RPC deadlines, profiles and crash recovery.
+
+C016
+COMMAND:
+nl -ba src/agent_desktop/worker.py | sed -n '394,810p'
+EXIT: 0
+RESULT: Reviewed observations, takeover privacy, actions and launch.
+
+C017
+COMMAND:
+nl -ba src/agent_desktop/worker.py | sed -n '810,1156p'; nl -ba src/agent_desktop/core.py | sed -n '299,530p'
+EXIT: 0
+RESULT: Reviewed server serialization, teardown, token transforms, waits and action sequencing.
+
+C018
+COMMAND:
+cat pyproject.toml .github/workflows/checks.yml; nl -ba src/agent_desktop/atspi.py; nl -ba src/agent_desktop/cli.py; rg -n '^class |^    def test_|setUp|TemporaryDirectory|mkdtemp|skip|claude|artifacts' tests/*.py
+EXIT: 0
+RESULT: Inspected test selection, dependency metadata, CI matrix, CLI and accessibility implementation.
+
+C019
+COMMAND:
+nl -ba src/agent_desktop/wayland.py | sed -n '1,310p'; nl -ba tests/test_focus.py; cat tests/test_cua_gateway.py
+EXIT: 0
+RESULT: Reviewed adapter parity, viewer lifecycle, runtime patch and protocol safety.
+
+C020
+COMMAND:
+nl -ba src/agent_desktop/mcp_server.py; nl -ba src/agent_desktop/viewer.py; nl -ba scripts/build_xwayland_runtime.sh; cat runtime/patches/wlroots-map-at-associate.patch
+EXIT: 0
+RESULT: Reviewed adapter parity, viewer lifecycle, runtime patch and protocol safety.
+
+C021
+COMMAND:
+web.run open https://github.com/{trycua/cua,quazardous/wbox-mcp,atassis/kde-mcp,e2b-dev/desktop}
+EXIT: n/a (web tool)
+RESULT: Read primary competitor pages; documentation claims only; accessed 2026-10-05.
+
+C022
+COMMAND:
+nl -ba src/agent_desktop/wayland.py | sed -n '310,600p'; nl -ba tests/test_capture.py; nl -ba tests/test_actions.py
+EXIT: 0
+RESULT: Read benchmark controls, verification and protocol/input tests.
+
+C023
+COMMAND:
+nl -ba scripts/benchmark.py; nl -ba scripts/export_results.py; nl -ba docs/BENCHMARK.md | sed -n '1,170p'
+EXIT: 0
+RESULT: Read benchmark controls, verification and protocol/input tests.
+
+C024
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37230235686 --log-failed | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T20:00:02.4275759Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (arch) UNKNOWN STEP 2026-10-04T20:00:30.1176893Z ERROR: test_stdio_desktop_round_trip (test_mcp.MCPTests.test_stdio_desktop_round_trip) runtime (arch) UNKNOWN STEP 2026-10-04T20:00:30.1213912Z | json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0) runtime (arch) UNKNOWN STEP 2026-10-04T20:00:30.1215427Z Ran 44 tests in 88.293s runtime (arch) UNKNOWN STEP 2026-10-04T20:00:30.1215789Z FAILED (errors=1, skipped=1) runtime (arch) UNKNOWN STEP 2026-10-04T20:00:30.2053901Z ##[error]Process completed with exit code 1.
+
+C025
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37211305391 --log-failed | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T15:01:12.9745392Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (arch) UNKNOWN STEP 2026-10-04T15:01:23.3799528Z Ran 33 tests in 58.315s runtime (arch) UNKNOWN STEP 2026-10-04T15:01:23.3800244Z OK (skipped=1) runtime (arch) UNKNOWN STEP 2026-10-04T15:01:34.5074984Z test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) ... FAIL runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0454665Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0469358Z raise AssertionError("Timed out waiting for an observed result") runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0470663Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0472961Z Ran 1 test in 11.457s runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0473848Z FAILED (failures=1) runtime (arch) UNKNOWN STEP 2026-10-04T15:01:35.0607065Z ##[error]Process completed with exit code 1.
+
+C026
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37214999497 --log-failed | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:22.6804772Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:30.4578046Z Ran 33 tests in 39.547s runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:30.4578654Z OK (skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.6574035Z test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) ... FAIL runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8615619Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8630475Z raise AssertionError("Timed out waiting for an observed result") runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8631117Z AssertionError: Timed out waiting for an observed result runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8632701Z Ran 5 tests in 13.234s runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8633312Z FAILED (failures=1) runtime (fedora) UNKNOWN STEP 2026-10-04T16:00:43.8755754Z ##[error]Process completed with exit code 1.
+
+C027
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37232451508 --log-failed | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T20:34:35.3475439Z test_chromium_receives_every_character (test_runtime.RuntimeTests.test_chromium_receives_every_character) ... FAIL runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:02.8218598Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.3936956Z FAIL: test_chromium_receives_every_character (test_runtime.RuntimeTests.test_chromium_receives_every_character) runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.3953661Z raise AssertionError("Timed out waiting for an observed result") runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.3954640Z AssertionError: Timed out waiting for an observed result runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.3956370Z Ran 54 tests in 88.845s runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.3956996Z FAILED (failures=1, skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T20:35:32.4776980Z ##[error]Process completed with exit code 1.
+
+C028
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37243415314 --log-failed | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:22:25.6014496Z test_steps_run_in_order (test_actions.ActionTests.test_steps_run_in_order) ... FAIL runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:10.6128798Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:27.2948901Z test_qt_input_dialog (test_ui.QtUITests.test_qt_input_dialog) ... skipped 'desktop tools, kdialog or at-spi2-core unavailable' runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:44.4006838Z FAIL: test_steps_run_in_order (test_actions.ActionTests.test_steps_run_in_order) runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:44.4018009Z AssertionError: '' != 'one café' runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:44.4018834Z Ran 59 tests in 80.915s runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:44.4019607Z FAILED (failures=1, skipped=2) runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:23:44.4773009Z ##[error]Process completed with exit code 1.
+
+C029
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37244764863 --log | rg 'FAIL:|ERROR:|AssertionError|Ran [0-9]+ tests?|FAILED|OK \(|Error:|error:|test_.*(FAIL|ERROR|skipped)|^.*Process completed'
+EXIT: 0
+RESULT: runtime Run routing and headless compositor tests 2026-10-04T23:44:15.0757379Z test_browser_cookie_survives_sessions (test_profiles.ProfileTests.test_browser_cookie_survives_sessions) ... skipped 'Chromium sandbox unavailable in this environment' runtime Run routing and headless compositor tests 2026-10-04T23:44:31.1023002Z test_chromium_receives_every_character (test_runtime.RuntimeTests.test_chromium_receives_every_character) ... skipped 'Chromium sandbox unavailable in this environment' runtime Run routing and headless compositor tests 2026-10-04T23:45:02.4096629Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime Run routing and headless compositor tests 2026-10-04T23:45:48.1970023Z test_web_form_without_coordinates (test_ui.ChromiumUITests.test_web_form_without_coordinates) ... skipped 'Chromium sandbox unavailable in this environment' runtime Run routing and headless compositor tests 2026-10-04T23:45:48.8294603Z test_qt_input_dialog (test_ui.QtUITests.test_qt_input_dialog) ... skipped 'desktop tools, kdialog or at-spi2-core unavailable' runtime Run routing and headless compositor tests 2026-10-04T23:46:33.1009530Z test_blinking_caret_counts_as_settled (test_wait.WaitTests.test_blinking_caret_counts_as_settled) ... skipped 'Chromium sandbox unavailable in this environment' runtime Run routing and headless compositor tests 2026-10-04T23:46:38.7229125Z Ran 59 tests in 158.400s runtime Run routing and headless compositor tests 2026-10-04T23:46:38.7229913Z OK (skipped=6) runtime Repeat focus switching, Xwayland input and supervisor crash cleanup 2026-10-04T23:47:04.7786618Z Ran 30 tests in 25.901s runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:45:35.6530451Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:45:54.7777931Z test_qt_input_dialog (test_ui.QtUITests.test_qt_input_dialog) ... skipped 'desktop tools, kdialog or at-spi2-core unavailable' runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:46:14.2878250Z Ran 59 tests in 89.549s runtime (fedora) Run routing and headless compositor tests 2026-10-04T23:46:14.2878608Z OK (skipped=2) runtime (fedora) Repeat Xwayland mapping and input under CPU load 2026-10-04T23:49:13.1077929Z Ran 100 tests in 178.587s runtime (arch) Run routing and headless compositor tests 2026-10-04T23:45:51.7121806Z test_visible_round_trip (test_runtime.RuntimeTests.test_visible_round_trip) ... skipped 'visible mode opt-in' runtime (arch) Run routing and headless compositor tests 2026-10-04T23:46:16.0956923Z test_qt_input_dialog (test_ui.QtUITests.test_qt_input_dialog) ... skipped 'desktop tools, kdialog or at-spi2-core unavailable' runtime (arch) Run routing and headless compositor tests 2026-10-04T23:46:40.6875257Z Ran 59 tests in 119.830s runtime (arch) Run routing and headless compositor tests 2026-10-04T23:46:40.6876076Z OK (skipped=2) runtime (arch) Repeat Xwayland mapping and input under CPU load 2026-10-04T23:53:18.8622080Z Ran 100 tests in 397.914s
+
+C030
+COMMAND:
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$PWD/reviews/2026-10-05-project-review/.cache/uv" uv run --no-sync --offline ruff check --no-cache src scripts tests benchmarks
+EXIT: 0
+RESULT: All checks passed!
+
+C031
+COMMAND:
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD/tests:$PWD" UV_CACHE_DIR="$PWD/reviews/2026-10-05-project-review/.cache/uv" uv run --no-sync --offline python -B -m unittest test_focus test_cua_gateway test_runtime.RoutingTests test_profiles.ProfileNameTests test_wait.ChangedBoxTests -v
+EXIT: 0
+RESULT: test_activation_waits_for_state (test_focus.FocusTests.test_activation_waits_for_state) ... ok test_refused_activation_times_out (test_focus.FocusTests.test_refused_activation_times_out) ... ok test_target_closes_during_activation (test_focus.FocusTests.test_target_closes_during_activation) ... ok test_unknown_target_sends_no_activation (test_focus.FocusTests.test_unknown_target_sends_no_activation) ... ok test_fixed_target_and_restricted_tools (test_cua_gateway.GatewayTests.test_fixed_target_and_restricted_tools) ... ok test_target_required (test_cua_gateway.GatewayTests.test_target_required) ... ok test_invalid_mode (test_runtime.RoutingTests.test_invalid_mode) ... ok test_invalid_session_identifiers (test_runtime.RoutingTests.test_invalid_session_identifiers) ... ok test_unknown_session (test_runtime.RoutingTests.test_unknown_session) ... ok test_invalid_names (test_profiles.ProfileNameTests.test_invalid_names) ... ok test_boxes (test_wait.ChangedBoxTests.test_boxes) ... ok ---------------------------------------------------------------------- Ran 11 tests in 0.010s OK
+
+C032
+COMMAND:
+nl -ba scripts/benchmark.py | sed -n '1,130p'; nl -ba scripts/cua_benchmark.py | sed -n '1,280p'; nl -ba scripts/cua_gui_mcp.py
+EXIT: 0
+RESULT: Reviewed exact agent prompts, tool exclusions, container baseline setup, cleanup and GUI gateway.
+
+C033
+COMMAND:
+python3 -B - <<'PY'
+import json,pathlib
+for p in pathlib.Path('benchmarks/results').glob('*.json'):
+ d=json.loads(p.read_text());print(p, 'type',type(d).__name__)
+ if isinstance(d,list):
+  for run in d:
+   rs=run['records']; print(run['run'],run['summary'],'calls',sum(x.get('tool_calls',0) for x in rs),'cost',sum(x.get('cost_usd',0) for x in rs),'raw_summary_exists',pathlib.Path('artifacts/benchmark',run['run'],'summary.json').exists())
+ else:
+  print(json.dumps(d,indent=2)[:8500])
+print('artifact roots', [str(x) for x in pathlib.Path('artifacts').glob('*')])
+PY
+rg -n 'check\(|passed|return |class |requires|sleep|success|title' benchmarks/tasks.py benchmarks/hard.py benchmarks/office.py
+EXIT: 0
+RESULT: Recomputed committed costs/calls and checked raw artifact availability and task verifiers.
+
+C034
+COMMAND:
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$PWD/reviews/2026-10-05-project-review/.cache/uv" uv run --no-sync --offline python -B - <<'PY'
+import tempfile, unittest, struct, fcntl, os
+from pathlib import Path
+from unittest.mock import Mock, patch
+from agent_desktop import core
+from agent_desktop.worker import Worker
+from agent_desktop.atspi import Accessibility, REGISTRY
+OUT=Path('reviews/2026-10-05-project-review').resolve()
+class ReviewProbes(unittest.TestCase):
+ def test_profile_delete_does_not_hold_lock(self):
+  with tempfile.TemporaryDirectory(dir=OUT) as d, patch.dict(os.environ,AGENT_DESKTOP_STATE_DIR=d):
+   p=core.profile_path('review'); (p/'home').mkdir(parents=True)
+   def deletion(path):
+    with (path/'lock').open('a') as lock:
+     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+   with patch('agent_desktop.core.shutil.rmtree',side_effect=deletion):
+    self.assertTrue(core.delete_profile('review')['deleted'])
+ def test_unstable_capture_still_returns_token(self):
+  with tempfile.TemporaryDirectory(dir=OUT) as d:
+   w=Worker.__new__(Worker); w.root=Path(d); w.virtual_pointer=Mock(output={'width':2,'height':2})
+   w.observation=Mock(side_effect=['a','b','c','d','e','f'])
+   w.command=lambda *args: Path(args[-1]).write_bytes(b'\x89PNG\r\n\x1a\n'+b'\0'*8+struct.pack('>II',2,2))
+   self.assertEqual(w.screenshot()['observation'],'e'); self.assertEqual(w.observation.call_count,6)
+ def test_wait_can_match_unrelated_window_element(self):
+  with patch.object(core,'request',side_effect=[{'windows':[{'title':'Editor','app_id':'edit'}]},{'nodes':[{'name':'Saved','role':'label','text':'other app'}]}]):
+   result=core.wait('unused',title='Editor',element='Saved')
+   self.assertTrue(result['satisfied']); self.assertEqual(result['elements'][0]['text'],'other app')
+ def test_wait_pause_ignores_timeout_and_session(self):
+  with patch.object(core,'request') as request:
+   result=core.wait('not-a-session',seconds=.02,timeout=.001)
+   self.assertTrue(result['satisfied']); self.assertGreaterEqual(result['elapsed_ms'],20); request.assert_not_called()
+ def test_action_post_observation_loses_partial_result(self):
+  with patch.object(core,'request',side_effect=[{'delivered':True},core.DesktopError('human takeover')]):
+   with self.assertRaises(core.DesktopError): core.run_actions('unused',[{'action':'type','text':'done'}],observation='baseline')
+ def test_tree_limit_does_not_bound_application_nodes(self):
+  a=Accessibility.__new__(Accessibility)
+  a.children=lambda node: [('app'+str(i),'/root') for i in range(3)] if node==REGISTRY else []
+  a.get=lambda *args:'app'
+  result=a.tree(max_nodes=1)
+  self.assertEqual(len(result['nodes']),3); self.assertFalse(result['truncated'])
+ def test_release_succeeds_when_clipboard_clear_fails(self):
+  w=Worker.__new__(Worker); w.control={'owner':'human','epoch':0}; w.takeover=None
+  w.info={'id':'review','runtime':str(OUT),'wayland_display':'unused'}; w.save_control=Mock()
+  with patch('agent_desktop.worker.clear_selection',side_effect=RuntimeError('unsupported')):
+   self.assertEqual(w.release('review')['owner'],'agent')
+ def test_ui_short_id_retargets_after_reset(self):
+  w=Worker.__new__(Worker); w.ui_ids={'n'+str(i):str(i) for i in range(1,50001)}; w.ui_names={'old':'n1'}
+  self.assertEqual(w.short_id('new'),'n1'); self.assertEqual(w.ui_ids['n1'],'new')
+unittest.main(verbosity=2)
+PY
+EXIT: 0
+RESULT: test_action_post_observation_loses_partial_result (__main__.ReviewProbes.test_action_post_observation_loses_partial_result) ... ok test_profile_delete_does_not_hold_lock (__main__.ReviewProbes.test_profile_delete_does_not_hold_lock) ... ok test_release_succeeds_when_clipboard_clear_fails (__main__.ReviewProbes.test_release_succeeds_when_clipboard_clear_fails) ... Clipboard not cleared: unsupported Control returned to the agent: review ok test_tree_limit_does_not_bound_application_nodes (__main__.ReviewProbes.test_tree_limit_does_not_bound_application_nodes) ... ok test_ui_short_id_retargets_after_reset (__main__.ReviewProbes.test_ui_short_id_retargets_after_reset) ... ok test_unstable_capture_still_returns_token (__main__.ReviewProbes.test_unstable_capture_still_returns_token) ... ok test_wait_can_match_unrelated_window_element (__main__.ReviewProbes.test_wait_can_match_unrelated_window_element) ... ok test_wait_pause_ignores_timeout_and_session (__main__.ReviewProbes.test_wait_pause_ignores_timeout_and_session) ... ok ---------------------------------------------------------------------- Ran 8 tests in 0.043s OK
+
+C035
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37158813080 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime UNKNOWN STEP 2026-10-03T22:33:19.2391006Z ERROR: test_crashes_preserve_errors_and_cleanup (test_runtime.RuntimeTests.test_crashes_preserve_errors_and_cleanup) runtime UNKNOWN STEP 2026-10-03T22:33:19.2411760Z agent_desktop.core.DesktopError: Session startup failed; see /tmp/desktop-test-kseacxk1/state/267112490d78/session.log runtime UNKNOWN STEP 2026-10-03T22:33:19.2421114Z ERROR: test_headless_round_trip (test_runtime.RuntimeTests.test_headless_round_trip) runtime UNKNOWN STEP 2026-10-03T22:33:19.2435309Z agent_desktop.core.DesktopError: Session startup failed; see /tmp/desktop-test-4kmj1amk/state/a2a541b39e9d/session.log runtime UNKNOWN STEP 2026-10-03T22:33:19.2437652Z ERROR: test_two_sessions_have_distinct_input (test_runtime.RuntimeTests.test_two_sessions_have_distinct_input) runtime UNKNOWN STEP 2026-10-03T22:33:19.2446426Z agent_desktop.core.DesktopError: Session startup failed; see /tmp/desktop-test-o3i3dvzv/state/1ee084e0faa8/session.log runtime UNKNOWN STEP 2026-10-03T22:33:19.2447637Z FAILED (errors=3, skipped=1) runtime UNKNOWN STEP 2026-10-03T22:33:19.2456655Z ##[error]Process completed with exit code 1.
+
+C036
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37208329189 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T14:13:26.4900036Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (fedora) UNKNOWN STEP 2026-10-04T14:13:26.4917014Z AssertionError: Timed out waiting for an observed result runtime (fedora) UNKNOWN STEP 2026-10-04T14:13:26.4920024Z FAILED (failures=1) runtime (fedora) UNKNOWN STEP 2026-10-04T14:13:26.5077411Z ##[error]Process completed with exit code 1.
+
+C037
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37162471223 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime UNKNOWN STEP 2026-10-03T23:40:48.5015839Z ##[error]Process completed with exit code 1.
+
+C038
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37164250440 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T00:14:01.5635022Z agent_desktop.core.DesktopError: XDG_RUNTIME_DIR must point to a writable user runtime directory runtime (arch) UNKNOWN STEP 2026-10-04T00:14:01.5737380Z ##[error]Process completed with exit code 1. runtime (fedora) UNKNOWN STEP 2026-10-04T00:13:56.6490072Z agent_desktop.core.DesktopError: XDG_RUNTIME_DIR must point to a writable user runtime directory runtime (fedora) UNKNOWN STEP 2026-10-04T00:13:56.6611078Z ##[error]Process completed with exit code 1.
+
+C039
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37164071690 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T00:10:57.9448981Z FAIL: test_destroy_recovers_session_without_supervisors (test_runtime.RuntimeTests.test_destroy_recovers_session_without_supervisors) runtime (fedora) UNKNOWN STEP 2026-10-04T00:10:57.9458244Z AssertionError: Timed out waiting for an observed result runtime (fedora) UNKNOWN STEP 2026-10-04T00:10:57.9459471Z FAILED (failures=1, skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T00:10:58.0086479Z ##[error]Process completed with exit code 1. runtime (arch) UNKNOWN STEP 2026-10-04T00:10:57.4972358Z FAIL: test_destroy_recovers_session_without_supervisors (test_runtime.RuntimeTests.test_destroy_recovers_session_without_supervisors) runtime (arch) UNKNOWN STEP 2026-10-04T00:10:57.4990618Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T00:10:57.4992404Z FAILED (failures=1, skipped=1) runtime (arch) UNKNOWN STEP 2026-10-04T00:10:57.5738716Z ##[error]Process completed with exit code 1.
+
+C040
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37203685617 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T12:55:19.8961021Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (arch) UNKNOWN STEP 2026-10-04T12:55:19.8977440Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T12:55:19.8979918Z FAILED (failures=1, skipped=1) runtime (arch) UNKNOWN STEP 2026-10-04T12:55:19.9799466Z ##[error]Process completed with exit code 1.
+
+C041
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37168329845 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime UNKNOWN STEP 2026-10-04T01:33:59.3566054Z FAIL: test_killed_supervisor_is_cleaned_up_by_guardian (test_runtime.RuntimeTests.test_killed_supervisor_is_cleaned_up_by_guardian) runtime UNKNOWN STEP 2026-10-04T01:33:59.3579270Z AssertionError: Lists differ: [4177] != [] runtime UNKNOWN STEP 2026-10-04T01:33:59.3585180Z FAILED (failures=1, skipped=2) runtime UNKNOWN STEP 2026-10-04T01:33:59.4272358Z ##[error]Process completed with exit code 1.
+
+C042
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37166356424 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime UNKNOWN STEP 2026-10-04T00:56:02.6136430Z FAIL: test_chromium_receives_every_character (test_runtime.RuntimeTests.test_chromium_receives_every_character) runtime UNKNOWN STEP 2026-10-04T00:56:02.6154024Z AssertionError: Timed out waiting for an observed result runtime UNKNOWN STEP 2026-10-04T00:56:02.6155978Z FAILED (failures=1, skipped=1) runtime UNKNOWN STEP 2026-10-04T00:56:02.6820730Z ##[error]Process completed with exit code 1.
+
+C043
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37205919528 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T13:34:11.2299796Z ERROR: test_calc_saves_formula_and_calculated_value (test_runtime.RuntimeTests.test_calc_saves_formula_and_calculated_value) runtime (fedora) UNKNOWN STEP 2026-10-04T13:34:11.2316612Z RuntimeError: Timed out waiting for an observed office result runtime (fedora) UNKNOWN STEP 2026-10-04T13:34:11.2317724Z FAILED (errors=1, skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T13:34:11.3025694Z ##[error]Process completed with exit code 1.
+
+C044
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37209103464 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T14:26:03.4128384Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (arch) UNKNOWN STEP 2026-10-04T14:26:03.4147538Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T14:26:03.4148949Z FAILED (failures=1) runtime (arch) UNKNOWN STEP 2026-10-04T14:26:03.4327127Z ##[error]Process completed with exit code 1.
+
+C045
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37209247332 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.8310107Z FAIL: test_toolkit_dialogs_receive_text (test_runtime.RuntimeTests.test_toolkit_dialogs_receive_text) (case='gtk-x11') runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.8325337Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.8327615Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.8335126Z AssertionError: Timed out waiting for an observed result runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.8347414Z FAILED (failures=2, skipped=1) runtime (arch) UNKNOWN STEP 2026-10-04T14:28:30.9225254Z ##[error]Process completed with exit code 1.
+
+C046
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37214209581 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (arch) UNKNOWN STEP 2026-10-04T15:47:16.3900131Z ##[error]Process completed with exit code 1.
+
+C047
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37205799424 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T13:32:17.1233890Z ERROR: test_calc_saves_formula_and_calculated_value (test_runtime.RuntimeTests.test_calc_saves_formula_and_calculated_value) runtime (fedora) UNKNOWN STEP 2026-10-04T13:32:17.1251833Z RuntimeError: Timed out waiting for an observed office result runtime (fedora) UNKNOWN STEP 2026-10-04T13:32:17.1253641Z FAILED (errors=1, skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T13:32:17.1910009Z ##[error]Process completed with exit code 1.
+
+C048
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37206984363 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T13:51:24.3654046Z FAIL: test_xwayland_application_receives_input (test_runtime.RuntimeTests.test_xwayland_application_receives_input) runtime (fedora) UNKNOWN STEP 2026-10-04T13:51:24.3667447Z AssertionError: Timed out waiting for an observed result runtime (fedora) UNKNOWN STEP 2026-10-04T13:51:24.3672133Z FAILED (failures=1, skipped=1) runtime (fedora) UNKNOWN STEP 2026-10-04T13:51:24.4359722Z ##[error]Process completed with exit code 1.
+
+C049
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37215444164 --log-failed | rg 'FAIL:|ERROR:|AssertionError:|Error:|error:|FAILED|No such file|not found|exit code' | tail -n 8
+EXIT: 0
+RESULT: runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.0992157Z ERROR: Subproject xserver is buildable: NO runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.0993096Z ../../_temp/private-runtime/wlroots-0.19.3/xwayland/meson.build:23:11: ERROR: Neither a subproject directory nor a xserver.wrap file was found. runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1672694Z Package xwayland was not found in the pkg-config search path. runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1674630Z Package 'xwayland' not found runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1676465Z CMake binary for machine host machine not found. Giving up. runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1677372Z ERROR: Subproject xserver is buildable: NO runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1678242Z ../../_temp/private-runtime/wlroots-0.19.3/xwayland/meson.build:23:11: ERROR: Neither a subproject directory nor a xserver.wrap file was found. runtime (fedora) UNKNOWN STEP 2026-10-04T16:07:04.1722153Z ##[error]Process completed with exit code 1.
+
+C050
+COMMAND:
+web.run open raw GitHub READMEs for wbox-mcp, kde-mcp, E2B Desktop; https://playwright.dev/docs/trace-viewer
+EXIT: n/a (web tool)
+RESULT: Fetched detailed primary documentation, accessed 2026-10-05; no competitor installations performed.
+
+C051
+COMMAND:
+nl -ba tests/test_ui.py | sed -n '1,170p'; nl -ba tests/test_takeover.py | sed -n '100,268p'; nl -ba tests/test_mcp.py
+EXIT: 0
+RESULT: Checked issue resolution, PR rationale, exact failure context and privacy/semantic/MCP assertions.
+
+C052
+COMMAND:
+gh issue view 17 --comments; gh issue view 6 --comments; gh pr view 39 --json body,comments,reviews; gh pr view 28 --json body,comments,reviews
+EXIT: 0
+RESULT: Checked issue resolution, PR rationale, exact failure context and privacy/semantic/MCP assertions.
+
+C053
+COMMAND:
+XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37230235686 --log-failed | tail -n 95; XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37214209581 --log-failed | tail -n 18; XDG_CACHE_HOME="$PWD/reviews/2026-10-05-project-review/.cache" gh run view 37162471223 --log-failed | tail -n 20
+EXIT: 0
+RESULT: Checked issue resolution, PR rationale, exact failure context and privacy/semantic/MCP assertions.
+
+C054
+COMMAND:
+rg -n 'async def run|call_fn_with_arg_validation|to_thread|run_sync|return fn|fn\(' .venv/lib/python3.12/site-packages/mcp/server/fastmcp/tools/base.py .venv/lib/python3.12/site-packages/mcp/server/fastmcp/utilities/func_metadata.py; nl -ba tests/test_mcp.py | sed -n '105,158p'; nl -ba scripts/m0_terminal.py; gh issue view 17 --comments; gh issue view 6 --comments
+EXIT: 0
+RESULT: Confirmed MCP fixture reads files at existence, reviewed open compatibility issue and #17 closure reasoning.
+
+C055
+COMMAND:
+python3 -B - <<'PY'
+import json,pathlib,hashlib
+p=pathlib.Path('benchmarks/results/2026-10-04-tool-profiles.json'); exported=json.loads(p.read_text())
+for run in exported:
+ raw=json.loads(pathlib.Path('artifacts/benchmark',run['run'],'summary.json').read_text()); rs=raw['records']
+ assert all(all(r.get(k)==rr.get(k) for k in r) for r,rr in zip(run['records'],rs))
+ print(run['run'],'verified export matches raw','failures',[(r['task'],r.get('detail'),r.get('error')) for r in rs if not r.get('passed')],'transcripts',sum(pathlib.Path('artifacts/benchmark',run['run'],r['task'],'transcript.jsonl').exists() for r in rs))
+p=pathlib.Path('benchmarks/results/2026-10-04-browser-comparison.json');d=json.loads(p.read_text())
+for kind in ['native','container']:
+ rs=[r for r in d['trials'] if r['interface']==kind]
+ print(kind, len(rs),sum(r['tool_calls'] for r in rs),sum(r['api_equivalent_usd'] for r in rs))
+for trial in d['trials']:
+ base=pathlib.Path('artifacts/benchmark' if trial['interface']=='native' else 'artifacts/cua-benchmark')/trial['run']/trial['task']
+ pages=list(base.glob('*.html'))
+ print(trial['run'],trial['task'],'record', (base/'record.json').exists(),'page_hash_matches',any(hashlib.sha256(x.read_bytes()).hexdigest()==trial['page_sha256'] for x in pages))
+PY
+nl -ba benchmarks/hard.py | sed -n '1,145p'; nl -ba benchmarks/office.py; nl -ba scripts/office_smoke.py | sed -n '1,145p'
+EXIT: 0
+RESULT: All ten tool-profile exports matched raw records; all twelve browser page hashes matched artifacts; read office independent verifiers and hard fixtures.
+
+C056
+COMMAND:
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$PWD/reviews/2026-10-05-project-review/.cache/uv" uv run --no-sync --offline python -B - <<'PY'
+import asyncio, time
+from unittest.mock import patch
+from agent_desktop.mcp_server import mcp
+async def main():
+ marks=[]
+ async def heartbeat():
+  await asyncio.sleep(.005); marks.append(time.monotonic())
+ start=time.monotonic()
+ with patch('agent_desktop.mcp_server.core.wait',side_effect=lambda *a: (time.sleep(.08) or {'satisfied':True})):
+  await asyncio.gather(mcp.call_tool('desktop_wait',{'session':'mock'}),heartbeat())
+ delay=marks[0]-start
+ assert delay >= .08,delay
+ print('MCP synchronous wait delayed independent event-loop heartbeat:',round(delay,3),'seconds; verified once without a desktop')
+asyncio.run(main())
+PY
+python3 -B - <<'PY'
+import ast,pathlib
+for folder in ['src/agent_desktop','tests','scripts','benchmarks']:
+ for path in sorted(pathlib.Path(folder).glob('*.py')):
+  tree=ast.parse(path.read_text()); print(path, '; '.join(n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef))))
+PY
+EXIT: 0
+RESULT: MCP blocked an independent heartbeat for 0.08+ seconds; indexed every Python source/test/script/benchmark definition.
+
+C057
+COMMAND:
+nl -ba README.md | sed -n '85,112p'; nl -ba README.md | sed -n '192,211p'; nl -ba scripts/lifecycle_stress.py | sed -n '1,145p'; nl -ba scripts/browser_smoke.py | sed -n '1,145p'; nl -ba scripts/claude_code_task.py | sed -n '1,180p'
+EXIT: 0
+RESULT: Checked stale coordinate guidance and independent smoke/stress/client verification scope.
+
+C058
+COMMAND:
+sed -n '270,600p' DEVELOPMENT_LOG.md; cat RESEARCH_FINDINGS.md; cat .gitignore; git ls-files '*nix*' '*lock*' '*install*' '*LICENSE*'
+EXIT: 0
+RESULT: Read repair investigation chronology, initial research and tracked packaging inventory.
+
+C059
+COMMAND:
+PYTHONDONTWRITEBYTECODE=1 UV_CACHE_DIR="$PWD/reviews/2026-10-05-project-review/.cache/uv" uv run --no-sync --offline agent-desktop --help
+nl -ba PROJECT_PLAN.md | sed -n '214,235p'
+nl -ba README.md | sed -n '112,129p'
+python3 -B - <<'PY'
+import json,pathlib,re,collections
+p=pathlib.Path('reviews/2026-10-05-project-review')
+f=[json.loads(l) for l in (p/'findings.jsonl').read_text().splitlines()]
+keys={'id','area','severity','title','detail','evidence','evidence_level','recommendation','effort','related'}
+levels={'verified-by-you','repeated-tests','single-observation','docs-claim','inference'}
+for i,x in enumerate(f,1):
+ assert set(x)==keys and x['id']==f'F{i:03d}'
+ assert len(x['title'])<=100 and x['evidence'] and x['evidence_level'] in levels
+ assert x['area'] in 'inventory drift code security reliability measurement competition usability docs future'.split()
+ assert x['severity'] in 'critical high medium low info'.split()
+ assert x['effort'] in ['S','M','L','']
+ assert all(y in {z['id'] for z in f} for y in x['related'])
+ for e in x['evidence']:
+  m=re.fullmatch(r'([^: ]+):(\d+)',e)
+  if m:
+   file=pathlib.Path(m[1]); assert file.exists(),e
+   assert int(m[2])<=len(file.read_text().splitlines()),e
+c=json.loads((p/'capabilities.json').read_text());o=json.loads((p/'options.json').read_text())
+for x in c:
+ assert set(x)=={'name','description','interfaces','evidence_level','proven_on','tests','limitations','finding_ids'}
+ assert set(x['interfaces'])<={'cli','mcp','core'} and x['evidence_level'] in levels
+ assert set(x['proven_on'])<={'nixos','ubuntu','fedora','arch'}
+ assert all(y in {z['id'] for z in f} for y in x['finding_ids'])
+for i,x in enumerate(o,1):
+ assert set(x)=={'id','name','summary','value','cost','risks','prerequisites','confirming_evidence','recommended'}
+ assert x['id']==f'O{i}' and isinstance(x['recommended'],bool)
+assert sum(x['recommended'] for x in o)==1
+print('Validated schemas, sequential IDs, cross-references and file:line existence:',len(f),'findings',len(c),'capabilities',len(o),'options')
+print(collections.Counter(x['severity'] for x in f))
+PY
+EXIT: 0
+RESULT: CLI help matched documented command surface; validated all schemas, finding IDs, references and source line existence.
+
+C060
+COMMAND:
+python3 -B - <<'PY'
+import pathlib,json,re
+for l in pathlib.Path('reviews/2026-10-05-project-review/findings.jsonl').read_text().splitlines():
+ f=json.loads(l)
+ for e in f['evidence']:
+  m=re.fullmatch(r'([^: ]+):(\d+)',e)
+  if m:
+   line=pathlib.Path(m[1]).read_text().splitlines()[int(m[2])-1]
+   print(f['id'],e,line[:120])
+PY
+EXIT: 0
+RESULT: Audited actual cited source-line contents; identified blank or imprecise documentation anchors for correction.
+
+C061
+COMMAND:
+rg -n 'packaged persistent|Action timelines|Optional observe-only|Strong.*isolation|security sandbox' PROJECT_PLAN.md; nl -ba tests/test_actions.py | sed -n '44,74p'; nl -ba .github/workflows/checks.yml | sed -n '60,90p'; nl -ba README.md | sed -n '240,248p'; sed -n '600,855p' DEVELOPMENT_LOG.md
+EXIT: 0
+RESULT: Located precise evidence anchors and read remaining middle development chronology.
+
+C062
+COMMAND:
+cat reviews/2026-10-05-project-review/findings.jsonl
+EXIT: 0
+RESULT: Read generated findings before source-anchor corrections; output intentionally limited.
+
+C063
+COMMAND:
+python3 -B - <<'PY'
+import json,pathlib
+p=pathlib.Path('reviews/2026-10-05-project-review/findings.jsonl')
+fix={'PROJECT_PLAN.md:222':'PROJECT_PLAN.md:223','PROJECT_PLAN.md:226':'PROJECT_PLAN.md:225','PROJECT_PLAN.md:275':'PROJECT_PLAN.md:272','PROJECT_PLAN.md:234':'PROJECT_PLAN.md:233','PROJECT_PLAN.md:302':'PROJECT_PLAN.md:297','PROJECT_PLAN.md:261':'PROJECT_PLAN.md:258','README.md:188':'README.md:189','README.md:239':'README.md:242','tests/test_actions.py:49':'tests/test_actions.py:60'}
+f=[json.loads(l) for l in p.read_text().splitlines()]
+for x in f:
+ x['evidence']=[fix.get(e,e) for e in x['evidence']]
+ if x['id']=='F018': x['evidence']=[e.replace('checks.yml:75','checks.yml:70') for e in x['evidence']]
+ if x['id']=='F019': x['evidence']=[e.replace('checks.yml:72','checks.yml:68') for e in x['evidence']]
+ if x['id']=='F006': x['detail']=x['detail'].replace('fixture now waits for activated state','fixture now waits for activated state plus 200 ms')
+p.write_text(''.join(json.dumps(x,ensure_ascii=False)+'\n' for x in f))
+print('Corrected evidence anchors and recorded the remaining fixture delay')
+PY
+EXIT: 0
+RESULT: Corrected evidence anchors and recorded the remaining fixture delay
+
+C064
+COMMAND:
+[cwd: /home/user/private-agent-desktop/reviews/2026-10-05-project-review]
+python3 -c "import json;[json.loads(l) for l in open('findings.jsonl')]"
+EXIT: 0
+RESULT: Required JSONL validation passed.
+
+C065
+COMMAND:
+python3 -B - <<'PY'
+import pathlib,shutil,json,re,collections
+p=pathlib.Path('reviews/2026-10-05-project-review')
+cache=p/'.cache'
+if cache.exists(): shutil.rmtree(cache)
+expected={'findings.jsonl','capabilities.json','options.json','plan.md','questions.md','report.md','commands.log'}
+assert {x.name for x in p.iterdir()}==expected
+f=[json.loads(l) for l in (p/'findings.jsonl').read_text().splitlines()]
+ids={x['id'] for x in f}
+for i,x in enumerate(f,1):
+ assert x['id']==f'F{i:03d}' and len(x['title'])<=100 and set(x)=={'id','area','severity','title','detail','evidence','evidence_level','recommendation','effort','related'}
+ for e in x['evidence']:
+  m=re.fullmatch(r'([^: ]+):(\d+)',e)
+  if m: assert pathlib.Path(m[1]).read_text().splitlines()[int(m[2])-1].strip(),e
+for name in ['plan.md','questions.md','report.md']:
+ for ref in re.findall(r'\bF\d{3}\b',(p/name).read_text()): assert ref in ids,ref
+for x in json.loads((p/'capabilities.json').read_text()):
+ assert set(x['finding_ids'])<=ids
+print('Exactly seven files; valid sequential finding IDs, nonblank source anchors and cross-references.')
+print('Severity counts:',dict(collections.Counter(x['severity'] for x in f)))
+print('Report words:',len((p/'report.md').read_text().split()))
+PY
+git diff --exit-code
+git status --short
+EXIT: 0
+RESULT: Exactly seven files; valid sequential finding IDs, nonblank source anchors and cross-references. Severity counts: {'high': 7, 'medium': 21, 'low': 3, 'info': 7} Report words: 1631 ?? reviews/

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "O1",
+    "name": "Harden and package for daily personal use",
+    "summary": "Turn the existing labwc runtime into a supported, repeatedly used Linux alpha before expanding its tool surface.",
+    "value": "Highest near-term value for the stated success criterion: fewer interruptions, predictable setup, trustworthy cleanup and real evidence of usefulness (F001, F007, F028).",
+    "cost": "M overall: roughly several focused engineering weeks plus a two-week use diary; estimate, not a measured schedule.",
+    "risks": [
+      "Real workflows may reveal application-specific fragility.",
+      "Maintaining a private wlroots repair can dominate packaging work.",
+      "A personal tool may remain valuable without attracting broad adoption."
+    ],
+    "prerequisites": [
+      "User chooses two or three recurring workflows and first supported non-Nix distro.",
+      "Fix profile deletion, wait semantics, observation and responsiveness defects.",
+      "Agree on a cooperative same-user trust boundary for the pilot."
+    ],
+    "confirming_evidence": [
+      "Fresh NixOS and non-Nix installs succeed from exact documented commands.",
+      "At least 20 real-work sessions over at least 10 working days record outputs, interventions and cleanup.",
+      "No unexplained wrong-target actions; zero owned-process leaks in declared supported failure cases.",
+      "Eight-hour soak remains responsive with bounded retained bytes."
+    ],
+    "recommended": true
+  },
+  {
+    "id": "O2",
+    "name": "Deepen agent interaction and semantic capabilities",
+    "summary": "Optimize target-specific observation, semantic actions, verified outcomes and tool efficiency for recurring difficult applications.",
+    "value": "Could reduce observation cost and wrong actions if actual failures are caused by the interface rather than model reasoning or setup (F004, F005, F008, F029).",
+    "cost": "M–L: per-toolkit investigation, robust target identities, latency budgets and separately authorized model experiments.",
+    "risks": [
+      "Large accessibility trees stall or exceed response limits.",
+      "Reduced tool calls can hide more primitive actions and higher token costs.",
+      "Custom-drawn/Electron/office interfaces may need different fallbacks.",
+      "More fixtures can remain saturated without improving real work."
+    ],
+    "prerequisites": [
+      "O1 pilot identifies recurring interaction failures.",
+      "Bound traversal and repair target/observation semantics.",
+      "Pinned paired benchmark protocol and explicit paid-run budget."
+    ],
+    "confirming_evidence": [
+      "Same real tasks fail with current tools and pass with the targeted extension.",
+      "Randomized paired trials on identical environments show fewer interventions or lower end-to-end cost without worse completion.",
+      "Report distributions, failures and cache counters, not only aggregate calls."
+    ],
+    "recommended": false
+  },
+  {
+    "id": "O3",
+    "name": "Add an explicit security and permissions boundary",
+    "summary": "Place the desktop and applications inside an existing container or VM boundary with deliberate mounts, network and credential policies.",
+    "value": "Useful if the agent handles untrusted apps/pages or the user expects takeover secrets to be hidden from a shell-capable agent (F002, F014, F024, F025).",
+    "cost": "L: threat model, IPC/services, credential handling, mounts, network policy, packaging and adversarial validation.",
+    "risks": [
+      "A policy UI can imply guarantees the underlying same-user process model cannot enforce.",
+      "Desktop integration, portals and GPU/audio support become harder.",
+      "Credential/session reuse conflicts with strict isolation.",
+      "Container and VM guarantees differ and need independent validation."
+    ],
+    "prerequisites": [
+      "User states which actor is untrusted and what data must be protected.",
+      "Select existing containment primitives rather than inventing isolation.",
+      "Define explicit host bridges and allowed external effects."
+    ],
+    "confirming_evidence": [
+      "Host files, credential sources, sockets and forbidden network routes remain inaccessible in controlled negative tests.",
+      "Takeover blocks all authorized observation channels in the defined threat model.",
+      "Crash cleanup and profile recovery work within the selected process boundary.",
+      "Useful workflows remain practical without broad host mounts."
+    ],
+    "recommended": false
+  },
+  {
+    "id": "O4",
+    "name": "Build a portable agent machine",
+    "summary": "Implement prompt2's managed Linux environment behind Linux/Windows/macOS entry points, reusing this runtime inside it.",
+    "value": "Could make setup reproducible and reach non-Linux users while retaining one Linux application environment (F030, F033).",
+    "cost": "L, likely a multi-month platform effort: image updates, VM/WSL lifecycle, host bridge, repository storage/sync, viewer and support.",
+    "risks": [
+      "Direct overlap with Cua and other provisioned environments.",
+      "Host filesystem watching, build performance and credentials may be worse than native.",
+      "Linux tasks do not validate native Windows/macOS behavior.",
+      "Reproducible packages do not imply deterministic app state or reversible external actions."
+    ],
+    "prerequisites": [
+      "O1 proves recurring value and the user chooses cross-platform product scope.",
+      "Compare existing provisioning platforms before implementing a manager.",
+      "Choose WSL/container/VM by measured requirements and available target hardware."
+    ],
+    "confirming_evidence": [
+      "One non-Linux host completes the same selected workflow from a fresh install.",
+      "Measured cold/warm startup, image size, repository I/O and update/rollback behavior meet user-agreed targets.",
+      "A small external pilot uses it repeatedly rather than only completing a demo."
+    ],
+    "recommended": false
+  },
+  {
+    "id": "O5",
+    "name": "Integrate or contribute to an existing runtime",
+    "summary": "Keep the useful tests and adapters, and use or extend wbox, kde-mcp, Cua or E2B where a real comparison shows a lower maintenance path.",
+    "value": "Potentially avoids owning provisioning, protocol and patch maintenance while preserving the original user outcome (F019, F031–F034).",
+    "cost": "S for a tightly scoped evaluation, M–L if migration or upstream integration is justified.",
+    "risks": [
+      "Documented capabilities may fail on NixOS or the actual workflow.",
+      "Licensing, trust boundaries and dependency footprint may differ.",
+      "Migration can lose lifecycle or session-routing properties already tested here."
+    ],
+    "prerequisites": [
+      "Select one comparator for the chosen workflow and pin its revision.",
+      "Check component-level licensing and required host changes.",
+      "Use disposable state; no personal profiles or paid calls without scoped authorization."
+    ],
+    "confirming_evidence": [
+      "The same installation-to-cleanup workflow is easier and at least as dependable.",
+      "Existing independent verifiers still pass.",
+      "Documented maintenance obligations are lower after accounting for adapters and upstream dependencies."
+    ],
+    "recommended": false
+  }
+]

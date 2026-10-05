@@ -1,0 +1,578 @@
+[
+  {
+    "name": "Headless session lifecycle",
+    "description": "Create, list, status and destroy explicitly identified private labwc desktops that survive client disconnect.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_headless_round_trip",
+      "test_runtime.RuntimeTests.test_two_sessions_have_distinct_input",
+      "test_mcp.MCPTests.test_stdio_desktop_round_trip"
+    ],
+    "limitations": [
+      "CI evidence: 37244764863; Fedora/Arch are containers with repaired runtimes, not desktop installs.",
+      "NixOS evidence is historical docs/retained artifacts, not rerun in this review.",
+      "Graphical separation only; one output, pixman, scale 1; unbounded retained sessions."
+    ],
+    "finding_ids": [
+      "F001",
+      "F013",
+      "F028"
+    ]
+  },
+  {
+    "name": "Process ownership and crash recovery",
+    "description": "Private D-Bus, worker/guardian subreapers, descendant/token cleanup and dead-supervisor recovery.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_daemonizing_application_without_token_is_cleaned_up",
+      "test_runtime.RuntimeTests.test_private_bus_and_term_ignoring_forks_are_cleaned_up",
+      "test_runtime.RuntimeTests.test_killed_supervisor_is_cleaned_up_by_guardian",
+      "test_runtime.RuntimeTests.test_destroy_recovers_session_without_supervisors"
+    ],
+    "limitations": [
+      "Tokenless processes can escape after both supervisors die; host-service processes and PID reuse remain boundaries.",
+      "Latest CI repeats crash recovery on Ubuntu; repetition is not proof for every failure ordering."
+    ],
+    "finding_ids": [
+      "F025",
+      "F028"
+    ]
+  },
+  {
+    "name": "Application launch and logs",
+    "description": "Launch argument lists in private HOME/display/bus, report PIDs/exits and read retained log tails.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_crashes_preserve_errors_and_cleanup",
+      "test_runtime.RuntimeTests.test_cli_honors_runtime_executable_environment"
+    ],
+    "limitations": [
+      "No allowlist or filesystem/network sandbox; environment and cwd inherited beyond overrides.",
+      "Delivery/startup does not imply widget readiness; per-file log bounds are not aggregate quotas."
+    ],
+    "finding_ids": [
+      "F013",
+      "F014",
+      "F027"
+    ]
+  },
+  {
+    "name": "Keyboard and Unicode",
+    "description": "Persistent US-layout virtual keyboard, spare Unicode keys, named chords and 1–100 repeats.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_keyboard_is_ready_once_window_is_active",
+      "test_runtime.RuntimeTests.test_keys_use_physical_us_codes",
+      "test_runtime.RuntimeTests.test_chromium_receives_every_character"
+    ],
+    "limitations": [
+      "10,000-character request limit; unsupported control characters rejected; IME/dead keys unverified.",
+      "Recent Fedora receipt failures unresolved; Ubuntu Chromium path skips in latest CI.",
+      "NixOS loaded repetitions are historical reports."
+    ],
+    "finding_ids": [
+      "F006",
+      "F018",
+      "F028"
+    ]
+  },
+  {
+    "name": "Pointer, click, drag and scroll",
+    "description": "Session-local absolute motion, buttons, interpolated drag and scroll.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_absolute_pointer_drag_and_scroll_reach_application",
+      "test_runtime.RuntimeTests.test_output_changes_update_bounds_and_scale_fails_closed"
+    ],
+    "limitations": [
+      "Single output at scale 1; no modifier-held drag or configurable drag speed.",
+      "Compositor delivery acknowledgement is not application success."
+    ],
+    "finding_ids": [
+      "F028",
+      "F038"
+    ]
+  },
+  {
+    "name": "Screenshots, crops and scaling",
+    "description": "Retained PNG images plus dimensions, region, scale and image-coordinate token.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_capture.CaptureTests.test_region_and_scale",
+      "test_capture.CaptureTests.test_image_tokens_map_coordinates",
+      "test_mcp.MCPTests.test_stdio_desktop_round_trip",
+      "ReviewProbes.test_unstable_capture_still_returns_token"
+    ],
+    "limitations": [
+      "Real CI tests inspected; no new capture performed in this review.",
+      "Exhausted stability retries still return a token; retention has no quota.",
+      "With a token coordinates are image pixels; without one desktop pixels."
+    ],
+    "finding_ids": [
+      "F009",
+      "F013",
+      "F015"
+    ]
+  },
+  {
+    "name": "Window enumeration and focus",
+    "description": "Foreign-toplevel IDs, titles, app IDs, states and parents; activation waits for observed state.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_focus_and_stale_observations",
+      "test_runtime.RuntimeTests.test_immediate_typing_after_repeated_focus_switches",
+      "test_focus.FocusTests.test_activation_waits_for_state",
+      "test_focus.FocusTests.test_refused_activation_times_out"
+    ],
+    "limitations": [
+      "No geometry/child-widget map; activated does not prove app keyboard readiness.",
+      "Four existing focus unit tests rerun here; latest Ubuntu CI has repeated real focus checks."
+    ],
+    "finding_ids": [
+      "F006",
+      "F028",
+      "F038"
+    ]
+  },
+  {
+    "name": "Observation guards",
+    "description": "Optional layout tokens refuse input when output, toplevel state or ownership epoch changes.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_focus_and_stale_observations",
+      "test_takeover.TakeoverTests.test_person_types_while_agent_is_refused"
+    ],
+    "limitations": [
+      "No pixels, geometry, UI contents or title checks; optional before ordinary input; unavoidable check/delivery gap.",
+      "Takeover requires a new screenshot, which currently can be unstable."
+    ],
+    "finding_ids": [
+      "F009",
+      "F038"
+    ]
+  },
+  {
+    "name": "Read-only viewer",
+    "description": "CLI TigerVNC observer with server-side input disabled over a private Unix socket.",
+    "interfaces": [
+      "cli",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_viewer.ViewerTests.test_read_only_viewer_disconnect_preserves_session"
+    ],
+    "limitations": [
+      "Protocol behavior covered in CI; graphical viewer window historically observed only on NixOS/Hyprland.",
+      "Requires wayvnc and an X11/Xwayland host viewer; existing stream remains visible during takeover.",
+      "No TCP listener does not provide same-UID confidentiality."
+    ],
+    "finding_ids": [
+      "F002",
+      "F028"
+    ]
+  },
+  {
+    "name": "Human takeover and paste",
+    "description": "Agent request/control tools, CLI take/release, separate interactive VNC and post-release observation gate.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_takeover.TakeoverTests.test_person_types_while_agent_is_refused",
+      "test_takeover.TakeoverTests.test_pasted_text_reaches_the_session",
+      "test_takeover.TakeoverTests.test_clipboard_is_cleared_when_control_returns",
+      "test_takeover.TakeoverTests.test_destroy_during_takeover_stops_the_server",
+      "ReviewProbes.test_release_succeeds_when_clipboard_clear_fails"
+    ],
+    "limitations": [
+      "MCP exposes request/control only; take/release intentionally CLI/core.",
+      "No real-site login or actual agent handoff verified; same-user callers can release; US keymap.",
+      "Clipboard failure logs a warning and resumes anyway; RFB automation is not a human usability test."
+    ],
+    "finding_ids": [
+      "F002",
+      "F023",
+      "F024"
+    ]
+  },
+  {
+    "name": "Named profiles",
+    "description": "Persistent HOME for logins/config, profile list/size and exclusive active-session flock.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_profiles.ProfileTests.test_home_persists_and_is_exclusive",
+      "test_profiles.ProfileTests.test_browser_cookie_survives_sessions",
+      "test_profiles.ProfileNameTests.test_invalid_names",
+      "ReviewProbes.test_profile_delete_does_not_hold_lock"
+    ],
+    "limitations": [
+      "Deletion CLI/core only; check/delete race; profile lock does not span guardian crash cleanup.",
+      "Cookie test skipped on latest Ubuntu; historical NixOS and Fedora/Arch evidence.",
+      "Cookies readable by same UID and any agent assigned that profile; real accounts unverified."
+    ],
+    "finding_ids": [
+      "F003",
+      "F014",
+      "F023",
+      "F025"
+    ]
+  },
+  {
+    "name": "Window, screen and semantic waits",
+    "description": "Client-side polling for windows/elements and screen stability; optional plain delay.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_wait.WaitTests.test_window_appears_settles_and_goes",
+      "test_wait.WaitTests.test_changing_screen_never_settles",
+      "test_wait.WaitTests.test_blinking_caret_counts_as_settled",
+      "test_ui.UITests.test_wait_for_elements_after_actions",
+      "ReviewProbes.test_wait_can_match_unrelated_window_element",
+      "ReviewProbes.test_wait_pause_ignores_timeout_and_session"
+    ],
+    "limitations": [
+      "Polling, not a generic event subscription; <=400 px² change bounding boxes treated as quiet.",
+      "Combined predicates not simultaneous/scoped; truncated trees cannot establish absence.",
+      "Timeout not end-to-end; Chromium caret test skipped on latest Ubuntu."
+    ],
+    "finding_ids": [
+      "F004",
+      "F005",
+      "F010",
+      "F036"
+    ]
+  },
+  {
+    "name": "Action sequences",
+    "description": "Up to 50 input/focus/wait/UI steps with per-step observation baselines and completed/stopped result.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_actions.ActionTests.test_steps_run_in_order",
+      "test_actions.ActionTests.test_expected_window_with_wait_step",
+      "test_actions.ActionTests.test_surprises_stop_before_input",
+      "ReviewProbes.test_action_post_observation_loses_partial_result"
+    ],
+    "limitations": [
+      "No exclusive multi-client lease; in-window changes invisible; post-step observe can escape result handling.",
+      "Sequence counts reduce round trips, not necessarily primitive actions or cost."
+    ],
+    "finding_ids": [
+      "F006",
+      "F011",
+      "F038"
+    ]
+  },
+  {
+    "name": "Semantic UI and AT-SPI actions",
+    "description": "Private registry; filtered UI listing; native actions/text with Chromium keyboard fallback.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_ui.UITests.test_fill_and_confirm_dialog_without_coordinates",
+      "test_ui.UITests.test_tree_filters_and_limits",
+      "test_ui.UITests.test_compact_listing",
+      "test_ui.ChromiumUITests.test_web_form_without_coordinates",
+      "test_ui.NoAccessibilityTests.test_ui_reports_missing_runtime"
+    ],
+    "limitations": [
+      "GTK evidence on all four; Chromium CI evidence Fedora/Arch, historical NixOS; Ubuntu browser skips.",
+      "Qt semantic test test_ui.QtUITests.test_qt_input_dialog is historically reported on NixOS only and skipped in all latest CI jobs.",
+      "LibreOffice/Electron semantic flows and large trees unverified; blocking traversal, response cap and recycled IDs."
+    ],
+    "finding_ids": [
+      "F004",
+      "F016",
+      "F017",
+      "F018",
+      "F029"
+    ]
+  },
+  {
+    "name": "Stdio MCP adapter",
+    "description": "Existing-agent tools over stdio with real PNG content, instructions and persistent sessions.",
+    "interfaces": [
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_mcp.MCPTests.test_stdio_desktop_round_trip",
+      "test_cua_gateway.GatewayTests.test_fixed_target_and_restricted_tools"
+    ],
+    "limitations": [
+      "Actual model-client task evidence is historical NixOS only, not every MCP client.",
+      "Sync handlers block event loop; CLI returns structured UI JSON while MCP compacts it to text.",
+      "Intentional human-only CLI operations are not MCP tools; same-UID enforcement remains cooperative."
+    ],
+    "finding_ids": [
+      "F002",
+      "F010",
+      "F012",
+      "F027"
+    ]
+  },
+  {
+    "name": "Visible nested mode",
+    "description": "Opt-in private labwc window for testing on a Wayland host.",
+    "interfaces": [
+      "cli",
+      "mcp",
+      "core"
+    ],
+    "evidence_level": "docs-claim",
+    "proven_on": [
+      "nixos"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_visible_round_trip"
+    ],
+    "limitations": [
+      "Always skipped in CI and not run here.",
+      "Focused nested window receives physical keyboard input and can take host focus; not the no-interference default."
+    ],
+    "finding_ids": [
+      "F028",
+      "F030"
+    ]
+  },
+  {
+    "name": "Application workflow fixtures",
+    "description": "Native Chromium, xterm, GTK/Qt dialogs, Mousepad save/clipboard and Writer/Calc saved-file checks.",
+    "interfaces": [
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "ubuntu",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_toolkit_dialogs_receive_text",
+      "test_runtime.RuntimeTests.test_editor_file_dialogs_and_save_as",
+      "test_runtime.RuntimeTests.test_editor_clipboards_are_private_to_each_session",
+      "test_runtime.RuntimeTests.test_writer_saves_unicode_document",
+      "test_runtime.RuntimeTests.test_calc_saves_formula_and_calculated_value"
+    ],
+    "limitations": [
+      "Uses actual apps but mostly synthetic workflows; fixture delays and explicit profiles are required.",
+      "Qt on NixOS historical only; no broad Qt distro evidence from tests that silently omit missing kdialog.",
+      "No representative sustained daily work established."
+    ],
+    "finding_ids": [
+      "F001",
+      "F006",
+      "F018",
+      "F020"
+    ]
+  },
+  {
+    "name": "Benchmark suites and restricted baseline",
+    "description": "Standard 20, hard 10 and office 2 task definitions, independent verifiers, tool-profile and Cua metrics.",
+    "interfaces": [
+      "core"
+    ],
+    "evidence_level": "verified-by-you",
+    "proven_on": [
+      "nixos"
+    ],
+    "tests": [
+      "test_cua_gateway.GatewayTests.test_fixed_target_and_restricted_tools",
+      "test_cua_gateway.GatewayTests.test_target_required",
+      "artifact: benchmarks/results/2026-10-04-tool-profiles.json",
+      "artifact: benchmarks/results/2026-10-04-browser-comparison.json"
+    ],
+    "limitations": [
+      "Harness scripts are command-line programs but not agent-desktop CLI/MCP capabilities.",
+      "No agent benchmark run in this review; raw/export consistency and fixture hashes checked.",
+      "Single model; saturation, changing prompts/runtime/cache and unmatched environments limit inference; office model result is one 2-task run."
+    ],
+    "finding_ids": [
+      "F008",
+      "F020",
+      "F021",
+      "F022",
+      "F037"
+    ]
+  },
+  {
+    "name": "Project-local wlroots runtime repair",
+    "description": "Pinned source patch maps a pre-buffered Xwayland surface after association; copied labwc loads private library.",
+    "interfaces": [
+      "core"
+    ],
+    "evidence_level": "repeated-tests",
+    "proven_on": [
+      "nixos",
+      "fedora",
+      "arch"
+    ],
+    "tests": [
+      "test_runtime.RuntimeTests.test_xwayland_application_receives_input",
+      "CI 37244764863: 100 loaded X11 repetitions each on Fedora and Arch",
+      "artifact: artifacts/x11-patched-load"
+    ],
+    "limitations": [
+      "Backend dependency, not a Python/MCP feature; Ubuntu uses stock older runtime and is not evidence for this patch.",
+      "NixOS 150/100 historical loaded experiments; only one recorded buffer-before-association recovery.",
+      "Exact 0.19.3/0.20.2 ABI/dev packages; no reusable NixOS build recipe or upstream retirement link."
+    ],
+    "finding_ids": [
+      "F007",
+      "F019"
+    ]
+  }
+]

@@ -23,7 +23,18 @@ from .viewer import take, view
 
 def main():
     use_runtime()
-    parser = argparse.ArgumentParser(description="Private Linux desktops")
+    parser = argparse.ArgumentParser(
+        description="Private Linux desktops",
+        epilog="Each session has one controller. Input, launch, focus and "
+        "ui-action from a named controller take the session's lease (renewed by "
+        "its requests, expiring after AGENT_DESKTOP_LEASE_SECONDS, default 60, "
+        "without them); other controllers' input is refused while it is held. "
+        "Without a controller id, input works only while no lease is held.",
+    )
+    parser.add_argument(
+        "--controller",
+        help="controller id for the session lease (default: $AGENT_DESKTOP_CONTROLLER)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     new = sub.add_parser("create")
     new.add_argument("--mode", choices=("headless", "visible"), default="headless")
@@ -93,6 +104,15 @@ def main():
     steps.add_argument("session")
     steps.add_argument("actions", type=json.loads)
     steps.add_argument("--observation")
+    leasing = sub.add_parser(
+        "lease", help="take, renew or release this controller's session lease"
+    )
+    leasing.add_argument("session")
+    leasing.add_argument("--seconds", type=float, help="expiry after inactivity")
+    leasing.add_argument("--release", action="store_true")
+    leasing.add_argument(
+        "--force", action="store_true", help="release another controller's lease"
+    )
     waiting = sub.add_parser("request-human", help="ask a person to take control")
     waiting.add_argument("session")
     waiting.add_argument("reason")
@@ -160,6 +180,7 @@ def main():
             )
     args = vars(parser.parse_args())
     command = args.pop("command")
+    controller = args.pop("controller")
     try:
         if command == "create":
             mode, profile = args.pop("mode"), args.pop("profile")
@@ -187,15 +208,24 @@ def main():
             result = view(**args)
         elif command in ("ui", "ui-action"):
             session = args.pop("session")
-            result = request(session, command.replace("-", "_"), **args)
+            result = request(session, command.replace("-", "_"), controller, **args)
         elif command == "actions":
-            result = run_actions(**args)
+            result = run_actions(**args, controller=controller)
         elif command == "wait":
-            result = wait(**args)
+            result = wait(**args, controller=controller)
+        elif command == "lease":
+            options = {"action": "release" if args["release"] else "acquire"}
+            if args["seconds"] is not None:
+                options["seconds"] = args["seconds"]
+            if args["force"]:
+                options["force"] = True
+            result = request(args["session"], "lease", controller, **options)
         elif command == "take":
             result = take(**args)
         elif command == "request-human":
-            result = request(args["session"], "request_human", reason=args["reason"])
+            result = request(
+                args["session"], "request_human", controller, reason=args["reason"]
+            )
         else:
             session = args.pop("session")
             if command == "launch" and args["argv"][:1] == ["--"]:
@@ -203,7 +233,7 @@ def main():
             if command == "launch":
                 # Relative paths on the command line mean the caller's directory.
                 args["cwd"] = os.getcwd()
-            result = request(session, command, **args)
+            result = request(session, command, controller, **args)
         print(json.dumps(result, indent=2))
     except DesktopError as error:
         print(json.dumps({"error": str(error)}))

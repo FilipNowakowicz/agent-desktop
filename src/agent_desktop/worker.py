@@ -38,7 +38,11 @@ def become_subreaper():
 
 
 def process_table():
-    """Return {pid: (parent pid, state)} for every visible process."""
+    """Return {pid: (parent pid, state, start time)} for every visible process.
+
+    The start time (clock ticks since boot, /proc/<pid>/stat field 22) tells a
+    process apart from a later one that reuses its number.
+    """
     table = {}
     for path in Path("/proc").iterdir():
         if not path.name.isdecimal():
@@ -49,14 +53,54 @@ def process_table():
             continue
         # The command name may contain spaces or parentheses; fields follow the last ")".
         fields = stat[stat.rindex(")") + 2 :].split()
-        table[int(path.name)] = (int(fields[1]), fields[0])
+        table[int(path.name)] = (int(fields[1]), fields[0], int(fields[19]))
     return table
+
+
+def start_time(pid):
+    """A process's start time, or None if it no longer exists."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    return int(stat[stat.rindex(")") + 2 :].split()[19])
+
+
+def signal_process(pid, started, sig):
+    """Signal pid only if it is still the process that started at `started`.
+
+    Teardown scans /proc and signals later, so a number may meanwhile belong to
+    an unrelated process. A pidfd, where available, pins the process between
+    the check and the signal; otherwise a short check-to-kill window remains.
+    Returns whether the signal was sent.
+    """
+    descriptor = None
+    if hasattr(os, "pidfd_open") and hasattr(signal, "pidfd_send_signal"):
+        try:
+            descriptor = os.pidfd_open(pid)
+        except ProcessLookupError:
+            return False
+        except OSError:
+            descriptor = None  # e.g. a kernel without pidfd support
+    try:
+        if start_time(pid) != started:
+            return False
+        if descriptor is not None:
+            signal.pidfd_send_signal(descriptor, sig)
+        else:
+            os.kill(pid, sig)
+        return True
+    except ProcessLookupError:
+        return False
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def descendants(root, table=None):
     table = process_table() if table is None else table
     children = {}
-    for pid, (parent, _state) in table.items():
+    for pid, (parent, _state, _start) in table.items():
         children.setdefault(parent, []).append(pid)
     found, pending = [], [root]
     while pending:
@@ -81,21 +125,26 @@ def owned_processes(token):
     return found
 
 
-def session_processes(token, tree=True):
-    """Live session processes: token carriers, plus this supervisor's subtree."""
+def session_process_starts(token, tree=True):
+    """{pid: start time} of live session processes: token carriers, plus this
+    supervisor's subtree."""
     table = process_table()
     pids = set(owned_processes(token))
     if tree:
         pids |= set(descendants(os.getpid(), table))
     # Never this supervisor or its parent (the worker's guardian).
     pids -= {os.getpid(), os.getppid()}
-    return sorted(p for p in pids if p in table and table[p][1] not in "ZX")
+    return {p: table[p][2] for p in pids if p in table and table[p][1] not in "ZX"}
+
+
+def session_processes(token, tree=True):
+    return sorted(session_process_starts(token, tree))
 
 
 def reap_orphans(tracked=()):
     """Collect adopted orphans without stealing exit codes from Popen objects."""
     me = os.getpid()
-    for pid, (parent, state) in process_table().items():
+    for pid, (parent, state, _start) in process_table().items():
         if parent == me and state == "Z" and pid not in tracked:
             try:
                 os.waitpid(pid, os.WNOHANG)
@@ -104,7 +153,11 @@ def reap_orphans(tracked=()):
 
 
 def cleanup_processes(token, tracked=(), spare=(), tree=True):
-    """Stop the session tree; processes in spare get SIGTERM only after the rest."""
+    """Stop the session tree; processes in spare get SIGTERM only after the rest.
+
+    Each process is identified by its number and start time, so a number reused
+    by an unrelated process after the scan is never signalled.
+    """
     phases = [(signal.SIGTERM, 2, set(spare))] if spare else []
     phases += [(signal.SIGTERM, 2, set()), (signal.SIGKILL, 3, set())]
     for sig, wait, excluded in phases:
@@ -112,15 +165,16 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             # Rescan: a process may fork while the tree is being stopped.
-            remaining = set(session_processes(token, tree)) - excluded
+            remaining = {
+                (pid, started)
+                for pid, started in session_process_starts(token, tree).items()
+                if pid not in excluded
+            }
             if not remaining:
                 break
-            for pid in remaining - signalled:
-                signalled.add(pid)
-                try:
-                    os.kill(pid, sig)
-                except ProcessLookupError:
-                    pass
+            for pid, started in remaining - signalled:
+                signalled.add((pid, started))
+                signal_process(pid, started, sig)
             reap_orphans(tracked)
             time.sleep(0.05)
         if not session_processes(token, tree):
@@ -129,6 +183,15 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
 
 
 INPUT_OPERATIONS = ("click", "move", "drag", "scroll", "type", "key")
+# Operations that change the desktop; they need the controller lease (below).
+MUTATING_OPERATIONS = (
+    *INPUT_OPERATIONS,
+    "launch",
+    "focus",
+    "ui_action",
+    "request_human",
+)
+CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 
 
 class StaleObservation(RuntimeError):
@@ -137,6 +200,19 @@ class StaleObservation(RuntimeError):
 
 class HumanControl(RuntimeError):
     pass
+
+
+class LeaseHeld(RuntimeError):
+    pass
+
+
+def lease_seconds_default():
+    """Inactivity limit for controller leases (AGENT_DESKTOP_LEASE_SECONDS, 60 s)."""
+    try:
+        seconds = float(os.environ.get("AGENT_DESKTOP_LEASE_SECONDS", 60))
+    except ValueError:
+        return 60.0
+    return min(max(seconds, 1.0), 3600.0)
 
 
 class Worker:
@@ -153,6 +229,9 @@ class Worker:
         self.takeover = None
         self.control = {"owner": "agent", "epoch": 0, "request": None, "last": None}
         self.needs_screenshot = False
+        # One exclusive controller per session: {"holder", "seconds", "expires"}.
+        self.lease = None
+        self.lease_seconds = lease_seconds_default()
         self.registry = None
         self.atspi = None
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
@@ -200,6 +279,8 @@ class Worker:
             "XDG_ACTIVATION_TOKEN",
             "DBUS_SESSION_BUS_ADDRESS",
             "DBUS_SESSION_BUS_PID",
+            # Session applications must not act as the creator's controller.
+            "AGENT_DESKTOP_CONTROLLER",
         ):
             self.env.pop(key, None)
         if self.info.get("home"):
@@ -511,7 +592,6 @@ class Worker:
                 "Windows or focus kept changing during capture; no screenshot "
                 "was taken. Try again once the desktop has settled."
             )
-        self.needs_screenshot = False
         with path.open("rb") as stream:
             header = stream.read(24)
         if not header.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -617,7 +697,93 @@ class Worker:
             **self.control,
             "needs_screenshot": self.needs_screenshot,
             "take_command": f"agent-desktop take {self.info['id']}",
+            "lease": self.lease_state(),
         }
+
+    def active_lease(self):
+        if self.lease and time.monotonic() >= self.lease["expires"]:
+            self.lease = None
+        return self.lease
+
+    def lease_state(self):
+        lease = self.active_lease()
+        if not lease:
+            return None
+        return {
+            "holder": lease["holder"],
+            "seconds": lease["seconds"],
+            "expires_in": round(lease["expires"] - time.monotonic(), 1),
+        }
+
+    def refuse_lease(self, controller):
+        lease = self.lease
+        who = "named no controller" if controller is None else f"is from {controller}"
+        raise LeaseHeld(
+            f"Controller {lease['holder']} holds this session's lease "
+            f"({lease['expires'] - time.monotonic():.0f} s left unless renewed) and "
+            f"this request {who}; nothing was sent. Each session has one "
+            "controller: use a separate session, or wait until the holder "
+            "releases the lease or it expires."
+        )
+
+    def check_lease(self, operation, controller):
+        """Enforce one exclusive controller.
+
+        Any request from the holder renews its lease. A mutating request from
+        another controller, or with no controller id, is refused while the
+        lease is active. Without an active lease, a mutating request with an id
+        acquires the lease; one without an id runs without taking a lease (the
+        compatible single-client behaviour). Reads are never refused.
+        """
+        lease = self.active_lease()
+        if lease and controller == lease["holder"]:
+            lease["expires"] = time.monotonic() + lease["seconds"]
+        elif operation in MUTATING_OPERATIONS:
+            if lease:
+                self.refuse_lease(controller)
+            if controller is not None:
+                self.lease = {
+                    "holder": controller,
+                    "seconds": self.lease_seconds,
+                    "expires": time.monotonic() + self.lease_seconds,
+                }
+
+    def lease_request(self, request, controller):
+        action = request.get("action", "acquire")
+        lease = self.active_lease()
+        if action == "acquire":
+            if controller is None:
+                raise ValueError("Acquiring a lease requires a controller id")
+            # Renewing keeps the holder's duration unless a new one is given.
+            same = lease and lease["holder"] == controller
+            seconds = request.get("seconds") or (
+                lease["seconds"] if same else self.lease_seconds
+            )
+            if (
+                not isinstance(seconds, (int, float))
+                or isinstance(seconds, bool)
+                or not 1 <= seconds <= 3600
+            ):
+                raise ValueError("Lease seconds must be between 1 and 3600")
+            if lease and lease["holder"] != controller:
+                self.refuse_lease(controller)
+            self.lease = {
+                "holder": controller,
+                "seconds": seconds,
+                "expires": time.monotonic() + seconds,
+            }
+            return {"session": self.info["id"], "lease": self.lease_state()}
+        if action == "release":
+            released = False
+            if lease:
+                if lease["holder"] != controller and request.get("force") is not True:
+                    raise LeaseHeld(
+                        f"Controller {lease['holder']} holds this session's lease; "
+                        "only it can release the lease (a person can use --force)."
+                    )
+                self.lease, released = None, True
+            return {"session": self.info["id"], "released": released, "lease": None}
+        raise ValueError("Lease action must be acquire or release")
 
     def save_control(self):
         self.info["control"] = {
@@ -765,6 +931,18 @@ class Worker:
             return {"status": "stopping"}
         if self.compositor.poll() is not None:
             raise RuntimeError("Private compositor has exited")
+        controller = request.get("controller")
+        if controller is not None and (
+            not isinstance(controller, str) or not CONTROLLER_ID.fullmatch(controller)
+        ):
+            raise ValueError(
+                "Controller ids are 1-64 letters, digits or . _ : @ - characters"
+            )
+        if operation == "lease":
+            return self.lease_request(request, controller)
+        # destroy, take, release and viewer_start stay available to everyone:
+        # they are lifecycle and person controls, never agent input.
+        self.check_lease(operation, controller)
         if operation == "status":
             return {
                 "session": self.info["id"],
@@ -777,6 +955,7 @@ class Worker:
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
+                "lease": self.lease_state(),
                 "applications": [
                     {"pid": p.pid, "exit_code": p.poll()} for p in self.apps.values()
                 ],
@@ -876,7 +1055,11 @@ class Worker:
                 "window": focused,
             }
         if operation == "screenshot":
-            return self.screenshot(request.get("region"), request.get("scale"))
+            capture = self.screenshot(request.get("region"), request.get("scale"))
+            # Another client's screenshot must not vouch for the controller.
+            if not self.active_lease() or self.lease["holder"] == controller:
+                self.needs_screenshot = False
+            return capture
         if operation == "ui":
             max_nodes = request.get("max_nodes", 300)
             if not isinstance(max_nodes, int) or not 1 <= max_nodes <= 2000:

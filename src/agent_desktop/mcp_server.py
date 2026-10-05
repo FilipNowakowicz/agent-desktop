@@ -2,6 +2,8 @@
 
 import functools
 import json
+import os
+import uuid
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
@@ -20,7 +22,25 @@ desktop_request_human with a short reason, tell the user that reason and the
 returned take_command, then wait with desktop_control. While the user has control,
 your input and screenshots are refused. When control returns, take a new screenshot
 before acting. To keep a login for later tasks, create sessions with the same
-profile name (one session per profile at a time)."""
+profile name (one session per profile at a time).
+
+Each session has one controller at a time. This server holds a session's
+controller lease while you use it (renewed by every call, released by default
+after 60 seconds without calls). If another client controls a session, your input is
+refused and nothing is sent; create your own session instead of sharing one.
+A step whose delivery is uncertain is reported, never retried: check the
+desktop before repeating it."""
+
+# One controller id for this server's lifetime (AGENT_DESKTOP_CONTROLLER overrides).
+CONTROLLER = os.environ.get("AGENT_DESKTOP_CONTROLLER") or (
+    f"mcp-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+)
+
+
+def call(session, operation, **arguments):
+    """A session request made as this server's controller."""
+    return core.request(session, operation, CONTROLLER, **arguments)
+
 
 mcp = FastMCP("Private desktop", instructions=INSTRUCTIONS)
 
@@ -75,7 +95,7 @@ def desktop_list() -> list[dict]:
 @tool()
 def desktop_status(session: str) -> dict:
     """Get session health and application exit codes."""
-    return core.request(session, "status")
+    return call(session, "status")
 
 
 @tool()
@@ -85,13 +105,13 @@ def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dic
     It runs in the session's private home unless cwd (an absolute directory)
     is given; use absolute paths for files.
     """
-    return core.request(session, "launch", argv=argv, cwd=cwd)
+    return call(session, "launch", argv=argv, cwd=cwd)
 
 
 @tool()
 def desktop_windows(session: str) -> dict:
     """List private desktop windows: id, title, app_id, states and parent."""
-    return core.request(session, "windows")
+    return call(session, "windows")
 
 
 @tool()
@@ -119,7 +139,17 @@ def desktop_wait(
     Returns satisfied=false at the timeout (at most 120 s).
     """
     return core.wait(
-        session, title, app_id, gone, stable_ms, timeout, element, role, text, seconds
+        session,
+        title,
+        app_id,
+        gone,
+        stable_ms,
+        timeout,
+        element,
+        role,
+        text,
+        seconds,
+        controller=CONTROLLER,
     )
 
 
@@ -136,9 +166,11 @@ def desktop_actions(
     as they were after the previous step; otherwise the run stops and reports
     which step and why. Insert a wait step where you expect a window to open or
     close. Popups and changes inside a window are not detected, so take a
-    screenshot afterwards to verify the result.
+    screenshot afterwards to verify the result. No other client can send input
+    while the steps run. Steps are never retried: a step reported with
+    "uncertain": true may or may not have happened, so check before repeating it.
     """
-    return core.run_actions(session, actions, observation)
+    return core.run_actions(session, actions, observation, CONTROLLER)
 
 
 @tool()
@@ -156,7 +188,7 @@ def desktop_ui(
     applications expose little (e.g. Chromium needs --force-renderer-accessibility).
     """
     return core.render_tree(
-        core.request(session, "ui", app=app, window=window, max_nodes=max_nodes)
+        call(session, "ui", app=app, window=window, max_nodes=max_nodes)
     )
 
 
@@ -173,7 +205,7 @@ def desktop_ui_action(
 
     Works without coordinates. Verify the result with desktop_ui or a screenshot.
     """
-    return core.request(
+    return call(
         session,
         "ui_action",
         node=node,
@@ -190,7 +222,7 @@ def desktop_focus(session: str, window: str) -> dict:
     Returns the observed window; fails if it closes or activation is not observed.
     Focus can still change afterward, so use screenshot observations for input.
     """
-    return core.request(session, "focus", window=window)
+    return call(session, "focus", window=window)
 
 
 @tool(structured_output=False)
@@ -205,7 +237,7 @@ def desktop_screenshot(
     the image. Input tools given this screenshot's observation interpret x/y as
     coordinates in this image; without an observation they are desktop pixels.
     """
-    capture = core.request(session, "screenshot", region=region, scale=scale)
+    capture = call(session, "screenshot", region=region, scale=scale)
     return [
         TextContent(type="text", text=json.dumps(capture)),
         Image(path=capture["path"]),
@@ -215,7 +247,7 @@ def desktop_screenshot(
 @tool()
 def desktop_type(session: str, text: str, observation: str | None = None) -> dict:
     """Type up to 10000 characters into the private focused app. Verify the result afterward."""
-    return core.request(session, "type", text=text, observation=observation)
+    return call(session, "type", text=text, observation=observation)
 
 
 @tool()
@@ -228,7 +260,7 @@ def desktop_key(
 ) -> dict:
     """Send a keysym such as Return or Right, optionally with ctrl/alt/shift/logo
     modifiers and repeated up to 100 times."""
-    return core.request(
+    return call(
         session,
         "key",
         key=key,
@@ -244,15 +276,13 @@ def desktop_click(
 ) -> dict:
     """Click at x/y: coordinates in the screenshot whose observation is passed,
     otherwise desktop pixels. Fails outside the desktop."""
-    return core.request(
-        session, "click", x=x, y=y, button=button, observation=observation
-    )
+    return call(session, "click", x=x, y=y, button=button, observation=observation)
 
 
 @tool()
 def desktop_move(session: str, x: int, y: int, observation: str | None = None) -> dict:
     """Move only the private desktop pointer (coordinates as for desktop_click)."""
-    return core.request(session, "move", x=x, y=y, observation=observation)
+    return call(session, "move", x=x, y=y, observation=observation)
 
 
 @tool()
@@ -267,7 +297,7 @@ def desktop_drag(
 ) -> dict:
     """Press at (x, y), move in steps to (to_x, to_y) and release (coordinates as
     for desktop_click)."""
-    return core.request(
+    return call(
         session,
         "drag",
         x=x,
@@ -284,7 +314,7 @@ def desktop_scroll(
     session: str, dy: int, dx: int = 0, observation: str | None = None
 ) -> dict:
     """Scroll the private desktop at its current pointer location."""
-    return core.request(session, "scroll", dy=dy, dx=dx, observation=observation)
+    return call(session, "scroll", dy=dy, dx=dx, observation=observation)
 
 
 @tool()
@@ -295,17 +325,18 @@ def desktop_request_human(session: str, reason: str) -> dict:
     returned take_command, then wait with desktop_control. While they have
     control, input and screenshots are refused; afterwards take a new screenshot.
     """
-    return core.request(session, "request_human", reason=reason)
+    return call(session, "request_human", reason=reason)
 
 
 @tool()
 def desktop_control(session: str, wait_seconds: int = 0) -> dict:
-    """Report who controls the session and any pending request for the user.
+    """Report who controls the session, any pending request for the user and
+    which client holds the controller lease.
 
     With wait_seconds (up to 600), wait until the user has finished and control
     is back with the agent; call again if it is still pending.
     """
-    return core.wait_for_agent_control(session, wait_seconds)
+    return core.wait_for_agent_control(session, wait_seconds, CONTROLLER)
 
 
 @tool()

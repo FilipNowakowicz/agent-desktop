@@ -17,6 +17,10 @@ class DesktopError(RuntimeError):
     pass
 
 
+class DeliveryUnknown(DesktopError):
+    """The request was sent but no reply arrived: it may or may not have acted."""
+
+
 def state_root():
     override = os.environ.get("AGENT_DESKTOP_STATE_DIR")
     if override:
@@ -143,22 +147,51 @@ def manifest(session):
         raise DesktopError(f"Unreadable session: {session}") from error
 
 
-def request(session, operation, **arguments):
+def controller_id(controller=None):
+    """The controller a request is made for: the argument, else
+    AGENT_DESKTOP_CONTROLLER, else None (anonymous)."""
+    return controller or os.environ.get("AGENT_DESKTOP_CONTROLLER") or None
+
+
+def request(session, operation, controller=None, **arguments):
+    """Send one operation to a session's supervisor and return its result.
+
+    Controller lease: each session has at most one controller. A mutating
+    operation (input, launch, focus, ui_action, request_human) from a named
+    controller takes the lease when none is held; any request from the holder
+    renews it; it expires after AGENT_DESKTOP_LEASE_SECONDS (default 60) without
+    requests or is released with the "lease" operation. While it is held,
+    mutating requests from other or anonymous controllers are refused with
+    LeaseHeld and nothing is sent. Anonymous requests run without a lease when
+    none is held. Reads, destroy, take and release are never refused by a lease.
+
+    Raises DeliveryUnknown when the request was sent but no reply arrived; the
+    operation may have run, so it must not be repeated blindly.
+    """
     info = manifest(session)
     endpoint = info["control_socket"]
+    message = {"operation": operation, **arguments}
+    controller = controller_id(controller)
+    if controller is not None:
+        message["controller"] = controller
+    sent = False
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(30)
             connection.connect(endpoint)
-            connection.sendall(
-                (json.dumps({"operation": operation, **arguments}) + "\n").encode()
-            )
+            connection.sendall((json.dumps(message) + "\n").encode())
+            sent = True
             with connection.makefile("rb") as stream:
                 line = stream.readline(262145)
             if len(line) > 262144:
                 raise DesktopError("Response exceeds the protocol limit")
             reply = json.loads(line)
     except (OSError, ValueError) as error:
+        if sent:
+            raise DeliveryUnknown(
+                f"No reply from session {session} after sending {operation}; it "
+                "may or may not have run. Check the desktop before acting again."
+            ) from error
         raise DesktopError(
             f"Session unavailable: {session}; see {session_path(session) / 'session.log'}"
         ) from error
@@ -422,6 +455,7 @@ def wait(
     role=None,
     text=None,
     seconds=0,
+    controller=None,
 ):
     """Wait until every condition holds at the same time.
 
@@ -442,7 +476,8 @@ def wait(
     if not isinstance(seconds, (int, float)) or not 0 <= seconds <= 30:
         raise DesktopError("seconds must be between 0 and 30")
     # Every wait addresses an existing, controllable session, even a plain pause.
-    request(session, "control")
+    # Its requests renew the caller's lease, so a long wait keeps control.
+    request(session, "control", controller)
     started = time.monotonic()
     # A plain pause first, for changes no condition can describe.
     time.sleep(seconds)
@@ -465,7 +500,7 @@ def wait(
         if wants_window:
             windows = [
                 w
-                for w in request(session, "windows")["windows"]
+                for w in request(session, "windows", controller)["windows"]
                 if (title is None or title in w["title"])
                 and (app_id is None or w["app_id"] == app_id)
             ]
@@ -478,7 +513,7 @@ def wait(
                 )
         if wants_element:
             scope = {"window": title} if title is not None and not gone else {}
-            tree = request(session, "ui", max_nodes=2000, **scope)
+            tree = request(session, "ui", controller, max_nodes=2000, **scope)
             elements = [n for n in tree["nodes"] if element_matches(n)]
             if element_gone and elements:
                 return False, "element still present", windows, elements
@@ -501,12 +536,12 @@ def wait(
         satisfied, reason, windows, elements = check()
         if satisfied and stable_ms:
             quiet_since = time.monotonic()
-            frame = request(session, "frame")["frame"]
+            frame = request(session, "frame", controller)["frame"]
             while time.monotonic() - quiet_since < stable_ms / 1000:
                 if time.monotonic() >= deadline:
                     return result(False, "screen still changing", windows, elements)
                 time.sleep(0.05)
-                latest = request(session, "frame", since=frame)
+                latest = request(session, "frame", controller, since=frame)
                 frame, box = latest["frame"], latest["changed"]
                 if box == "unknown" or (box and box[2] * box[3] > QUIET_AREA):
                     quiet_since = time.monotonic()
@@ -532,13 +567,19 @@ SEQUENCE_ACTIONS = (
 )
 
 
-def run_actions(session, actions, observation=None):
+def run_actions(session, actions, observation=None, controller=None):
     """Run up to 50 actions, stopping at the first surprise.
 
     Each input action is sent only if windows, focus and output are as they were
     right after the previous action (or as in `observation` for the first). A
     `wait` or `focus` step expects a change and takes a new baseline. Popups and
     in-window changes are not detected; take a screenshot afterwards.
+
+    The sequence holds the session's controller lease throughout, so another
+    client cannot interleave input: the caller's lease when a controller is
+    given (kept afterwards), otherwise a temporary one released at the end.
+    Steps are never retried. A step whose request got no reply is reported
+    with "uncertain": true; it may or may not have been delivered.
     """
     if not isinstance(actions, list) or not 1 <= len(actions) <= 50:
         raise DesktopError("Actions must be a list of 1 to 50 steps")
@@ -547,9 +588,30 @@ def run_actions(session, actions, observation=None):
             raise DesktopError(
                 f"Step {index} needs an action: {', '.join(SEQUENCE_ACTIONS)}"
             )
-        if "observation" in step or "session" in step:
-            raise DesktopError(f"Step {index} must not set observation or session")
-    baseline = observation or request(session, "observe")["observation"]
+        if {"observation", "session", "controller"} & step.keys():
+            raise DesktopError(
+                f"Step {index} must not set observation, session or controller"
+            )
+    controller = controller_id(controller)
+    temporary = controller is None
+    if temporary:
+        controller = f"sequence-{uuid.uuid4().hex[:12]}"
+    try:
+        request(session, "lease", controller)
+    except DesktopError as error:
+        return stopped(0, len(actions), str(error))
+    try:
+        return run_steps(session, actions, observation, controller)
+    finally:
+        if temporary:
+            try:
+                request(session, "lease", controller, action="release")
+            except DesktopError:
+                pass  # e.g. the session was destroyed; the lease went with it
+
+
+def run_steps(session, actions, observation, controller):
+    baseline = observation or request(session, "observe", controller)["observation"]
     # Keep a cropped or scaled screenshot's coordinate mapping for every step.
     mapping = "@" + observation.partition("@")[2] if "@" in (observation or "") else ""
     for index, step in enumerate(actions):
@@ -557,13 +619,19 @@ def run_actions(session, actions, observation=None):
         action = step["action"]
         try:
             if action == "wait":
-                waited = wait(session, **arguments)
+                waited = wait(session, **arguments, controller=controller)
                 if not waited["satisfied"]:
                     return stopped(index, len(actions), f"wait: {waited['reason']}")
             elif action == "focus":
-                request(session, "focus", **arguments)
+                request(session, "focus", controller, **arguments)
             else:
-                request(session, action, observation=baseline, **arguments)
+                request(session, action, controller, observation=baseline, **arguments)
+        except DeliveryUnknown as error:
+            # Never retried: input such as typing or submitting may not be
+            # idempotent. Report the step so the caller can check the desktop.
+            result = stopped(index, len(actions), str(error))
+            result["stopped"]["uncertain"] = True
+            return result
         except DesktopError as error:
             return stopped(index, len(actions), str(error))
         except TypeError as error:
@@ -575,7 +643,7 @@ def run_actions(session, actions, observation=None):
             )
             return stopped(index, len(actions), f"{error}{hint}")
         try:
-            baseline = request(session, "observe")["observation"] + mapping
+            baseline = request(session, "observe", controller)["observation"] + mapping
         except DesktopError as error:
             # The step was delivered; report it rather than an unqualified error.
             return stopped(
@@ -618,11 +686,11 @@ def render_tree(tree):
     return "\n".join(lines) or "(no accessible elements)"
 
 
-def wait_for_agent_control(session, timeout):
+def wait_for_agent_control(session, timeout, controller=None):
     """Wait until no person holds or has been asked to take the session."""
     deadline = time.monotonic() + max(0, min(timeout, 600))
     while True:
-        state = request(session, "control")
+        state = request(session, "control", controller)
         if state["owner"] == "agent" and not state["request"]:
             return state
         if time.monotonic() >= deadline:

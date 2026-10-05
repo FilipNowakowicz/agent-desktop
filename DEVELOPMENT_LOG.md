@@ -10,6 +10,16 @@ gone, never live sessions or profiles. Tests: tests/test_retention.py (synthetic
 state plus a real session keeping 3 of 6 screenshots). A working-day soak is
 still to do.
 
+Soak (`scripts/soak.py --minutes 60`, local Nix labwc 0.20.2): one persistent
+session typed 8,913 numbered mixed-script lines through a terminal fixture with
+screenshot tokens and 200 ms settle waits, all received exactly; 891 short
+sessions were created, captured and destroyed with no leftover processes.
+Worker RSS stayed at 36.9 MB from minute 5 to 60, process count at 4, and
+latencies were flat (screenshot p95 55 ms, type/key p95 13 ms, wait p95 267 ms,
+create p50 202 ms, destroy p50 414 ms). State grew about 70 KB per 5 minutes,
+all from stopped short sessions (prunable). Worker CPU was a steady ~29% of one
+core under this continuous load. Eight hours and an idle-session soak remain.
+
 ## 2026-10-05 — Preflight doctor
 
 First step of the review's packaging milestone, independent of the choice of

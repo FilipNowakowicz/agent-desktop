@@ -39,6 +39,7 @@ TEXT_ROLES = {"text", "entry", "text box", "paragraph", "terminal", "document te
 PRESS_ACTIONS = ("click", "press", "activate", "toggle", "jump", "dodefault")
 # Offered by every Chromium node; omitted from listings, still callable by name.
 HIDDEN_ACTIONS = {"showContextMenu"}
+MAX_DEPTH = 200
 NODE = re.compile(r"(:[0-9]+\.[0-9]+)((?:/[A-Za-z0-9_]+)+)")
 
 
@@ -178,36 +179,65 @@ class Accessibility:
     def children(self, node):
         return [tuple(c) for c in self.call(node, ACCESSIBLE, "GetChildren")[0]]
 
-    def tree(self, app=None, window=None, max_nodes=300):
-        """Visible UI nodes as a flat list with depth, filtered by app or window."""
-        nodes, truncated = [], False
+    def tree(self, app=None, window=None, max_nodes=300, budget=3.0):
+        """Visible UI nodes as a flat list with depth, filtered by app or window.
 
-        def visit(node, depth, top=None):
+        Bounded by listed nodes, visited nodes and elapsed time, so a slow or
+        enormous application cannot monopolize the session worker.
+        """
+        nodes, truncated = [], None
+        deadline = time.monotonic() + budget
+        visited = 0
+        max_visited = max(2000, max_nodes * 10)
+
+        def exhausted():
             nonlocal truncated
             if len(nodes) >= max_nodes:
-                truncated = True
-                return
-            try:
-                record, showing = self.describe(node)
-                children = self.children(node)
-            except (AccessibilityError, TimeoutError):
-                # Elements disappear while the tree is read (e.g. a closing window).
-                return
-            if depth > 0 and not showing:
-                return
-            if top and window and depth == 1 and window not in record["name"]:
-                return
-            keep = not (
-                record["role"] in CONTAINERS
-                and not record["name"]
-                and set(record.get("actions", ())) <= {"doDefault"}
-            )
-            if keep:
-                nodes.append({**record, "depth": depth})
-            for child in children:
-                visit(child, depth + 1 if keep else depth, top)
+                truncated = truncated or "node limit"
+            elif visited >= max_visited:
+                truncated = truncated or "visit limit"
+            elif time.monotonic() >= deadline:
+                truncated = truncated or "time limit"
+            return truncated is not None
+
+        seen = set()
+
+        def walk(window_nodes):
+            """Depth-first, in order, with an explicit stack (trees can be deep)."""
+            nonlocal visited, truncated
+            stack = [(node, 1, True) for node in reversed(window_nodes)]
+            while stack and not exhausted():
+                node, depth, is_window = stack.pop()
+                if node in seen:  # a cyclic tree must not loop forever
+                    continue
+                seen.add(node)
+                visited += 1
+                if depth > MAX_DEPTH:
+                    truncated = truncated or "depth limit"
+                    continue
+                try:
+                    record, showing = self.describe(node)
+                    children = self.children(node)
+                except (AccessibilityError, TimeoutError):
+                    # Elements disappear while the tree is read (e.g. a closing window).
+                    continue
+                if not showing:
+                    continue
+                if is_window and window and window not in record["name"]:
+                    continue
+                keep = not (
+                    record["role"] in CONTAINERS
+                    and not record["name"]
+                    and set(record.get("actions", ())) <= {"doDefault"}
+                )
+                if keep:
+                    nodes.append({**record, "depth": depth})
+                below = depth + 1 if keep else depth
+                stack.extend((child, below, False) for child in reversed(children))
 
         for application in self.children(REGISTRY):
+            if exhausted():
+                break
             try:
                 name = self.get(application, ACCESSIBLE, "Name")
                 windows = self.children(application)
@@ -226,9 +256,12 @@ class Accessibility:
                     "depth": 0,
                 }
             )
-            for child in windows:
-                visit(child, 1, application)
-        return {"nodes": nodes, "truncated": truncated}
+            walk(windows)
+        return {
+            "nodes": nodes,
+            "truncated": truncated is not None,
+            "truncated_by": truncated,
+        }
 
     def act(self, node_id, action, text=None):
         node = self.parse(node_id)

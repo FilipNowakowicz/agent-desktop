@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-10-05 — Takeover follows the person's keyboard layout
+
+The user's first real takeover (US Dvorak on Hyprland) typed QWERTY: the line
+"the quick brown fox..." arrived as `asdfasdferewqasdfasdf`. TigerVNC sends key
+positions (QEMU extended key events) and wayvnc maps them with its own default
+layout. `take` now detects the host layout (`AGENT_DESKTOP_KEYBOARD`, Hyprland
+`kb_layout`/`kb_variant`, `XKB_DEFAULT_*`, then `localectl`; first entry of
+multi-layout lists) and starts wayvnc with `--keyboard=<layout>[-<variant>]`;
+`--keyboard` overrides it. The value is validated and reported in the control
+state. Detected here: `us-dvorak`. Test
+`test_key_positions_follow_the_person_layout` sends QEMU key events for the
+QWERTY positions a s d f + Return: `asdf` without a layout (the reported bug),
+`aoeu` with `us-dvorak`. A unit test covers the detection order.
+
 ## 2026-10-05 — Action trace
 
 Review F035 (and the diagnostics F006 asks for). Every session writes

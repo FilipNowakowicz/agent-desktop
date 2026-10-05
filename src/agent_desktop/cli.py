@@ -8,9 +8,11 @@ from .core import (
     destroy,
     logs,
     profiles,
+    prune,
     request,
     run_actions,
     sessions,
+    usage,
     wait,
 )
 from .doctor import doctor
@@ -40,6 +42,10 @@ def main():
         help="also create, capture and destroy a session",
     )
     sub.add_parser("profiles")
+    sub.add_parser("usage", help="disk used by sessions, screenshots and profiles")
+    pruning = sub.add_parser("prune", help="delete stopped/failed sessions' state")
+    pruning.add_argument("--older-than", type=float, default=0, metavar="DAYS")
+    pruning.add_argument("--dry-run", action="store_true")
     removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
     removal.add_argument("profile")
     for name, text in (
@@ -164,6 +170,10 @@ def main():
             return 0 if result["status"] != "fail" else 1
         elif command == "profiles":
             result = profiles()
+        elif command == "usage":
+            result = usage()
+        elif command == "prune":
+            result = prune(args["older_than"], args["dry_run"])
         elif command == "delete-profile":
             result = delete_profile(args["profile"])
         elif command == "logs":

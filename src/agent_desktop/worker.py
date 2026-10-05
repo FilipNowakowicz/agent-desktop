@@ -464,6 +464,7 @@ class Worker:
             arguments += ["-s", str(scale)]
         directory = self.root / "screenshots"
         directory.mkdir(exist_ok=True, mode=0o700)
+        self.prune_screenshots(directory)
         path = directory / (uuid.uuid4().hex + ".png")
         # Retry so the token describes the layout the image actually shows.
         for _ in range(3):
@@ -491,6 +492,13 @@ class Worker:
             "scale": scale or 1,
             "observation": image_token(before, region, scale),
         }
+
+    def prune_screenshots(self, directory):
+        """Keep the newest screenshots only, so long sessions do not fill the disk."""
+        keep = int(os.environ.get("AGENT_DESKTOP_KEEP_SCREENSHOTS", 200))
+        shots = sorted(directory.glob("*.png"), key=lambda p: p.stat().st_mtime)
+        for old in shots[: max(0, len(shots) - (keep - 1))]:
+            old.unlink(missing_ok=True)
 
     def capture_pixels(self):
         """Capture the output as raw RGB without writing a file."""

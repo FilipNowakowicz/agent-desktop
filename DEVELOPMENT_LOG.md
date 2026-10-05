@@ -1,5 +1,15 @@
 # Development log
 
+## 2026-10-05 — Bounded retention
+
+Review F013 / plan step 4. Screenshots are pruned to the newest 200 per session
+on each capture (`AGENT_DESKTOP_KEEP_SCREENSHOTS`). `usage` reports sessions by
+status, session and screenshot bytes and profile bytes; `prune [--older-than
+DAYS] [--dry-run]` removes only stopped/failed sessions whose supervisors are
+gone, never live sessions or profiles. Tests: tests/test_retention.py (synthetic
+state plus a real session keeping 3 of 6 screenshots). A working-day soak is
+still to do.
+
 ## 2026-10-05 — Preflight doctor
 
 First step of the review's packaging milestone, independent of the choice of

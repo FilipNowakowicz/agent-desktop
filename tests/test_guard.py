@@ -120,6 +120,17 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(any(name.startswith("AGENT_DESKTOP_") for name in removed))
         self.assertEqual(lines["pwd"], lines["home"])
 
+    def test_launch_directory(self):
+        session = core.create()["session"]
+        self.sessions.append(session)
+        target = Path(self.temporary.name)
+        app = core.request(session, "launch", argv=["sh", "-c", "pwd"], cwd=str(target))
+        wait_for(lambda: Path(app["logs"]).read_text().strip())
+        self.assertEqual(Path(app["logs"]).read_text().strip(), str(target))
+        for bad in ("relative/dir", str(target / "missing")):
+            with self.subTest(cwd=bad), self.assertRaises(core.DesktopError):
+                core.request(session, "launch", argv=["true"], cwd=bad)
+
     def test_unguarded_session_keeps_host_tools(self):
         session, lines = self.probe(False)
         self.assertFalse(core.request(session, "status")["guard_host"])

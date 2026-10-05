@@ -109,7 +109,8 @@ def main():
     parser.add_argument("--cycles", type=int, default=10)
     parser.add_argument("--load", type=int, default=0, help="busy CPU processes")
     args = parser.parse_args()
-    artifact = Path("artifacts/stress") / uuid.uuid4().hex[:12]
+    # Absolute: applications start in the session home, not this directory.
+    artifact = (Path("artifacts/stress") / uuid.uuid4().hex[:12]).resolve()
     artifact.mkdir(parents=True, mode=0o700)
     os.environ["AGENT_DESKTOP_STATE_DIR"] = str((artifact / "state").resolve())
     stop = multiprocessing.Event()

@@ -79,9 +79,13 @@ def desktop_status(session: str) -> dict:
 
 
 @tool()
-def desktop_launch(session: str, argv: list[str]) -> dict:
-    """Launch an application argument list in the session's private environment."""
-    return core.request(session, "launch", argv=argv)
+def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dict:
+    """Launch an application argument list in the session's private environment.
+
+    It runs in the session's private home unless cwd (an absolute directory)
+    is given; use absolute paths for files.
+    """
+    return core.request(session, "launch", argv=argv, cwd=cwd)
 
 
 @tool()

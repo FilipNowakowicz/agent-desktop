@@ -9,8 +9,14 @@ askpass helpers, GNOME keyring, cloud prefixes, names containing TOKEN, SECRET,
 PASSWORD, API_KEY or CREDENTIAL), exempting AGENT_DESKTOP_* so the session
 token that ownership depends on survives; `status` lists removed names, never
 values. Tests: fake SSH/API/AWS variables absent in guarded and present in
-unguarded sessions, PWD equals HOME, a classification unit test. Full suite
-81 OK, 5 skipped.
+unguarded sessions, PWD equals HOME, a classification unit test.
+
+CI then failed `lifecycle_stress.py` on all three distributions (0/5): it passed
+a relative fixture path, which now resolved from the session home. Relative
+paths are a real interface question, so `launch` takes an optional absolute
+`cwd`; the CLI sends the caller's directory (shell semantics), MCP and core
+default to the session home, and the stress script uses absolute paths. Full
+suite 84 OK, 5 skipped; stress 3/3 locally.
 ## 2026-10-05 — Bounded retention
 
 Review F013 / plan step 4. Screenshots are pruned to the newest 200 per session

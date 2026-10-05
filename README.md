@@ -133,8 +133,10 @@ the error (`release --force` hands back anyway). The session keymap is US, so
 characters missing from that layout may not reach the session when typed
 (pasting avoids this).
 
-Every session starts applications in its private home directory rather than
-the directory it was created from. Unguarded sessions inherit the rest of your
+Applications start in the session's private home directory unless `launch`
+is given an absolute `cwd`; the CLI passes your current directory, so relative
+paths on its command line work as in a shell. They never inherit the directory
+the session happened to be created from. Unguarded sessions inherit the rest of your
 environment.
 
 ### Guarding the host

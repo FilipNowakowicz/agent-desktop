@@ -802,6 +802,13 @@ class Worker:
                 or not all(isinstance(v, str) and "\0" not in v for v in argv)
             ):
                 raise ValueError("Launch requires a nonempty argument list")
+            cwd = request.get("cwd") or self.env["HOME"]
+            if (
+                not isinstance(cwd, str)
+                or not os.path.isabs(cwd)
+                or not os.path.isdir(cwd)
+            ):
+                raise ValueError("cwd must be an existing absolute directory")
             executable = shutil.which(argv[0], path=self.env.get("PATH"))
             if not executable:
                 raise ValueError(f"Executable not found: {argv[0]}")
@@ -811,8 +818,9 @@ class Worker:
                 process = subprocess.Popen(
                     [executable, *argv[1:]],
                     env=self.env,
-                    # Not the directory the session was created from.
-                    cwd=self.env["HOME"],
+                    # The caller's choice, else the session home; never the
+                    # directory the session happened to be created from.
+                    cwd=cwd,
                     stdout=log,
                     stderr=log,
                     start_new_session=True,

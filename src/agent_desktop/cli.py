@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 
 from .core import (
     DesktopError,
@@ -197,6 +198,9 @@ def main():
             session = args.pop("session")
             if command == "launch" and args["argv"][:1] == ["--"]:
                 args["argv"] = args["argv"][1:]
+            if command == "launch":
+                # Relative paths on the command line mean the caller's directory.
+                args["cwd"] = os.getcwd()
             result = request(session, command, **args)
         print(json.dumps(result, indent=2))
     except DesktopError as error:

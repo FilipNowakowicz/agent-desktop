@@ -321,6 +321,7 @@ def desktop_destroy(session: str) -> dict:
 
 
 def main():
+    core.use_runtime()
     mcp.run(transport="stdio")
 
 

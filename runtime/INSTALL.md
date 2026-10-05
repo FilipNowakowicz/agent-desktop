@@ -31,14 +31,28 @@ pinned by `runtime/nix/flake.lock`. Nothing is installed into a profile and the
 host is not changed:
 
 ```sh
-runtime=$(nix build --no-link --print-out-paths ./runtime/nix)
-PATH="$runtime/bin:$PATH" uv run agent-desktop doctor --smoke
+nix build ./runtime/nix --out-link ~/.local/share/agent-desktop/runtime
+uv run agent-desktop doctor --smoke
 ```
 
-`doctor` should report `repaired runtime (... (nix))`. Start your agent or MCP
-client with the same `PATH` so the sessions it creates use this runtime. A
-garbage collection can remove the build; `nix build --out-link` gives it a GC
-root if you want to keep it.
+`doctor` should report `repaired runtime (... (nix))`. The link is also a
+garbage-collection root. Remove it to stop using this runtime.
+
+## Selecting a runtime
+
+The CLI and the MCP server put a selected runtime's `bin/` first on `PATH` for
+themselves and the sessions they create, so an MCP client needs no extra
+configuration:
+
+1. `AGENT_DESKTOP_RUNTIME=/prefix`, if set;
+2. otherwise `$XDG_DATA_HOME/agent-desktop/runtime` (default
+   `~/.local/share/agent-desktop/runtime`), if it has a `bin/` directory;
+3. otherwise whatever is on `PATH` (the Ubuntu packages).
+
+`doctor` reports the selection in its `runtime` check. Single tools can still be
+overridden with `AGENT_DESKTOP_LABWC`, `AGENT_DESKTOP_GRIM` and similar variables.
+The prebuilt repair from `scripts/build_xwayland_runtime.sh` can be selected the
+same way: `AGENT_DESKTOP_RUNTIME=<output>/install`.
 
 ## Ubuntu 24.04 LTS
 

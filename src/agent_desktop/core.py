@@ -27,6 +27,35 @@ def state_root():
     )
 
 
+def runtime_prefix():
+    """The selected desktop runtime prefix, if any.
+
+    AGENT_DESKTOP_RUNTIME names it; otherwise a runtime installed (or linked,
+    e.g. by `nix build --out-link`) at $XDG_DATA_HOME/agent-desktop/runtime is
+    used. Without either, tools come from PATH.
+    """
+    override = os.environ.get("AGENT_DESKTOP_RUNTIME")
+    if override:
+        return Path(override).expanduser()
+    default = (
+        Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
+        / "agent-desktop/runtime"
+    )
+    return default if (default / "bin").is_dir() else None
+
+
+def use_runtime():
+    """Put the selected runtime first on PATH for this process and its sessions."""
+    prefix = runtime_prefix()
+    if prefix is None:
+        return None
+    bin_dir = str(prefix / "bin")
+    entries = os.environ.get("PATH", "").split(os.pathsep)
+    if entries[:1] != [bin_dir]:
+        os.environ["PATH"] = os.pathsep.join([bin_dir, *entries])
+    return prefix
+
+
 def session_path(session):
     if not isinstance(session, str) or not re.fullmatch(r"[a-f0-9]{12}", session):
         raise DesktopError("Invalid session identifier")

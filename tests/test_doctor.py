@@ -7,12 +7,14 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from agent_desktop import doctor
+from agent_desktop import core, doctor
 
 
 class DoctorTests(unittest.TestCase):
     def test_missing_required_tools_fail_with_hints(self):
-        with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
+        environment = {"PATH": "/nonexistent", "XDG_DATA_HOME": "/nonexistent"}
+        with mock.patch.dict(os.environ, environment):
+            os.environ.pop("AGENT_DESKTOP_RUNTIME", None)
             result = doctor.doctor()
         self.assertEqual(result["status"], "fail")
         failed = {c["check"] for c in result["checks"] if c["status"] == "fail"}
@@ -98,6 +100,23 @@ class DoctorTests(unittest.TestCase):
             with mock.patch.dict(os.environ, environment):
                 os.environ.pop("AGENT_DESKTOP_AT_SPI_REGISTRYD", None)
                 self.assertEqual(doctor.accessibility()["path"], str(registryd))
+
+    def test_selected_runtime_goes_first_on_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            linked = Path(directory) / "agent-desktop" / "runtime"
+            (linked / "bin").mkdir(parents=True)
+            environment = {"PATH": "/usr/bin", "XDG_DATA_HOME": directory}
+            with mock.patch.dict(os.environ, environment):
+                os.environ.pop("AGENT_DESKTOP_RUNTIME", None)
+                self.assertEqual(core.use_runtime(), linked)
+                core.use_runtime()
+                self.assertEqual(os.environ["PATH"], f"{linked}/bin:/usr/bin")
+                self.assertEqual(doctor.runtime_selection()["path"], str(linked))
+                os.environ["AGENT_DESKTOP_RUNTIME"] = f"{directory}/missing"
+                self.assertEqual(doctor.runtime_selection()["status"], "fail")
+            with mock.patch.dict(os.environ, {"XDG_DATA_HOME": f"{directory}/empty"}):
+                os.environ.pop("AGENT_DESKTOP_RUNTIME", None)
+                self.assertIsNone(core.runtime_prefix())
 
     @unittest.skipUnless(
         all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),

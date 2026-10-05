@@ -144,8 +144,24 @@ def smoke():
     return {"check": "smoke", "status": "ok", "detail": f"{detail} in {elapsed} s"}
 
 
+def runtime_selection():
+    prefix = core.runtime_prefix()
+    if prefix is None:
+        return {"check": "runtime", "status": "ok", "detail": "tools from PATH"}
+    if not (prefix / "bin").is_dir():
+        return {
+            "check": "runtime",
+            "status": "fail",
+            "detail": f"selected runtime has no bin directory: {prefix}",
+            "hint": "fix AGENT_DESKTOP_RUNTIME or rebuild the runtime (runtime/INSTALL.md)",
+        }
+    return {"check": "runtime", "status": "ok", "path": str(prefix)}
+
+
 def doctor(with_smoke=False):
+    core.use_runtime()
     checks = [
+        runtime_selection(),
         tool("labwc", True, "install labwc (the private compositor)"),
         tool("grim", True, "install grim (screenshots)"),
         tool("dbus-daemon", True, "install dbus (the session's private bus)"),
@@ -155,7 +171,7 @@ def doctor(with_smoke=False):
         runtime_directory(),
         accessibility(),
     ]
-    labwc = checks[0].get("path")
+    labwc = checks[1].get("path")
     if labwc:
         checks.append(wlroots(labwc))
     if with_smoke and all(c["status"] != "fail" for c in checks):

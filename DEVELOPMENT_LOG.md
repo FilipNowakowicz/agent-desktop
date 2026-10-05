@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-10-05 — Runtime selection without PATH setup
+
+First pilot attempt: this repository's `.mcp.json` starts `uv run
+agent-desktop-mcp`, which inherits the client's PATH, and `desktop_create`
+failed with `Missing executable: labwc`. An MCP client should not need a
+hand-built PATH. The CLI and MCP server now put a selected runtime's `bin/`
+first on PATH for themselves and their sessions: `AGENT_DESKTOP_RUNTIME`, or
+else `~/.local/share/agent-desktop/runtime` if it exists (the Nix install is
+`nix build ./runtime/nix --out-link` to that path, which is also a GC root),
+else PATH. `doctor` reports the selection. Installed that link locally; with
+the user's ordinary PATH, `doctor --smoke` is all ok, finding the repaired
+runtime and the libexec registryd. Full suite 86 OK, 6 skipped. Test
+`test_selected_runtime_goes_first_on_path`.
+
 ## 2026-10-05 — Two installation paths
 
 Plan step 3 / F007/F019. `runtime/nix/flake.nix` (nixpkgs pinned at `4975466`)

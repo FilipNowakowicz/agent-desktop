@@ -13,6 +13,7 @@ from .core import (
     sessions,
     wait,
 )
+from .doctor import doctor
 from .viewer import take, view
 
 
@@ -32,6 +33,12 @@ def main():
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
+    checkup = sub.add_parser("doctor", help="check the runtime before first use")
+    checkup.add_argument(
+        "--smoke",
+        action="store_true",
+        help="also create, capture and destroy a session",
+    )
     sub.add_parser("profiles")
     removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
     removal.add_argument("profile")
@@ -151,6 +158,10 @@ def main():
             result = create(mode, tools=args, profile=profile, guard_host=guard)
         elif command == "list":
             result = sessions()
+        elif command == "doctor":
+            result = doctor(with_smoke=args["smoke"])
+            print(json.dumps(result, indent=2))
+            return 0 if result["status"] != "fail" else 1
         elif command == "profiles":
             result = profiles()
         elif command == "delete-profile":

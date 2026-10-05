@@ -56,6 +56,8 @@ jobs:
           name: desktop-tests-${{ github.job }}-${{ strategy.job-index }}
           path: ${{ runner.temp }}/desktop-tests
           retention-days: 7
+      - name: Preflight check
+        run: uv run agent-desktop doctor --smoke
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2
   distributions:
@@ -144,5 +146,7 @@ jobs:
           name: desktop-tests-${{ github.job }}-${{ strategy.job-index }}
           path: ${{ runner.temp }}/desktop-tests
           retention-days: 7
+      - name: Preflight check
+        run: uv run agent-desktop doctor --smoke
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2

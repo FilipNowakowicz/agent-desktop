@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-10-05 — Preflight doctor
+
+First step of the review's packaging milestone, independent of the choice of
+distribution: `agent-desktop doctor [--smoke]` checks required and optional
+tools, the runtime directory and socket-path length, accessibility, and the
+wlroots version labwc loads, warning for stock 0.19.3/0.20.2 unless the repair
+marker written by `scripts/build_xwayland_runtime.sh` sits beside the library.
+`--smoke` creates, captures and destroys a session. CI runs it on all three
+distributions. Locally (Nix labwc 0.20.2): warn for stock wlroots, missing
+viewer tools and registry; smoke 1280x720 in 0.69 s; empty PATH fails with hints.
+
 ## 2026-10-05 — Review fixes: bounded listings, responsive MCP
 
 F004/F017/F010. AT-SPI listings are bounded by listed nodes (application rows

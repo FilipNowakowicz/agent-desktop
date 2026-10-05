@@ -9,6 +9,7 @@ import ctypes
 import socket
 import struct
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -598,3 +599,64 @@ def clear_selection(display_path):
         if version >= 2 or interface.startswith("ext_"):
             connection.send(device, 2, struct.pack("=I", 0))  # set_primary_selection
         connection.roundtrip()
+
+
+class InputActivity:
+    """Notices input on a compositor's seat through ext-idle-notify.
+
+    A thread blocks on the connection, so each event is timestamped when it
+    happens. The seat reports input from every device, including our own
+    virtual ones; callers tell them apart by when they last sent input.
+    """
+
+    def __init__(self, display_path, idle_ms=1000):
+        self.connection = Connection(display_path)
+        if "ext_idle_notifier_v1" not in self.connection.globals:
+            raise WaylandError("Compositor does not provide ext_idle_notifier_v1")
+        version = self.connection.globals["ext_idle_notifier_v1"][0][1]
+        seat = self.connection.bind("wl_seat", 1)
+        notifier = self.connection.bind("ext_idle_notifier_v1", 2)
+        notification = self.connection.new_id()
+        # Version 2 can ignore idle inhibitors (e.g. a playing video).
+        opcode = 2 if version >= 2 else 1
+        self.connection.send(
+            notifier, opcode, struct.pack("=III", notification, idle_ms, seat)
+        )
+        self.idle = False
+        self.resumed_at = []  # monotonic times of idle -> active transitions
+        self.connection.listeners[notification] = self.event
+        self.connection.roundtrip()
+        self.connection.socket.settimeout(None)
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def event(self, opcode, _payload):
+        if opcode == 0:  # idled
+            self.idle = True
+        elif opcode == 1:  # resumed
+            self.idle = False
+            self.resumed_at = [*self.resumed_at[-19:], time.monotonic()]
+
+    def run(self):
+        try:
+            while True:
+                self.connection.dispatch()
+        except (OSError, WaylandError):
+            pass
+
+    def close(self):
+        try:
+            self.connection.socket.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.connection.close()
+
+
+def peer_pid(display_path):
+    """The process id of the compositor serving a Wayland socket."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+        client.connect(str(display_path))
+        credentials = client.getsockopt(
+            socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")
+        )
+    return struct.unpack("3i", credentials)[0]

@@ -200,8 +200,18 @@ def request(session, operation, controller=None, **arguments):
     return reply["result"]
 
 
-def create(mode="headless", tools=None, profile=None, guard_host=False):
-    if mode not in ("headless", "visible"):
+def create(
+    mode="headless", tools=None, profile=None, guard_host=False, _host_minutes=None
+):
+    if mode == "host":
+        # Only approve_host/request_host may attach to the person's own screen.
+        if _host_minutes is None:
+            raise DesktopError(
+                "Host sessions need the person's approval: use request_host"
+            )
+        if profile is not None or guard_host:
+            raise DesktopError("Host sessions take no profile or host guard")
+    elif mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
     home = None
     if profile is not None:
@@ -212,7 +222,8 @@ def create(mode="headless", tools=None, profile=None, guard_host=False):
         if profile_in_use(home.parent):
             raise DesktopError(f"Profile {profile} is in use by another session")
     paths = {}
-    for tool in ("labwc", "grim", "dbus-daemon"):
+    required = ("grim",) if mode == "host" else ("labwc", "grim", "dbus-daemon")
+    for tool in required:
         executable = (tools or {}).get(tool) or os.environ.get(
             "AGENT_DESKTOP_" + tool.upper().replace("-", "_"), tool
         )
@@ -225,13 +236,17 @@ def create(mode="headless", tools=None, profile=None, guard_host=False):
         raise DesktopError(
             "XDG_RUNTIME_DIR must point to a writable user runtime directory"
         )
-    if mode == "visible":
+    if mode in ("visible", "host"):
         display = os.environ.get("WAYLAND_DISPLAY")
         if not display:
-            raise DesktopError("Visible mode requires a parent Wayland display")
+            raise DesktopError(f"{mode.title()} mode requires a Wayland desktop")
         parent = str((Path(host_runtime) / display).resolve())
         if not Path(parent).is_socket():
             raise DesktopError("Parent Wayland socket does not exist")
+    if mode == "host" and active_host_session():
+        raise DesktopError(
+            f"A host session is already running: {active_host_session()}"
+        )
     session = uuid.uuid4().hex[:12]
     base = state_root()
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -263,6 +278,10 @@ def create(mode="headless", tools=None, profile=None, guard_host=False):
         "status": "starting",
         "created_at": time.time(),
     }
+    if mode == "host":
+        info["parent_wayland"] = None
+        info["host_wayland"] = parent
+        info["expires_at"] = time.time() + _host_minutes * 60
     (root / "session.json").write_text(json.dumps(info, indent=2) + "\n")
     env = os.environ.copy()
     env["AGENT_DESKTOP_SESSION_TOKEN"] = info["token"]
@@ -400,6 +419,122 @@ def logs(session):
             stream.seek(max(0, stream.tell() - 16384))
             result[path.name] = stream.read().decode(errors="replace")
     return result
+
+
+HOST_REQUEST = "host-request.json"
+
+
+def active_host_session():
+    """The running host session's id, if any."""
+    for entry in sessions():
+        if entry.get("mode") == "host" and entry.get("status") in ("starting", "ready"):
+            return entry["session"]
+    return None
+
+
+def host_minutes(minutes):
+    if (
+        not isinstance(minutes, (int, float))
+        or isinstance(minutes, bool)
+        or not 0 < minutes <= 240
+    ):
+        raise DesktopError("Minutes must be between 0 and 240")
+    return minutes
+
+
+def request_host(reason, minutes=15, timeout=120):
+    """Ask the person to let the agent use their own screen; wait for the answer.
+
+    A notification shows the reason: clicking it allows, dismissing it declines.
+    `agent-desktop host approve` (or `deny`) answers from a terminal instead.
+    Returns the host session on approval.
+    """
+    if not isinstance(reason, str) or not 0 < len(reason.strip()) <= 300:
+        raise DesktopError("Reason must be a nonempty string of at most 300 characters")
+    minutes = host_minutes(minutes)
+    if not 0 < timeout <= 600:
+        raise DesktopError("Timeout must be between 0 and 600 seconds")
+    running = active_host_session()
+    if running:
+        return {"session": running, "status": "ready", "approved": "already running"}
+    base = state_root()
+    base.mkdir(parents=True, exist_ok=True, mode=0o700)
+    request_id = uuid.uuid4().hex[:12]
+    path = base / HOST_REQUEST
+    path.write_text(
+        json.dumps({"id": request_id, "reason": reason.strip(), "minutes": minutes})
+    )
+    notice = None
+    if (
+        shutil.which("notify-send")
+        and os.environ.get("AGENT_DESKTOP_HOST_NOTIFY") != "0"
+    ):
+        notice = subprocess.Popen(
+            [
+                "notify-send",
+                "--app-name=Agent Desktop",
+                "--urgency=critical",
+                f"--expire-time={int(timeout * 1000)}",
+                "--action=default=Allow",
+                "--action=deny=Decline",
+                "Allow an agent to use your screen?",
+                f"{reason.strip()}\n{minutes:g} min. Click to allow; dismiss to "
+                "decline. Terminal: agent-desktop host approve",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    answer = None
+    deadline = time.monotonic() + timeout
+    try:
+        while answer is None and time.monotonic() < deadline:
+            try:
+                current = json.loads(path.read_text())
+            except (OSError, ValueError):
+                current = {}
+            if current.get("id") == request_id and current.get("answer"):
+                answer = current["answer"]
+            elif notice and notice.poll() is not None:
+                chosen = notice.stdout.read().strip()
+                answer = "approved" if chosen == "default" else "declined"
+                notice = None
+            else:
+                time.sleep(0.2)
+    finally:
+        if notice and notice.poll() is None:
+            notice.terminate()
+        path.unlink(missing_ok=True)
+    if answer is None:
+        raise DesktopError("No answer from the person; the screen was not shared")
+    if answer != "approved":
+        raise DesktopError("The person declined; do not use their screen")
+    return {**create("host", _host_minutes=minutes), "approved": True}
+
+
+def answer_host(approve, minutes=None):
+    """Answer a pending request; approving with none pending starts a session."""
+    path = state_root() / HOST_REQUEST
+    try:
+        pending = json.loads(path.read_text())
+    except (OSError, ValueError):
+        pending = None
+    if pending:
+        pending["answer"] = "approved" if approve else "declined"
+        path.write_text(json.dumps(pending))
+        return {"request": pending["id"], "answer": pending["answer"]}
+    if not approve:
+        return {"request": None, "answer": "nothing pending"}
+    return create("host", _host_minutes=host_minutes(minutes or 15))
+
+
+def stop_host():
+    """End the host session (and decline any pending request)."""
+    answer_host(False)
+    running = active_host_session()
+    if not running:
+        return {"stopped": None}
+    return {"stopped": running, **destroy(running)}
 
 
 def trace(session, limit=50):

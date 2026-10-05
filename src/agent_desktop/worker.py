@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -20,11 +21,13 @@ from pathlib import Path
 from .atspi import Accessibility, Unsupported, wait_for_registry
 from .wayland import (
     BUTTONS,
+    InputActivity,
     Keysyms,
     Toplevels,
     VirtualKeyboard,
     VirtualPointer,
     clear_selection,
+    peer_pid,
 )
 
 PR_SET_CHILD_SUBREAPER = 36
@@ -234,6 +237,51 @@ class LeaseHeld(RuntimeError):
     pass
 
 
+class UserActive(RuntimeError):
+    pass
+
+
+# Operations a host session refuses: the person is already at this screen, and
+# its accessibility bus and viewers belong to them.
+HOST_UNSUPPORTED = (
+    "take",
+    "release",
+    "viewer_start",
+    "request_human",
+    "ui",
+    "ui_action",
+)
+# Pause agent input this long after the person last used the computer.
+HOST_PAUSE_SECONDS = 3.0
+
+
+class HostCompositor:
+    """The person's own compositor: never started or stopped by a session."""
+
+    def __init__(self, display):
+        self.display = Path(display)
+        self.pid = peer_pid(display)
+
+    def poll(self):
+        return None if self.display.is_socket() else 1
+
+
+def notify(summary, body, env):
+    """Tell the person on their own screen (best effort)."""
+    if env.get("AGENT_DESKTOP_HOST_NOTIFY") == "0":
+        return
+    for argv in (
+        ["notify-send", "--app-name=Agent Desktop", summary, body],
+        ["hyprctl", "notify", "1", "8000", "0", f"{summary}: {body}"],
+    ):
+        if shutil.which(argv[0], path=env.get("PATH")):
+            try:
+                subprocess.run(argv, env=env, capture_output=True, timeout=5)
+                return
+            except (OSError, subprocess.SubprocessError):
+                continue
+
+
 def lease_seconds_default():
     """Inactivity limit for controller leases (AGENT_DESKTOP_LEASE_SECONDS, 60 s)."""
     try:
@@ -271,6 +319,8 @@ class Worker:
         self.keysyms = None
         self.stop = False
         self.profile_lock = None
+        self.activity = None  # host sessions: the person's input
+        self.agent_input = []  # host sessions: (start, end) of our input
 
     def save(self, status, **values):
         self.info.update(status=status, **values)
@@ -292,7 +342,79 @@ class Worker:
             )
         return result.stdout.strip()
 
+    def start_host(self):
+        """Attach to the person's own desktop instead of starting a compositor."""
+        self.env.pop("AGENT_DESKTOP_CONTROLLER", None)
+        display = self.info["host_wayland"]
+        self.compositor = HostCompositor(display)
+        self.info["compositor_pid"] = self.compositor.pid
+        self.info["wayland_display"] = display
+        self.virtual_pointer = VirtualPointer(display)
+        self.virtual_keyboard = VirtualKeyboard(display, self.root)
+        self.keysyms = Keysyms(self.compositor.pid)
+        self.toplevels = Toplevels(display)
+        # Agents pause between steps longer than this, so the person's input after
+        # one of those pauses is noticed even while the agent is working.
+        self.activity = InputActivity(display, idle_ms=300)
+        until = time.strftime("%H:%M", time.localtime(self.info["expires_at"]))
+        notify(
+            "An agent is using your screen",
+            f"Until {until}. Using the mouse or keyboard pauses it; "
+            "stop it with: agent-desktop host stop",
+            self.env,
+        )
+
+    def user_active(self):
+        """Whether the person used the computer recently (host sessions)."""
+        now = time.monotonic()
+        ours = self.agent_input
+        theirs = [
+            moment
+            for moment in self.activity.resumed_at
+            if not any(start - 0.05 <= moment <= end + 0.5 for start, end in ours)
+        ]
+        if not theirs:
+            return False
+        latest = theirs[-1]
+        # Still active since their last input (no idle period yet) or recently.
+        still = not self.activity.idle and latest == self.activity.resumed_at[-1]
+        return still or now - latest < HOST_PAUSE_SECONDS
+
+    def launch_on_host(self, argv, cwd):
+        """Start an application the way the person's desktop would, outside the
+        session, so it stays open when the session ends."""
+        command = f"cd {shlex.quote(cwd)} && exec {shlex.join(argv)}"
+        if self.env.get("HYPRLAND_INSTANCE_SIGNATURE") and shutil.which(
+            "hyprctl", path=self.env.get("PATH")
+        ):
+            launcher = ["hyprctl", "dispatch", "exec", command]
+        elif shutil.which("systemd-run", path=self.env.get("PATH")):
+            launcher = [
+                "systemd-run",
+                "--user",
+                "--collect",
+                "--quiet",
+                f"--working-directory={cwd}",
+                "--",
+                *argv,
+            ]
+        else:
+            raise ValueError(
+                "No way to start an application outside the session: needs "
+                "Hyprland (hyprctl) or a systemd user manager"
+            )
+        result = subprocess.run(
+            launcher, env=self.env, capture_output=True, text=True, timeout=10
+        )
+        if result.returncode:
+            raise RuntimeError(
+                f"{launcher[0]} failed: {result.stderr.strip() or result.stdout.strip()}"
+            )
+        return {"launched_via": launcher[0], "argv": argv}
+
     def start(self):
+        if self.info["mode"] == "host":
+            return self.start_host()
         for key in (
             "DISPLAY",
             "WAYLAND_DISPLAY",
@@ -982,6 +1104,17 @@ class Worker:
             )
         if operation == "lease":
             return self.lease_request(request, controller)
+        host = self.info["mode"] == "host"
+        if host and operation in HOST_UNSUPPORTED:
+            raise ValueError(
+                f"{operation} is not available on the host session: the person "
+                "is at this screen. Use a private session for it."
+            )
+        if host and operation in (*INPUT_OPERATIONS, "focus") and self.user_active():
+            raise UserActive(
+                "The person is using the computer; nothing was sent. Wait a few "
+                "seconds (desktop_wait with seconds) and try again."
+            )
         # destroy, take, release and viewer_start stay available to everyone:
         # they are lifecycle and person controls, never agent input.
         self.check_lease(operation, controller)
@@ -1062,6 +1195,8 @@ class Worker:
             executable = shutil.which(argv[0], path=self.env.get("PATH"))
             if not executable:
                 raise ValueError(f"Executable not found: {argv[0]}")
+            if host:
+                return self.launch_on_host([executable, *argv[1:]], cwd)
             app = uuid.uuid4().hex[:12]
             log_path = self.root / f"app-{app}.log"
             with log_path.open("ab") as log:
@@ -1234,6 +1369,12 @@ class Worker:
             server.settimeout(0.5)
             self.save("ready", worker_pid=os.getpid(), guardian_pid=os.getppid())
             while not self.stop:
+                if (
+                    self.info.get("expires_at")
+                    and time.time() >= self.info["expires_at"]
+                ):
+                    print("Host session expired", file=sys.stderr, flush=True)
+                    break
                 self.trim_logs()
                 reap_orphans(self.tracked())
                 if self.compositor.poll() is not None:
@@ -1262,7 +1403,17 @@ class Worker:
                             raise ValueError("Request too large")
                         request = json.loads(line)
                         trace = self.trace_start(request)
+                        started = time.monotonic()
                         result = self.handle(request)
+                        if self.activity and request.get("operation") in (
+                            *INPUT_OPERATIONS,
+                            "focus",
+                        ):
+                            # Activity during our own input is not the person's.
+                            self.agent_input = [
+                                *self.agent_input[-49:],
+                                (started, time.monotonic()),
+                            ]
                         reply = {"ok": True, "result": result}
                     except Exception as error:
                         reply = {
@@ -1381,7 +1532,26 @@ class Worker:
             reap_orphans(self.tracked())
             time.sleep(0.05)
 
+    def cleanup_host(self):
+        """Release the person's desktop: never close their windows."""
+        for device in (
+            self.virtual_pointer,
+            self.virtual_keyboard,
+            self.toplevels,
+            self.activity,
+        ):
+            if device:
+                device.close()
+        try:
+            cleanup_processes(self.info["token"], self.tracked())
+        finally:
+            reap_orphans(self.tracked())
+        shutil.rmtree(self.info["runtime"], ignore_errors=True)
+        notify("The agent stopped using your screen", "Host session ended.", self.env)
+
     def cleanup(self):
+        if self.info["mode"] == "host":
+            return self.cleanup_host()
         if self.toplevels and self.compositor and self.compositor.poll() is None:
             self.stop_applications()
         for device in (

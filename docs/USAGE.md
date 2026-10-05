@@ -137,6 +137,37 @@ paths on its command line work as in a shell. They never inherit the directory
 the session happened to be created from. Unguarded sessions inherit the rest of your
 environment.
 
+## Your own screen (host session, experimental)
+
+When you ask an agent to do something on your screen ("open Firefox and go to
+the settings page"), it can request a host session. A notification shows its
+reason: click it to allow, dismiss it to decline. From a terminal, use
+`agent-desktop host approve` or `agent-desktop host deny`. The agent then uses
+the normal tools on your real desktop until the session expires (default 15
+minutes, at most 240) or is destroyed.
+
+```sh
+agent-desktop host start --minutes 10   # allow without a request
+agent-desktop host status
+agent-desktop host stop                 # end it now (bind this to a key if you like)
+```
+
+- **You come first.** When you use the mouse or keyboard, agent input is refused
+  for about 3 seconds after your last activity ("UserActive", nothing sent).
+  Activity is noticed after a 0.3 s pause in the agent's input, so a fast burst of
+  agent steps can finish before it stops.
+- **Notifications.** You get one when the session starts and ends.
+- **Your windows stay open.** Applications the agent starts open through your
+  desktop (`hyprctl dispatch exec` on Hyprland, otherwise `systemd-run --user`).
+  Ending the session never closes your windows.
+- **Not available:** takeover, viewers, `request_human` and semantic UI (the
+  accessibility bus belongs to your desktop). Use a private session for those.
+- **Screenshots** show your whole screen, including notifications and other
+  windows, and the agent's model provider receives them.
+- **Requirements:** a wlroots-style Wayland desktop with virtual keyboard and
+  pointer, foreign-toplevel, screencopy and ext-idle-notify (Hyprland, Sway,
+  labwc), and a single monitor at scale 1 (for now).
+
 ## Guarding the host
 
 Applications in a session run as your user. A panel button, widget or script can

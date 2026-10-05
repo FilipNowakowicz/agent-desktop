@@ -1,5 +1,15 @@
 # Development log
 
+## 2026-10-05 — Review fixes: bounded listings, responsive MCP
+
+F004/F017/F010. AT-SPI listings are bounded by listed nodes (application rows
+included), visited nodes, depth (200) and a 3 s budget, reported as
+`truncated_by`; the walk is iterative with cycle detection (a 5000-deep
+synthetic tree raised RecursionError before). UI replies are trimmed below
+200 KB and any reply over the 256 KB protocol limit becomes an explicit error.
+MCP tools run in worker threads; the MCP test fails with synchronous tools
+(`desktop_list` took 1.85 s behind a 2 s wait) and passes now.
+
 ## 2026-10-05 — Review fixes: profile lock, clipboard release, fixture race
 
 F003: the profile lock is `profiles/.NAME.lock`, outside the deleted directory

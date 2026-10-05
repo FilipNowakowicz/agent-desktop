@@ -833,6 +833,10 @@ class Worker:
             )
             for node in tree["nodes"]:
                 node["id"] = self.short_id(node["id"])
+            # Stay well under the protocol's response limit.
+            while len(json.dumps(tree["nodes"])) > 200_000:
+                del tree["nodes"][int(len(tree["nodes"]) * 0.9) :]
+                tree.update(truncated=True, truncated_by="size limit")
             return tree
         if operation == "ui_action":
             if request.get("observation") is not None:
@@ -979,8 +983,21 @@ class Worker:
                             "ok": False,
                             "error": f"{type(error).__name__}: {error}",
                         }
+                    encoded = (json.dumps(reply) + "\n").encode()
+                    if len(encoded) > 262144:
+                        # A clear error instead of a reply the client cannot read.
+                        encoded = (
+                            json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "ValueError: response exceeds the "
+                                    "protocol limit; narrow the request",
+                                }
+                            )
+                            + "\n"
+                        ).encode()
                     try:
-                        connection.sendall((json.dumps(reply) + "\n").encode())
+                        connection.sendall(encoded)
                     except OSError:
                         pass
 

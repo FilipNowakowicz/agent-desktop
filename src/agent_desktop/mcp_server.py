@@ -1,7 +1,9 @@
 """Stdio MCP adapter over the same session API used by the CLI."""
 
+import functools
 import json
 
+import anyio
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
@@ -23,7 +25,26 @@ profile name (one session per profile at a time)."""
 mcp = FastMCP("Private desktop", instructions=INSTRUCTIONS)
 
 
-@mcp.tool()
+def tool(**options):
+    """Register a tool that runs in a worker thread.
+
+    FastMCP runs synchronous tools on its event loop, so one long wait would
+    block every other request of the server, including other sessions.
+    """
+
+    def register(function):
+        @functools.wraps(function)
+        async def threaded(*args, **kwargs):
+            return await anyio.to_thread.run_sync(
+                functools.partial(function, *args, **kwargs)
+            )
+
+        return mcp.tool(**options)(threaded)
+
+    return register
+
+
+@tool()
 def desktop_create(
     mode: str = "headless", profile: str | None = None, guard_host: bool = False
 ) -> dict:
@@ -39,37 +60,37 @@ def desktop_create(
     return core.create(mode, profile=profile, guard_host=guard_host)
 
 
-@mcp.tool()
+@tool()
 def desktop_profiles() -> list[dict]:
     """List saved profiles and whether a session is using them."""
     return core.profiles()
 
 
-@mcp.tool()
+@tool()
 def desktop_list() -> list[dict]:
     """List desktop sessions and their current availability."""
     return core.sessions()
 
 
-@mcp.tool()
+@tool()
 def desktop_status(session: str) -> dict:
     """Get session health and application exit codes."""
     return core.request(session, "status")
 
 
-@mcp.tool()
+@tool()
 def desktop_launch(session: str, argv: list[str]) -> dict:
     """Launch an application argument list in the session's private environment."""
     return core.request(session, "launch", argv=argv)
 
 
-@mcp.tool()
+@tool()
 def desktop_windows(session: str) -> dict:
     """List private desktop windows: id, title, app_id, states and parent."""
     return core.request(session, "windows")
 
 
-@mcp.tool()
+@tool()
 def desktop_wait(
     session: str,
     title: str | None = None,
@@ -98,7 +119,7 @@ def desktop_wait(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_actions(
     session: str, actions: list[dict], observation: str | None = None
 ) -> dict:
@@ -116,7 +137,7 @@ def desktop_actions(
     return core.run_actions(session, actions, observation)
 
 
-@mcp.tool()
+@tool()
 def desktop_ui(
     session: str,
     app: str | None = None,
@@ -135,7 +156,7 @@ def desktop_ui(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_ui_action(
     session: str,
     node: str,
@@ -158,7 +179,7 @@ def desktop_ui_action(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_focus(session: str, window: str) -> dict:
     """Activate a private window and wait for its activated state (up to 2 seconds).
 
@@ -168,7 +189,7 @@ def desktop_focus(session: str, window: str) -> dict:
     return core.request(session, "focus", window=window)
 
 
-@mcp.tool(structured_output=False)
+@tool(structured_output=False)
 def desktop_screenshot(
     session: str, region: list[int] | None = None, scale: float | None = None
 ) -> list:
@@ -187,13 +208,13 @@ def desktop_screenshot(
     ]
 
 
-@mcp.tool()
+@tool()
 def desktop_type(session: str, text: str, observation: str | None = None) -> dict:
     """Type up to 10000 characters into the private focused app. Verify the result afterward."""
     return core.request(session, "type", text=text, observation=observation)
 
 
-@mcp.tool()
+@tool()
 def desktop_key(
     session: str,
     key: str,
@@ -213,7 +234,7 @@ def desktop_key(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_click(
     session: str, x: int, y: int, button: str = "left", observation: str | None = None
 ) -> dict:
@@ -224,13 +245,13 @@ def desktop_click(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_move(session: str, x: int, y: int, observation: str | None = None) -> dict:
     """Move only the private desktop pointer (coordinates as for desktop_click)."""
     return core.request(session, "move", x=x, y=y, observation=observation)
 
 
-@mcp.tool()
+@tool()
 def desktop_drag(
     session: str,
     x: int,
@@ -254,7 +275,7 @@ def desktop_drag(
     )
 
 
-@mcp.tool()
+@tool()
 def desktop_scroll(
     session: str, dy: int, dx: int = 0, observation: str | None = None
 ) -> dict:
@@ -262,7 +283,7 @@ def desktop_scroll(
     return core.request(session, "scroll", dy=dy, dx=dx, observation=observation)
 
 
-@mcp.tool()
+@tool()
 def desktop_request_human(session: str, reason: str) -> dict:
     """Ask the user to take control, e.g. to log in, enter a 2FA code or pass a CAPTCHA.
 
@@ -273,7 +294,7 @@ def desktop_request_human(session: str, reason: str) -> dict:
     return core.request(session, "request_human", reason=reason)
 
 
-@mcp.tool()
+@tool()
 def desktop_control(session: str, wait_seconds: int = 0) -> dict:
     """Report who controls the session and any pending request for the user.
 
@@ -283,13 +304,13 @@ def desktop_control(session: str, wait_seconds: int = 0) -> dict:
     return core.wait_for_agent_control(session, wait_seconds)
 
 
-@mcp.tool()
+@tool()
 def desktop_logs(session: str) -> dict:
     """Read bounded compositor and application log tails, including stopped sessions."""
     return core.logs(session)
 
 
-@mcp.tool()
+@tool()
 def desktop_destroy(session: str) -> dict:
     """Stop a session's owned processes and remove its private runtime/configuration."""
     return core.destroy(session)

@@ -326,6 +326,7 @@ name = "private-agent-desktop"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "jeepney" },
     { name = "mcp" },
 ]
@@ -337,6 +338,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.15.1" },
     { name = "jeepney", specifier = ">=0.9.0" },
     { name = "mcp", specifier = ">=1,<2" },
 ]

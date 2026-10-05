@@ -57,6 +57,19 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(created.isError)
                 session_id = json.loads(created.content[0].text)["session"]
                 try:
+                    # A long wait must not block other requests to the server.
+                    waiting = asyncio.create_task(
+                        client.call_tool(
+                            "desktop_wait", {"session": session_id, "seconds": 2}
+                        )
+                    )
+                    await asyncio.sleep(0.2)
+                    started = asyncio.get_running_loop().time()
+                    listed = await client.call_tool("desktop_list", {})
+                    self.assertFalse(listed.isError)
+                    self.assertLess(asyncio.get_running_loop().time() - started, 1.5)
+                    self.assertFalse(waiting.done())
+                    self.assertFalse((await waiting).isError)
                     fixture = root / "fixture"
                     fixture.mkdir()
                     script = (

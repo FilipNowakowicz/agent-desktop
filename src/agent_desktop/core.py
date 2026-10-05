@@ -269,6 +269,65 @@ def sessions():
     return results
 
 
+def directory_bytes(path):
+    total = 0
+    for item in path.rglob("*"):
+        try:
+            if item.is_file() and not item.is_symlink():
+                total += item.stat().st_size
+        except OSError:
+            pass
+    return total
+
+
+def usage():
+    """Disk used by session state and named profiles."""
+    root = state_root()
+    counts, total, screenshots = {}, 0, 0
+    for path in root.glob("*/session.json"):
+        try:
+            status = json.loads(path.read_text())["status"]
+        except (OSError, ValueError, KeyError):
+            status = "unreadable"
+        counts[status] = counts.get(status, 0) + 1
+        total += directory_bytes(path.parent)
+        screenshots += directory_bytes(path.parent / "screenshots")
+    profile_bytes = sum(p["bytes"] for p in profiles())
+    return {
+        "sessions": counts,
+        "session_bytes": total,
+        "screenshot_bytes": screenshots,
+        "profile_bytes": profile_bytes,
+        "state_root": str(root),
+    }
+
+
+def prune(older_than_days=0, dry_run=False):
+    """Remove stopped or failed sessions' state; never live sessions or profiles."""
+    cutoff = time.time() - older_than_days * 86400
+    removed, kept, freed = [], [], 0
+    for path in sorted(state_root().glob("*/session.json")):
+        root = path.parent
+        try:
+            info = json.loads(path.read_text())
+        except (OSError, ValueError):
+            kept.append({"session": root.name, "reason": "unreadable manifest"})
+            continue
+        if info.get("status") not in ("stopped", "failed") or supervisor_alive(info):
+            kept.append(
+                {"session": root.name, "reason": f"status {info.get('status')}"}
+            )
+            continue
+        if path.stat().st_mtime > cutoff:
+            kept.append({"session": root.name, "reason": "newer than the cutoff"})
+            continue
+        freed += directory_bytes(root)
+        removed.append(root.name)
+        if not dry_run:
+            shutil.rmtree(root)
+    return {"removed": removed, "kept": kept, "bytes_freed": freed, "dry_run": dry_run}
+
+
 def logs(session):
     root = session_path(session)
     files = sorted(root.glob("*.log"))

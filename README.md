@@ -217,6 +217,20 @@ default bindings, which execute host commands such as `brightnessctl`, are not l
 Accessibility trees remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
 
+## Disk use
+
+Each session keeps its newest 200 screenshots (`AGENT_DESKTOP_KEEP_SCREENSHOTS`);
+logs are trimmed per file. Stopped and failed sessions keep their logs and
+screenshots until pruned:
+
+```sh
+uv run agent-desktop usage                         # sessions by status, bytes, profiles
+uv run agent-desktop prune --older-than 7 --dry-run
+uv run agent-desktop prune --older-than 7
+```
+
+`prune` never removes live sessions or named profiles (`delete-profile` does that).
+
 ## Preflight
 
 ```sh

@@ -77,6 +77,10 @@ def main():
                 action="store_true",
                 help="send your clipboard in (cleared from the session on release)",
             )
+            observer.add_argument(
+                "--keyboard",
+                help="your layout, e.g. us-dvorak (default: detected from the host)",
+            )
     waiter = sub.add_parser("wait", help="wait for a window and/or a settled screen")
     waiter.add_argument("session")
     waiter.add_argument("--title")

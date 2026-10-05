@@ -1,5 +1,6 @@
 """Optional observer and human takeover over private Unix VNC sockets."""
 
+import json
 import os
 import shutil
 import signal
@@ -89,13 +90,67 @@ def view(session, wayvnc=None, viewer=None):
     }
 
 
-def take(session, wayvnc=None, viewer=None, paste=False):
+def first(value):
+    """The first entry of a comma-separated layout list, if any."""
+    value = (value or "").split(",")[0].strip()
+    return value or None
+
+
+def host_keyboard():
+    """The person's keyboard layout as wayvnc's <layout>[-<variant>], or None.
+
+    TigerVNC sends key positions, which wayvnc translates with its own layout,
+    so takeover must use the host's layout (e.g. us-dvorak types QWERTY
+    otherwise). Order: AGENT_DESKTOP_KEYBOARD, Hyprland, XKB_DEFAULT_*,
+    localectl.
+    """
+    configured = os.environ.get("AGENT_DESKTOP_KEYBOARD")
+    if configured:
+        return configured
+    layout = variant = None
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE") and shutil.which("hyprctl"):
+        values = []
+        for option in ("input:kb_layout", "input:kb_variant"):
+            try:
+                result = subprocess.run(
+                    ["hyprctl", "getoption", option, "-j"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
+                values.append(first(json.loads(result.stdout).get("str")))
+            except (OSError, ValueError, subprocess.SubprocessError):
+                values.append(None)
+        layout, variant = values
+    if not layout:
+        layout = first(os.environ.get("XKB_DEFAULT_LAYOUT"))
+        variant = first(os.environ.get("XKB_DEFAULT_VARIANT"))
+    if not layout and shutil.which("localectl"):
+        try:
+            status = subprocess.run(
+                ["localectl", "status"], capture_output=True, text=True, timeout=3
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            status = ""
+        for line in status.splitlines():
+            key, _, value = line.strip().partition(":")
+            if key == "X11 Layout":
+                layout = first(value)
+            elif key == "X11 Variant":
+                variant = first(value)
+    if not layout:
+        return None
+    return f"{layout}-{variant}" if variant else layout
+
+
+def take(session, wayvnc=None, viewer=None, paste=False, keyboard=None):
     """Hold control of a session in an interactive viewer; closing it hands back."""
     executable = viewer_executable(viewer)
     server = request(
         session,
         "take",
         wayvnc=wayvnc or os.environ.get("AGENT_DESKTOP_WAYVNC", "wayvnc"),
+        keyboard=keyboard or host_keyboard(),
     )
     try:
         code = run_viewer(executable, server["socket"], interactive_flags(paste))
@@ -112,6 +167,7 @@ def take(session, wayvnc=None, viewer=None, paste=False):
     return {
         "session": session,
         "viewer_closed": True,
+        "keyboard": server.get("keyboard"),
         "control": state["owner"] if state else "human",
         "release_error": release_error,
         "desktop_running": desktop_running(session),

@@ -191,6 +191,7 @@ MUTATING_OPERATIONS = (
     "ui_action",
     "request_human",
 )
+KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
 TRACED_OPERATIONS = (*MUTATING_OPERATIONS, "screenshot", "lease", "take", "release")
@@ -819,7 +820,9 @@ class Worker:
         }
         write_manifest(self.root, self.info)
 
-    def start_vnc(self, wayvnc, endpoint, control_socket, interactive=False):
+    def start_vnc(
+        self, wayvnc, endpoint, control_socket, interactive=False, keyboard=None
+    ):
         executable = shutil.which(wayvnc, path=self.env.get("PATH"))
         if not executable:
             raise ValueError("Missing optional viewer dependency: wayvnc")
@@ -845,6 +848,9 @@ class Worker:
         elif "--exit-on-disconnect" in help_result.stdout:
             # The server exits with its client, which returns control.
             flags.append("-e")
+        if keyboard:
+            # Viewers send key positions; read them with the person's layout.
+            flags.append(f"--keyboard={keyboard}")
         if "--disable-resizing" in help_result.stdout:
             flags.append("-R")
         if "--name" in help_result.stdout:
@@ -870,12 +876,21 @@ class Worker:
         process.wait(timeout=3)
         raise TimeoutError("Viewer socket did not appear")
 
-    def take(self, wayvnc):
+    def take(self, wayvnc, keyboard=None):
         endpoint = Path(self.info["runtime"]) / "takeover.sock"
+        if keyboard is not None and (
+            not isinstance(keyboard, str) or not KEYBOARD.fullmatch(keyboard)
+        ):
+            raise ValueError("Keyboard must look like us or us-dvorak")
         if self.control["owner"] != "human":
             self.takeover = self.start_vnc(
-                wayvnc, endpoint, "takeover-control.sock", interactive=True
+                wayvnc,
+                endpoint,
+                "takeover-control.sock",
+                interactive=True,
+                keyboard=keyboard,
             )
+            self.control["keyboard"] = keyboard
             self.control.update(owner="human", since=time.time())
             self.control["epoch"] += 1
             self.save_control()
@@ -1010,7 +1025,7 @@ class Worker:
             self.save_control()
             return self.control_state()
         if operation == "take":
-            return self.take(request.get("wayvnc", "wayvnc"))
+            return self.take(request.get("wayvnc", "wayvnc"), request.get("keyboard"))
         if operation == "release":
             return self.release(
                 "released by the user", force=request.get("force") is True

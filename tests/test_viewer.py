@@ -118,3 +118,20 @@ class ViewerTests(unittest.TestCase):
                         os.environ.pop(key, None)
                     else:
                         os.environ[key] = value
+
+
+class HostKeyboardTests(unittest.TestCase):
+    def test_layout_detection_order(self):
+        from unittest import mock
+
+        from agent_desktop import viewer
+
+        clean = {"PATH": "/nonexistent", "XKB_DEFAULT_LAYOUT": "de,us"}
+        with mock.patch.dict(os.environ, clean, clear=True):
+            self.assertEqual(viewer.host_keyboard(), "de")
+            os.environ["XKB_DEFAULT_VARIANT"] = "nodeadkeys"
+            self.assertEqual(viewer.host_keyboard(), "de-nodeadkeys")
+            os.environ["AGENT_DESKTOP_KEYBOARD"] = "us-dvorak"
+            self.assertEqual(viewer.host_keyboard(), "us-dvorak")
+        with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}, clear=True):
+            self.assertIsNone(viewer.host_keyboard())

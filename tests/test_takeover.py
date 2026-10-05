@@ -60,6 +60,23 @@ EXIT_ON_DISCONNECT = shutil.which("wayvnc") and "--exit-on-disconnect" in (
 )
 
 
+# XT scancodes of the QWERTY positions a, s, d, f and Return.
+POSITIONS = (0x1E, 0x1F, 0x20, 0x21, 0x1C)
+
+
+def press_position(connection, scancode, keysym):
+    """Send a key the way TigerVNC does: QEMU extended key event with its position."""
+    for down in (1, 0):
+        connection.sendall(struct.pack(">BBHII", 255, 0, down, keysym, scancode))
+        time.sleep(0.03)
+
+
+def enable_key_positions(connection):
+    # SetEncodings: raw plus the QEMU extended key event pseudo-encoding.
+    connection.sendall(struct.pack(">BxHii", 2, 2, 0, -258))
+    time.sleep(0.2)
+
+
 @unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "foot", "dbus-daemon", "wayvnc")),
     "takeover runtime tools unavailable",
@@ -188,6 +205,28 @@ class TakeoverTests(unittest.TestCase):
         core.request(self.session, "key", key="Return")
         wait_for((second / "typed.txt").exists)
         self.assertEqual((second / "typed.txt").read_text(), "agent café λ")
+
+    def test_key_positions_follow_the_person_layout(self):
+        # Positions typed on a Dvorak keyboard: a o e u, then Return.
+        for keyboard, expected in ((None, "asdf"), ("us-dvorak", "aoeu")):
+            with self.subTest(keyboard=keyboard):
+                fixture = self.fixture(f"layout-{keyboard}")
+                taken = core.request(self.session, "take", keyboard=keyboard)
+                self.assertEqual(taken["keyboard"], keyboard)
+                connection = connect(taken["socket"])
+                try:
+                    enable_key_positions(connection)
+                    for scancode, keysym in zip(
+                        POSITIONS, (*b"aoeu", 0xFF0D), strict=True
+                    ):
+                        press_position(connection, scancode, keysym)
+                    wait_for((fixture / "typed.txt").exists)
+                finally:
+                    connection.close()
+                core.request(self.session, "release", force=True)
+                self.assertEqual((fixture / "typed.txt").read_text(), expected)
+        with self.assertRaisesRegex(core.DesktopError, "Keyboard must"):
+            core.request(self.session, "take", keyboard="us;rm")
 
     def test_release_and_requests_without_takeover(self):
         state = core.request(self.session, "release")

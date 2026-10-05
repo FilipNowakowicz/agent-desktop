@@ -319,13 +319,17 @@ def wait(
     text=None,
     seconds=0,
 ):
-    """Wait for a window to appear (or disappear), then for a UI element
-    (accessibility name substring, exact role and/or text or value substring),
-    then for the screen to settle. `gone` applies to the window condition, or to
-    the element condition when no window condition is given.
+    """Wait until every condition holds at the same time.
+
+    Conditions: a window (title substring and/or exact app_id), a UI element
+    (accessible name substring, exact role and/or text or value substring,
+    searched within the matched window when a title is given) and a settled
+    screen. `gone` applies to the window condition, or to the element condition
+    when no window condition is given; an incomplete tree never counts as gone.
+    `seconds` pauses first; `timeout` counts from the end of the pause.
 
     Changes covering at most QUIET_AREA square pixels, such as a blinking caret,
-    count as settled. Returns whether every condition held before the deadline.
+    count as settled.
     """
     if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 120:
         raise DesktopError("Timeout must be between 0 and 120 seconds")
@@ -333,21 +337,15 @@ def wait(
         raise DesktopError("stable_ms must be an integer from 0 to 30000")
     if not isinstance(seconds, (int, float)) or not 0 <= seconds <= 30:
         raise DesktopError("seconds must be between 0 and 30")
+    # Every wait addresses an existing, controllable session, even a plain pause.
+    request(session, "control")
     started = time.monotonic()
     # A plain pause first, for changes no condition can describe.
     time.sleep(seconds)
-    deadline = started + timeout
-
-    elements = []
-
-    def result(satisfied, reason, matches=None):
-        return {
-            "satisfied": satisfied,
-            "reason": reason,
-            "elapsed_ms": round((time.monotonic() - started) * 1000),
-            "windows": matches or [],
-            "elements": elements[:5],
-        }
+    deadline = time.monotonic() + timeout
+    wants_window = title is not None or app_id is not None
+    wants_element = element is not None or role is not None or text is not None
+    element_gone = gone and not wants_window
 
     def element_matches(node):
         content = str(node.get("text") or "") + str(node.get("value") or "")
@@ -357,47 +355,64 @@ def wait(
             and (text is None or text in content)
         )
 
-    matches = []
-    if title is not None or app_id is not None:
-        while True:
-            windows = request(session, "windows")["windows"]
-            matches = [
+    def check():
+        """(satisfied, reason, windows, elements) for one consistent look."""
+        windows, elements = [], []
+        if wants_window:
+            windows = [
                 w
-                for w in windows
+                for w in request(session, "windows")["windows"]
                 if (title is None or title in w["title"])
                 and (app_id is None or w["app_id"] == app_id)
             ]
-            if bool(matches) != gone:
-                break
-            if time.monotonic() >= deadline:
-                return result(False, "window still present" if gone else "no window")
-            time.sleep(0.05)
-    if element is not None or role is not None or text is not None:
-        element_gone = gone and title is None and app_id is None
-        while True:
-            nodes = request(session, "ui", max_nodes=2000)["nodes"]
-            elements = [n for n in nodes if element_matches(n)]
-            if bool(elements) != element_gone:
-                break
-            if time.monotonic() >= deadline:
-                return result(
+            if bool(windows) == gone:
+                return (
                     False,
-                    "element still present" if element_gone else "no element",
-                    matches,
+                    ("window still present" if gone else "no window"),
+                    windows,
+                    [],
                 )
-            time.sleep(0.2)
-    if stable_ms:
-        quiet_since = time.monotonic()
-        frame = request(session, "frame")["frame"]
-        while time.monotonic() - quiet_since < stable_ms / 1000:
-            if time.monotonic() >= deadline:
-                return result(False, "screen still changing", matches)
-            time.sleep(0.05)
-            latest = request(session, "frame", since=frame)
-            frame, box = latest["frame"], latest["changed"]
-            if box == "unknown" or (box and box[2] * box[3] > QUIET_AREA):
-                quiet_since = time.monotonic()
-    return result(True, "ok", matches)
+        if wants_element:
+            scope = {"window": title} if title is not None and not gone else {}
+            tree = request(session, "ui", max_nodes=2000, **scope)
+            elements = [n for n in tree["nodes"] if element_matches(n)]
+            if element_gone and elements:
+                return False, "element still present", windows, elements
+            if element_gone and tree["truncated"]:
+                return False, "element unknown: tree truncated", windows, elements
+            if not element_gone and not elements:
+                return False, "no element", windows, elements
+        return True, "ok", windows, elements
+
+    def result(satisfied, reason, windows, elements):
+        return {
+            "satisfied": satisfied,
+            "reason": reason,
+            "elapsed_ms": round((time.monotonic() - started) * 1000),
+            "windows": windows,
+            "elements": elements[:5],
+        }
+
+    while True:
+        satisfied, reason, windows, elements = check()
+        if satisfied and stable_ms:
+            quiet_since = time.monotonic()
+            frame = request(session, "frame")["frame"]
+            while time.monotonic() - quiet_since < stable_ms / 1000:
+                if time.monotonic() >= deadline:
+                    return result(False, "screen still changing", windows, elements)
+                time.sleep(0.05)
+                latest = request(session, "frame", since=frame)
+                frame, box = latest["frame"], latest["changed"]
+                if box == "unknown" or (box and box[2] * box[3] > QUIET_AREA):
+                    quiet_since = time.monotonic()
+            # The conditions must still hold once the screen has settled.
+            satisfied, reason, windows, elements = check()
+        if satisfied:
+            return result(True, "ok", windows, elements)
+        if time.monotonic() >= deadline:
+            return result(False, reason, windows, elements)
+        time.sleep(0.2 if wants_element else 0.05)
 
 
 SEQUENCE_ACTIONS = (
@@ -455,7 +470,15 @@ def run_actions(session, actions, observation=None):
                 else ""
             )
             return stopped(index, len(actions), f"{error}{hint}")
-        baseline = request(session, "observe")["observation"] + mapping
+        try:
+            baseline = request(session, "observe")["observation"] + mapping
+        except DesktopError as error:
+            # The step was delivered; report it rather than an unqualified error.
+            return stopped(
+                index + 1,
+                len(actions),
+                f"step {index} was delivered, then observation failed: {error}",
+            )
     return {"completed": len(actions), "total": len(actions), "stopped": None}
 
 

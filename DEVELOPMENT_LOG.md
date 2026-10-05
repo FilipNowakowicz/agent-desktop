@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-05 — Review fixes: waits, captures, sequences, UI ids
+
+From reviews/2026-10-05-project-review (F005, F009, F011, F016, F036): `wait`
+evaluates window, element and stability conditions together in one loop, scopes
+element searches to the matched window, re-checks after the screen settles,
+treats a truncated tree as unknown rather than gone, and validates the session
+even for a plain pause (the timeout now explicitly counts after the pause). An
+unstable capture raises instead of returning a token and keeps the post-takeover
+screenshot gate. A sequence step that was delivered before observation failed
+is reported as completed. UI ids are never reused after the map is cleared, and
+unknown or expired ids are rejected. Tests: tests/test_correctness.py (no
+desktop) and a two-dialog combined-wait test that the previous code fails.
 ## 2026-10-05 — Host guard and software GTK from the shell trial
 
 Findings for the user's configuration were filed as nixos-config#417. Two

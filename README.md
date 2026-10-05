@@ -217,6 +217,18 @@ default bindings, which execute host commands such as `brightnessctl`, are not l
 Accessibility trees remain unimplemented. Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.
 
+## Preflight
+
+```sh
+uv run agent-desktop doctor          # tools, runtime directory, wlroots, accessibility
+uv run agent-desktop doctor --smoke  # also create, capture and destroy a session
+```
+
+Each check reports `ok`, `warn` or `fail` with a hint; the command exits 1 on any
+failure. It warns when labwc uses a stock wlroots version with the reproduced
+X11 mapping race (0.19.3, 0.20.2) and recognises the project's repaired runtime
+by the marker `scripts/build_xwayland_runtime.sh` writes beside the library.
+
 ## Checks
 
 ```sh

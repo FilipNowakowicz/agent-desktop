@@ -46,4 +46,7 @@ cp -- "$compositor" "$output/install/bin/labwc"
 # Limit the repaired library to this copied compositor; do not change the host loader.
 old_rpath=$(patchelf --print-rpath "$output/install/bin/labwc")
 patchelf --set-rpath "\$ORIGIN/../lib${old_rpath:+:$old_rpath}" "$output/install/bin/labwc"
+# Lets `agent-desktop doctor` recognise the repaired library beside this labwc.
+printf 'wlroots %s with %s\n' "$version" "$(sha256sum < "$repository/runtime/patches/wlroots-map-at-associate.patch" | cut -d' ' -f1)" \
+    > "$output/install/lib/agent-desktop-xwayland-repair"
 printf 'Private runtime: %s/install/bin/labwc\n' "$output"

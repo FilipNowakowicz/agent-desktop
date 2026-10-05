@@ -43,6 +43,18 @@ subcommand help checks passed; `git diff --check` passed. No desktop experiment
 or paid model run was needed for this documentation-only change. Open the PR
 against `main`, with no stacked dependency, and leave it unmerged.
 
+## 2026-10-05 — Decisions on the review questions
+
+The user delegated the review's open questions; decisions are in
+docs/reviews/2026-10-05-project-review/decisions.md. In short: cooperative
+same-user threat model; NixOS (project-local repaired runtime) plus Ubuntu 24.04
+as the supported installations; one exclusive controller per session; no
+automatic retries of non-idempotent actions; three account-free pilot tasks run
+through MCP; no new paid comparisons. wlroots master (`c5c57cd3`) still lacks the
+existing-buffer check at association, so runtime/UPSTREAM.md holds a proposed
+merge request for the user to submit. The user's layout is US Dvorak, and
+takeover still needs the user to confirm it works with that layout.
+
 ## 2026-10-05 — Session environment: credentials and working directory
 
 Review F014. Applications now start in the session's private home instead of

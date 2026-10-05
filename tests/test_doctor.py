@@ -43,6 +43,29 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(repaired["status"], "ok")
         self.assertIn("repaired runtime", repaired["detail"])
 
+    def test_version_from_library_name_when_labwc_omits_it(self):
+        def fake_run(argv, timeout=5):
+            if argv[1:] == ["--version"]:
+                return 0, "labwc 0.9.6"
+            return 0, "\tlibwlroots-0.19.so => /nonexistent/libwlroots-0.19.so (0x0)"
+
+        with mock.patch.object(doctor, "run", fake_run):
+            result = doctor.wlroots("labwc")
+        self.assertEqual(result["version"], "0.19")
+        self.assertEqual(result["status"], "warn")
+        self.assertIn("patch level is unknown", result["detail"])
+
+    def test_unknown_version_is_explained(self):
+        def fake_run(argv, timeout=5):
+            if argv[1:] == ["--version"]:
+                return 0, "labwc 0.7.1"
+            return 0, "\tlibwlroots.so.12 => /nonexistent/libwlroots.so.12 (0x0)"
+
+        with mock.patch.object(doctor, "run", fake_run):
+            result = doctor.wlroots("labwc")
+        self.assertIsNone(result["version"])
+        self.assertIn("could not determine", result["detail"])
+
     def test_runtime_directory_problems_fail(self):
         with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": "/nonexistent/runtime"}):
             self.assertEqual(doctor.runtime_directory()["status"], "fail")

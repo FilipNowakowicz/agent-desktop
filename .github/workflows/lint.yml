@@ -1,0 +1,28 @@
+name: Lint
+# Fast checks for every PR and push to main; desktop tests run in checks.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --managed-python
+      - name: Check Python source
+        run: |
+          uv run ruff check src scripts tests benchmarks
+          uv run ruff format --check src scripts tests benchmarks
+          uv run python -m compileall -q src scripts tests benchmarks
+      - name: Unit tests (desktop tests skip without a runtime)
+        run: uv run python -m unittest discover -s tests

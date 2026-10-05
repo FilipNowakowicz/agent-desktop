@@ -17,8 +17,15 @@ DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
 uv run scripts/lifecycle_stress.py --cycles 20 --load 4
 ```
 
-Integration tests skip when desktop tools are missing. CI installs them explicitly
-on Ubuntu; passing unit-only checks must not be described as a desktop validation.
+Integration tests skip when desktop tools are missing; passing unit-only checks
+must not be described as a desktop validation.
+
+GitHub Actions minutes are limited. Every PR runs only `Lint` (ruff, compile, unit
+tests with desktop tests skipped). The full desktop matrix (`Checks`: Ubuntu,
+Nix, Fedora and Arch, about 30 runner-minutes) runs for release tags or on
+demand: `gh workflow run checks.yml --ref BRANCH`. Run it before merging changes
+to the runtime, packaging or CI, and at milestones; otherwise run the desktop
+suite locally and record the result in the PR.
 
 ## Original headless experiment
 

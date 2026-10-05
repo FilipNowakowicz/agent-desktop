@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-05 — No keyring password prompt in sessions
+
+Pilot task A (Chromium research) hit a "Choose password for new keyring"
+dialog: the private bus activated the host's gnome-keyring service files,
+which started a fresh keyring in the session home and asked for a password an
+agent cannot answer. The agent dismissed it through `ui-action` (Cancel) and
+finished, but this would block most browser tasks. Sessions now place
+failing service files for org.freedesktop.secrets, org.gnome.keyring and the
+secret portal in the session's `$XDG_RUNTIME_DIR/dbus-1/services`, which takes
+precedence over host directories, so applications fall back (Chromium to its
+basic store). `AGENT_DESKTOP_SECRET_SERVICE=1` restores the host behaviour;
+`status` reports `secret_service`. Test `test_keyring_is_not_activated`: with
+the opt-out, StartServiceByName returns 1 (started) on this host; without it,
+activation fails. Chromium then loaded python.org with only its own window.
+
 ## 2026-10-05 — Runtime selection without PATH setup
 
 First pilot attempt: this repository's `.mcp.json` starts `uv run

@@ -27,6 +27,11 @@ FAKE_CREDENTIALS = {
     "TRIAL_API_TOKEN": "not-a-real-token",
     "AWS_PROFILE": "trial",
 }
+SECRETS_PROBE = (
+    "dbus-send --session --print-reply --dest=org.freedesktop.DBus "
+    "/org/freedesktop/DBus org.freedesktop.DBus.StartServiceByName "
+    'string:org.freedesktop.secrets uint32:0; echo "secrets=$?"'
+)
 KEYS = ("systemctl", "pkill", "bus", "gsk", "ssh", "api", "aws", "lang", "pwd", "home")
 
 
@@ -142,6 +147,22 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(lines["api"], "not-a-real-token")
         if shutil.which("systemctl"):
             self.assertEqual(lines["systemctl"], "0")
+
+    @unittest.skipUnless(shutil.which("dbus-send"), "dbus-send unavailable")
+    def test_keyring_is_not_activated(self):
+        # A host keyring service would prompt for a new keyring password.
+        session = core.create()["session"]
+        self.sessions.append(session)
+        self.assertFalse(core.request(session, "status")["secret_service"])
+        app = core.request(session, "launch", argv=["sh", "-c", SECRETS_PROBE])
+
+        def output():
+            for entry in core.request(session, "status")["applications"]:
+                if entry["pid"] == app["pid"] and entry["exit_code"] is not None:
+                    return Path(app["logs"]).read_text()
+            return None
+
+        self.assertIn("secrets=1", wait_for(output))
 
 
 if __name__ == "__main__":

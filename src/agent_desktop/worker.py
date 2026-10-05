@@ -1228,7 +1228,18 @@ REGISTRYD_PATHS = (
 
 def find_registryd():
     override = os.environ.get("AGENT_DESKTOP_AT_SPI_REGISTRYD")
-    candidates = [override] if override else list(REGISTRYD_PATHS)
+    if override:
+        candidates = [override]
+    else:
+        # Prefixes on PATH first (Nix profiles, local installs), then system paths.
+        prefixes = {
+            str(Path(entry).parent)
+            for entry in os.environ.get("PATH", "").split(os.pathsep)
+            if entry.endswith("/bin")
+        }
+        candidates = [
+            f"{prefix}/libexec/at-spi2-registryd" for prefix in sorted(prefixes)
+        ] + list(REGISTRYD_PATHS)
     return next((c for c in candidates if c and os.access(c, os.X_OK)), None)
 
 

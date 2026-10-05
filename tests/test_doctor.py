@@ -77,6 +77,18 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result["status"], "fail")
         self.assertIn("too long", result["detail"])
 
+    def test_registryd_found_in_libexec_beside_path_prefix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "bin").mkdir()
+            registryd = Path(directory) / "libexec" / "at-spi2-registryd"
+            registryd.parent.mkdir()
+            registryd.write_text("#!/bin/sh\n")
+            registryd.chmod(0o755)
+            environment = {"PATH": f"{directory}/bin"}
+            with mock.patch.dict(os.environ, environment):
+                os.environ.pop("AGENT_DESKTOP_AT_SPI_REGISTRYD", None)
+                self.assertEqual(doctor.accessibility()["path"], str(registryd))
+
     @unittest.skipUnless(
         all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),
         "desktop tools unavailable",

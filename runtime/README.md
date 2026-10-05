@@ -1,5 +1,8 @@
 # Project-local Xwayland mapping repair
 
+Supported installation paths (Nix runtime with this repair, Ubuntu 24.04) are in
+`runtime/INSTALL.md`.
+
 Stock labwc 0.20.2 / wlroots 0.20.2 and Fedora labwc 0.9.6 / wlroots 0.19.3 intermittently leaves X11 windows unmapped
 in the private headless desktop. Native Wayland tasks are unaffected by this
 observed failure. Do not interpret earlier passing repetitions as a repair.

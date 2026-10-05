@@ -1,5 +1,26 @@
 # Development log
 
+## 2026-10-05 — Two installation paths
+
+Plan step 3 / F007/F019. `runtime/nix/flake.nix` (nixpkgs pinned at `4975466`)
+builds labwc 0.20.2 against wlroots 0.20.2 with the mapping patch, plus grim,
+dbus, Xwayland, wayvnc, TigerVNC, wl-clipboard, at-spi2-core and foot. It writes
+the repair marker, so `doctor` recognises it. The build took 27 s locally (most
+inputs cached), with no profile install and no host change. `runtime/install-ubuntu.sh`
+is the Ubuntu 24.04 apt recipe; the Ubuntu CI job now installs through it, so
+the documented recipe is what CI tests. `runtime/INSTALL.md` documents both.
+at-spi2-registryd is now also looked up in `libexec/` beside each `bin/` entry on
+PATH (Nix keeps it out of `bin`).
+
+Ubuntu's wlroots 0.17 association code lacks the same existing-buffer check,
+so the Ubuntu job now also runs 100 loaded Xwayland repetitions on stock packages
+(`scripts/repeat_xwayland.py`, shared with Fedora/Arch). A new `nix` CI job
+builds the flake, requires `doctor` to report the repaired runtime, and runs
+the full suite.
+
+Local (Nix runtime + xterm/mousepad/zenity/xprop): `doctor --smoke` all ok, smoke
+0.67 s; full suite 85 tests OK, 6 skipped. Not yet done: a fresh, non-CI Ubuntu
+desktop installation.
 ## 2026-10-05 — Decisions on the review questions
 
 The user delegated the review's open questions; decisions are in

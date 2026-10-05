@@ -123,5 +123,9 @@ longer lifecycle testing and representative workflows. Current benchmarks do not
 establish a general reliability or performance advantage over other runtimes.
 
 The repository remains private while documentation is prepared for a possible
-public release. Licensing is undecided; see the
-[publication checklist](docs/PUBLICATION.md) for outstanding decisions.
+public release. See the [publication checklist](docs/PUBLICATION.md) for
+outstanding decisions.
+
+## License
+
+Licensed under the [MIT License](LICENSE).

@@ -49,6 +49,6 @@ of tool delivery responses.
 
 ## Before publication
 
-Keep repository visibility private until explicitly authorized. Licensing is
-undecided; no license grant should be inferred from future publication plans.
+The project is licensed under the [MIT License](LICENSE). Keep repository
+visibility private until publication is explicitly authorized.
 The [publication checklist](docs/PUBLICATION.md) tracks remaining decisions.

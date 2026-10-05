@@ -22,7 +22,8 @@ credential security boundary. The README and user guide must retain that limit.
 
 ## Release decisions
 
-- [ ] Choose a license and add the corresponding file and package metadata.
+- [x] MIT License approved by the maintainer; added [LICENSE](../LICENSE) and
+      package license metadata.
 - [ ] Select supported runtime versions and document reproducible installation
       on NixOS and at least one chosen non-Nix desktop.
 - [ ] Complete representative daily-use and longer lifecycle trials; record

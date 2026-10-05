@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-05 — MIT licensing
+
+The maintainer approved MIT licensing. Added the standard MIT text from GitHub's
+license template with copyright 2026 Filip Nowakowicz, declared the MIT SPDX
+identifier and license file in package metadata, and updated the README,
+contributor guide and publication checklist. This supersedes the undecided
+licensing note in the earlier documentation entry. Repository visibility remains
+private; PR #54 remains unmerged.
+
+Validation: locked uv sync, distribution build and inspection confirmed the MIT
+identifier and license file in the wheel and source distribution.
+`git diff --check` passed. No runtime behavior or dependencies changed.
+
 ## 2026-10-05 — Documentation and publication preparation
 
 Prepared in the separate `docs/public-facing` worktree from main revision

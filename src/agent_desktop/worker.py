@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import socket
@@ -155,6 +156,7 @@ class Worker:
         self.registry = None
         self.atspi = None
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
+        self.ui_counter = 0
         self.frames = {}  # recent raw frames for change detection, oldest first
         self.virtual_pointer = None
         self.virtual_keyboard = None
@@ -366,9 +368,12 @@ class Worker:
         """Short, stable identifiers for UI nodes, to keep listings small."""
         if node not in self.ui_names:
             if len(self.ui_ids) >= 50000:
+                # Forget old ids but never reuse them: a stale id must fail,
+                # not silently address a different element.
                 self.ui_ids.clear()
                 self.ui_names.clear()
-            short = f"n{len(self.ui_ids) + 1}"
+            self.ui_counter += 1
+            short = f"n{self.ui_counter}"
             self.ui_ids[short] = node
             self.ui_names[node] = short
         return self.ui_names[node]
@@ -464,6 +469,12 @@ class Worker:
             self.command("grim", *arguments, path)
             if self.observation() == before:
                 break
+        else:
+            path.unlink(missing_ok=True)
+            raise StaleObservation(
+                "Windows or focus kept changing during capture; no screenshot "
+                "was taken. Try again once the desktop has settled."
+            )
         self.needs_screenshot = False
         with path.open("rb") as stream:
             header = stream.read(24)
@@ -809,7 +820,11 @@ class Worker:
             if request.get("observation") is not None:
                 self.check_observation(request["observation"])
             accessibility = self.accessibility()
-            node = self.ui_ids.get(request.get("node"), request.get("node"))
+            node = request.get("node")
+            if isinstance(node, str) and re.fullmatch(r"n[0-9]+", node):
+                if node not in self.ui_ids:
+                    raise ValueError("Unknown or expired UI node id; list the UI again")
+                node = self.ui_ids[node]
             try:
                 return {
                     **accessibility.act(
@@ -1130,8 +1145,6 @@ def command_name(pid):
 
 
 def re_key(key):
-    import re
-
     return re.fullmatch(r"[A-Za-z0-9_]+", key)
 
 

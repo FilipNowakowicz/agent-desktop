@@ -136,6 +136,26 @@ class UITests(UISessionTest):
         )
         self.find(lambda n: n["id"] == field["id"] and n.get("text") == "42")
 
+    def test_combined_wait_requires_element_in_the_window(self):
+        for title, text in (("Alpha dialog", "Secret code"), ("Beta dialog", "Other")):
+            core.request(
+                self.session,
+                "launch",
+                argv=["zenity", "--entry", f"--title={title}", f"--text={text}"],
+            )
+        self.find(lambda n: n["name"] == "Secret code")
+        self.find(lambda n: n["name"] == "Other")
+        # The element exists, but only in the other window.
+        wrong = core.wait(
+            self.session, title="Beta dialog", element="Secret code", timeout=1
+        )
+        self.assertFalse(wrong["satisfied"])
+        self.assertEqual(wrong["reason"], "no element")
+        right = core.wait(
+            self.session, title="Alpha dialog", element="Secret code", timeout=5
+        )
+        self.assertTrue(right["satisfied"], right)
+
     def test_tree_filters_and_limits(self):
         core.request(
             self.session,

@@ -163,3 +163,12 @@ class HostLaunchTests(unittest.TestCase):
         with mock.patch("shutil.which", lambda name, path=None: None):
             with self.assertRaisesRegex(ValueError, "outside the session"):
                 worker.launch_on_host(["/bin/firefox"], "/home/u")
+
+
+class KeysymFallbackTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("labwc"), "labwc unavailable")
+    def test_undumpable_compositor(self):
+        # Like Hyprland with CAP_SYS_NICE, init's memory map is unreadable.
+        from agent_desktop.wayland import Keysyms
+
+        self.assertEqual(Keysyms(1).resolve("Return"), 0xFF0D)

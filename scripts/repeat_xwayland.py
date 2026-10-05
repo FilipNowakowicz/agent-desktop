@@ -6,7 +6,8 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
+repository = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(repository / "tests"), str(repository)]
 
 NAME = "test_runtime.RuntimeTests.test_xwayland_application_receives_input"
 

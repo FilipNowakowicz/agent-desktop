@@ -28,9 +28,10 @@ Do not restart the original M0 exploration without a concrete regression.
 
 The [2026-10-05 review](docs/reviews/2026-10-05-project-review/report.md) recommends
 finishing a daily-use alpha before adding more features. The plan tracks current
-progress; the review remains a dated assessment. Non-Nix installation targets,
-recurring pilot tasks, a real login handoff and the takeover threat model need
-maintainer decisions. Benchmark results include measured tool profiles; consult
+progress; the review remains a dated assessment. Its open questions (threat model,
+supported installations, pilot tasks, controller policy) are decided in
+[decisions.md](docs/reviews/2026-10-05-project-review/decisions.md). A real login
+handoff still needs the maintainer. Benchmark results include measured tool profiles; consult
 the [report](docs/BENCHMARK.md) rather than older handoff notes.
 
 General computer use remains the product goal. GUI testing and diagnostics can

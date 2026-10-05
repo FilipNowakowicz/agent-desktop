@@ -25,9 +25,10 @@ A generic client configuration looks like:
 ```
 
 The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
-visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
-`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the
-client's environment. The protocol is also tested with the official Python SDK's
+visible mode, `WAYLAND_DISPLAY`). The server selects the desktop runtime itself
+(`AGENT_DESKTOP_RUNTIME`, then `~/.local/share/agent-desktop/runtime`, then PATH;
+see [runtime/INSTALL.md](../runtime/INSTALL.md#selecting-a-runtime)), so the
+client does not need to adjust PATH. The protocol is also tested with the official Python SDK's
 stdio client.
 
 ### Claude Code
@@ -35,9 +36,8 @@ stdio client.
 This repository includes a project-scoped `.mcp.json` declaring the
 `private-desktop` server. Start `claude` in the repository and approve the project
 server when asked; the desktop tools then appear as `mcp__private-desktop__*`.
-The server inherits Claude Code's environment, so the runtime tools must be on
-its PATH. On NixOS, start `claude` inside the temporary shell described in the
-[installation guide](../README.md#installation).
+With the Nix runtime linked at `~/.local/share/agent-desktop/runtime`, or the
+Ubuntu packages installed, no further environment setup is needed.
 
 `scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
 non-interactively, with no built-in tools and only this MCP server. The agent must

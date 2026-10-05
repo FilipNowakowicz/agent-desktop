@@ -14,6 +14,7 @@ from .core import (
     run_actions,
     sessions,
     usage,
+    use_runtime,
     wait,
 )
 from .doctor import doctor
@@ -21,6 +22,7 @@ from .viewer import take, view
 
 
 def main():
+    use_runtime()
     parser = argparse.ArgumentParser(description="Private Linux desktops")
     sub = parser.add_subparsers(dest="command", required=True)
     new = sub.add_parser("create")

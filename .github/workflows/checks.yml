@@ -13,8 +13,10 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
-      - name: Install desktop runtime
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends labwc foot grim wayvnc wl-clipboard at-spi2-core wlr-randr dbus-daemon xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc libreoffice-gtk3 x11-utils xfonts-base fonts-dejavu-core
+      - name: Install desktop runtime (documented recipe)
+        run: sh runtime/install-ubuntu.sh
+      - name: Install test applications
+        run: sudo apt-get install -y --no-install-recommends wlr-randr xterm zenity mousepad libreoffice-writer libreoffice-calc libreoffice-gtk3 x11-utils xfonts-base fonts-dejavu-core
       - name: Record runtime versions
         run: dpkg-query -W labwc foot grim wayvnc wlr-randr dbus-daemon xwayland xterm zenity mousepad libreoffice-writer libreoffice-calc
       - run: uv sync --locked --managed-python
@@ -60,6 +62,47 @@ jobs:
         run: uv run agent-desktop doctor --smoke
       - name: Repeat lifecycle under CPU load
         run: uv run scripts/lifecycle_stress.py --cycles 5 --load 2
+      - name: Repeat Xwayland mapping and input under CPU load (stock wlroots)
+        run: uv run scripts/repeat_xwayland.py --repetitions 100 --load 4
+        env:
+          DESKTOP_TEST_DEBUG: 1
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests-x11
+      - name: Keep loaded Xwayland repetitions on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-tests-x11-ubuntu
+          path: ${{ runner.temp }}/desktop-tests-x11
+          retention-days: 7
+  nix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --managed-python
+      - name: Build the Nix runtime with the repaired wlroots
+        run: |
+          runtime=$(nix build --no-link --print-out-paths ./runtime/nix)
+          echo "$runtime/bin" >> "$GITHUB_PATH"
+          apps=$(nix build --no-link --print-out-paths nixpkgs#xterm nixpkgs#mousepad nixpkgs#zenity nixpkgs#xorg.xprop)
+          for app in $apps; do echo "$app/bin" >> "$GITHUB_PATH"; done
+      - name: Preflight check
+        run: uv run agent-desktop doctor --smoke | tee doctor.json && grep -q 'repaired runtime' doctor.json
+      - name: Run routing and headless compositor tests
+        run: uv run python -m unittest discover -s tests -v
+        env:
+          DESKTOP_TEST_DEBUG: 1
+          DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
+      - name: Keep test desktops on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-tests-nix
+          path: ${{ runner.temp }}/desktop-tests
+          retention-days: 7
   distributions:
     runs-on: ubuntu-24.04
     strategy:
@@ -113,29 +156,7 @@ jobs:
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests
       - name: Repeat Xwayland mapping and input under CPU load
-        run: |
-          uv run python - <<'PY'
-          import subprocess
-          import sys
-          import unittest
-          sys.path.insert(0, "tests")
-          name = "test_runtime.RuntimeTests.test_xwayland_application_receives_input"
-          suite = unittest.TestSuite(
-              unittest.defaultTestLoader.loadTestsFromName(name)
-              for _ in range(100)
-          )
-          load = []
-          try:
-              for _ in range(4):
-                  load.append(subprocess.Popen([sys.executable, "-c", "while True: pass"]))
-              result = unittest.TextTestRunner(verbosity=2, failfast=True).run(suite)
-          finally:
-              for child in load:
-                  child.terminate()
-              for child in load:
-                  child.wait()
-          sys.exit(not result.wasSuccessful())
-          PY
+        run: uv run scripts/repeat_xwayland.py --repetitions 100 --load 4
         env:
           DESKTOP_TEST_DEBUG: 1
           DESKTOP_TEST_ARTIFACTS: ${{ runner.temp }}/desktop-tests

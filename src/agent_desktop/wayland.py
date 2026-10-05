@@ -6,8 +6,11 @@ zwlr_virtual_pointer_manager_v1 on one private compositor socket.
 
 import array
 import ctypes
+import ctypes.util
+import shutil
 import socket
 import struct
+import subprocess
 import tempfile
 import threading
 import time
@@ -330,6 +333,28 @@ def char_keysym(character):
     return point if point < 0x100 else 0x1000000 | point
 
 
+def find_xkbcommon():
+    """Any libxkbcommon: keysym names resolve the same in every copy."""
+    found = ctypes.util.find_library("xkbcommon")
+    if found:
+        return found
+    for program in ("labwc", "foot", "wayvnc"):
+        executable = shutil.which(program)
+        if not executable:
+            continue
+        try:
+            linked = subprocess.run(
+                ["ldd", executable], capture_output=True, text=True, timeout=5
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            continue
+        for line in linked.splitlines():
+            parts = line.split()
+            if parts and parts[0].startswith("libxkbcommon.so") and len(parts) > 2:
+                return parts[2]
+    return None
+
+
 class Keysyms:
     """Resolve keysym names with the libxkbcommon already loaded by the compositor."""
 
@@ -342,9 +367,10 @@ class Keysyms:
                     library = path
                     break
         except OSError:
-            pass
+            pass  # e.g. a compositor with capabilities is not dumpable
+        library = library or find_xkbcommon()
         if not library:
-            raise WaylandError("Cannot locate the compositor's libxkbcommon")
+            raise WaylandError("Cannot locate libxkbcommon")
         self.library = ctypes.CDLL(library)
         self.library.xkb_keysym_from_name.restype = ctypes.c_uint32
         self.library.xkb_keysym_from_name.argtypes = [ctypes.c_char_p, ctypes.c_int]

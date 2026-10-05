@@ -1,5 +1,15 @@
 # Development log
 
+## 2026-10-05 — First host session on the real screen: keysym fallback
+
+The maintainer approved the first real host request, and both attempts failed
+at startup with `Cannot locate the compositor's libxkbcommon`. The keysym
+resolver read the compositor's /proc maps, but Hyprland runs with CAP_SYS_NICE
+(CapEff 0x800000), so it is not dumpable and its maps are unreadable. Keysym
+names resolve the same in any libxkbcommon, so the resolver now falls back to
+`ctypes.util.find_library` and then to the library labwc/foot/wayvnc link.
+Test: `Keysyms(1)` (init, also unreadable) resolves Return. Host tests pass.
+
 ## 2026-10-05 — Host sessions: an agent on the person's own screen (experimental)
 
 Maintainer request: let the agent act on their screen. Their Hyprland 0.56.2

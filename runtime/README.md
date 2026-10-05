@@ -1,6 +1,6 @@
 # Project-local Xwayland mapping repair
 
-Stock labwc 0.20.2 / wlroots 0.20.2 and Fedora labwc 0.9.6 / wlroots 0.19.3 intermittently leaves X11 windows unmapped
+Stock labwc 0.20.2 / wlroots 0.20.2 and Fedora labwc 0.9.6 / wlroots 0.19.3 intermittently leave X11 windows unmapped
 in the private headless desktop. Native Wayland tasks are unaffected by this
 observed failure. Do not interpret earlier passing repetitions as a repair.
 
@@ -30,8 +30,9 @@ The output directory must be new. The script downloads the pinned upstream
 copies the current labwc binary and changes only that copy's library search
 path. No global libraries, profiles, loader settings or host compositor are
 changed. Keep the output directory while using its runtime; deleting it removes
-the repair. Choose this runtime explicitly on `PATH` or through `core.create`'s
-`tools` argument. Python dependencies and the core remain portable.
+the repair. Choose this runtime explicitly on `PATH`, with `create --labwc`, with
+`AGENT_DESKTOP_LABWC`, or through `core.create`'s `tools` argument. Python
+dependencies and the core remain portable.
 
 Arch CI 37214448862 passed its full suite, 100 loaded Xterm sessions and
 lifecycle stress using this private repair. Both matching private repairs passed CI 37215643286: full suites, 100 loaded

@@ -1,0 +1,49 @@
+# Integrations
+
+Agent Desktop provides a CLI and a stdio MCP server for clients that support
+local MCP tools. No model or cloud service is required by the runtime itself.
+
+## MCP
+
+Run the stdio server with `uv run agent-desktop-mcp`. It exposes session lifecycle,
+launch, windows, PNG images with dimensions, input and logs through the same core.
+Desktop sessions persist when an MCP client disconnects; destroy them explicitly.
+The server sends instructions to the client describing the screenshot/act/verify
+loop and the login handoff (`desktop_request_human`, `desktop_control`, profiles).
+
+A generic client configuration looks like:
+
+```json
+{
+  "mcpServers": {
+    "private-desktop": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/private-agent-desktop", "run", "agent-desktop-mcp"]
+    }
+  }
+}
+```
+
+The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
+visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
+`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the
+client's environment. The protocol is also tested with the official Python SDK's
+stdio client.
+
+### Claude Code
+
+This repository includes a project-scoped `.mcp.json` declaring the
+`private-desktop` server. Start `claude` in the repository and approve the project
+server when asked; the desktop tools then appear as `mcp__private-desktop__*`.
+The server inherits Claude Code's environment, so the runtime tools must be on
+its PATH. On NixOS, start `claude` inside the temporary shell described in the
+[installation guide](../README.md#installation).
+
+`scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
+non-interactively, with no built-in tools and only this MCP server. The agent must
+create a session, launch Chromium on a local page, read a code that exists only
+in the rendered screenshot, type it, drag a box into a target and submit. The
+harness then verifies the page state itself, records host focus and pointer
+(Hyprland only), and destroys the session. It uses your Claude Code account.
+A 20-task suite and its results are in [the benchmark report](BENCHMARK.md).
+

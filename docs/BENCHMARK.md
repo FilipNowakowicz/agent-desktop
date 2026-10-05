@@ -1,4 +1,15 @@
-# GUI task benchmark
+# GUI task benchmarks
+
+Recorded experiments cover fixture completion, tool usage and cost in specific
+environments. They do not establish broad daily-use reliability or a general
+performance winner. See [compatibility](COMPATIBILITY.md) for tested versions and
+[validation](VALIDATION.md) for non-model smoke tests.
+
+Start with the task and limits sections, then the native/container and tool-profile
+comparisons. Committed aggregate metrics are in
+[`benchmarks/results`](../benchmarks/results). Detailed local artifacts named by
+run ID may not be included in the repository. Model-driven runs use the operator's
+configured account; obtain an agreed scope and budget before running them.
 
 `scripts/benchmark.py` runs 20 representative tasks (`benchmarks/tasks.py`) with
 Claude Code as the agent. For each task the harness creates a fresh headless

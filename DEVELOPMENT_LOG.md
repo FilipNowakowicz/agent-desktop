@@ -1,5 +1,35 @@
 # Development log
 
+## 2026-10-05 — Documentation and publication preparation
+
+Prepared in the separate `docs/public-facing` worktree from main revision
+`1e9b20f`; no runtime, tests, dependency metadata or workflow code changed.
+The README now introduces Agent Desktop, separates installation from the first
+session, and routes detailed behavior to user, integration and validation guides.
+Contributor instructions and the continuation guide use portable paths and
+clarify parallel-worktree, publication and PR boundaries. Corrected stale claims
+about accessibility, the viewer, retention and unmeasured tool profiles.
+
+Reviewed both original brainstorming prompts at the maintainer's request. Their
+core direction and most deferred ideas already exist in the plan; retained WSLg,
+provisioning/update, networking and per-task-machine questions in section 7E.
+Deleted `prompt1.txt` and `prompt2.txt`, removed preservation instructions, and
+annotated the historical review with their retained Git revision. Dated review
+data and prior validation records remain historical evidence.
+
+Updated the GitHub description and added `computer-use` and `accessibility`
+topics; verified visibility remains private. Kept the repository/package name
+`private-agent-desktop` and left licensing undecided. The publication checklist
+records those decisions and remaining release gates. This pass is documentation
+preparation, not a full disclosure audit or a public release.
+
+Validation: `uv sync --managed-python --locked` succeeded. Documentation checks
+validated local Markdown links and anchors, balanced fences, JSON configuration
+syntax and shell example syntax without execution. All 27 documented CLI
+subcommand help checks passed; `git diff --check` passed. No desktop experiment
+or paid model run was needed for this documentation-only change. Open the PR
+against `main`, with no stacked dependency, and leave it unmerged.
+
 ## 2026-10-05 — Session environment: credentials and working directory
 
 Review F014. Applications now start in the session's private home instead of

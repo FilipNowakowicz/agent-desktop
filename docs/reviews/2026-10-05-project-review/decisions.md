@@ -1,0 +1,18 @@
+# Decisions on the review questions
+
+Decided 2026-10-05. The user delegated these choices to development. Any of them can
+be revised; record the change here and in `DEVELOPMENT_LOG.md`.
+
+| # | Question | Decision |
+| --- | --- | --- |
+| 1 | Recurring pilot tasks | Three low-risk tasks with no accounts, run by an agent through the MCP tools: (a) **research** — read stated facts from a public web page in Chromium and save them to a file; (b) **configuration** — change a setting in a GUI application and verify the change on disk; (c) **document** — enter given data into LibreOffice Calc, save it and verify the file. The user may replace them with their own tasks at any time. |
+| 2 | Target | A dependable personal tool first, installable on a second ordinary Linux distribution. A public package comes after the pilot. Cross-platform work is deferred. The repository stays private until the user decides otherwise. |
+| 3 | Threat model | Cooperative operation as the same user. The project prevents *accidental* misuse: agent input, focus or windows never reaching the physical desktop, and opt-in guarding of host-affecting commands. It does not contain an agent that also has a host shell, and it does not protect against malicious applications beyond what the applications themselves provide (for example the browser sandbox). Takeover changes who may send input; it is not a confidentiality boundary. |
+| 4 | Accounts and takeover privacy | No account is pre-selected; persistent profiles are used only for accounts the user names. During takeover, agent screenshots and input are refused (implemented), logs never record typed text or clipboard contents, and the clipboard is cleared on release (failures are reported). The observer remains available to the user only. |
+| 5 | Supported installations and keyboard | **NixOS**: a project-local runtime expression that includes the repaired wlroots, without host activation. **Ubuntu 24.04 LTS** (apt packages, default GNOME host): the first non-Nix target, since its runtime packages are in the archive and it is the most common desktop distribution. Fedora and Arch remain CI-tested. The user's layout is US Dvorak; takeover sends keysyms through VNC, so it should be layout-independent, but the user still has to confirm this. |
+| 6 | Retention | Disposable by default: at most 200 screenshots per session, manual `prune` for stopped sessions, profiles kept until explicitly deleted. About 1 GB is the expected working budget; `usage` reports actual bytes. |
+| 7 | Controllers per session | One exclusive controller per session, enforced by a lease. Parallel agents use separate desktops. |
+| 8 | Failure tolerance | The pilot passes at 18 of 20 tasks completed without developer changes or unplanned rescue, and no wrong-target or host-input action. Non-idempotent actions (typing into forms, submitting, sending, deleting, paying) are never retried automatically; an uncertain step is reported to the agent instead. |
+| 9 | Paid comparisons | No new budget. The pilot uses the developer's normal interactive agent session through MCP; paid model comparisons need a new explicit budget from the user. |
+| 10 | Upstream and maintenance | Keep the single wlroots patch and offer it upstream. As of 2026-10-05 wlroots master (`c5c57cd3`) still lacks the check, and the patch applies with an offset. Submitting needs the user's freedesktop GitLab account; the proposed text is in `runtime/UPSTREAM.md`. Retire the patch once a packaged wlroots release contains an equivalent fix. Adopt another project only if the pilot shows it handles the chosen tasks better. |
+| 11 | Portable machine | Deferred; there is no current Windows or macOS need. |

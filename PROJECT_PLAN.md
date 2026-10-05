@@ -19,7 +19,7 @@ update this status and the development log with completed work and remaining gap
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
 
 Next work follows the review's plan (docs/reviews/2026-10-05-project-review/plan.md):
-correctness fixes (#42-#44), then packaging for NixOS and one non-Nix distribution
+correctness fixes (#42-#44, merged), then packaging for NixOS and one non-Nix distribution
 with a preflight check, bounded retention, and a personal-use pilot on tasks the
 user chooses. Extensions are added only when the pilot shows a need.
 

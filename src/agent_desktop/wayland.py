@@ -18,7 +18,7 @@ from pathlib import Path
 
 BUTTONS = {"left": 0x110, "right": 0x111, "middle": 0x112}
 VERTICAL, HORIZONTAL = 0, 1
-SOURCE_FINGER = 2
+SOURCE_WHEEL = 0
 
 
 class WaylandError(RuntimeError):
@@ -204,15 +204,14 @@ class VirtualPointer:
         self.request(4)
 
     def scroll(self, dy, dx):
-        for axis, value in ((HORIZONTAL, dx), (VERTICAL, dy)):
-            if value:
-                self.request(5, "I", SOURCE_FINGER)
-                self.request(3, "IIi", timestamp(), axis, fixed(value))
-        self.request(4)
-        for axis, value in ((HORIZONTAL, dx), (VERTICAL, dy)):
-            if value:
-                self.request(5, "I", SOURCE_FINGER)
-                self.request(6, "II", timestamp(), axis)
+        """Scroll by mouse-wheel notches (positive dy: down, positive dx: right)."""
+        for axis, notches in ((HORIZONTAL, dx), (VERTICAL, dy)):
+            if notches:
+                self.request(5, "I", SOURCE_WHEEL)
+                # axis_discrete: 15 units per notch, as a physical wheel reports.
+                self.request(
+                    7, "IIii", timestamp(), axis, fixed(15 * notches), int(notches)
+                )
         self.request(4)
 
     def sync(self):

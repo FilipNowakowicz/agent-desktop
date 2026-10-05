@@ -342,7 +342,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertGreater(release["row"], press["row"])
 
         before = len(drag) + 6
-        core.request(session, "scroll", dy=120)
+        core.request(session, "scroll", dy=3)
         self.assertTrue(any(e["wheel"] for e in events(before + 1)[before:]))
 
         for arguments in ({"to_x": 5000, "to_y": 0}, {"to_x": -1, "to_y": 10}):

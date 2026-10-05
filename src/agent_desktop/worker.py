@@ -1348,11 +1348,11 @@ class Worker:
         elif operation == "scroll":
             dx, dy = request.get("dx", 0), request.get("dy", 0)
             if not all(
-                isinstance(v, int) and not isinstance(v, bool) and abs(v) <= 10000
+                isinstance(v, int) and not isinstance(v, bool) and abs(v) <= 100
                 for v in (dx, dy)
             ):
                 raise ValueError(
-                    "Scroll distances must be integers between -10000 and 10000"
+                    "Scroll amounts are wheel notches: integers between -100 and 100"
                 )
             pointer = self.pointer()
             pointer.scroll(dy, dx)

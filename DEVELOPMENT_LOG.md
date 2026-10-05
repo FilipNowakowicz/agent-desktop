@@ -13,6 +13,9 @@ state. Detected here: `us-dvorak`. Test
 `test_key_positions_follow_the_person_layout` sends QEMU key events for the
 QWERTY positions a s d f + Return: `asdf` without a layout (the reported bug),
 `aoeu` with `us-dvorak`. A unit test covers the detection order.
+User confirmation (real TigerVNC viewer on the user's Dvorak Hyprland host,
+session from this branch): the saved line was `aoeu134AOEU`. That is the Dvorak home row
+plus digits and shifted letters, so the user's layout came through correctly; the user reported "works good".
 
 ## 2026-10-05 — Action trace
 

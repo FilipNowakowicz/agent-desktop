@@ -402,6 +402,23 @@ def logs(session):
     return result
 
 
+def trace(session, limit=50):
+    """The newest action-trace records (oldest first); readable after a crash."""
+    path = session_path(session) / "trace.jsonl"
+    if not 0 < limit <= 1000:
+        raise DesktopError("Limit must be between 1 and 1000")
+    if not path.exists():
+        return {"session": session, "records": []}
+    lines = path.read_text(errors="replace").splitlines()[-limit:]
+    records = []
+    for line in lines:
+        try:
+            records.append(json.loads(line))
+        except ValueError:
+            continue
+    return {"session": session, "records": records}
+
+
 def supervisor_alive(info):
     marker = f"AGENT_DESKTOP_SESSION_TOKEN={info['token']}".encode()
     for key in ("guardian_pid", "worker_pid"):

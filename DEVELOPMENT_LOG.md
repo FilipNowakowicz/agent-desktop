@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-05 — First real-use trial: the user's desktop shell
+
+Independent review saved (untracked) in `reviews/2026-10-05-project-review/`;
+it recommends daily-use hardening before more features. As the first real task
+the user chose their waybar, control panel and launcher. Harness:
+`scripts/shell_trial/` (fake Hyprland IPC, logging stand-ins, trial copies under
+git-ignored artifacts). Results and findings: `docs/trials/2026-10-05-desktop-shell.md`.
+Project lessons: nested Hyprland is not usable inside labwc (aquamarine commits
+before ack_configure) and probes real input/DRM devices unless contained; GTK 4
+layer surfaces need `GSK_RENDERER=cairo` in software sessions; command audits
+must parse code, not grep it; one unexplained hidden-bar observation remains.
+
 ## 2026-10-04 — Tool profile comparison
 
 See docs/BENCHMARK.md (tool profile comparison). Fixes found by it are on branch

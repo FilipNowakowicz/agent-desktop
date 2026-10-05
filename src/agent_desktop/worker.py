@@ -284,6 +284,7 @@ class Worker:
                 if self.info.get("guard_host"):
                     self.guard_host()
                 registryd = self.prepare_accessibility()
+                self.mask_secret_service()
                 self.start_bus()
                 if registryd:
                     self.start_registry(registryd)
@@ -358,6 +359,27 @@ class Worker:
             current = self.env.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share")
             self.env["XDG_DATA_DIRS"] = f"{share}:{current}"
         return registryd
+
+    def mask_secret_service(self):
+        """Keep the private bus from starting a keyring that prompts for a password.
+
+        Host service files would start gnome-keyring inside the session, which
+        asks for a new keyring password that an agent cannot answer. Services in
+        $XDG_RUNTIME_DIR/dbus-1/services take precedence over the host's, and this
+        Exec fails at once, so applications fall back (Chromium to its basic
+        store). AGENT_DESKTOP_SECRET_SERVICE=1 keeps the host's keyring service.
+        """
+        if os.environ.get("AGENT_DESKTOP_SECRET_SERVICE") == "1":
+            self.info["secret_service"] = True
+            return
+        self.info["secret_service"] = False
+        services = Path(self.info["runtime"]) / "dbus-1/services"
+        services.mkdir(parents=True, exist_ok=True)
+        for name in SECRET_SERVICES:
+            (services / f"{name}.service").write_text(
+                f"[D-BUS Service]\nName={name}\n"
+                "Exec=/nonexistent/agent-desktop-has-no-secret-service\n"
+            )
 
     def start_registry(self, registryd):
         # D-Bus activation of the registry fails without a systemd user session.
@@ -749,6 +771,7 @@ class Worker:
                 "mode": self.info["mode"],
                 "status": "ready",
                 "accessibility": self.info.get("accessibility", False),
+                "secret_service": self.info.get("secret_service", True),
                 "guard_host": bool(self.info.get("guard_host")),
                 "guard_removed_variables": self.info.get("guard_removed_variables", []),
                 "x_display": self.info.get("x_display"),
@@ -1224,6 +1247,11 @@ def credential_variable(name):
     ) and not upper.startswith("AGENT_DESKTOP_")
 
 
+SECRET_SERVICES = (
+    "org.freedesktop.secrets",
+    "org.gnome.keyring",
+    "org.freedesktop.impl.portal.Secret",
+)
 REGISTRYD_PATHS = (
     "/usr/libexec/at-spi2-registryd",
     "/usr/lib/at-spi2-registryd",

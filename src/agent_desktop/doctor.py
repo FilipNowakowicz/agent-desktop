@@ -48,11 +48,24 @@ def wlroots(labwc):
     _, libraries = run(["ldd", labwc])
     library = re.search(r"libwlroots[^\s]* => (\S+)", libraries or "")
     library = Path(library.group(1)).resolve() if library else None
+    if version is None and library:
+        # Older labwc releases omit wlroots from --version; use the library name.
+        named = re.search(r"libwlroots-([0-9]+\.[0-9]+)", library.name)
+        version = named.group(1) if named else None
     repaired = bool(library and (library.parent / REPAIR_MARKER).exists())
     result = {"check": "wlroots", "version": version, "library": str(library)}
     if repaired:
         marker = (library.parent / REPAIR_MARKER).read_text().strip()
         return {**result, "status": "ok", "detail": f"repaired runtime ({marker})"}
+    if version and any(v.startswith(version + ".") for v in AFFECTED_WLROOTS):
+        return {
+            **result,
+            "status": "warn",
+            "detail": f"wlroots {version}.x: the patch level is unknown, and "
+            f"{', '.join(AFFECTED_WLROOTS)} can leave X11 windows unmapped",
+            "hint": "native Wayland apps are unaffected; for X11 apps build the "
+            "repair (scripts/build_xwayland_runtime.sh, runtime/README.md)",
+        }
     if version in AFFECTED_WLROOTS:
         return {
             **result,
@@ -61,7 +74,13 @@ def wlroots(labwc):
             "hint": "native Wayland apps are unaffected; for X11 apps build the "
             "repair (scripts/build_xwayland_runtime.sh, runtime/README.md)",
         }
-    return {**result, "status": "ok" if version else "warn"}
+    if version:
+        return {**result, "status": "ok"}
+    return {
+        **result,
+        "status": "warn",
+        "detail": "could not determine the wlroots version labwc uses",
+    }
 
 
 def runtime_directory():

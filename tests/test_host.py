@@ -81,7 +81,7 @@ class HostTests(unittest.TestCase):
         result = {}
 
         def ask():
-            result.update(core.request_host("Open the report", minutes, timeout=20))
+            result.update(core.request_host("Open the report", minutes, wait=20))
 
         asking = threading.Thread(target=ask)
         asking.start()
@@ -96,9 +96,20 @@ class HostTests(unittest.TestCase):
             core.create("host")
         threading.Timer(0.5, core.answer_host, (False,)).start()
         with self.assertRaisesRegex(core.DesktopError, "declined"):
-            core.request_host("Open the report", 1, timeout=20)
-        with self.assertRaisesRegex(core.DesktopError, "No answer"):
-            core.request_host("Open the report", 1, timeout=0.5)
+            core.request_host("Open the report", 1, wait=20)
+        # Without an answer the call returns, and the request stays open.
+        self.assertEqual(
+            core.request_host("Open the report", 1, wait=0.2)["status"], "pending"
+        )
+        threading.Timer(0.3, core.answer_host, (True,)).start()
+        approved = core.request_host("Open the report", 1, wait=20)
+        self.sessions.append(approved["session"])
+        core.stop_host()
+        with mock.patch.object(core, "HOST_REQUEST_SECONDS", 0.3):
+            core.request_host("Expire", 1, wait=0)
+            time.sleep(0.5)
+            with self.assertRaisesRegex(core.DesktopError, "No answer"):
+                core.request_host("Expire", 1, wait=1)
 
     def test_acts_on_the_desktop_and_leaves_it_open(self):
         fixture = self.person_terminal()
@@ -172,3 +183,34 @@ class KeysymFallbackTests(unittest.TestCase):
         from agent_desktop.wayland import Keysyms
 
         self.assertEqual(Keysyms(1).resolve("Return"), 0xFF0D)
+
+
+class HostPromptTests(unittest.TestCase):
+    def test_click_and_dismiss_are_recorded(self):
+        import json
+        import subprocess
+
+        for printed, expected in (("default", "approved"), ("", "declined")):
+            with (
+                tempfile.TemporaryDirectory() as directory,
+                self.subTest(printed=printed),
+            ):
+                fake = Path(directory) / "notify-send"
+                fake.write_text(f"#!/bin/sh\nprintf '{printed}'\n")
+                fake.chmod(0o755)
+                path = Path(directory) / "request.json"
+                request = {
+                    "id": "r1",
+                    "reason": "x",
+                    "minutes": 1,
+                    "expires": time.time() + 30,
+                }
+                path.write_text(json.dumps(request))
+                env = {**os.environ, "PATH": f"{directory}:{os.environ['PATH']}"}
+                subprocess.run(
+                    [sys.executable, "-m", "agent_desktop.hostprompt", str(path)],
+                    env=env,
+                    check=True,
+                    timeout=30,
+                )
+                self.assertEqual(json.loads(path.read_text())["answer"], expected)

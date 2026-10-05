@@ -9,6 +9,7 @@ Every request is appended to $SHELL_TRIAL_LOG as JSON.
 
 import json
 import os
+import queue
 import socket
 import sys
 import threading
@@ -68,7 +69,9 @@ class FakeHyprland:
 
     def answer(self, request):
         command = request.split("/", 1)[1] if "/" in request[:3] else request
-        if command.startswith("dispatch workspace"):
+        if command.startswith(
+            ("dispatch workspace", "dispatch focusworkspaceoncurrentmonitor")
+        ):
             target = command.split()[-1]
             if target.lstrip("+-").isdigit():
                 number = int(target)
@@ -99,7 +102,8 @@ class FakeHyprland:
         return "[]" if request.startswith("j/") else "unknown request"
 
     def switch(self, number):
-        previous, self.active = self.active, number
+        with self.lock:
+            previous, self.active = self.active, number
         events = (
             f"workspace>>{number}\n"
             f"workspacev2>>{number},{number}\n"
@@ -107,44 +111,58 @@ class FakeHyprland:
             f"focusedmonv2>>HEADLESS-1,{number}\n"
         )
         self.record("event", {"from": previous, "to": number})
+        # Queued per listener, as in Hyprland: a client that is busy sending
+        # requests must not block the request socket.
         with self.lock:
-            alive = []
-            for connection in self.listeners:
-                try:
-                    connection.sendall(events.encode())
-                    alive.append(connection)
-                except OSError:
-                    connection.close()
-            self.listeners = alive
+            for outbox in self.listeners:
+                outbox.put(events.encode())
 
     def serve_requests(self, server):
         while True:
             connection, _ = server.accept()
-            with connection:
-                data = b""
-                connection.settimeout(1)
-                try:
-                    while True:
-                        chunk = connection.recv(65536)
-                        if not chunk:
-                            break
-                        data += chunk
-                        if len(chunk) < 65536:
-                            break
-                except TimeoutError:
-                    pass
-                request = data.decode(errors="replace").strip()
-                self.record("request", request)
-                try:
-                    connection.sendall(self.answer(request).encode())
-                except OSError:
-                    pass
+            threading.Thread(
+                target=self.handle_request, args=(connection,), daemon=True
+            ).start()
+
+    def handle_request(self, connection):
+        with connection:
+            data = b""
+            connection.settimeout(1)
+            try:
+                while True:
+                    chunk = connection.recv(65536)
+                    if not chunk:
+                        break
+                    data += chunk
+                    if len(chunk) < 65536:
+                        break
+            except TimeoutError:
+                pass
+            request = data.decode(errors="replace").strip()
+            self.record("request", request)
+            try:
+                connection.sendall(self.answer(request).encode())
+            except OSError:
+                pass
 
     def serve_events(self, server):
         while True:
             connection, _ = server.accept()
+            outbox = queue.Queue()
             with self.lock:
-                self.listeners.append(connection)
+                self.listeners.append(outbox)
+            threading.Thread(
+                target=self.write_events, args=(connection, outbox), daemon=True
+            ).start()
+
+    def write_events(self, connection, outbox):
+        try:
+            while True:
+                connection.sendall(outbox.get())
+        except OSError:
+            with self.lock:
+                self.listeners.remove(outbox)
+            connection.close()
 
     def run(self):
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)

@@ -1,6 +1,9 @@
-# Private Linux desktop for AI agents — development handoff
+# Agent Desktop project plan
 
-Updated: 2026-10-04. Status: M1 hardening (#5) is complete. Sessions own their whole process tree (including a private D-Bus) and survive supervisor crashes. Input uses persistent session-local virtual devices; windows, focus and stale-observation checks use the compositor directly. Focus now waits for observed activation before reporting success (#23, CI passed on Ubuntu, Fedora and Arch). X11, GTK and Qt applications are covered. Claude Code integration and initial benchmarks are complete. The guardian-exit test race is fixed (#24, CI passed on all three distributions). Human takeover for logins and persistent login profiles are implemented. Open: larger daily-use applications (#6), a real-agent login handoff run and comparisons with matched environments. Two sets of browser baseline tasks passed 6/6 per runtime within the $5 allowance. The reproduced wlroots 0.20.2 buffer-before-association race has a project-local repair (150 loaded sessions passed); repaired CI passed on all three distributions (37214448862), including 100 loaded Arch repetitions. Stock Fedora wlroots 0.19.3 subsequently failed X11 mapping in 37214999497; both matching repairs passed CI 37215643286, including 100 loaded X11 repetitions each on Fedora and Arch. Stock 0.19.3/0.20.2 remain affected. See `DEVELOPMENT_LOG.md`.
+Updated: 2026-10-05. This document records the chosen direction, implemented
+stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
+for exact validation, failures and historical changes. The runtime is experimental;
+implemented features are not a claim of universal compatibility.
 
 ## Development status
 
@@ -11,28 +14,30 @@ update this status and the development log with completed work and remaining gap
 | Stage | State (after the 2026-10-05 review) | Release gate still open |
 | --- | --- | --- |
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
-| M1 | Implemented and repeatedly tested; hardening continues | Retention limits, unexplained input symptoms, lifecycle edge cases (PID reuse) |
+| M1 | Implemented and repeatedly tested; hardening continues | Longer soak coverage, unexplained input symptoms, lifecycle edge cases (PID reuse) |
 | M2 | MCP and viewer tested; cooperative takeover and profiles implemented | Real login/resume by the user, keyboard layout; takeover is not a confidentiality boundary |
 | M3 | Partial: application fixtures, three CI distributions, first real-use trial (desktop shell, docs/trials/) | Reproducible supported-runtime installs (NixOS and one non-Nix desktop), sustained real work |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
 
-Next work follows the review's plan (docs/reviews/2026-10-05-project-review/plan.md):
-correctness fixes (#42-#44, merged), then packaging for NixOS and one non-Nix distribution
-with a preflight check, bounded retention, and a personal-use pilot on tasks the
-user chooses. Extensions are added only when the pilot shows a need.
+Next work follows the [review plan](docs/reviews/2026-10-05-project-review/plan.md).
+Correctness fixes (#42–#44), preflight (#46–#47), bounded retention and a one-hour
+soak (#48), and guarded environment hygiene (#49) are implemented. Remaining work
+includes reproducible installs for NixOS and a selected non-Nix desktop, longer
+soak coverage, and a pilot on maintainer-selected recurring tasks. Extensions
+should follow observed pilot needs.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from
-the later observer-only viewer whose disconnection must preserve a headless session.
+the implemented read-only viewer, whose disconnection preserves a headless session.
 
 ## 1. Read this first
 
-The user has decided to try building this project, initially for Linux and tested on their NixOS + Hyprland machine. It should work on other Linux distributions and leave room for later expansion.
+The project is Linux-first, with initial local validation on NixOS + Hyprland and headless CI on Ubuntu, Fedora and Arch. Other desktop installations need separate validation.
 
-The objective is **general computer use by existing agents**, beginning with a private desktop. Do not redirect the project into a specialized bug investigator or GUI testing framework. Those can become capabilities, but they are not the central product the user chose.
+The objective is **general computer use by existing agents**, beginning with a private desktop. Do not redirect the project into a specialized bug investigator or GUI testing framework. Testing and diagnostics can support general computer use; the project should retain that broader scope.
 
 Working product description:
 
@@ -43,12 +48,15 @@ Build a small working foundation, use it, and improve it from observed failures.
 ### Files and authority
 
 - `PROJECT_PLAN.md` — current direction, proposed architecture, milestones, extensions and handoff.
-- `START_HERE.md` — prompt to start implementation in a new chat.
-- `prompt1.txt` — original detailed brainstorm. Preserve it unchanged.
-- `prompt2.txt` — original portable Linux/NixOS-machine extension. Preserve it unchanged.
+- `START_HERE.md` — portable orientation and continuation workflow.
 - `RESEARCH_FINDINGS.md` — initial research and dated popularity snapshot. Its debugging-first recommendation was subsequently superseded by the broader direction in this plan.
 
-The original prompts preserve the full brainstorm; not every feature in them is a commitment. Current explicit user instructions take precedence over this plan. Technical choices below are recommendations to validate, not already-proven decisions.
+The original brainstorming prompts were retired during documentation cleanup.
+Their useful direction is preserved here, especially in sections 7A–7E; these
+options are not commitments. The originals remain in Git history at
+`1e9b20f21188b981b1a398e79aee10ccf924afc0` as `prompt1.txt` and `prompt2.txt`.
+Current explicit user instructions take precedence over this plan. Technical
+choices below distinguish the implemented foundation from recommendations to validate.
 
 ## 2. What the discussion established
 
@@ -147,7 +155,7 @@ Optional viewer connects to the session; closing it does not end the session.
 
 ### Choose the backend experimentally
 
-The physical host compositor need not match the agent's compositor. The M0 experiment selected a private labwc/wlroots-based session and verified headless screenshots plus keyboard/mouse delivery. It remains the first backend candidate for M1; general application compatibility and production reliability are not yet verified. See `DEVELOPMENT_LOG.md`.
+The physical host compositor need not match the agent's compositor. The M0 experiment selected a private labwc/wlroots-based session and verified headless screenshots plus keyboard/mouse delivery. It is the implemented runtime backend; general application compatibility and production reliability are not established. See `DEVELOPMENT_LOG.md`.
 
 | Candidate | Reason to consider | What must be validated |
 | --- | --- | --- |
@@ -282,7 +290,8 @@ Use the measured failure distribution to choose extensions. Do not interpret a l
 
 ### E. Portable agent machine
 
-Preserve `prompt2.txt` as the full proposal. Possible future architecture:
+The portable-machine proposal remains a deferred research direction. Possible
+future architecture:
 
 ```text
 Linux host → native runtime
@@ -290,19 +299,28 @@ Windows host → managed Linux environment → same runtime
 macOS host → managed Linux environment → same runtime
 ```
 
-- Evaluate WSL2 versus a managed VM later; neither is chosen.
+- Evaluate WSL2 versus a managed VM later; neither is chosen. Test whether the
+  headless desktop works independently of visible WSLg routing, and whether
+  NixOS or Nix on another WSL distribution is practical.
 - NixOS or Nix may pin/provision the environment without becoming a user-facing prerequisite.
 - Native frontend could manage installation, updates, lifecycle, viewing, networking and repository access.
 - Research host mounts versus guest-local repositories/worktree synchronization, file watching, credentials, GPU acceleration, image size, boot/resume and snapshot costs.
 - A host bridge should expose selected capabilities rather than unrestricted host access.
+- Measure environment update/rollback behavior, host/guest networking and
+  isolation between task machines. Declarative packages do not make live state
+  deterministic.
+- Consider per-task, issue, branch or PR machines only after one dependable
+  workflow. A frontend could manage provisioning and recovery without asking
+  users to operate a VM manually. Keep natural core/backend boundaries; avoid
+  abstractions introduced solely for hypothetical platform support.
 - Linux application tests on a Windows host do not verify native Windows behavior. Native host control would require another backend.
 
 ## 8. Development conventions and boundaries
 
 - The planning conversation created no implementation or running desktop. Development subsequently completed the M0 experiment; temporary runtime packages were fetched without host activation. See `DEVELOPMENT_LOG.md`.
-- Development is underway; `START_HERE.md` provides a continuation prompt for the implemented stages and remaining issues.
+- Development is underway; `START_HERE.md` provides contributor orientation for the implemented stages and remaining issues.
 - The packaged persistent runtime uses uv-managed Python and headless labwc. Subreaper-based process ownership and persistent session-local input devices and supervisor-crash recovery are implemented; keep improvements grounded in experiments.
-- If Python is chosen, use `uv`, a uv-managed interpreter, `uv sync` and `uv run`; ignore `.venv`. Keep portable Python metadata. Do not add project Nix files solely to supply Python dependencies.
+- Use `uv`, a uv-managed interpreter, `uv sync` and `uv run`; ignore `.venv`. Keep portable Python metadata. Do not add project Nix files solely to supply Python dependencies.
 - Nix packaging or a NixOS test environment for the actual Linux runtime is a separate legitimate design choice. Follow current user/local instructions.
 - For native wheel loading failures on NixOS, diagnose shared-library requirements and consider centralized workstation configuration rather than embedding machine-specific linker paths in the project.
 - Do not activate/rebuild the host, close unrelated applications, or change persistent host permissions merely because they are convenient for a prototype. A project-local experiment should stay within its task resources; discuss any necessary broader host change concretely.

@@ -1,8 +1,10 @@
-# Development conventions
+# Repository instructions
 
-- Build a private Linux desktop for existing agents. Follow `PROJECT_PLAN.md` and
-  record decisions, exact validation and remaining failures in `DEVELOPMENT_LOG.md`.
-- Keep `prompt1.txt` and `prompt2.txt` unchanged as historical brainstorming inputs.
+- Build a private Linux desktop for general computer use by existing agents.
+  Read `CONTRIBUTING.md`, `START_HERE.md` and `PROJECT_PLAN.md` for workflow and
+  current direction. Record decisions, exact validation and remaining failures
+  in `DEVELOPMENT_LOG.md`.
+- Keep current product direction and deferred ideas in `PROJECT_PLAN.md`.
 - Use a branch and pull request for each development stage. Keep changes small
   enough to review. Report dependencies between stacked pull requests explicitly.
 - Commit messages and pull request titles/bodies must not mention agent tooling
@@ -21,3 +23,19 @@
   profiles require specific authorization.
 - Test lifecycle, actual input receipt, screenshots, cleanup and failure behavior
   as appropriate. Distinguish experimental proof from production reliability.
+
+## Documentation and collaboration
+
+- Keep `README.md` focused on installation, a first session and navigation.
+  Detailed behavior belongs in `docs/USAGE.md`; MCP setup belongs in
+  `docs/INTEGRATIONS.md`; validation commands belong in `docs/VALIDATION.md`.
+- Keep technical claims consistent with source and recorded evidence. Dated
+  logs, research, reviews and trials are historical records, not current promises.
+- Use portable paths in instructions. Preserve exact paths in historical evidence
+  when they explain a result. Do not copy credentials or personal account data
+  into public-facing examples.
+- When contributors work in parallel, use a separate worktree. Do not edit, stage
+  or commit another contributor's changes. State the PR base and dependencies.
+- Keep the repository private until explicitly authorized to publish. A request
+  to open a PR does not authorize merging it. Do not choose a license without
+  a maintainer decision.

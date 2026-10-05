@@ -1,5 +1,11 @@
 # Independent project review — 2026-10-05
 
+> Archive note: this review refers to brainstorming prompts removed during later
+> documentation cleanup. Its file/line evidence describes the reviewed revision;
+> `prompt1.txt` and `prompt2.txt` remain available at Git commit
+> `1e9b20f21188b981b1a398e79aee10ccf924afc0`. Useful ideas now live in
+> [PROJECT_PLAN.md](../../../PROJECT_PLAN.md).
+
 **Verdict: a credible engineering alpha with an unfinished daily-use release. Stop adding capabilities for now.** The core private-desktop loop is real, and much of its complexity comes from diagnosing actual failures. What has not been earned is the stronger story: convenient installation, dependable long sessions, private credential handoff, broadly reliable applications or a measured performance advantage. Recommend **O1: harden and package for daily personal use**. The other directions should compete for investment after that pilot, not accumulate as another feature list.
 
 This review covers `8632cdedd2d20701230ae7d0b3afc8afbbce4adf` and live GitHub history checked on 2026-10-05. Source and repository state were read without changes; only this directory was written. No benchmark, paid agent, physical-desktop action, personal profile access or host change was performed. I ran lint and 11 existing non-desktop unit tests successfully, then eight focused unittest probes and one MCP scheduling probe. Those probes **confirm defects/edge cases**, not successful desktop operation. Desktop evidence here comes from inspected CI logs, retained artifacts and explicitly labeled historical reports; I did not rerun the compositor suite.

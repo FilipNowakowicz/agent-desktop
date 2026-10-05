@@ -1,10 +1,11 @@
-# Private agent desktop: research and assessment
+# Historical research and assessment
 
 Date: 2026-10-02
 
-> Follow-up, 2026-10-03: the user chose to pursue general computer use through a private Linux desktop, tested initially on NixOS. See `PROJECT_PLAN.md` for the current direction, newer popularity snapshot, implementation milestones and extensions, and `START_HERE.md` for the next-chat prompt. The debugging-first recommendation below is historical and is not the chosen product scope.
+> Historical scope note, 2026-10-03: the user chose to pursue general computer use through a private Linux desktop, tested initially on NixOS. See `PROJECT_PLAN.md` for the current direction, newer popularity snapshot, implementation milestones and extensions, and [START_HERE.md](START_HERE.md) for contributor orientation. The debugging-first recommendation below is historical and is not the chosen product scope.
 
-Based on the early ideas in `prompt1.txt` and `prompt2.txt` and a review of public project documentation and GitHub repository metadata. This is an initial survey, not an exhaustive market study or technical audit. No competing tools were installed or benchmarked, and no prototype was implemented.
+Based on the early brainstorming prompts (now retired; useful ideas are retained
+in [the project plan](PROJECT_PLAN.md)) and a review of public project documentation and GitHub repository metadata. This is an initial survey, not an exhaustive market study or technical audit. At the time of this survey, no competing tools had been installed or benchmarked and no prototype had been implemented. Later implementation and comparisons are recorded in [the development log](DEVELOPMENT_LOG.md) and [benchmark report](docs/BENCHMARK.md).
 
 ## The proposed idea
 

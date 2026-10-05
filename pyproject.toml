@@ -1,6 +1,8 @@
 [project]
 name = "private-agent-desktop"
 version = "0.0.1"
+license = "MIT"
+license-files = ["LICENSE"]
 description = "Experiments for a private Linux desktop for existing agents"
 requires-python = ">=3.12"
 dependencies = [

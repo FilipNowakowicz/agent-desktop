@@ -1,392 +1,131 @@
-# Private agent desktop
+# Agent Desktop
 
-Give an existing agent its own Linux desktop while you keep using your computer.
+Give your agent its own Linux desktop while you keep using your computer.
 
-An initial persistent desktop runtime and CLI work on NixOS + Hyprland, with
-headless operation and a visible nested window for testing. The runtime is still
-experimental. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for stage status and
-[DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) for observed results.
+Agent Desktop runs persistent, separate graphical sessions controlled through a
+CLI or a local MCP server. Agents can launch applications, inspect windows and
+accessible UI elements, take screenshots, and send keyboard and pointer input.
+You can watch a session or take control when a task needs human interaction.
 
-## Use a persistent desktop
+**Experimental, Linux-first.** Headless sessions have been tested locally on
+NixOS/Hyprland and in Ubuntu, Fedora and Arch CI environments. Those checks cover
+specific tasks, not every application or desktop installation. See the
+[compatibility matrix](docs/COMPATIBILITY.md) for versions and known failures.
 
-Install the runtime tools listed below, then run:
+Applications run as your user with host filesystem and network access. Separate
+display sockets, application profiles and input routing **do not provide a
+security sandbox**. The optional host guard reduces accidental host changes.
+
+## What it provides
+
+- Persistent headless labwc sessions with private display sockets and D-Bus.
+- Explicit session routing for window focus, screenshots, Unicode typing,
+  key chords, clicks, dragging and scrolling.
+- Screenshot observation tokens, waits and bounded action sequences to help
+  detect changes before acting; verify outcomes after each action.
+- Optional AT-SPI element inspection and semantic actions.
+- A read-only observer, cooperative human takeover and named login profiles.
+- Process supervision, cleanup, bounded screenshot retention and diagnostics.
+
+The runtime uses existing Linux desktop infrastructure and works with existing
+agents. It does not require a particular model or cloud service.
+
+## Installation
+
+Use Python 3.12 or newer managed by [uv](https://docs.astral.sh/uv/). From a local
+checkout of this repository, install the locked Python dependencies:
 
 ```sh
-uv sync --managed-python
-uv run agent-desktop create
-uv run agent-desktop create --mode visible
-# Commands return JSON. Use the returned session identifier:
+uv sync --managed-python --locked
+```
+
+Install desktop tools using your distribution's package manager. Python packages
+alone do not supply the compositor or capture tools.
+
+| Dependency | Purpose |
+| --- | --- |
+| `labwc`, `grim`, `dbus-daemon` | Required: compositor, screenshots, private session bus |
+| `foot` | Terminal for the quick start and test fixtures |
+| `xwayland` | Optional X11 application support |
+| `wayvnc`, TigerVNC `vncviewer` | Optional observer and interactive takeover |
+| `at-spi2-core` | Optional semantic UI access; coverage depends on the application |
+
+Package names and versions differ between distributions. Run preflight before
+creating a session:
+
+```sh
+uv run agent-desktop doctor
+uv run agent-desktop doctor --smoke  # create, capture and destroy a test session
+```
+
+Stock wlroots 0.19.3 and 0.20.2 have a reproduced intermittent X11 mapping failure.
+See the optional [project-local runtime repair](runtime/README.md) when using
+those versions. A passing smoke check does not establish sustained reliability.
+
+On NixOS, an optional temporary shell supplies desktop runtime tools while uv
+continues to manage Python:
+
+```sh
+nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#dbus \
+  nixpkgs#wayvnc nixpkgs#tigervnc --command zsh
+```
+
+Runtime paths can be set with `--labwc`, `--grim` or corresponding
+`AGENT_DESKTOP_*` environment variables. See the [user guide](docs/USAGE.md).
+
+## Quick start
+
+Run these commands from the repository root. `create` returns JSON containing a
+session identifier; replace `SESSION` below with that value. Replace `WINDOW_ID`
+with an identifier returned by `windows`.
+
+```sh
+uv run agent-desktop create --guard-host
 uv run agent-desktop launch SESSION -- foot --config=/dev/null
 uv run agent-desktop windows SESSION
 uv run agent-desktop focus SESSION WINDOW_ID
 uv run agent-desktop screenshot SESSION
 uv run agent-desktop type SESSION 'hello café λ'
-uv run agent-desktop key SESSION Return
-uv run agent-desktop click SESSION 640 360
-uv run agent-desktop drag SESSION 300 400 900 400
-uv run agent-desktop scroll SESSION 120
-uv run agent-desktop status SESSION
-uv run agent-desktop logs SESSION
+uv run agent-desktop screenshot SESSION
 uv run agent-desktop destroy SESSION
-uv run agent-desktop list
 ```
 
-Headless mode never opens a host window. Visible mode requires a Wayland host and
-opens a nested desktop window that you can inspect and interact with directly.
-Opening that window can change host focus; closing it ends the nested session.
-While the nested window has host focus, your physical keyboard input also reaches
-the agent's desktop, so do not type into it unintentionally. Use the read-only `view`
-observer below to watch a headless session without this.
-
-To observe a headless session without forwarding human input, install optional
-`wayvnc` and TigerVNC's `vncviewer`, then run:
-
-```sh
-uv run agent-desktop view SESSION
-```
-
-The observer uses a Unix VNC socket inside the private session runtime directory,
-with input disabled on the server and clipboard transfer/remote resizing disabled
-in the client. It opens no TCP listener. Closing the viewer preserves the desktop.
-TigerVNC's graphical client needs a host X11 display or Xwayland; the applications
-inside the private desktop remain native Wayland. Override optional tools with
-`--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
-
-### Waiting
-
-`agent-desktop wait SESSION --title Settings --stable-ms 500 --timeout 10` (MCP:
-`desktop_wait`) waits for a window whose title contains the text (or `--app-id`,
-or `--gone` for its disappearance), then until the screen has not changed for
-`--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
-returns `satisfied: false` at the timeout instead of failing.
-With accessibility, `--element NAME`, `--role ROLE` and `--text TEXT` wait for a
-matching UI element (e.g. a "Saved" label or a field containing a value), or for
-its disappearance with `--gone`, so an action's outcome can be verified without a
-screenshot.
-
-### Semantic UI (accessibility)
-
-When `at-spi2-core` is installed, each session runs its own AT-SPI registry on its
-private bus and enables accessibility for its applications only (overriding host
-settings such as `NO_AT_BRIDGE` or `GTK_A11Y=none` inside the session). The
-registry is found in the usual libexec locations or through
-`AGENT_DESKTOP_AT_SPI_REGISTRYD`; `status` reports `accessibility`.
-
-`agent-desktop ui SESSION [--app NAME] [--window TITLE]` (MCP: `desktop_ui`) lists
-visible elements as a flat list with depth: role, name, states, text, value and
-actions; unnamed layout containers are omitted. `ui-action SESSION NODE press|focus|
-set_text --text ...` (MCP: `desktop_ui_action`, also usable as a `ui_action` step in
-action sequences) acts without coordinates, which Wayland does not provide to
-AT-SPI. Coverage depends on the toolkit: GTK 3/4 expose rich trees; Chromium needs
-`--force-renderer-accessibility` (sessions set `ACCESSIBILITY_ENABLED=1`) and gets
-`set_text` by focusing the field and typing; Qt 6 (kdialog) works;
-X11-only and custom-drawn applications may expose little. Like other input, actions are refused while a person has control.
-
-### Partial and scaled screenshots
-
-`screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,
-scale=...)`) captures part of the desktop and/or shrinks it (0.1–1) to save image
-tokens. The result reports `region` and `scale`. Coordinates follow the token you
-pass: with this screenshot's `observation`, input tools (and every step of an
-action sequence) take x/y in this image and convert them; without a token, x/y
-are desktop pixels. Do not convert manually and also pass the token, or the
-scaling is applied twice. The token's layout part always describes the whole
-desktop.
-
-### Action sequences
-
-`desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)
-runs up to 50 steps such as `{"action": "click", "x": 10, "y": 20}`,
-`{"action": "type", "text": "hello"}` or `{"action": "wait", "title": "Saved"}`.
-Each input step is sent only while windows, focus and output match the state right
-after the previous step (or the given screenshot token); otherwise the run stops
-and reports the step and reason. `wait` and `focus` steps expect a change and take
-a new baseline. Popups and changes inside a window are not detected, and the
-result carries no observation token, so take a screenshot to verify.
-
-### Taking control (logins, 2FA, CAPTCHAs)
-
-An agent that reaches a login page calls `desktop_request_human` with a reason
-instead of asking for your password. `agent-desktop list` shows the pending request.
-Take the session yourself:
-
-```sh
-uv run agent-desktop take SESSION
-```
-
-This opens an interactive viewer on a separate Unix socket. While you hold control,
-the session refuses the agent's desktop tools (input, focus, launch, window
-listing, screenshots and UI listing). This is cooperative routing, not a
-confidentiality boundary: a read-only observer that is already open keeps
-streaming, logs stay readable, and any process running as your user, including an
-agent with shell access, can reach the session's sockets or call `release`. Treat
-takeover as protection from the agent's tools, not from a hostile process. Closing the viewer (or `agent-desktop release
-SESSION`) hands control back; the agent must then take a new screenshot before any
-input, and all earlier observation tokens are stale. The agent can wait for this
-with `desktop_control(session, wait_seconds=...)`; only you can release control.
-The session's clipboard is never copied to your host. `take --paste` sends your
-host clipboard into the session (e.g. a password from your password manager);
-without it nothing is transferred. Whenever control returns, the session's
-clipboard and primary selection are cleared first, so a pasted secret is not left
-for the agent; if clearing fails, control stays with you and `release` reports
-the error (`release --force` hands back anyway). The session keymap is US, so
-characters missing from that layout may not reach the session when typed
-(pasting avoids this).
-
-Applications start in the session's private home directory unless `launch`
-is given an absolute `cwd`; the CLI passes your current directory, so relative
-paths on its command line work as in a shell. They never inherit the directory
-the session happened to be created from. Unguarded sessions inherit the rest of your
-environment.
-
-### Guarding the host
-
-Applications in a session run as your user. A panel button, widget or script can
-therefore still power off the machine, change Wi-Fi or kill your processes
-(`pkill` matches processes outside the session). `create --guard-host` (MCP:
-`desktop_create(guard_host=True)`) points the session's system bus at a
-non-existent socket and puts refusing stand-ins first on `PATH` for common
-host-affecting commands (systemctl, loginctl, shutdown/poweroff/reboot, nmcli,
-bluetoothctl, rfkill, brightnessctl, powerprofilesctl, tailscale, mullvad,
-udisksctl, pkill, killall, hyprctl, swaymsg). It also removes credential
-variables inherited from your environment (SSH and GPG agents, Kerberos, cloud
-prefixes such as `AWS_`, and names containing TOKEN, SECRET, PASSWORD or
-API_KEY); `status` lists their names. Refusals are written to `guard.log`,
-which `logs` returns. This prevents accidents; it is not a
-security boundary, since absolute paths and other mechanisms still reach the
-host.
-
-GTK 4 applications render in software in every session (`GSK_RENDERER=cairo`,
-override with `AGENT_DESKTOP_GSK_RENDERER`); without it, layer-shell panels came
-up blank.
-
-### Saved logins (profiles)
-
-By default everything in a session is deleted at `destroy`. To keep a login, create
-the session with a named profile:
-
-```sh
-uv run agent-desktop create --profile github     # MCP: desktop_create(profile="github")
-uv run agent-desktop profiles                    # list, size, whether in use
-uv run agent-desktop delete-profile github       # permanently remove saved logins
-```
-
-The profile becomes the session's `HOME` (and so its XDG config, cache and data),
-stored under `$XDG_STATE_HOME/agent-desktop/profiles/NAME/home` with mode 0700.
-Only one session can use a profile at a time. Teardown first closes every window
-as a person would and waits briefly, so browsers write cookies before the
-compositor stops; applications still open after that are terminated. Profiles
-hold login cookies and tokens on disk, readable by any process running as your
-user and by any agent given that profile; they are never your personal browser
-profile. Deleting a profile is CLI-only.
-
-Each session has private display sockets, D-Bus, configuration and application
-profiles. The session supervisor is a child subreaper and starts the private bus
-itself, so daemonizing applications and D-Bus-activated services remain in its
-process tree and are stopped at teardown. `status` lists those processes. A small
-guardian process watches the supervisor; if the supervisor dies, the guardian stops
-the session's processes and marks it `failed`. If both are killed, `destroy`
-recovers the session using its environment token (processes that cleared their
-environment cannot be found then).
-Screenshots and bounded log tails remain in
-`~/.local/state/agent-desktop/SESSION/` after teardown. Set
-`AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;
-verify its outcome using screenshots or application evidence.
-
-X11 applications run through the private compositor's own Xwayland when labwc
-supports it (install `xwayland`); `status` reports its `x_display`. The host's
-`DISPLAY` is never passed to applications.
-
-`windows` lists each window's id, title, app_id, states (`activated`, `maximized`,
-`minimized`, `fullscreen`) and parent; `focus` activates one by id and returns its
-observed window state. It waits up to two seconds for the compositor to report
-`activated`, failing if the window closes or activation is not observed. Focus
-can change again afterward; this does not prove the application received input.
-Each screenshot
-returns an `observation` token: a window-topology and focus guard describing the
-output and windows (ids, app ids, states, parents; not titles, positions or
-pixels). Pass it with `--observation` (CLI) or `observation` (MCP) to input
-requests: if a window appeared, closed or changed focus/state, or the output
-changed, the request fails with `StaleObservation` and sends nothing. A moved or
-resized window, changes inside a window and a change between the check and the
-input are not detected; verify outcomes explicitly.
-
-Pointer input uses one persistent wlroots virtual pointer per session with absolute
-coordinates in screenshot pixels. Output mode changes are tracked; anything other
-than one output at scale 1 is rejected.
-
-Keyboard input uses one persistent virtual keyboard per session with a US layout
-on real key codes (Shift for capitals and symbols). Characters a US keyboard lacks
-(accents, Greek, CJK) are mapped on demand to spare keys, so any Unicode text can
-be typed regardless of layout: up to 10000 characters per request, without fixed
-delays. `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
-XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
-modifiers. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
-default bindings, which execute host commands such as `brightnessctl`, are not loaded.
-Accessibility trees remain unimplemented. Applications run as your user, with
-host filesystem and network access; graphical separation is not a security sandbox.
-
-## Disk use
-
-Each session keeps its newest 200 screenshots (`AGENT_DESKTOP_KEEP_SCREENSHOTS`);
-logs are trimmed per file. Stopped and failed sessions keep their logs and
-screenshots until pruned:
-
-```sh
-uv run agent-desktop usage                         # sessions by status, bytes, profiles
-uv run agent-desktop prune --older-than 7 --dry-run
-uv run agent-desktop prune --older-than 7
-```
-
-`prune` never removes live sessions or named profiles (`delete-profile` does that).
-
-## Preflight
-
-```sh
-uv run agent-desktop doctor          # tools, runtime directory, wlroots, accessibility
-uv run agent-desktop doctor --smoke  # also create, capture and destroy a session
-```
-
-Each check reports `ok`, `warn` or `fail` with a hint; the command exits 1 on any
-failure. It warns when labwc uses a stock wlroots version with the reproduced
-X11 mapping race (0.19.3, 0.20.2) and recognises the project's repaired runtime
-by the marker `scripts/build_xwayland_runtime.sh` writes beside the library.
-
-## Checks
-
-```sh
-uv run ruff check src scripts tests
-uv run ruff format --check src scripts tests
-uv run python -m unittest discover -s tests -v
-# Optional: opens and tears down a visible test desktop.
-DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
-# Repeated lifecycle cycles, optionally with busy CPU processes.
-uv run scripts/lifecycle_stress.py --cycles 20 --load 4
-```
-
-Integration tests skip when desktop tools are missing. CI installs them explicitly
-on Ubuntu; passing unit-only checks must not be described as a desktop validation.
-
-## MCP
-
-Run the stdio server with `uv run agent-desktop-mcp`. It exposes session lifecycle,
-launch, windows, PNG images with dimensions, input and logs through the same core.
-Desktop sessions persist when an MCP client disconnects; destroy them explicitly.
-The server sends instructions to the client describing the screenshot/act/verify
-loop and the login handoff (`desktop_request_human`, `desktop_control`, profiles).
-
-A generic client configuration looks like:
-
-```json
-{
-  "mcpServers": {
-    "private-desktop": {
-      "command": "uv",
-      "args": ["--directory", "/absolute/path/to/private-agent-desktop", "run", "agent-desktop-mcp"]
-    }
-  }
-}
-```
-
-The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
-visible mode, `WAYLAND_DISPLAY`). If runtime tools are not on PATH, configure
-`AGENT_DESKTOP_LABWC` and `AGENT_DESKTOP_GRIM` with their executable paths in the
-client's environment. The protocol is also tested with the official Python SDK's
-stdio client.
-
-### Claude Code
-
-This repository includes a project-scoped `.mcp.json` declaring the
-`private-desktop` server. Start `claude` in the repository and approve the project
-server when asked; the desktop tools then appear as `mcp__private-desktop__*`.
-The server inherits Claude Code's environment, so the runtime tools must be on
-its PATH (on NixOS, for example, start `claude` inside the `nix shell` shown below).
-
-`scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
-non-interactively, with no built-in tools and only this MCP server. The agent must
-create a session, launch Chromium on a local page, read a code that exists only
-in the rendered screenshot, type it, drag a box into a target and submit. The
-harness then verifies the page state itself, records host focus and pointer
-(Hyprland only), and destroys the session. It uses your Claude Code account.
-A 20-task suite and its results are in [docs/BENCHMARK.md](docs/BENCHMARK.md).
-
-## Run the experiment
-
-The runtime needs `labwc`, `grim` and `dbus-daemon`; tests also use `foot`.
-The original M0 experiment script additionally needs `wtype` and `wlrctl`. Install
-them using your distribution's package manager. Python is managed with uv:
-
-```sh
-uv sync --managed-python
-uv run scripts/m0_headless.py
-uv run scripts/m0_headless.py --text 'agent café λ 123'
-```
-
-On NixOS, an optional temporary shell can supply the actual desktop runtime tools.
-Python and project dependencies remain managed with uv:
-
-```sh
-nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
-  nixpkgs#wayvnc nixpkgs#tigervnc --command zsh
-# Inside that temporary shell:
-uv run agent-desktop create
-```
-
-Runtime executable paths can be supplied with `--labwc` and `--grim` (the M0
-script also accepts `--foot`, `--wtype` and `--wlrctl`). The tested NixOS invocation is
-in the development log. Headless CI also runs in Fedora and Arch containers;
-desktop installs on those distributions remain untested.
-
-The experiment creates a temporary headless labwc session with software rendering,
-a private runtime directory, disposable home/configuration and a separate D-Bus
-session. It launches a terminal fixture, captures screenshots, types a message and
-delivers a virtual mouse click. The fixture checks actual received text and mouse
-events. Session resources are stopped and removed; screenshots, logs and a JSON
-report remain under `artifacts/m0/`.
-
-When launched from Hyprland, the report compares the host workspace, focused window
-and pointer position before and after. These snapshots cannot prove there was no
-transient disturbance, and normal human activity can change them.
-
-Graphical separation and disposable configuration do not constitute a security
-sandbox. Applications still run as your user with host filesystem and network access.
-
-## Next
-
-Expand application coverage and measure baseline efficiency. See [the compatibility matrix](docs/COMPATIBILITY.md)
-for tested configurations and [the roadmap](PROJECT_PLAN.md) for remaining stages.
-
-For a scripted Chromium GUI task with a disposable profile and local HTML fixture:
-
-```sh
-uv run scripts/browser_smoke.py
-```
-
-For Writer document creation and a Calc formula/save workflow, install optional
-LibreOffice Writer, Calc and GTK3 integration, then run:
-
-```sh
-uv run scripts/office_smoke.py
-uv run scripts/office_smoke.py --component writer
-```
-
-The script uses native Wayland, separate disposable office profiles, and validates
-the saved ODT paragraphs and ODS formula/result. It handles known first-run
-Welcome/Tip dialogs, checks session cleanup and writes artifacts under
-`artifacts/office/`. File-dialog validation includes a short fixture delay;
-this does not establish general application widget readiness.
-
-For an optional graphical observer smoke test on Hyprland (opens and closes its
-own viewer window):
-
-```sh
-uv run scripts/viewer_smoke.py
-```
-
-See [the benchmark report](docs/BENCHMARK.md) for verified GUI tasks and a
-restricted local-container comparison. Its optional harness uses an existing
-local runtime and performs no host installation or configuration.
-
-For the reproduced X11 mapping race on wlroots 0.19.3/0.20.2, see the optional
-[project-local runtime repair](runtime/README.md). Stock-package passes do not
-establish reliable X11 mapping on that version.
+Headless mode is the default and opens no host window. Sessions persist when a
+CLI or MCP client exits; destroy them explicitly. The example types into the
+terminal without pressing Return. For guarded input, pass the screenshot's
+`observation` token with `--observation`; its limits are explained in the
+[user guide](docs/USAGE.md).
+
+Watch an existing headless session with `uv run agent-desktop view SESSION`.
+Use `take SESSION` for an interactive handoff. `create --mode visible` instead
+opens a nested Wayland window: while focused it also receives your physical
+keyboard input, and closing it ends the session.
+
+## Documentation
+
+| Guide | Contents |
+| --- | --- |
+| [Desktop user guide](docs/USAGE.md) | Input, coordinates, waits, UI access, profiles, handoff, cleanup and limits |
+| [Integrations](docs/INTEGRATIONS.md) | Local MCP configuration and the existing end-to-end client harness |
+| [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
+| [Validation](docs/VALIDATION.md) | Checks, lifecycle experiments and application smoke tests |
+| [Benchmarks](docs/BENCHMARK.md) | Task definitions, recorded results and comparison limits |
+| [Contributing](CONTRIBUTING.md) | Development workflow and testing boundaries |
+| [Start here](START_HERE.md) | Contributor orientation and continuation workflow |
+| [Project plan](PROJECT_PLAN.md) / [development log](DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |
+
+The [research notes](RESEARCH_FINDINGS.md) and dated reviews are historical context. The project plan records the chosen direction.
+
+## Project status
+
+The next goal is a dependable daily-use alpha: reproducible runtime installation,
+longer lifecycle testing and representative workflows. Current benchmarks do not
+establish a general reliability or performance advantage over other runtimes.
+
+The repository remains private while documentation is prepared for a possible
+public release. See the [publication checklist](docs/PUBLICATION.md) for
+outstanding decisions.
+
+## License
+
+Licensed under the [MIT License](LICENSE).

@@ -1,6 +1,9 @@
 # Tested configurations
 
-Updated: 2026-10-04. Distinguish observed tests from advertised runtime support.
+Evidence through 2026-10-05. These are observations from particular revisions
+and environments, not a support guarantee. CI containers do not establish desktop
+installation support. See the [validation guide](VALIDATION.md) to reproduce
+checks and the [development log](../DEVELOPMENT_LOG.md) for later changes.
 
 | Environment | Observation |
 | --- | --- |
@@ -52,5 +55,6 @@ untested.
 Ubuntu checks skip visible testing because the runner has no physical Wayland host.
 Do not infer general support for browsers beyond the one tested fixture, GTK/Qt
 applications beyond simple dialogs, X11 applications beyond xterm and the dialogs,
-or processes started by host services outside the session tree. General applications need explicit profile separation and task-specific
-outcome checks.
+or processes started by host services outside the session tree. Mousepad and
+LibreOffice coverage is limited to the tasks recorded above. General applications
+need explicit profile separation and task-specific outcome checks.

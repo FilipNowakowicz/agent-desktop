@@ -16,9 +16,9 @@ A generic client configuration looks like:
 ```json
 {
   "mcpServers": {
-    "private-desktop": {
+    "agent-desktop": {
       "command": "uv",
-      "args": ["--directory", "/absolute/path/to/private-agent-desktop", "run", "agent-desktop-mcp"]
+      "args": ["--directory", "/absolute/path/to/agent-desktop", "run", "agent-desktop-mcp"]
     }
   }
 }
@@ -34,8 +34,8 @@ stdio client.
 ### Claude Code
 
 This repository includes a project-scoped `.mcp.json` declaring the
-`private-desktop` server. Start `claude` in the repository and approve the project
-server when asked; the desktop tools then appear as `mcp__private-desktop__*`.
+`agent-desktop` server. Start `claude` in the repository and approve the project
+server when asked; the desktop tools then appear as `mcp__agent-desktop__*`.
 With the Nix runtime linked at `~/.local/share/agent-desktop/runtime`, or the
 Ubuntu packages installed, no further environment setup is needed.
 

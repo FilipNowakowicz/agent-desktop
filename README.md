@@ -7,6 +7,11 @@ CLI or a local MCP server. Agents can launch applications, inspect windows and
 accessible UI elements, take screenshots, and send keyboard and pointer input.
 You can watch a session or take control when a task needs human interaction.
 
+![A headless session: LibreOffice Calc with a small table and a chart](docs/images/calc-session.png)
+
+*A headless session captured with the tool. An agent entered the table and
+inserted the chart through the MCP tools while the host desktop stayed in use.*
+
 **Experimental, Linux-first.** Headless sessions have been tested locally on
 NixOS/Hyprland and in Ubuntu, Fedora and Arch CI environments. Those checks cover
 specific tasks, not every application or desktop installation. See the
@@ -100,6 +105,40 @@ Watch an existing headless session with `uv run agent-desktop view SESSION`.
 Use `take SESSION` for an interactive handoff. `create --mode visible` instead
 opens a nested Wayland window: while focused it also receives your physical
 keyboard input, and closing it ends the session.
+
+## Use it from an agent
+
+Any client that supports local stdio MCP servers can use the desktop. From a
+checkout, point the client at the server:
+
+```json
+{
+  "mcpServers": {
+    "agent-desktop": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/agent-desktop", "run", "agent-desktop-mcp"]
+    }
+  }
+}
+```
+
+The server tells the agent the screenshot → act → verify loop and how to ask a
+person for help (logins, 2FA, CAPTCHAs). This repository's `.mcp.json` already
+declares the server for clients that read project configuration, such as Claude
+Code. See [integrations](docs/INTEGRATIONS.md).
+
+## How it differs
+
+- **Your machine, no VM or container.** Each session is a separate headless
+  labwc compositor on the host. A session starts in well under a second, and
+  applications use your installed software. Other tools run a desktop in Docker or a VM, which isolates better but
+  costs setup and resources.
+- **Your own desktop stays yours.** Agent input goes to the agent's session
+  only, never to your physical screen, unlike tools that drive your real desktop.
+- **Built-in handoff.** An agent can request a person; `take` opens the session
+  in a viewer, with your keyboard layout, and closing it hands control back.
+
+It is not a security boundary: applications run as your user (see above).
 
 ## Documentation
 

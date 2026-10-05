@@ -1,5 +1,5 @@
 [project]
-name = "private-agent-desktop"
+name = "agent-desktop"
 version = "0.0.1"
 license = "MIT"
 license-files = ["LICENSE"]

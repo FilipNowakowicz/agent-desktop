@@ -1,7 +1,7 @@
 """Run the representative GUI task suite with Claude Code and record outcomes.
 
 Each task gets a fresh harness-created session with its application already
-launched. The agent receives only the private-desktop MCP tools; the harness
+launched. The agent receives only the agent-desktop MCP tools; the harness
 verifies the outcome independently, then destroys the session and checks cleanup.
 """
 
@@ -41,7 +41,7 @@ NEWER = [
 ]
 TOOL_PROFILES = {"basic": LIFECYCLE + NEWER, "full": LIFECYCLE}
 
-PROMPT = """You control a private Linux desktop through the private-desktop tools.
+PROMPT = """You control a private Linux desktop through the agent-desktop tools.
 Use session {session}; it already exists and the application is already open.
 Do not create or destroy sessions.
 
@@ -82,7 +82,7 @@ def run_agent(
     model,
     *,
     mcp_config=".mcp.json",
-    server="private-desktop",
+    server="agent-desktop",
     disallowed=None,
 ):
     if disallowed is None:
@@ -196,7 +196,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
                     budget,
                     model,
                     disallowed=[
-                        f"mcp__private-desktop__desktop_{name}"
+                        f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
                     ],
                 )

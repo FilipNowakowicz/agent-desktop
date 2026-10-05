@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-05 — Rename to agent-desktop; public presentation
+
+Maintainer decision: the repository and Python package become `agent-desktop`
+(from `private-agent-desktop`). The reader-facing title stays "Agent Desktop",
+although an unrelated Rust project uses the same title (lahfir/agent-desktop,
+an accessibility-tree computer-use tool). The project MCP server is now registered
+as `agent-desktop`, so its tools are `mcp__agent-desktop__*`; harness scripts and
+docs are updated. Clients must approve the renamed project server once. Dated
+logs, reviews and benchmark results keep the old names as historical evidence.
+
+README: a real headless-session screenshot (LibreOffice Calc with a table and a
+chart, made through the MCP tools), a "use it from an agent" MCP snippet, and a
+short comparison (host sessions instead of VMs/containers; never the physical
+desktop; built-in handoff). Disclosure scan of tracked files and the full
+history: no secrets; local paths and the author email (accepted by the
+maintainer). Publication checklist updated.
+
 ## 2026-10-05 — Pilot through MCP; UI actions in sequences
 
 After `/mcp` reconnect the MCP tools work with the auto-selected runtime. Pilot

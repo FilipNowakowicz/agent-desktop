@@ -42,7 +42,7 @@ def call(session, operation, **arguments):
     return core.request(session, operation, CONTROLLER, **arguments)
 
 
-mcp = FastMCP("Private desktop", instructions=INSTRUCTIONS)
+mcp = FastMCP("Agent Desktop", instructions=INSTRUCTIONS)
 
 
 def tool(**options):

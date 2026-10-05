@@ -13,8 +13,8 @@ You need git, curl and [uv](https://docs.astral.sh/uv/). uv installs with
 afterwards (or `source ~/.local/bin/env`) so `uv` is on PATH. Then:
 
 ```sh
-git clone <repository URL> private-agent-desktop
-cd private-agent-desktop
+git clone https://github.com/FilipNowakowicz/agent-desktop.git
+cd agent-desktop
 uv sync --managed-python   # a uv-managed Python, not the system one
 ```
 

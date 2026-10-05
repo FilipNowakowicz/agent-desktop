@@ -14,7 +14,7 @@ configured account; obtain an agreed scope and budget before running them.
 `scripts/benchmark.py` runs 20 representative tasks (`benchmarks/tasks.py`) with
 Claude Code as the agent. For each task the harness creates a fresh headless
 session, launches the application and waits for its window. It then runs
-`claude -p` with **only** the private-desktop MCP tools (`--tools ""`, strict MCP
+`claude -p` with **only** the agent-desktop MCP tools (`--tools ""`, strict MCP
 config, $1 cap per task). The outcome is verified independently: window titles set by
 the page, files on disk, or a dialog's stdout and exit code. The agent's reply is
 not trusted. After each task the session is destroyed and checked for leftover

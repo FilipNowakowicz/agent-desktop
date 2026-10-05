@@ -1,8 +1,14 @@
 name: Checks
+# The full desktop matrix (about 30 runner-minutes) runs on demand and for
+# release tags, not on every PR: Actions minutes are limited. PRs run lint.yml.
+# Start it with: gh workflow run checks.yml --ref BRANCH
 on:
-  pull_request:
+  workflow_dispatch:
   push:
-    branches: [main]
+    tags: ['v*']
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

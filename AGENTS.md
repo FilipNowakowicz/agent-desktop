@@ -5,6 +5,9 @@
   current direction. Record decisions, exact validation and remaining failures
   in `DEVELOPMENT_LOG.md`.
 - Keep current product direction and deferred ideas in `PROJECT_PLAN.md`.
+- CI minutes are limited: PRs run only the Lint workflow. Run the desktop suite
+  locally; trigger the full Checks matrix manually only for runtime, packaging or
+  CI changes and milestones (see docs/VALIDATION.md).
 - Use a branch and pull request for each development stage. Keep changes small
   enough to review. Report dependencies between stacked pull requests explicitly.
 - Commit messages and pull request titles/bodies must not mention agent tooling

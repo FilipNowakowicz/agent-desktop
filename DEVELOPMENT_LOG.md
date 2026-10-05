@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-10-05 — Full CI on demand only
+
+The maintainer reported GitHub Actions minutes running low. The full desktop
+matrix (Ubuntu, Nix, Fedora and Arch, about 30 runner-minutes per run, with the
+Arch/Fedora wlroots builds and 100-repetition loops) ran on every PR push and every
+merge. `checks.yml` now runs only on `workflow_dispatch` and `v*` tags, with
+cancel-in-progress. A new `lint.yml` (ruff, format, compileall, unit tests with
+desktop tests skipped; 62 skip without a runtime) runs on PRs and main pushes,
+and is now the required status check instead of `runtime`. Desktop tests run
+locally before merging, and their results go in the PR.
+
 ## 2026-10-05 — Rename to agent-desktop; public presentation
 
 Maintainer decision: the repository and Python package become `agent-desktop`

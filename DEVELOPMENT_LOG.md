@@ -43,8 +43,7 @@ had encoded exactly this case as unknown. INSTALL.md now covers uv, the clone,
 `--managed-python`, the expected doctor result, retained stopped sessions and test-only
 packages. The apt step runs noninteractively. README still needs a link to
 INSTALL.md (left for the documentation rewrite, #54).
-0.67 s; full suite 85 tests OK, 6 skipped. Not yet done: a fresh, non-CI Ubuntu
-desktop installation.
+
 ## 2026-10-05 — Decisions on the review questions
 
 The user delegated the review's open questions; decisions are in

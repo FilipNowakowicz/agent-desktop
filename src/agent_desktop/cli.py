@@ -24,6 +24,11 @@ def main():
     new.add_argument(
         "--profile", help="keep this named home (e.g. browser logins) across sessions"
     )
+    new.add_argument(
+        "--guard-host",
+        action="store_true",
+        help="block the system bus and host-affecting commands for session apps",
+    )
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
@@ -136,7 +141,8 @@ def main():
     try:
         if command == "create":
             mode, profile = args.pop("mode"), args.pop("profile")
-            result = create(mode, tools=args, profile=profile)
+            guard = args.pop("guard_host")
+            result = create(mode, tools=args, profile=profile, guard_host=guard)
         elif command == "list":
             result = sessions()
         elif command == "profiles":

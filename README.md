@@ -124,6 +124,24 @@ clipboard and primary selection are cleared, so a pasted secret is not left for
 the agent. The session keymap is US, so characters missing from that layout may
 not reach the session when typed (pasting avoids this).
 
+### Guarding the host
+
+Applications in a session run as your user. A panel button, widget or script can
+therefore still power off the machine, change Wi-Fi or kill your processes
+(`pkill` matches processes outside the session). `create --guard-host` (MCP:
+`desktop_create(guard_host=True)`) points the session's system bus at a
+non-existent socket and puts refusing stand-ins first on `PATH` for common
+host-affecting commands (systemctl, loginctl, shutdown/poweroff/reboot, nmcli,
+bluetoothctl, rfkill, brightnessctl, powerprofilesctl, tailscale, mullvad,
+udisksctl, pkill, killall, hyprctl, swaymsg). Refusals are written to
+`guard.log`, which `logs` returns. This prevents accidents; it is not a
+security boundary, since absolute paths and other mechanisms still reach the
+host.
+
+GTK 4 applications render in software in every session (`GSK_RENDERER=cairo`,
+override with `AGENT_DESKTOP_GSK_RENDERER`); without it, layer-shell panels came
+up blank.
+
 ### Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create

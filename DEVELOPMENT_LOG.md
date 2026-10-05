@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-05 — Host guard and software GTK from the shell trial
+
+Findings for the user's configuration were filed as nixos-config#417. Two
+project changes follow from the trial: sessions set `GSK_RENDERER=cairo` (GTK 4
+layer surfaces were blank with Vulkan in software sessions), and an opt-in
+`guard_host` blocks the system bus and puts refusing, logging shims for common
+host-affecting commands first on PATH. The trial showed why: panel buttons run
+`systemctl poweroff`, `nmcli`, `pkill wlsunset` (which would match host
+processes) and `systemd-inhibit`. Opt-in because blocking the system bus may
+degrade some applications; not a security boundary. `tests/test_guard.py` uses
+only harmless probes (`systemctl --version`, `pkill -0` on a missing name). Full
+suite: 61 OK, 5 skipped (Nix runtime incl. mousepad, zenity, kdialog, Chromium).
 ## 2026-10-05 — First real-use trial: the user's desktop shell
 
 Independent review saved (untracked) in `reviews/2026-10-05-project-review/`;

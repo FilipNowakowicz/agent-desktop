@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-10-05 — Session environment: credentials and working directory
+
+Review F014. Applications now start in the session's private home instead of
+the creator's working directory (previously often this checkout). Guarded
+sessions also remove credential variables (SSH/GPG agents, Kerberos, netrc and
+askpass helpers, GNOME keyring, cloud prefixes, names containing TOKEN, SECRET,
+PASSWORD, API_KEY or CREDENTIAL), exempting AGENT_DESKTOP_* so the session
+token that ownership depends on survives; `status` lists removed names, never
+values. Tests: fake SSH/API/AWS variables absent in guarded and present in
+unguarded sessions, PWD equals HOME, a classification unit test. Full suite
+81 OK, 5 skipped.
 ## 2026-10-05 — Bounded retention
 
 Review F013 / plan step 4. Screenshots are pruned to the newest 200 per session

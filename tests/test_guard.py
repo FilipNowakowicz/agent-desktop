@@ -12,13 +12,45 @@ from pathlib import Path
 from test_runtime import wait_for
 
 from agent_desktop import core
-from agent_desktop.worker import owned_processes
+from agent_desktop.worker import credential_variable, owned_processes
 
 PROBE = (
     'systemctl --version >/dev/null 2>&1; echo "systemctl=$?"; '
     'pkill -0 -x agent-desktop-no-such-process; echo "pkill=$?"; '
-    'echo "bus=$DBUS_SYSTEM_BUS_ADDRESS"; echo "gsk=$GSK_RENDERER"'
+    'echo "bus=$DBUS_SYSTEM_BUS_ADDRESS"; echo "gsk=$GSK_RENDERER"; '
+    'echo "ssh=${SSH_AUTH_SOCK:-none}"; echo "api=${TRIAL_API_TOKEN:-none}"; '
+    'echo "aws=${AWS_PROFILE:-none}"; echo "lang=${LANG:-none}"; '
+    'echo "pwd=$PWD"; echo "home=$HOME"'
 )
+FAKE_CREDENTIALS = {
+    "SSH_AUTH_SOCK": "/nonexistent/agent.sock",
+    "TRIAL_API_TOKEN": "not-a-real-token",
+    "AWS_PROFILE": "trial",
+}
+KEYS = ("systemctl", "pkill", "bus", "gsk", "ssh", "api", "aws", "lang", "pwd", "home")
+
+
+class CredentialNameTests(unittest.TestCase):
+    def test_classification(self):
+        for name in (
+            "SSH_AUTH_SOCK",
+            "GITHUB_TOKEN",
+            "OPENAI_API_KEY",
+            "AWS_SECRET_ACCESS_KEY",
+            "DB_PASSWORD",
+            "GNOME_KEYRING_CONTROL",
+        ):
+            self.assertTrue(credential_variable(name), name)
+        for name in (
+            "AGENT_DESKTOP_SESSION_TOKEN",
+            "TERM",
+            "LANG",
+            "PATH",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "XDG_SESSION_ID",
+            "XKB_DEFAULT_LAYOUT",
+        ):
+            self.assertFalse(credential_variable(name), name)
 
 
 @unittest.skipUnless(
@@ -36,6 +68,9 @@ class GuardTests(unittest.TestCase):
         os.environ["AGENT_DESKTOP_STATE_DIR"] = str(root / "state")
         os.environ["XDG_RUNTIME_DIR"] = str(root / "runtime")
         self.sessions = []
+        for key, value in FAKE_CREDENTIALS.items():
+            self.previous[key] = os.environ.get(key)
+            os.environ[key] = value
 
     def tearDown(self):
         for session in self.sessions:
@@ -64,7 +99,7 @@ class GuardTests(unittest.TestCase):
         lines = dict(
             line.split("=", 1)
             for line in wait_for(output).splitlines()
-            if line.split("=", 1)[0] in ("systemctl", "pkill", "bus", "gsk")
+            if line.split("=", 1)[0] in KEYS
         )
         return session, lines
 
@@ -78,14 +113,22 @@ class GuardTests(unittest.TestCase):
         log = core.logs(session)["guard.log"]
         self.assertIn("blocked: systemctl --version", log)
         self.assertIn("blocked: pkill -0 -x agent-desktop-no-such-process", log)
+        # Credentials are removed; ownership (session token) and locale are not.
+        self.assertEqual((lines["ssh"], lines["api"], lines["aws"]), ("none",) * 3)
+        removed = core.request(session, "status")["guard_removed_variables"]
+        self.assertLessEqual(set(FAKE_CREDENTIALS), set(removed))
+        self.assertFalse(any(name.startswith("AGENT_DESKTOP_") for name in removed))
+        self.assertEqual(lines["pwd"], lines["home"])
 
     def test_unguarded_session_keeps_host_tools(self):
         session, lines = self.probe(False)
         self.assertFalse(core.request(session, "status")["guard_host"])
         self.assertNotIn("guard.log", core.logs(session))
         self.assertNotEqual(lines["bus"], "unix:path=/nonexistent/system_bus_socket")
-        # Software rendering applies to every session.
+        # Software rendering and the private working directory apply to every session.
         self.assertEqual(lines["gsk"], "cairo")
+        self.assertEqual(lines["pwd"], lines["home"])
+        self.assertEqual(lines["api"], "not-a-real-token")
         if shutil.which("systemctl"):
             self.assertEqual(lines["systemctl"], "0")
 

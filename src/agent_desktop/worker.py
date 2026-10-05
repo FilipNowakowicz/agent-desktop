@@ -335,6 +335,11 @@ class Worker:
             shim.chmod(0o700)
         self.env["PATH"] = f"{directory}:{self.env.get('PATH', '')}"
         self.env["DBUS_SYSTEM_BUS_ADDRESS"] = "unix:path=/nonexistent/system_bus_socket"
+        # Host credentials and agents (SSH, GPG, cloud and API tokens).
+        removed = sorted(k for k in self.env if credential_variable(k))
+        for key in removed:
+            del self.env[key]
+        self.info["guard_removed_variables"] = removed
 
     def prepare_accessibility(self):
         """Enable AT-SPI for this session when at-spi2-core is installed."""
@@ -739,6 +744,7 @@ class Worker:
                 "status": "ready",
                 "accessibility": self.info.get("accessibility", False),
                 "guard_host": bool(self.info.get("guard_host")),
+                "guard_removed_variables": self.info.get("guard_removed_variables", []),
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
@@ -805,6 +811,8 @@ class Worker:
                 process = subprocess.Popen(
                     [executable, *argv[1:]],
                     env=self.env,
+                    # Not the directory the session was created from.
+                    cwd=self.env["HOME"],
                     stdout=log,
                     stderr=log,
                     start_new_session=True,
@@ -1169,6 +1177,38 @@ GUARDED_COMMANDS = (
     "hyprctl",
     "swaymsg",
 )
+
+CREDENTIAL_NAMES = (
+    "SSH_AUTH_SOCK",
+    "SSH_AGENT_PID",
+    "GPG_AGENT_INFO",
+    "KRB5CCNAME",
+    "NETRC",
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
+    "GNOME_KEYRING_CONTROL",
+)
+CREDENTIAL_PREFIXES = ("AWS_", "AZURE_", "GOOGLE_APPLICATION_", "GCLOUD_", "DOCKER_")
+CREDENTIAL_PARTS = (
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASSWD",
+    "API_KEY",
+    "APIKEY",
+    "CREDENTIAL",
+)
+
+
+def credential_variable(name):
+    """Whether an environment variable is likely to grant access to something."""
+    upper = name.upper()
+    return (
+        upper in CREDENTIAL_NAMES
+        or upper.startswith(CREDENTIAL_PREFIXES)
+        or any(part in upper for part in CREDENTIAL_PARTS)
+    ) and not upper.startswith("AGENT_DESKTOP_")
+
 
 REGISTRYD_PATHS = (
     "/usr/libexec/at-spi2-registryd",

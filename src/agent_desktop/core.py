@@ -123,7 +123,7 @@ def request(session, operation, **arguments):
     return reply["result"]
 
 
-def create(mode="headless", tools=None, profile=None):
+def create(mode="headless", tools=None, profile=None, guard_host=False):
     if mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
     home = None
@@ -179,6 +179,7 @@ def create(mode="headless", tools=None, profile=None):
         "control_socket": endpoint,
         "parent_wayland": parent,
         "profile": profile,
+        "guard_host": bool(guard_host),
         "home": str(home) if home else None,
         "token": uuid.uuid4().hex,
         "status": "starting",

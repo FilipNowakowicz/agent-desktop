@@ -249,6 +249,9 @@ class Worker:
                 "WLR_WL_OUTPUTS": "1",
                 "WLR_LIBINPUT_NO_DEVICES": "1",
                 "XKB_DEFAULT_LAYOUT": "us",
+                # Software sessions: GTK 4 would otherwise try Vulkan/GL on the
+                # host GPU, which left layer-shell panels blank in a trial.
+                "GSK_RENDERER": os.environ.get("AGENT_DESKTOP_GSK_RENDERER", "cairo"),
             }
         )
         if self.info["mode"] == "visible":
@@ -274,6 +277,8 @@ class Worker:
                 self.env["WAYLAND_DISPLAY"] = str(display)
                 self.info["wayland_display"] = str(display)
                 # Activated services get the private display, never the host's.
+                if self.info.get("guard_host"):
+                    self.guard_host()
                 registryd = self.prepare_accessibility()
                 self.start_bus()
                 if registryd:
@@ -303,6 +308,29 @@ class Worker:
         if value:
             self.env["DISPLAY"] = value
         self.info["x_display"] = value or None
+
+    def guard_host(self):
+        """Refuse common host-affecting commands and the system bus.
+
+        Accident prevention for applications such as panels and widgets, not a
+        security boundary: absolute paths and other mechanisms still work.
+        """
+        directory = self.root / "guard"
+        directory.mkdir(mode=0o700, exist_ok=True)
+        log = self.root / "guard.log"
+        for name in GUARDED_COMMANDS:
+            shim = directory / name
+            shim.write_text(
+                "#!/bin/sh\n"
+                f'printf "%s blocked: {name}" "$(date +%s)" >> "{log}"\n'
+                f'for a in "$@"; do printf " %s" "$a" >> "{log}"; done\n'
+                f'echo >> "{log}"\n'
+                f'echo "agent-desktop: {name} is blocked in a guarded session" >&2\n'
+                "exit 1\n"
+            )
+            shim.chmod(0o700)
+        self.env["PATH"] = f"{directory}:{self.env.get('PATH', '')}"
+        self.env["DBUS_SYSTEM_BUS_ADDRESS"] = "unix:path=/nonexistent/system_bus_socket"
 
     def prepare_accessibility(self):
         """Enable AT-SPI for this session when at-spi2-core is installed."""
@@ -675,6 +703,7 @@ class Worker:
                 "mode": self.info["mode"],
                 "status": "ready",
                 "accessibility": self.info.get("accessibility", False),
+                "guard_host": bool(self.info.get("guard_host")),
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
@@ -1054,6 +1083,30 @@ def changed_box(before, after, width, height):
         right = max(right, width - 1 - first_difference(a[::-1], b[::-1]) // 3)
     return [left, top, right - left + 1, bottom - top + 1]
 
+
+# Host-affecting commands that panels, widgets and scripts commonly run.
+GUARDED_COMMANDS = (
+    "systemctl",
+    "loginctl",
+    "systemd-inhibit",
+    "shutdown",
+    "poweroff",
+    "reboot",
+    "halt",
+    "nmcli",
+    "nmtui",
+    "bluetoothctl",
+    "rfkill",
+    "brightnessctl",
+    "powerprofilesctl",
+    "tailscale",
+    "mullvad",
+    "udisksctl",
+    "pkill",
+    "killall",
+    "hyprctl",
+    "swaymsg",
+)
 
 REGISTRYD_PATHS = (
     "/usr/libexec/at-spi2-registryd",

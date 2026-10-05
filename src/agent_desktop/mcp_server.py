@@ -24,14 +24,19 @@ mcp = FastMCP("Private desktop", instructions=INSTRUCTIONS)
 
 
 @mcp.tool()
-def desktop_create(mode: str = "headless", profile: str | None = None) -> dict:
+def desktop_create(
+    mode: str = "headless", profile: str | None = None, guard_host: bool = False
+) -> dict:
     """Create a private Linux desktop. Visible mode opens a nested host Wayland window.
 
     A named profile keeps the session's home directory (browser logins, app
     settings) for later sessions; one session can use a profile at a time.
-    Without a profile, everything is deleted at destroy.
+    Without a profile, everything is deleted at destroy. guard_host blocks the
+    system bus and common host-affecting commands (power, network, Bluetooth,
+    brightness, pkill) for applications in the session; use it when testing
+    panels, widgets or scripts that could change the real machine.
     """
-    return core.create(mode, profile=profile)
+    return core.create(mode, profile=profile, guard_host=guard_host)
 
 
 @mcp.tool()

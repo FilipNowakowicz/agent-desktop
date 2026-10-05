@@ -29,7 +29,15 @@ controller lease while you use it (renewed by every call, released by default
 after 60 seconds without calls). If another client controls a session, your input is
 refused and nothing is sent; create your own session instead of sharing one.
 A step whose delivery is uncertain is reported, never retried: check the
-desktop before repeating it."""
+desktop before repeating it.
+
+Only when the user asks you to act on their own screen (open an app there,
+navigate, click), call desktop_request_host with the reason. They confirm it;
+then use the returned session with the same tools. Their windows are real: act
+carefully, prefer reading before clicking, and never close their windows. If
+input is refused because they are using the computer, wait a few seconds. Call
+desktop_destroy on that session as soon as you are done; it never closes their
+applications. Use private sessions for everything else."""
 
 # One controller id for this server's lifetime (AGENT_DESKTOP_CONTROLLER overrides).
 CONTROLLER = os.environ.get("AGENT_DESKTOP_CONTROLLER") or (
@@ -327,6 +335,19 @@ def desktop_request_human(session: str, reason: str) -> dict:
     control, input and screenshots are refused; afterwards take a new screenshot.
     """
     return call(session, "request_human", reason=reason)
+
+
+@tool()
+def desktop_request_host(reason: str, minutes: float = 15) -> dict:
+    """Ask the user to let you act on their own screen; waits up to 2 minutes.
+
+    Only for tasks the user asked to happen on their screen. They see the reason
+    and approve or decline; on approval this returns a host session to use with
+    the other tools until it expires (minutes, at most 240) or you destroy it.
+    Applications you launch there stay open afterwards. Your input pauses while
+    the user is typing or moving the mouse.
+    """
+    return core.request_host(reason, minutes)
 
 
 @tool()

@@ -4,6 +4,8 @@ import os
 
 from .core import (
     DesktopError,
+    active_host_session,
+    answer_host,
     create,
     delete_profile,
     destroy,
@@ -11,8 +13,10 @@ from .core import (
     profiles,
     prune,
     request,
+    request_host,
     run_actions,
     sessions,
+    stop_host,
     trace,
     usage,
     use_runtime,
@@ -118,6 +122,17 @@ def main():
     leasing.add_argument(
         "--force", action="store_true", help="release another controller's lease"
     )
+    hosting = sub.add_parser(
+        "host", help="let an agent use your own screen (experimental, opt-in)"
+    )
+    hosting.add_argument(
+        "action",
+        choices=("start", "approve", "deny", "stop", "request", "status"),
+        help="start/approve: allow (approve answers a pending request); deny; "
+        "stop: end the host session; request: ask as an agent would",
+    )
+    hosting.add_argument("reason", nargs="?", help="for request")
+    hosting.add_argument("--minutes", type=float, default=15)
     tracing = sub.add_parser(
         "trace", help="recent actions: target, focus and outcome, no typed text"
     )
@@ -212,6 +227,18 @@ def main():
             result = delete_profile(args["profile"])
         elif command == "logs":
             result = logs(args["session"])
+        elif command == "host":
+            action = args["action"]
+            if action in ("start", "approve"):
+                result = answer_host(True, args["minutes"])
+            elif action == "deny":
+                result = answer_host(False)
+            elif action == "stop":
+                result = stop_host()
+            elif action == "request":
+                result = request_host(args["reason"] or "", args["minutes"])
+            else:
+                result = {"session": active_host_session()}
         elif command == "trace":
             result = trace(args["session"], args["limit"])
         elif command == "destroy":

@@ -20,7 +20,10 @@
 - Keep runtime desktop dependencies distinct from Python dependencies. Nix can
   optionally provide the actual Linux runtime without becoming a core requirement.
 - Never silently route input to the physical desktop. Every operation must target
-  an explicit private session. Visible testing may use a nested desktop window.
+  an explicit session. The only exception is a host session, which the person
+  approves (`desktop_request_host` / `agent-desktop host`) and which expires.
+  Tests use a private session as a stand-in host and never the real screen.
+  Visible testing may use a nested desktop window.
 - Reversible project-local experiments are allowed. Host activation/rebuilds,
   persistent permission changes, unrelated app shutdowns and personal browser
   profiles require specific authorization.

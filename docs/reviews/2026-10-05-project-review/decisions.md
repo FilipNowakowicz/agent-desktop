@@ -16,3 +16,10 @@ be revised; record the change here and in `DEVELOPMENT_LOG.md`.
 | 9 | Paid comparisons | No new budget. The pilot uses the developer's normal interactive agent session through MCP; paid model comparisons need a new explicit budget from the user. |
 | 10 | Upstream and maintenance | Keep the single wlroots patch and offer it upstream. As of 2026-10-05 wlroots master (`c5c57cd3`) still lacks the check, and the patch applies with an offset. Submitting needs the user's freedesktop GitLab account; the proposed text is in `runtime/UPSTREAM.md`. Retire the patch once a packaged wlroots release contains an equivalent fix. Adopt another project only if the pilot shows it handles the chosen tasks better. |
 | 11 | Portable machine | Deferred; there is no current Windows or macOS need. |
+
+## Later decisions
+
+| Date | Decision |
+| --- | --- |
+| 2026-10-05 | **Host sessions.** The maintainer asked for agents to act on their own screen ("turn on an app, navigate somewhere"). Built as an experimental, opt-in host session covering the whole screen. The agent asks with a reason and the person approves (notification or CLI). Sessions expire; agent input pauses while the person is active; the session never closes the person's windows. It reverses the original "never the physical desktop" rule only through this explicit, approved path. |
+| 2026-10-05 | **CI minutes.** Full desktop matrix on demand and for release tags; PRs run lint only. |

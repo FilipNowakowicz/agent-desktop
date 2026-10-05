@@ -1,5 +1,39 @@
 # Development log
 
+## 2026-10-05 — Host sessions: an agent on the person's own screen (experimental)
+
+Maintainer request: let the agent act on their screen. Their Hyprland 0.56.2
+offers virtual pointer/keyboard, wlr foreign-toplevel, screencopy and
+ext-idle-notify v2 (checked with wayland-info, read-only); one 1920×1080 output.
+A host session reuses the worker's input, screenshot, window, lease and trace
+code but attaches to the person's Wayland socket instead of starting labwc
+(`HostCompositor`: the compositor pid comes from SO_PEERCRED and is never
+signalled). Consent: `request_host`/`desktop_request_host` shows a
+notify-send notification with Allow (click) / Decline actions, or the person
+answers with `agent-desktop host approve|deny`; `host start` allows directly.
+`create("host")` without that path is refused. One host session at a time; it
+expires (15 min default, ≤240) and notifies on start and end.
+
+The person's activity pauses the agent. An ext-idle-notify listener (300 ms
+idle) timestamps each idle→active transition in its own thread. Experiment:
+labwc reports our own virtual input as activity within 1 ms, so transitions
+during or within 0.5 s after the worker's own input are ours. Anything else
+refuses input and focus for 3 s (`UserActive`, nothing sent). The first version
+used a 1 s idle threshold and missed the person's input right after the agent's;
+the test caught it. Limitation: the person's input during an agent burst without
+a 300 ms pause is noticed only after the burst. Launches go through
+`hyprctl dispatch exec` or `systemd-run --user`, so applications outlive the
+session. Cleanup closes only our virtual devices, never windows (private
+sessions close all windows). Take/view/request_human/ui are refused on a host
+session.
+
+Tests (tests/test_host.py) use a private headless session as the stand-in host,
+with notifications disabled, so no test touches the real screen:
+refusal without approval, decline, timeout, typing into the stand-in's terminal,
+person's input pausing the agent then resuming after 4.5 s, expiry, the stand-in's
+window surviving `host stop`, unsupported operations, and launch command
+construction. Full suite 107 OK, 6 skipped. Not yet tried on the real Hyprland
+screen; that needs the maintainer.
 ## 2026-10-05 — Full CI on demand only
 
 The maintainer reported GitHub Actions minutes running low. The full desktop

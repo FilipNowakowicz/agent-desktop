@@ -398,11 +398,17 @@ class Worker:
     def start_bus(self):
         # A child bus keeps D-Bus-activated services inside this worker's tree.
         bus = Path(self.info["runtime"]) / "bus"
+        daemon = self.info["tools"]["dbus-daemon"]
+        # Some builds (e.g. Nix) default to /etc/dbus-1/session.conf, which only
+        # their own distribution provides; prefer the configuration shipped beside
+        # the daemon.
+        shipped = Path(daemon).resolve().parent.parent / "share/dbus-1/session.conf"
+        config = [f"--config-file={shipped}"] if shipped.is_file() else ["--session"]
         with (self.root / "dbus.log").open("ab") as log:
             self.bus = subprocess.Popen(
                 [
-                    self.info["tools"]["dbus-daemon"],
-                    "--session",
+                    daemon,
+                    *config,
                     "--nofork",
                     "--nopidfile",
                     f"--address=unix:path={bus}",

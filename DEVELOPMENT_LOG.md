@@ -18,6 +18,11 @@ so the Ubuntu job now also runs 100 loaded Xwayland repetitions on stock package
 builds the flake, requires `doctor` to report the repaired runtime, and runs
 the full suite.
 
+The first `nix` CI run (37346098614) failed every desktop test: Nix's
+dbus-daemon defaults to `/etc/dbus-1/session.conf`, which exists only on NixOS.
+The worker now passes the `share/dbus-1/session.conf` shipped beside the daemon
+when there is one (identical to the default on conventional distributions).
+
 Local (Nix runtime + xterm/mousepad/zenity/xprop): `doctor --smoke` all ok, smoke
 0.67 s; full suite 85 tests OK, 6 skipped. Not yet done: a fresh, non-CI Ubuntu
 desktop installation.

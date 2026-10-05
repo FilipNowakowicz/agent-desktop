@@ -12,8 +12,9 @@ dy=10` had no visible effect: scroll used the finger source, whose values are
 pixels (copied from wlrctl in M0), so 10 meant 10 px. Page_Down worked. Scroll
 amounts are now wheel notches (wheel source, axis_discrete 15 units per notch,
 ±100), documented in the MCP tool and CLI help. The runtime scroll test sends 3
-notches and still sees a wheel event in the terminal fixture. Not yet re-checked
-on Hyprland.
+notches and still sees a wheel event in the terminal fixture. Re-checked on
+Hyprland in a second approved MCP host session: 5 notches scrolled the Firefox
+repository page from the file list down to the README.
 
 ## 2026-10-05 — Real-screen trial; non-blocking host requests
 

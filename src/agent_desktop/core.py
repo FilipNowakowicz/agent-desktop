@@ -294,6 +294,7 @@ def create(
                 str(root),
             ],
             env=env,
+            stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=log,
             start_new_session=True,
@@ -422,6 +423,7 @@ def logs(session):
 
 
 HOST_REQUEST = "host-request.json"
+HOST_REQUEST_SECONDS = 120
 
 
 def active_host_session():
@@ -442,74 +444,79 @@ def host_minutes(minutes):
     return minutes
 
 
-def request_host(reason, minutes=15, timeout=120):
-    """Ask the person to let the agent use their own screen; wait for the answer.
+def request_host(reason, minutes=15, wait=50):
+    """Ask the person to let the agent use their own screen.
 
-    A notification shows the reason: clicking it allows, dismissing it declines.
-    `agent-desktop host approve` (or `deny`) answers from a terminal instead.
-    Returns the host session on approval.
+    A notification shows the reason: clicking it allows, dismissing it declines
+    (`agent-desktop host approve` / `deny` answers from a terminal). Waits up to
+    `wait` seconds and returns {"status": "pending"} if there is no answer yet;
+    call again with the same reason to keep waiting. The request lapses after
+    two minutes. Returns the host session on approval.
     """
     if not isinstance(reason, str) or not 0 < len(reason.strip()) <= 300:
         raise DesktopError("Reason must be a nonempty string of at most 300 characters")
     minutes = host_minutes(minutes)
-    if not 0 < timeout <= 600:
-        raise DesktopError("Timeout must be between 0 and 600 seconds")
+    if not 0 <= wait <= 60:
+        raise DesktopError("Wait must be between 0 and 60 seconds")
     running = active_host_session()
     if running:
         return {"session": running, "status": "ready", "approved": "already running"}
     base = state_root()
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
-    request_id = uuid.uuid4().hex[:12]
     path = base / HOST_REQUEST
-    path.write_text(
-        json.dumps({"id": request_id, "reason": reason.strip(), "minutes": minutes})
-    )
-    notice = None
-    if (
-        shutil.which("notify-send")
-        and os.environ.get("AGENT_DESKTOP_HOST_NOTIFY") != "0"
-    ):
-        notice = subprocess.Popen(
-            [
-                "notify-send",
-                "--app-name=Agent Desktop",
-                "--urgency=critical",
-                f"--expire-time={int(timeout * 1000)}",
-                "--action=default=Allow",
-                "--action=deny=Decline",
-                "Allow an agent to use your screen?",
-                f"{reason.strip()}\n{minutes:g} min. Click to allow; dismiss to "
-                "decline. Terminal: agent-desktop host approve",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-    answer = None
-    deadline = time.monotonic() + timeout
     try:
-        while answer is None and time.monotonic() < deadline:
-            try:
-                current = json.loads(path.read_text())
-            except (OSError, ValueError):
-                current = {}
-            if current.get("id") == request_id and current.get("answer"):
-                answer = current["answer"]
-            elif notice and notice.poll() is not None:
-                chosen = notice.stdout.read().strip()
-                answer = "approved" if chosen == "default" else "declined"
-                notice = None
-            else:
-                time.sleep(0.2)
-    finally:
-        if notice and notice.poll() is None:
-            notice.terminate()
+        pending = json.loads(path.read_text())
+    except (OSError, ValueError):
+        pending = None
+    if pending and time.time() > pending.get("expires", 0):
         path.unlink(missing_ok=True)
-    if answer is None:
+        if not pending.get("answer"):
+            pending = None
+    if not pending or pending.get("reason") != reason.strip():
+        pending = {
+            "id": uuid.uuid4().hex[:12],
+            "reason": reason.strip(),
+            "minutes": minutes,
+            "expires": time.time() + HOST_REQUEST_SECONDS,
+        }
+        path.write_text(json.dumps(pending))
+        if (
+            shutil.which("notify-send")
+            and os.environ.get("AGENT_DESKTOP_HOST_NOTIFY") != "0"
+        ):
+            # A separate process owns the notification, so this call can return.
+            subprocess.Popen(
+                [sys.executable, "-m", "agent_desktop.hostprompt", str(path)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            current = json.loads(path.read_text())
+        except (OSError, ValueError):
+            current = {}
+        answer = current.get("answer") if current.get("id") == pending["id"] else None
+        if answer or time.monotonic() >= deadline:
+            break
+        if time.time() > pending["expires"]:
+            answer = "expired"
+            break
+        time.sleep(0.2)
+    if not answer:
+        return {
+            "status": "pending",
+            "detail": "No answer yet; call desktop_request_host again with the same "
+            "reason to keep waiting.",
+        }
+    path.unlink(missing_ok=True)
+    if answer == "expired":
         raise DesktopError("No answer from the person; the screen was not shared")
     if answer != "approved":
         raise DesktopError("The person declined; do not use their screen")
-    return {**create("host", _host_minutes=minutes), "approved": True}
+    return {**create("host", _host_minutes=pending["minutes"]), "approved": True}
 
 
 def answer_host(approve, minutes=None):

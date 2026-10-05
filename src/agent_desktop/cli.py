@@ -236,7 +236,9 @@ def main():
             elif action == "stop":
                 result = stop_host()
             elif action == "request":
-                result = request_host(args["reason"] or "", args["minutes"])
+                result = {"status": "pending"}
+                while result.get("status") == "pending":
+                    result = request_host(args["reason"] or "", args["minutes"])
             else:
                 result = {"session": active_host_session()}
         elif command == "trace":

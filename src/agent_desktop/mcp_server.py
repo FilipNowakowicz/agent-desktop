@@ -339,11 +339,13 @@ def desktop_request_human(session: str, reason: str) -> dict:
 
 @tool()
 def desktop_request_host(reason: str, minutes: float = 15) -> dict:
-    """Ask the user to let you act on their own screen; waits up to 2 minutes.
+    """Ask the user to let you act on their own screen.
 
     Only for tasks the user asked to happen on their screen. They see the reason
-    and approve or decline; on approval this returns a host session to use with
-    the other tools until it expires (minutes, at most 240) or you destroy it.
+    and approve or decline. Waits up to 50 seconds; if it returns status
+    "pending", tell the user to click the notification and call again with the
+    same reason. On approval this returns a host session to use with the other
+    tools until it expires (minutes, at most 240) or you destroy it.
     Applications you launch there stay open afterwards. Your input pauses while
     the user is typing or moving the mouse.
     """

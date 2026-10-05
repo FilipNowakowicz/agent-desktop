@@ -1,5 +1,29 @@
 # Development log
 
+## 2026-10-05 — Real-screen trial; non-blocking host requests
+
+With the keysym fallback, the maintainer approved a host request (through the
+CLI, since the MCP connection had dropped). On their Hyprland screen,
+the agent launched Firefox through `hyprctl dispatch exec`. Firefox was already
+running, so a new window appeared. The first `focus` was refused with
+UserActive while the maintainer was still using the computer, and it succeeded
+on the sixth retry about 12 s later. A sequence (Ctrl+L, `about:preferences`,
+Return, wait for the title) completed, and a screenshot showed the Settings page.
+`host stop` ended the session with Firefox left open. No wrong-target input.
+
+The MCP disconnect: `desktop_request_host` blocked for up to 2 minutes. The
+interrupted first call got a "Request cancelled" response that Claude Code
+did not expect ("unknown message ID"). The tool's thread kept running (a
+second, failed host session came from it), and the client then closed the
+connection. Requests no longer block: a detached helper
+(`agent_desktop.hostprompt`) owns the notification and records the answer. The
+tool waits at most 50 s and otherwise returns `pending`, to be called again.
+Requests lapse after 120 s, and the CLI `host request` loops. The session worker
+also no longer inherits the caller's stdin, which for an MCP server is the
+protocol pipe. Tests: pending/approve/expire through the request file, and the
+helper with a fake notify-send for click and dismiss. Full suite 109 OK,
+6 skipped.
+
 ## 2026-10-05 — First host session on the real screen: keysym fallback
 
 The maintainer approved the first real host request, and both attempts failed

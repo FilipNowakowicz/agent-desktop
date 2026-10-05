@@ -205,11 +205,13 @@ class Worker:
         if self.info.get("home"):
             home = Path(self.info["home"])
             # Held for the session's lifetime; released by the kernel if it dies.
-            self.profile_lock = (home.parent / "lock").open("a")
+            self.profile_lock = Path(self.info["profile_lock"]).open("a")
             try:
                 fcntl.flock(self.profile_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise RuntimeError("Profile is in use by another session") from None
+            if not home.is_dir():
+                raise RuntimeError("Profile was deleted while the session started")
         else:
             home = self.root / "home"
             home.mkdir(mode=0o700)
@@ -646,8 +648,23 @@ class Worker:
             print("Control taken by a person", file=sys.stderr, flush=True)
         return {**self.control_state(), "socket": str(endpoint)}
 
-    def release(self, how):
+    def release(self, how, force=False):
         if self.control["owner"] == "human":
+            try:
+                # Anything the person pasted (e.g. a password) must not stay
+                # available to the agent; clear it while they still own control.
+                clear_selection(self.info["wayland_display"])
+                cleared = True
+            except (OSError, RuntimeError) as error:
+                print(f"Clipboard not cleared: {error}", file=sys.stderr, flush=True)
+                if not force:
+                    self.control["release_error"] = f"clipboard not cleared: {error}"
+                    self.save_control()
+                    raise RuntimeError(
+                        f"Clipboard could not be cleared ({error}); control stays "
+                        "with the person. Retry, or release with --force."
+                    ) from None
+                cleared = False
             if self.takeover and self.takeover.poll() is None:
                 self.takeover.terminate()
                 try:
@@ -656,16 +673,15 @@ class Worker:
                     self.takeover.kill()
                     self.takeover.wait()
             Path(self.info["runtime"], "takeover.sock").unlink(missing_ok=True)
-            try:
-                # Anything the person pasted (e.g. a password) must not stay
-                # available to the agent.
-                clear_selection(self.info["wayland_display"])
-            except (OSError, RuntimeError) as error:
-                print(f"Clipboard not cleared: {error}", file=sys.stderr, flush=True)
+            self.control.pop("release_error", None)
             self.control.update(
                 owner="agent",
                 request=None,
-                last={"released_at": time.time(), "how": how},
+                last={
+                    "released_at": time.time(),
+                    "how": how,
+                    "clipboard_cleared": cleared,
+                },
             )
             self.control.pop("since", None)
             self.control["epoch"] += 1
@@ -747,7 +763,9 @@ class Worker:
         if operation == "take":
             return self.take(request.get("wayvnc", "wayvnc"))
         if operation == "release":
-            return self.release("released by the user")
+            return self.release(
+                "released by the user", force=request.get("force") is True
+            )
         if self.control["owner"] == "human":
             raise HumanControl(
                 "A person has control of this private desktop; nothing was sent. "
@@ -937,8 +955,12 @@ class Worker:
                     self.control["owner"] == "human"
                     and self.takeover
                     and self.takeover.poll() is not None
+                    and "release_error" not in self.control
                 ):
-                    self.release("viewer disconnected")
+                    try:
+                        self.release("viewer disconnected")
+                    except RuntimeError:
+                        pass  # recorded in the control state; the person decides
                 try:
                     connection, _ = server.accept()
                 except TimeoutError:

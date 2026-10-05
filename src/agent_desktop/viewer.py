@@ -100,10 +100,11 @@ def take(session, wayvnc=None, viewer=None, paste=False):
     try:
         code = run_viewer(executable, server["socket"], interactive_flags(paste))
     finally:
+        release_error = None
         try:
             state = request(session, "release")
-        except DesktopError:
-            state = None
+        except DesktopError as error:
+            state, release_error = None, str(error)
     if code:
         raise DesktopError(
             f"Viewer exited with code {code}; control returned to the agent"
@@ -111,6 +112,7 @@ def take(session, wayvnc=None, viewer=None, paste=False):
     return {
         "session": session,
         "viewer_closed": True,
-        "control": state["owner"] if state else None,
+        "control": state["owner"] if state else "human",
+        "release_error": release_error,
         "desktop_running": desktop_running(session),
     }

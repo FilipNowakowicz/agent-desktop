@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-10-05 — Review fixes: profile lock, clipboard release, fixture race
+
+F003: the profile lock is `profiles/.NAME.lock`, outside the deleted directory
+and never removed; `delete_profile` holds it for the whole deletion, and a
+worker that obtains it after a deletion fails instead of using a missing home.
+F024: release clears the clipboard first; on failure control stays with the
+person and the error is recorded (`release --force` overrides; automatic
+release on viewer exit then waits for the person). F012: the terminal fixture
+publishes typed.txt/mouse.json by rename. Tests: tests/test_release_profiles.py;
+full suite 62 OK, 5 skipped.
+
 ## 2026-10-05 — Review fixes: waits, captures, sequences, UI ids
 
 From reviews/2026-10-05-project-review (F005, F009, F011, F016, F036): `wait`

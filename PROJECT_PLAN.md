@@ -14,19 +14,23 @@ update this status and the development log with completed work and remaining gap
 | Stage | State (after the 2026-10-05 review) | Release gate still open |
 | --- | --- | --- |
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
-| M1 | Implemented and repeatedly tested; hardening continues | Longer soak coverage, unexplained input symptoms, lifecycle edge cases (PID reuse) |
-| M2 | MCP and viewer tested; cooperative takeover and profiles implemented | Real login/resume by the user, keyboard layout; takeover is not a confidentiality boundary |
-| M3 | Partial: application fixtures, three CI distributions, first real-use trial (desktop shell, docs/trials/) | Reproducible supported-runtime installs (NixOS and one non-Nix desktop), sustained real work |
+| M1 | Implemented and repeatedly tested; hardening continues | Eight-hour soak (running), loaded repetitions of the unexplained typing symptoms (F006), remaining lifecycle edges (both supervisors dead, profile recovery state) |
+| M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
+| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, plus a fresh-VM check); runtime selected automatically; pilot started (3/3 sessions, docs/trials/pilot.md) | Pilot to at least 20 sessions over 10 working days, including runs through MCP; a graphical Ubuntu desktop install |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
 
-Next work follows the [review plan](docs/reviews/2026-10-05-project-review/plan.md).
-Correctness fixes (#42–#44), preflight (#46–#47), bounded retention and a one-hour
-soak (#48), and guarded environment hygiene (#49) are implemented. Remaining work
-includes reproducible installs for NixOS and a selected non-Nix desktop, longer
-soak coverage, and a pilot on maintainer-selected recurring tasks. Extensions
-should follow observed pilot needs.
+Next work follows the [review plan](docs/reviews/2026-10-05-project-review/plan.md),
+with the review's open questions decided in
+[decisions.md](docs/reviews/2026-10-05-project-review/decisions.md). Implemented:
+correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), environment
+hygiene (#49), the two installation paths with automatic runtime selection (#52), the
+controller lease (#55), no keyring prompts (#56) and the action trace (#58). Remaining:
+the pilot ([diary](docs/trials/pilot.md)), the eight-hour soak and loaded typing
+repetitions, a user-run login handoff, and submitting the wlroots fix upstream
+([runtime/UPSTREAM.md](runtime/UPSTREAM.md), which needs the maintainer's account).
+Extensions should follow observed pilot needs.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

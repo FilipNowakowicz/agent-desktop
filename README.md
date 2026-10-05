@@ -133,6 +133,12 @@ the error (`release --force` hands back anyway). The session keymap is US, so
 characters missing from that layout may not reach the session when typed
 (pasting avoids this).
 
+Applications start in the session's private home directory unless `launch`
+is given an absolute `cwd`; the CLI passes your current directory, so relative
+paths on its command line work as in a shell. They never inherit the directory
+the session happened to be created from. Unguarded sessions inherit the rest of your
+environment.
+
 ### Guarding the host
 
 Applications in a session run as your user. A panel button, widget or script can
@@ -142,8 +148,11 @@ therefore still power off the machine, change Wi-Fi or kill your processes
 non-existent socket and puts refusing stand-ins first on `PATH` for common
 host-affecting commands (systemctl, loginctl, shutdown/poweroff/reboot, nmcli,
 bluetoothctl, rfkill, brightnessctl, powerprofilesctl, tailscale, mullvad,
-udisksctl, pkill, killall, hyprctl, swaymsg). Refusals are written to
-`guard.log`, which `logs` returns. This prevents accidents; it is not a
+udisksctl, pkill, killall, hyprctl, swaymsg). It also removes credential
+variables inherited from your environment (SSH and GPG agents, Kerberos, cloud
+prefixes such as `AWS_`, and names containing TOKEN, SECRET, PASSWORD or
+API_KEY); `status` lists their names. Refusals are written to `guard.log`,
+which `logs` returns. This prevents accidents; it is not a
 security boundary, since absolute paths and other mechanisms still reach the
 host.
 

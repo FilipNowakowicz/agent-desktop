@@ -335,6 +335,11 @@ class Worker:
             shim.chmod(0o700)
         self.env["PATH"] = f"{directory}:{self.env.get('PATH', '')}"
         self.env["DBUS_SYSTEM_BUS_ADDRESS"] = "unix:path=/nonexistent/system_bus_socket"
+        # Host credentials and agents (SSH, GPG, cloud and API tokens).
+        removed = sorted(k for k in self.env if credential_variable(k))
+        for key in removed:
+            del self.env[key]
+        self.info["guard_removed_variables"] = removed
 
     def prepare_accessibility(self):
         """Enable AT-SPI for this session when at-spi2-core is installed."""
@@ -739,6 +744,7 @@ class Worker:
                 "status": "ready",
                 "accessibility": self.info.get("accessibility", False),
                 "guard_host": bool(self.info.get("guard_host")),
+                "guard_removed_variables": self.info.get("guard_removed_variables", []),
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
@@ -796,6 +802,13 @@ class Worker:
                 or not all(isinstance(v, str) and "\0" not in v for v in argv)
             ):
                 raise ValueError("Launch requires a nonempty argument list")
+            cwd = request.get("cwd") or self.env["HOME"]
+            if (
+                not isinstance(cwd, str)
+                or not os.path.isabs(cwd)
+                or not os.path.isdir(cwd)
+            ):
+                raise ValueError("cwd must be an existing absolute directory")
             executable = shutil.which(argv[0], path=self.env.get("PATH"))
             if not executable:
                 raise ValueError(f"Executable not found: {argv[0]}")
@@ -805,6 +818,9 @@ class Worker:
                 process = subprocess.Popen(
                     [executable, *argv[1:]],
                     env=self.env,
+                    # The caller's choice, else the session home; never the
+                    # directory the session happened to be created from.
+                    cwd=cwd,
                     stdout=log,
                     stderr=log,
                     start_new_session=True,
@@ -1169,6 +1185,38 @@ GUARDED_COMMANDS = (
     "hyprctl",
     "swaymsg",
 )
+
+CREDENTIAL_NAMES = (
+    "SSH_AUTH_SOCK",
+    "SSH_AGENT_PID",
+    "GPG_AGENT_INFO",
+    "KRB5CCNAME",
+    "NETRC",
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
+    "GNOME_KEYRING_CONTROL",
+)
+CREDENTIAL_PREFIXES = ("AWS_", "AZURE_", "GOOGLE_APPLICATION_", "GCLOUD_", "DOCKER_")
+CREDENTIAL_PARTS = (
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "PASSWD",
+    "API_KEY",
+    "APIKEY",
+    "CREDENTIAL",
+)
+
+
+def credential_variable(name):
+    """Whether an environment variable is likely to grant access to something."""
+    upper = name.upper()
+    return (
+        upper in CREDENTIAL_NAMES
+        or upper.startswith(CREDENTIAL_PREFIXES)
+        or any(part in upper for part in CREDENTIAL_PARTS)
+    ) and not upper.startswith("AGENT_DESKTOP_")
+
 
 REGISTRYD_PATHS = (
     "/usr/libexec/at-spi2-registryd",

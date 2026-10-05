@@ -39,8 +39,16 @@ checkout of this repository, install the locked Python dependencies:
 uv sync --managed-python --locked
 ```
 
-Install desktop tools using your distribution's package manager. Python packages
-alone do not supply the compositor or capture tools.
+Python packages alone do not supply the compositor or capture tools. Two
+installation paths are supported and tested in CI; see
+[runtime/INSTALL.md](runtime/INSTALL.md):
+
+- **NixOS or any Linux with Nix:** `nix build ./runtime/nix --out-link
+  ~/.local/share/agent-desktop/runtime` builds the runtime, including the X11
+  repair. The CLI and MCP server use it automatically.
+- **Ubuntu 24.04:** `sh runtime/install-ubuntu.sh` installs the packages below.
+
+On other distributions, install the same tools with the package manager:
 
 | Dependency | Purpose |
 | --- | --- |
@@ -61,14 +69,6 @@ uv run agent-desktop doctor --smoke  # create, capture and destroy a test sessio
 Stock wlroots 0.19.3 and 0.20.2 have a reproduced intermittent X11 mapping failure.
 See the optional [project-local runtime repair](runtime/README.md) when using
 those versions. A passing smoke check does not establish sustained reliability.
-
-On NixOS, an optional temporary shell supplies desktop runtime tools while uv
-continues to manage Python:
-
-```sh
-nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#dbus \
-  nixpkgs#wayvnc nixpkgs#tigervnc --command zsh
-```
 
 Runtime paths can be set with `--labwc`, `--grim` or corresponding
 `AGENT_DESKTOP_*` environment variables. See the [user guide](docs/USAGE.md).

@@ -40,6 +40,9 @@ def tool(name, required, hint):
     }
 
 
+SONAME_WLROOTS = {"10": "0.15", "11": "0.16", "12": "0.17"}
+
+
 def wlroots(labwc):
     """Which wlroots this labwc loads, and whether it is the project's repair."""
     _, output = run([labwc, "--version"])
@@ -52,6 +55,10 @@ def wlroots(labwc):
         # Older labwc releases omit wlroots from --version; use the library name.
         named = re.search(r"libwlroots-([0-9]+\.[0-9]+)", library.name)
         version = named.group(1) if named else None
+        # Before 0.18 the library was libwlroots.so.<soname> (Ubuntu 24.04: 12).
+        numbered = re.search(r"libwlroots\.so\.([0-9]+)", library.name)
+        if version is None and numbered:
+            version = SONAME_WLROOTS.get(numbered.group(1))
     repaired = bool(library and (library.parent / REPAIR_MARKER).exists())
     result = {"check": "wlroots", "version": version, "library": str(library)}
     if repaired:
@@ -137,8 +144,24 @@ def smoke():
     return {"check": "smoke", "status": "ok", "detail": f"{detail} in {elapsed} s"}
 
 
+def runtime_selection():
+    prefix = core.runtime_prefix()
+    if prefix is None:
+        return {"check": "runtime", "status": "ok", "detail": "tools from PATH"}
+    if not (prefix / "bin").is_dir():
+        return {
+            "check": "runtime",
+            "status": "fail",
+            "detail": f"selected runtime has no bin directory: {prefix}",
+            "hint": "fix AGENT_DESKTOP_RUNTIME or rebuild the runtime (runtime/INSTALL.md)",
+        }
+    return {"check": "runtime", "status": "ok", "path": str(prefix)}
+
+
 def doctor(with_smoke=False):
+    core.use_runtime()
     checks = [
+        runtime_selection(),
         tool("labwc", True, "install labwc (the private compositor)"),
         tool("grim", True, "install grim (screenshots)"),
         tool("dbus-daemon", True, "install dbus (the session's private bus)"),
@@ -148,7 +171,7 @@ def doctor(with_smoke=False):
         runtime_directory(),
         accessibility(),
     ]
-    labwc = checks[0].get("path")
+    labwc = checks[1].get("path")
     if labwc:
         checks.append(wlroots(labwc))
     if with_smoke and all(c["status"] != "fail" for c in checks):

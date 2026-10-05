@@ -398,11 +398,17 @@ class Worker:
     def start_bus(self):
         # A child bus keeps D-Bus-activated services inside this worker's tree.
         bus = Path(self.info["runtime"]) / "bus"
+        daemon = self.info["tools"]["dbus-daemon"]
+        # Some builds (e.g. Nix) default to /etc/dbus-1/session.conf, which only
+        # their own distribution provides; prefer the configuration shipped beside
+        # the daemon.
+        shipped = Path(daemon).resolve().parent.parent / "share/dbus-1/session.conf"
+        config = [f"--config-file={shipped}"] if shipped.is_file() else ["--session"]
         with (self.root / "dbus.log").open("ab") as log:
             self.bus = subprocess.Popen(
                 [
-                    self.info["tools"]["dbus-daemon"],
-                    "--session",
+                    daemon,
+                    *config,
                     "--nofork",
                     "--nopidfile",
                     f"--address=unix:path={bus}",
@@ -1228,7 +1234,18 @@ REGISTRYD_PATHS = (
 
 def find_registryd():
     override = os.environ.get("AGENT_DESKTOP_AT_SPI_REGISTRYD")
-    candidates = [override] if override else list(REGISTRYD_PATHS)
+    if override:
+        candidates = [override]
+    else:
+        # Prefixes on PATH first (Nix profiles, local installs), then system paths.
+        prefixes = {
+            str(Path(entry).parent)
+            for entry in os.environ.get("PATH", "").split(os.pathsep)
+            if entry.endswith("/bin")
+        }
+        candidates = [
+            f"{prefix}/libexec/at-spi2-registryd" for prefix in sorted(prefixes)
+        ] + list(REGISTRYD_PATHS)
     return next((c for c in candidates if c and os.access(c, os.X_OK)), None)
 
 

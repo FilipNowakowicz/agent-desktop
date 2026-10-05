@@ -1,5 +1,63 @@
 # Development log
 
+## 2026-10-05 — Runtime selection without PATH setup
+
+First pilot attempt: this repository's `.mcp.json` starts `uv run
+agent-desktop-mcp`, which inherits the client's PATH, and `desktop_create`
+failed with `Missing executable: labwc`. An MCP client should not need a
+hand-built PATH. The CLI and MCP server now put a selected runtime's `bin/`
+first on PATH for themselves and their sessions: `AGENT_DESKTOP_RUNTIME`, or
+else `~/.local/share/agent-desktop/runtime` if it exists (the Nix install is
+`nix build ./runtime/nix --out-link` to that path, which is also a GC root),
+else PATH. `doctor` reports the selection. Installed that link locally; with
+the user's ordinary PATH, `doctor --smoke` is all ok, finding the repaired
+runtime and the libexec registryd. Full suite 86 OK, 6 skipped. Test
+`test_selected_runtime_goes_first_on_path`.
+
+## 2026-10-05 — Two installation paths
+
+Plan step 3 / F007/F019. `runtime/nix/flake.nix` (nixpkgs pinned at `4975466`)
+builds labwc 0.20.2 against wlroots 0.20.2 with the mapping patch, plus grim,
+dbus, Xwayland, wayvnc, TigerVNC, wl-clipboard, at-spi2-core and foot. It writes
+the repair marker, so `doctor` recognises it. The build took 27 s locally (most
+inputs cached), with no profile install and no host change. `runtime/install-ubuntu.sh`
+is the Ubuntu 24.04 apt recipe; the Ubuntu CI job now installs through it, so
+the documented recipe is what CI tests. `runtime/INSTALL.md` documents both.
+at-spi2-registryd is now also looked up in `libexec/` beside each `bin/` entry on
+PATH (Nix keeps it out of `bin`).
+
+Ubuntu's wlroots 0.17 association code lacks the same existing-buffer check,
+so the Ubuntu job now also runs 100 loaded Xwayland repetitions on stock packages
+(`scripts/repeat_xwayland.py`, shared with Fedora/Arch). A new `nix` CI job
+builds the flake, requires `doctor` to report the repaired runtime, and runs
+the full suite.
+
+The first `nix` CI run (37346098614) failed every desktop test: Nix's
+dbus-daemon defaults to `/etc/dbus-1/session.conf`, which exists only on NixOS.
+The worker now passes the `share/dbus-1/session.conf` shipped beside the daemon
+when there is one (identical to the default on conventional distributions).
+
+Local (Nix runtime + xterm/mousepad/zenity/xprop): `doctor --smoke` all ok, smoke
+0.67 s; full suite 85 tests OK, 6 skipped. Fresh Ubuntu 24.04 check: a QEMU/KVM VM from the
+official noble cloud image (SHA-256 verified), with an ssh login session, a
+checkout, and only the documented steps. uv 0.12.23; `install-ubuntu.sh` took
+2m02s and installed 186 packages (labwc 0.7.1, libwlroots12t64 0.17.1, grim 1.4.0,
+xwayland 23.2.6, wayvnc 0.7.2). `doctor --smoke` passed its smoke check (0.56 s capture). A CLI
+session typed `hello café λ 123` into foot, read back exactly from a file
+and the screenshot, then was destroyed with no leftover processes. Suite: 86 tests OK,
+19 skipped with documented packages only; 8 skipped after adding
+xterm/zenity/mousepad/x11-utils/wlr-randr (the remaining skips: Chromium, LibreOffice, kdialog,
+visible). X11 tests passed on stock wlroots 0.17. A cloud image with an ssh
+session, not a graphical Ubuntu desktop; view/take were not tested.
+
+The VM run found that `doctor` warned "could not determine the wlroots
+version": Ubuntu's labwc omits it, and the library is `libwlroots.so.12`. Pre-0.18
+sonames now map to versions (10/11/12 → 0.15/0.16/0.17); the old unit test
+had encoded exactly this case as unknown. INSTALL.md now covers uv, the clone,
+`--managed-python`, the expected doctor result, retained stopped sessions and test-only
+packages. The apt step runs noninteractively. README still needs a link to
+INSTALL.md (left for the documentation rewrite, #54).
+
 ## 2026-10-05 — MIT licensing
 
 The maintainer approved MIT licensing. Added the standard MIT text from GitHub's

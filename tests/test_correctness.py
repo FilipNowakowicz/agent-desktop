@@ -57,7 +57,9 @@ class SequenceTests(unittest.TestCase):
             ]
         )
 
-        def fake_request(_session, operation, **_arguments):
+        def fake_request(_session, operation, _controller=None, **_arguments):
+            if operation == "lease":
+                return {}
             if operation == "observe" and fake_request.observed:
                 raise core.DesktopError("Session unavailable")
             if operation == "observe":
@@ -72,6 +74,29 @@ class SequenceTests(unittest.TestCase):
             )
         self.assertEqual(result["completed"], 1)
         self.assertIn("step 0 was delivered", result["stopped"]["reason"])
+
+    def test_uncertain_step_is_reported_and_never_retried(self):
+        sent = []
+
+        def fake_request(_session, operation, controller=None, **arguments):
+            sent.append((operation, controller))
+            if operation == "lease":
+                return {}
+            if operation == "observe":
+                return {"observation": "a" * 16}
+            raise core.DeliveryUnknown("No reply after sending type")
+
+        with mock.patch.object(core, "request", fake_request):
+            result = core.run_actions(
+                "0" * 12,
+                [{"action": "type", "text": "pay"}, {"action": "key", "key": "a"}],
+                controller="client-a",
+            )
+        self.assertEqual(result["completed"], 0)
+        self.assertTrue(result["stopped"]["uncertain"])
+        self.assertEqual([op for op, _ in sent].count("type"), 1)
+        self.assertNotIn("key", [op for op, _ in sent])
+        self.assertTrue(all(c == "client-a" for _, c in sent))
 
 
 class WaitTests(unittest.TestCase):

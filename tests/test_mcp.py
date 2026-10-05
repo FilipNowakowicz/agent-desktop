@@ -119,6 +119,12 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                         "desktop_key", {"session": session_id, "key": "Return"}
                     )
                     self.assertFalse(key.isError)
+                    # The server acts as one controller and holds the lease.
+                    status = await client.call_tool(
+                        "desktop_status", {"session": session_id}
+                    )
+                    lease = json.loads(status.content[0].text)["lease"]
+                    self.assertTrue(lease["holder"].startswith("mcp-"), lease)
                     for _ in range(100):
                         if (fixture / "mouse-ready").exists():
                             break

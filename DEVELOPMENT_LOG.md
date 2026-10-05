@@ -1,5 +1,45 @@
 # Development log
 
+## 2026-10-05 — Controller lease, harness cleanup, PID start times
+
+Review F011 (decisions 7 and 8). Each session has at most one controller. A
+mutating request (input, launch, focus, ui_action, request_human) from a named
+controller takes the worker's lease when none is active; any request from the
+holder renews it; it expires after `AGENT_DESKTOP_LEASE_SECONDS` (default 60)
+without requests, or is released with the `lease` operation (`--force` lets a
+person break it). Other or anonymous mutations are refused with `LeaseHeld`,
+nothing sent. Anonymous requests run lease-free when no lease is held, so
+single-client CLI use is unchanged. Reads, destroy, take and release are never
+refused; another client's screenshot no longer clears the post-takeover
+screenshot requirement. CLI: `--controller` or `AGENT_DESKTOP_CONTROLLER`, and
+`lease SESSION [--seconds N] [--release] [--force]`; the MCP server uses one
+id for its lifetime; session applications do not inherit the variable.
+`run_actions` holds the lease for the whole sequence (a temporary one when
+anonymous). A request sent without a reply raises `DeliveryUnknown`; the
+sequence reports that step with `"uncertain": true` and never retries it.
+
+F037: `claude_code_task.py` runs the client in its own process group (killed
+on timeout), records transcript and verification failures in `errors`, and
+always destroys every session in its state directory, reporting leftovers.
+
+F025 (partial): teardown records each process's start time (/proc stat field
+22) and signals only if it still matches; a pidfd pins the process where
+`os.pidfd_open` exists. The uv CPython 3.12.13 here lacks it, so a short
+check-to-kill window remains there.
+
+Tests: tests/test_lease.py (real compositor: B and anonymous refused while A
+holds, B succeeds after release, A succeeds after a 1 s lease expires, B cannot
+type into or start a sequence during A's four-step `run_actions`; typed text
+exactly "alpha omega"; 5 repeats OK), test_mcp checks the MCP lease holder,
+test_correctness an uncertain step sent once, test_process_identity,
+test_harness_cleanup (fake hanging client, no model: timeout, malformed
+transcript, created session destroyed with no owned processes). CLI checked by
+hand. Full suite under `nix shell` labwc, foot, grim, dbus, wl-clipboard,
+wayvnc, xterm, wlr-randr, at-spi2-core, xwayland, zenity, mousepad: 92 OK,
+11 skipped (LibreOffice, xev, kdialog, Chromium/zenity UI, visible mode).
+Remaining: no MCP tool releases a lease early (expiry or destroy); leases are
+cooperative ids, not authentication; profile recovery state and
+double-supervisor loss (rest of F025) are not addressed.
 ## 2026-10-05 — No keyring password prompt in sessions
 
 Pilot task A (Chromium research) hit a "Choose password for new keyring"

@@ -9,12 +9,14 @@ import json
 import os
 import secrets
 import shutil
+import signal
 import subprocess
 import time
 import uuid
 from pathlib import Path
 
 from agent_desktop import core
+from agent_desktop.worker import owned_processes
 
 PAGE = """<!doctype html><meta charset="utf-8"><title>Agent task</title>
 <style>body{{font:18px sans-serif;margin:24px}}#zone{{position:absolute;left:520px;
@@ -73,10 +75,127 @@ def host_state():
     return {"active_window": active, "cursor": cursor.stdout.strip()}
 
 
+def summarize_transcript(path):
+    """Tool calls, result and cost from a stream-json transcript."""
+    events = [json.loads(line) for line in path.read_text().splitlines() if line]
+    tools = [
+        block["name"]
+        for event in events
+        if event.get("type") == "assistant"
+        for block in event["message"]["content"]
+        if block.get("type") == "tool_use"
+    ]
+    final = next((e for e in reversed(events) if e.get("type") == "result"), {})
+    init = next((e for e in events if e.get("subtype") == "init"), {})
+    return {
+        "model": init.get("model"),
+        "tool_calls": len(tools),
+        "tools": {name: tools.count(name) for name in sorted(set(tools))},
+        "result": final.get("result"),
+        "cost_usd": final.get("total_cost_usd"),
+        "turns": final.get("num_turns"),
+    }
+
+
+def run_client(command, environment, timeout):
+    """Run the client in its own process group; stop the whole group on timeout."""
+    process = subprocess.Popen(
+        command,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+        return process.returncode, stdout, stderr, None
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        stdout, stderr = process.communicate()
+        return None, stdout, stderr, f"client timed out after {timeout} s"
+
+
+def verify(report):
+    """Independent verification: the harness reads the session itself."""
+    sessions = [s for s in core.sessions() if s["status"] == "ready"]
+    report["sessions"] = sessions
+    for session in sessions:
+        windows = core.request(session["session"], "windows")["windows"]
+        report["windows"] = [w["title"] for w in windows]
+        capture = core.request(session["session"], "screenshot")
+        report["final_screenshot"] = capture["path"]
+        report["passed"] = len(sessions) == 1 and any(
+            w["title"].startswith("Agent task - complete") for w in windows
+        )
+
+
+def clean_up(state):
+    """Destroy every session the client left in the private state directory.
+
+    Returns per-session results and a list of anything that may remain, so a
+    report always says whether the run left processes or state behind.
+    """
+    results, leftovers = {}, []
+    for path in sorted(Path(state).glob("*/session.json")):
+        session = path.parent.name
+        try:
+            token = json.loads(path.read_text()).get("token")
+            results[session] = core.destroy(session)
+        except Exception as error:  # recorded, never raised: keep cleaning
+            results[session] = {"error": f"{type(error).__name__}: {error}"}
+            leftovers.append({"session": session, "reason": "destroy failed"})
+            continue
+        remaining = owned_processes(token) if token else []
+        if remaining:
+            leftovers.append({"session": session, "processes": remaining})
+    return {"sessions": results, "leftovers": leftovers}
+
+
+def run_task(command, environment, artifact, state, timeout=1200):
+    """Run the client, summarize and verify, and always destroy its sessions.
+
+    Every failure (client timeout, unreadable transcript, failed verification)
+    is recorded in the report instead of skipping cleanup.
+    """
+    report = {"passed": False, "errors": []}
+    os.environ["AGENT_DESKTOP_STATE_DIR"] = str(state)
+    host_before = host_state()
+    started = time.monotonic()
+    try:
+        exit_code, stdout, stderr, problem = run_client(command, environment, timeout)
+        (artifact / "transcript.jsonl").write_text(stdout or "")
+        report.update(exit_code=exit_code, stderr=(stderr or "")[-2000:])
+        if problem:
+            report["errors"].append(problem)
+        report["elapsed_seconds"] = round(time.monotonic() - started, 1)
+        host_after = host_state()
+        report.update(
+            host_before=host_before,
+            host_after=host_after,
+            host_unchanged=host_before == host_after,
+        )
+        try:
+            report.update(summarize_transcript(artifact / "transcript.jsonl"))
+        except Exception as error:
+            report["errors"].append(f"transcript: {type(error).__name__}: {error}")
+        try:
+            verify(report)
+        except Exception as error:
+            report["passed"] = False
+            report["errors"].append(f"verification: {type(error).__name__}: {error}")
+    finally:
+        report["cleanup"] = clean_up(state)
+        if report["cleanup"]["leftovers"]:
+            report["passed"] = False
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model")
     parser.add_argument("--budget", default="2")
+    parser.add_argument("--timeout", type=float, default=1200)
     args = parser.parse_args()
     browser = shutil.which("chromium")
     if not browser or not shutil.which("claude"):
@@ -119,58 +238,10 @@ def main():
     ]
     if args.model:
         command += ["--model", args.model]
-    host_before = host_state()
-    started = time.monotonic()
-    with (artifact / "transcript.jsonl").open("w") as transcript:
-        process = subprocess.run(
-            command,
-            env=environment,
-            stdout=transcript,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=1200,
-        )
-    elapsed = round(time.monotonic() - started, 1)
-    host_after = host_state()
-    events = [json.loads(line) for line in (artifact / "transcript.jsonl").open()]
-    tools = [
-        block["name"]
-        for event in events
-        if event.get("type") == "assistant"
-        for block in event["message"]["content"]
-        if block.get("type") == "tool_use"
-    ]
-    final = next((e for e in reversed(events) if e.get("type") == "result"), {})
-    init = next((e for e in events if e.get("subtype") == "init"), {})
     report = {
         "code": code,
-        "model": init.get("model"),
-        "exit_code": process.returncode,
-        "stderr": process.stderr[-2000:],
-        "elapsed_seconds": elapsed,
-        "tool_calls": len(tools),
-        "tools": {name: tools.count(name) for name in sorted(set(tools))},
-        "result": final.get("result"),
-        "cost_usd": final.get("total_cost_usd"),
-        "turns": final.get("num_turns"),
-        "passed": False,
-        "host_before": host_before,
-        "host_after": host_after,
-        "host_unchanged": host_before == host_after,
+        **run_task(command, environment, artifact, state, args.timeout),
     }
-    # Independent verification: the harness reads the session itself.
-    os.environ["AGENT_DESKTOP_STATE_DIR"] = str(state)
-    sessions = [s for s in core.sessions() if s["status"] == "ready"]
-    report["sessions"] = sessions
-    for session in sessions:
-        windows = core.request(session["session"], "windows")["windows"]
-        report["windows"] = [w["title"] for w in windows]
-        capture = core.request(session["session"], "screenshot")
-        report["final_screenshot"] = capture["path"]
-        report["passed"] = len(sessions) == 1 and any(
-            w["title"].startswith("Agent task - complete") for w in windows
-        )
-        report["cleanup"] = core.destroy(session["session"])
     (artifact / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({"artifacts": str(artifact), **report}, indent=2))
     return 0 if report["passed"] else 1

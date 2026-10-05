@@ -21,6 +21,7 @@ def releasing_worker(directory):
     worker.save_control = lambda: None
     worker.takeover = None
     worker.needs_screenshot = False
+    worker.lease = None
     worker.control = {"owner": "human", "epoch": 1, "request": None, "last": None}
     return worker
 

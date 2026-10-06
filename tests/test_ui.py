@@ -285,6 +285,7 @@ class FirefoxUITests(UISessionTest):
         page = Path(self.temporary.name) / "probe.html"
         page.write_text(
             "<!doctype html><title>Firefox probe</title><button>Probe</button>"
+            "<p>Probe paragraph text</p><label>Field <input></label>"
         )
         # The session pins a private profile; no profile flag is needed here.
         core.request(self.session, "launch", argv=["firefox", page.as_uri()])
@@ -292,6 +293,17 @@ class FirefoxUITests(UISessionTest):
             self.session, title="Firefox probe", element="Probe", timeout=60
         )
         self.assertTrue(found["satisfied"], found)
+        # Paragraph text is readable (Firefox needs an in-range end offset).
+        paragraph = core.wait(
+            self.session, role="paragraph", text="Probe paragraph", timeout=10
+        )
+        self.assertTrue(paragraph["satisfied"], paragraph)
+        # Only editable nodes offer set_text, although Firefox gives every
+        # web node the EditableText interface.
+        nodes = core.request(self.session, "ui", window="Firefox probe")["nodes"]
+        offering = {n["role"] for n in nodes if "set_text" in n.get("actions", [])}
+        self.assertIn("entry", offering)
+        self.assertNotIn("paragraph", offering)
 
 
 @unittest.skipUnless(

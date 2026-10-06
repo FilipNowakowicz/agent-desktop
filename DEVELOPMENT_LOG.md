@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-06 — Firefox text in UI listings
+
+Pilot session 19 waited for `text="stable"` on debian.org in Firefox and found
+nothing: Firefox paragraphs listed `text=''`, and every Firefox web node offered
+`set_text`. Text was read with `GetText(0, 500)`; GTK clamps the end offset, but
+Firefox returns an empty string when it is past the text. The listing now
+clamps to `CharacterCount`. Firefox also gives every web node the EditableText
+interface, so `set_text` is now offered only for nodes in the `editable` state
+(GTK, Qt, Chromium and LibreOffice fields all report it). FirefoxUITests now
+waits for a paragraph's text and checks that an entry, but not a paragraph,
+offers `set_text`; it failed before the change. Full suite with the optional
+applications: 112 OK, 1 skipped (visible mode).
 ## 2026-10-06 — Calc "rapid navigation" failures explained and fixed (F006)
 
 Pilot session 20 typed an order table in Calc with `desktop_actions`: a `type`

@@ -16,7 +16,7 @@ update this status and the development log with completed work and remaining gap
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
 | M1 | Implemented and repeatedly tested; hardening continues | The Calc navigation part of F006 is explained and fixed (#76); the Fedora Chromium typing failure is not reproduced (20 of 20 under load). Remaining lifecycle edges (both supervisors dead, profile recovery state) |
 | M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
-| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, a fresh-VM check and a GNOME desktop VM check); runtime selected automatically; first pilot batch of 20: 17 passed, short of the bar of 18; failures fixed (docs/trials/pilot.md) | A second pilot batch of 20 on the fixed build reaching 18 of 20; the maintainer's own continued use; a graphical Ubuntu desktop install |
+| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, a fresh-VM check and a GNOME desktop VM check); runtime selected automatically; pilot: first batch 17/20, second batch 20/20 on the fixed build, which meets the bar of 18 (docs/trials/pilot.md) | The maintainer's own continued use |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
@@ -27,8 +27,8 @@ with the review's open questions decided in
 correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), environment
 hygiene (#49), the two installation paths with automatic runtime selection (#52), the
 controller lease (#55), no keyring prompts (#56), the action trace (#58), and the
-first pilot batch with its fixes (#72–#76). Remaining: a second pilot batch
-([diary](docs/trials/pilot.md)), a user-run login handoff, and submitting the wlroots fix upstream
+two pilot batches with their fixes (#72–#79, [diary](docs/trials/pilot.md)).
+Remaining: the maintainer's own use, a user-run login handoff, and submitting the wlroots fix upstream
 ([runtime/UPSTREAM.md](runtime/UPSTREAM.md), which needs the maintainer's account).
 Extensions should follow observed pilot needs.
 

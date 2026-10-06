@@ -20,8 +20,11 @@ typing continuously.
 First Checks run (37482451325): Nix, Fedora and Arch passed; Ubuntu (LibreOffice
 24.2) failed the new test with "marker" in A1, so on that runner the settle wait
 did not cover the shortcut. The test now runs only when the Welcome dialog
-appears (the reproduced condition) and skips otherwise; whether the runner
-showed it is not known.
+appears (the reproduced condition) and skips otherwise. The second run
+(37504822099, all four passed) skipped it on Ubuntu: no Welcome dialog appeared
+there, so the first failure happened without one. On that runner the settle
+wait did not cover the shortcut; it is a heuristic, not a guarantee, and a
+short explicit wait after a focus-moving shortcut remains advisable.
 
 Idle soak (`soak.py --minutes 240 --interval 600`, started before #74): 24
 checks over 4 hours, 24 lines received exactly, 2 short sessions, 0 failures;

@@ -11,6 +11,7 @@ checks and the [development log](../DEVELOPMENT_LOG.md) for later changes.
 | Same host, visible nested labwc | Round trips pass when the host keyboard is idle. Host keyboard input reaches the nested session whenever its window has host focus; three 2026-10-04 runs received an extra character decoded with the host keymap |
 | Ubuntu 24.04 GitHub Actions runner, distribution runtime packages | Headless CLI tests passed in run 37159062985; real stdio MCP/image integration passed in run 37159264698 |
 | Ubuntu 24.04 CI (labwc 0.7.1, foot 1.16.2, Xwayland 23.2.6, xterm 390, zenity 4.0.1, wayvnc 0.7.2) | Full headless suite including Xwayland and GTK dialogs, plus stress cycles. One intermittent focus-test failure in 7 runs (issue #17) |
+| Ubuntu 24.04 desktop (GNOME Shell 46 on Wayland, QEMU/KVM VM, 2026-10-06; labwc 0.7.1, wlroots 0.17.1, wayvnc 0.7.2, TigerVNC 1.13.1, Xwayland 23.2.6) | Documented apt install; headless typing; visible mode as a nested window on the GNOME desktop (typing received exactly, closing ends the session); `view` and `take`/`release`; full suite with visible tests 116 OK, 9 skipped for applications not installed. Ubuntu's snap Firefox opened no window in a private session (not supported). `view` needs an X11 `DISPLAY` (Xwayland) |
 | Fedora 44 container in CI (labwc 0.9.6, foot 1.27.0, Xwayland 24.1.13, xterm 411, zenity 4.2.2, wayvnc 0.9.1) | Full headless suite and stress cycles passed (run 37164358545) |
 | Arch Linux container in CI (labwc 0.20.2, foot 1.28.0, Xwayland 24.1.13, xterm 411, zenity 4.2.2, wayvnc 0.10.2) | Full headless suite and stress cycles passed (run 37164358545) |
 | NixOS, Claude Code 2.1.288 (claude-opus-5-5) over project `.mcp.json` | End-to-end Chromium task (read code from screenshot, type, drag, submit): 5/5 verified by harness; host active window and cursor unchanged in 4/4 recorded runs |
@@ -52,7 +53,8 @@ not establish widget readiness. Clipboard coverage is application-to-application
 within each session; clipboard APIs, images and retention after owner exit remain
 untested.
 
-Ubuntu checks skip visible testing because the runner has no physical Wayland host.
+Ubuntu CI skips visible testing because the runner has no physical Wayland host;
+the GNOME VM check above ran it.
 Do not infer general support for browsers beyond the one tested fixture, GTK/Qt
 applications beyond simple dialogs, X11 applications beyond xterm and the dialogs,
 or processes started by host services outside the session tree. Mousepad and

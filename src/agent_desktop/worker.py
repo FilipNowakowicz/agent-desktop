@@ -676,8 +676,13 @@ class Worker:
             self.info["secret_service"] = True
             return
         self.info["secret_service"] = False
+        # dbus-daemon ignores this directory if it is writable by anyone else
+        # ("can be written by others"), which Ubuntu's default umask 002
+        # produced; the keyring then started anyway.
         services = Path(self.info["runtime"]) / "dbus-1/services"
         services.mkdir(parents=True, exist_ok=True)
+        for directory in (services.parent, services):
+            directory.chmod(0o700)
         for name in SECRET_SERVICES:
             (services / f"{name}.service").write_text(
                 f"[D-BUS Service]\nName={name}\n"

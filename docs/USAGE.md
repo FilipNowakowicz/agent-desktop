@@ -136,7 +136,15 @@ Applications start in the session's private home directory unless `launch`
 is given an absolute `cwd`; the CLI passes your current directory, so relative
 paths on its command line work as in a shell. They never inherit the directory
 the session happened to be created from. Unguarded sessions inherit the rest of your
-environment.
+environment, except variables whose value is a single path inside your home
+directory (for example `MOZ_APP_DATA`, `GNUPGHOME` or `ZDOTDIR`), which would
+otherwise send applications to your own files; `status` lists their names as
+`home_removed_variables`. Colon-separated search paths such as `PATH` are kept.
+Firefox always gets a profile in the session home (`~/.mozilla/agent-desktop`),
+because a wrapper can hard-code your own profile directory: home-manager does
+this with `MOZ_APP_DATA`. A `firefox` shim first on the session's `PATH` adds
+`--profile` unless the arguments already choose one (`--profile`, `-P`).
+Applications that start Firefox by absolute path bypass the shim.
 
 ## Your own screen (host session, experimental)
 

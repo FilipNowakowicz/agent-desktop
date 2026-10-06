@@ -1,5 +1,36 @@
 # Development log
 
+## 2026-10-06 — Private sessions no longer reach the person's Firefox profile
+
+Pilot session 10 launched `firefox` in a private session and got "Firefox is
+already running, but is not responding". The maintainer's home-manager wrapper
+exports `MOZ_APP_DATA=/home/user/.config/mozilla/firefox`, an absolute path to
+their own profile root, so the private `HOME` did not matter: Firefox found the
+personal profile locked by the maintainer's running browser. Had that browser been
+closed, the agent would have opened the personal profile. No input reached it;
+the session was destroyed. (The new `open_windows` field showed the dialog's
+title in the failed wait.)
+
+Two changes. (1) Every private session drops inherited variables whose value is a
+single path inside the person's home (HOME and the password database entry,
+resolved), keeping colon-separated search paths, HOME itself and
+`AGENT_DESKTOP_*`; `status` lists them as `home_removed_variables`. On this
+machine that removed GNUPGHOME, ZDOTDIR, STARSHIP_CONFIG, VIRTUAL_ENV, PWD and
+npm settings, among others. It does not fix the wrapper case, because the wrapper
+sets the variable itself. (2) A `firefox` shim (also firefox-esr, -devedition,
+-nightly) first on the session PATH adds `--profile ~/.mozilla/agent-desktop`
+in the session home unless the arguments choose a profile; `status` reports
+`pinned_browsers`. The shim also covers applications that open links through
+PATH, but not those that use an absolute path. Of the maintainer's wrappers
+only firefox (and two unrelated scripts) contain their home path.
+
+Tests: home_variables classification (unit); guard tests check that a home path
+variable is removed in an unguarded session and that a stand-in wrapper gets
+`--profile` in the session home, while `--profile X` and `-P NAME` pass
+unchanged. Real Firefox 156: the page opened in 4 s with a profile under the
+session home, and no session process had files open in the personal profile.
+Firefox exposed no accessibility tree in that session; not investigated yet.
+
 ## 2026-10-06 — Pilot day 2; loaded repetitions; failed window waits list windows
 
 Pilot sessions 7–9 (all MCP, all completed, see docs/trials/pilot.md): Rust

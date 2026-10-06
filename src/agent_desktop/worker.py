@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+import pwd
 import re
 import shlex
 import shutil
@@ -433,6 +434,12 @@ class Worker:
             "AGENT_DESKTOP_CONTROLLER",
         ):
             self.env.pop(key, None)
+        # A variable naming a place in the person's home, such as a browser's
+        # profile root (MOZ_APP_DATA), would bypass the private home.
+        removed = home_variables(self.env, host_homes(self.env))
+        for key in removed:
+            del self.env[key]
+        self.info["home_removed_variables"] = removed
         if self.info.get("home"):
             home = Path(self.info["home"])
             # Held for the session's lifetime; released by the kernel if it dies.
@@ -489,6 +496,7 @@ class Worker:
                 "GSK_RENDERER": os.environ.get("AGENT_DESKTOP_GSK_RENDERER", "cairo"),
             }
         )
+        self.pin_browser_profiles()
         if self.info["mode"] == "visible":
             self.env["WAYLAND_DISPLAY"] = self.info["parent_wayland"]
         self.compositor = subprocess.Popen(
@@ -544,6 +552,37 @@ class Worker:
         if value:
             self.env["DISPLAY"] = value
         self.info["x_display"] = value or None
+
+    def pin_browser_profiles(self):
+        """Start Firefox with a profile in the session home.
+
+        A wrapper may hard-code the person's own profile root (home-manager
+        exports MOZ_APP_DATA with an absolute path), which no environment
+        change overrides. A shim first on PATH adds --profile unless the caller
+        chose a profile; it also covers applications that open links.
+        """
+        directory = self.root / "shims"
+        pinned = []
+        for name in FIREFOX_NAMES:
+            real = shutil.which(name, path=self.env.get("PATH"))
+            if not real:
+                continue
+            directory.mkdir(mode=0o700, exist_ok=True)
+            shim = directory / name
+            shim.write_text(
+                "#!/bin/sh\n"
+                'for a in "$@"; do case "$a" in\n'
+                f'  {FIREFOX_PROFILE_PATTERNS}) exec {shlex.quote(real)} "$@";;\n'
+                "esac; done\n"
+                'profile="$HOME/.mozilla/agent-desktop"\n'
+                'mkdir -p "$profile"\n'
+                f'exec {shlex.quote(real)} --profile "$profile" "$@"\n'
+            )
+            shim.chmod(0o700)
+            pinned.append(name)
+        if pinned:
+            self.env["PATH"] = f"{directory}:{self.env.get('PATH', '')}"
+        self.info["pinned_browsers"] = pinned
 
     def guard_host(self):
         """Refuse common host-affecting commands and the system bus.
@@ -1127,6 +1166,8 @@ class Worker:
                 "secret_service": self.info.get("secret_service", True),
                 "guard_host": bool(self.info.get("guard_host")),
                 "guard_removed_variables": self.info.get("guard_removed_variables", []),
+                "home_removed_variables": self.info.get("home_removed_variables", []),
+                "pinned_browsers": self.info.get("pinned_browsers", []),
                 "x_display": self.info.get("x_display"),
                 "control": self.control["owner"],
                 "human_requested": self.control["request"] is not None,
@@ -1704,6 +1745,46 @@ def credential_variable(name):
         or upper.startswith(CREDENTIAL_PREFIXES)
         or any(part in upper for part in CREDENTIAL_PARTS)
     ) and not upper.startswith("AGENT_DESKTOP_")
+
+
+FIREFOX_NAMES = ("firefox", "firefox-esr", "firefox-devedition", "firefox-nightly")
+# Arguments by which the caller already chose a profile (shell case patterns).
+FIREFOX_PROFILE_PATTERNS = (
+    "-P|-p|--P|-profile|--profile|-profile=*|--profile=*|"
+    "-ProfileManager|--ProfileManager|-profilemanager|--profilemanager"
+)
+
+
+def host_homes(env):
+    """The person's real home directories (from HOME and the password database)."""
+    homes = set()
+    for home in (env.get("HOME"), pwd.getpwuid(os.getuid()).pw_dir):
+        if home and os.path.isabs(home):
+            homes.update({os.path.normpath(home), os.path.realpath(home)})
+    homes.discard("/")
+    return homes
+
+
+def home_variables(env, homes):
+    """Inherited variables whose value is a single path inside one of `homes`.
+
+    Search-path lists (PATH, XDG_DATA_DIRS and other colon-separated values)
+    are kept; they mostly name read-only installation directories. HOME is
+    replaced by the session anyway, and the project's own settings are kept.
+    """
+    removed = []
+    for key, value in env.items():
+        if (
+            key == "HOME"
+            or key.startswith("AGENT_DESKTOP_")
+            or ":" in value
+            or not os.path.isabs(value)
+        ):
+            continue
+        paths = {os.path.normpath(value), os.path.realpath(value)}
+        if any(p == h or p.startswith(h + "/") for p in paths for h in homes):
+            removed.append(key)
+    return sorted(removed)
 
 
 SECRET_SERVICES = (

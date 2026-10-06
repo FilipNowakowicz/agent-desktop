@@ -12,7 +12,7 @@ from pathlib import Path
 from test_runtime import wait_for
 
 from agent_desktop import core
-from agent_desktop.worker import credential_variable, owned_processes
+from agent_desktop.worker import credential_variable, home_variables, owned_processes
 
 PROBE = (
     'systemctl --version >/dev/null 2>&1; echo "systemctl=$?"; '
@@ -20,7 +20,7 @@ PROBE = (
     'echo "bus=$DBUS_SYSTEM_BUS_ADDRESS"; echo "gsk=$GSK_RENDERER"; '
     'echo "ssh=${SSH_AUTH_SOCK:-none}"; echo "api=${TRIAL_API_TOKEN:-none}"; '
     'echo "aws=${AWS_PROFILE:-none}"; echo "lang=${LANG:-none}"; '
-    'echo "pwd=$PWD"; echo "home=$HOME"'
+    'echo "pwd=$PWD"; echo "home=$HOME"; echo "appdata=${TRIAL_APP_DATA:-none}"'
 )
 FAKE_CREDENTIALS = {
     "SSH_AUTH_SOCK": "/nonexistent/agent.sock",
@@ -32,7 +32,19 @@ SECRETS_PROBE = (
     "/org/freedesktop/DBus org.freedesktop.DBus.StartServiceByName "
     'string:org.freedesktop.secrets uint32:0; echo "secrets=$?"'
 )
-KEYS = ("systemctl", "pkill", "bus", "gsk", "ssh", "api", "aws", "lang", "pwd", "home")
+KEYS = (
+    "systemctl",
+    "pkill",
+    "bus",
+    "gsk",
+    "ssh",
+    "api",
+    "aws",
+    "lang",
+    "pwd",
+    "home",
+    "appdata",
+)
 
 
 class CredentialNameTests(unittest.TestCase):
@@ -58,6 +70,25 @@ class CredentialNameTests(unittest.TestCase):
             self.assertFalse(credential_variable(name), name)
 
 
+class HomeVariableTests(unittest.TestCase):
+    def test_paths_inside_the_home_are_removed(self):
+        env = {
+            "HOME": "/home/ada",
+            "MOZ_APP_DATA": "/home/ada/.config/mozilla/firefox",
+            "PWD": "/home/ada",
+            "CARGO_HOME": "/home/ada/.cargo",
+            "XDG_DATA_DIRS": "/home/ada/.nix-profile/share:/usr/share",
+            "PATH": "/home/ada/bin:/usr/bin",
+            "SHELL": "/usr/bin/zsh",
+            "LANG": "en_GB.UTF-8",
+            "OTHER": "/home/adam/file",
+            "AGENT_DESKTOP_RUNTIME": "/home/ada/.local/share/agent-desktop/runtime",
+        }
+        self.assertEqual(
+            home_variables(env, {"/home/ada"}), ["CARGO_HOME", "MOZ_APP_DATA", "PWD"]
+        )
+
+
 @unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),
     "desktop tools unavailable",
@@ -76,6 +107,9 @@ class GuardTests(unittest.TestCase):
         for key, value in FAKE_CREDENTIALS.items():
             self.previous[key] = os.environ.get(key)
             os.environ[key] = value
+        # A profile root in the person's home, as MOZ_APP_DATA is on NixOS.
+        self.previous["TRIAL_APP_DATA"] = os.environ.get("TRIAL_APP_DATA")
+        os.environ["TRIAL_APP_DATA"] = str(Path.home() / ".config/trial-app")
 
     def tearDown(self):
         for session in self.sessions:
@@ -136,6 +170,37 @@ class GuardTests(unittest.TestCase):
             with self.subTest(cwd=bad), self.assertRaises(core.DesktopError):
                 core.request(session, "launch", argv=["true"], cwd=bad)
 
+    def test_firefox_gets_a_profile_in_the_session_home(self):
+        # A stand-in wrapper that, like home-manager's, names the person's profile.
+        bin_dir = Path(self.temporary.name) / "bin"
+        bin_dir.mkdir()
+        fake = bin_dir / "firefox"
+        fake.write_text(
+            "#!/bin/sh\n"
+            f"export MOZ_APP_DATA={Path.home()}/.config/mozilla/firefox\n"
+            'echo "args=$*"\n'
+        )
+        fake.chmod(0o700)
+        self.previous["PATH"] = os.environ["PATH"]
+        os.environ["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+        session = core.create()["session"]
+        self.sessions.append(session)
+        home = core.session_path(session) / "home"
+        self.assertEqual(
+            core.request(session, "status")["pinned_browsers"], ["firefox"]
+        )
+        for argv, expected in (
+            (
+                ["firefox", "about:blank"],
+                f"args=--profile {home}/.mozilla/agent-desktop about:blank",
+            ),
+            (["firefox", "--profile", "/x", "a"], "args=--profile /x a"),
+            (["firefox", "-P", "work"], "args=-P work"),
+        ):
+            app = core.request(session, "launch", argv=argv)
+            wait_for(lambda app=app: Path(app["logs"]).read_text().strip())
+            self.assertEqual(Path(app["logs"]).read_text().strip(), expected)
+
     def test_unguarded_session_keeps_host_tools(self):
         session, lines = self.probe(False)
         self.assertFalse(core.request(session, "status")["guard_host"])
@@ -145,6 +210,10 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(lines["gsk"], "cairo")
         self.assertEqual(lines["pwd"], lines["home"])
         self.assertEqual(lines["api"], "not-a-real-token")
+        # Paths into the person's home are removed in every session.
+        self.assertEqual(lines["appdata"], "none")
+        removed = core.request(session, "status")["home_removed_variables"]
+        self.assertIn("TRIAL_APP_DATA", removed)
         if shutil.which("systemctl"):
             self.assertEqual(lines["systemctl"], "0")
 

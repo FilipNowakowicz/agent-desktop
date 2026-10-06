@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-10-06 — Firefox accessibility; observed AT-SPI exceptions
+
+Firefox 156 exposed no accessibility tree in sessions (pilot session 10). It
+enables accessibility only with `GNOME_ACCESSIBILITY=1`, which sessions now set
+next to `ACCESSIBILITY_ENABLED` (Chromium). With it, Firefox listed its tabs,
+toolbar and page. New test FirefoxUITests waits for a button on a local page.
+
+Other exceptions seen in pilot sessions 12, 14 and 15, now in USAGE: in Thunar's
+GTK 3 menu bar, an AT-SPI `click` on any menu ("View", "Help") opened the first
+menu (File); the node resolved to the right element, and GTK logged "no trigger
+event for menu popup". Chromium accepted `press` on a settings radio button but
+did not change it. Chromium exposes only the part of a page it has rendered, so
+a wait for an element further down needs a scroll first.
+
 ## 2026-10-06 — Private sessions no longer reach the person's Firefox profile
 
 Pilot session 10 launched `firefox` in a private session and got "Firefox is

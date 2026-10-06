@@ -623,6 +623,7 @@ class Worker:
             self.env.pop(key, None)
         self.env["QT_LINUX_ACCESSIBILITY_ALWAYS_ON"] = "1"
         self.env["ACCESSIBILITY_ENABLED"] = "1"  # Chromium/Electron
+        self.env["GNOME_ACCESSIBILITY"] = "1"  # Firefox exposes no tree otherwise
         # Let the private bus activate the matching bus launcher (e.g. from Nix).
         share = Path(registryd).resolve().parent.parent / "share"
         if (share / "dbus-1/services/org.a11y.Bus.service").is_file():

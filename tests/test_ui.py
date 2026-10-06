@@ -275,6 +275,26 @@ class ChromiumUITests(UISessionTest):
 
 
 @unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "firefox"))
+    and find_registryd()
+    and os.geteuid() != 0,
+    "desktop tools, Firefox or at-spi2-core unavailable",
+)
+class FirefoxUITests(UISessionTest):
+    def test_firefox_exposes_its_page(self):
+        page = Path(self.temporary.name) / "probe.html"
+        page.write_text(
+            "<!doctype html><title>Firefox probe</title><button>Probe</button>"
+        )
+        # The session pins a private profile; no profile flag is needed here.
+        core.request(self.session, "launch", argv=["firefox", page.as_uri()])
+        found = core.wait(
+            self.session, title="Firefox probe", element="Probe", timeout=60
+        )
+        self.assertTrue(found["satisfied"], found)
+
+
+@unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),
     "desktop tools unavailable",
 )

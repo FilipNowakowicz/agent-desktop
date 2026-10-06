@@ -1,5 +1,42 @@
 # Development log
 
+## 2026-10-06 — Calc "rapid navigation" failures explained and fixed (F006)
+
+Pilot session 20 typed an order table in Calc with `desktop_actions`: a `type`
+step per row and Home, Down between rows. Every row landed in row 1 and the
+cursor ended at C5. Experiments (scripts outside the repository, one Calc
+session each, LibreOffice 26.8.0.3, labwc 0.20.2):
+
+- With 1.5 s between steps every step was right; with no pause the text of all
+  rows went to row 1 and the Home/Down pairs took effect after it (J1 → A3).
+  LibreOffice applied navigation keys sent right after typed text only after
+  the text that followed them. The earlier Fedora CI failure (formula in A2
+  instead of B4, 2026-10-04) fits the same pattern.
+- Idle and empty, Calc received every key: 20 Downs (`repeat`, separate calls
+  or spaced), 20 Tabs and alternating Down/Right, 5 of 5 each.
+- A pause after a 20-character `type` fixed it from about 100 ms (3 of 3 at 0.1,
+  0.2 and 0.4 s; 0 of 3 at 0.02 and 0.05 s). Typing one character per request
+  (1–2 ms apart) also fixed it. A Wayland roundtrip per key did not, nor did
+  pacing at 1–2 ms (0 of 4); 4 ms gave 3 of 4, 8 ms and 12 ms 8 of 8.
+- With 12 busy processes on 12 CPUs, 8 ms pacing failed again (rows 1–2 in row
+  10), and Tabs inside one text ("Total\t\t\t=SUM(…)") were overtaken by the
+  formula after them.
+
+The mechanism inside LibreOffice is not established. Changes: keys are paced at
+8 ms (xdotool's default is 12 ms; `AGENT_DESKTOP_KEY_INTERVAL_MS`), and in
+private sessions a `key` within 1 s of `type`, and each switch between
+characters and Tab/Return runs inside a `type` text, first waits until the
+screen has not changed for 150 ms (at most 1 s; caret-sized changes ignored).
+Host sessions skip the wait. The client's timeout for `type` grows with its
+length. Results with the change: 8 of 8 idle and 10 of 10 under the 12-process
+load for the full sequence. A new test (test_calc_rows_typed_with_navigation_keys,
+office_smoke.calc_rows) types the rows in one `run_actions` sequence and checks
+the saved cells. It fails with `AGENT_DESKTOP_KEY_INTERVAL_MS=0` and the settle
+wait removed. Under load the fixture's 3 s window for late Welcome dialogs was
+too short; its profile is now seeded with the first-run settings (FirstRun,
+ShowTipOfTheDay, ooSetupLastVersion). Pacing costs time: about 8 ms per
+character, plus up to 1 s at each type/key transition. Full suite: 113 OK,
+1 skipped (visible mode).
 ## 2026-10-06 — Idle worker CPU
 
 The idle-session soak (`soak.py --minutes 240 --interval 600`) showed the

@@ -7,6 +7,7 @@ zwlr_virtual_pointer_manager_v1 on one private compositor socket.
 import array
 import ctypes
 import ctypes.util
+import os
 import shutil
 import socket
 import struct
@@ -32,6 +33,12 @@ def fixed(value):
 def string(value):
     data = value.encode() + b"\0"
     return struct.pack("=I", len(data)) + data + b"\0" * (-len(data) % 4)
+
+
+# Typed keys are paced like fast typing (xdotool waits 12 ms). Sent as one burst,
+# LibreOffice handled navigation keys after all the text sent with them, so
+# rows typed with Tab, Home and Down landed in the wrong cells (F006).
+KEY_INTERVAL = float(os.environ.get("AGENT_DESKTOP_KEY_INTERVAL_MS", 8)) / 1000
 
 
 def timestamp():
@@ -478,6 +485,8 @@ class VirtualKeyboard:
     def tap(self, code):
         self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 1))
         self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 0))
+        self.connection.roundtrip()
+        time.sleep(KEY_INTERVAL)
 
     def modifiers(self, mask):
         self.connection.send(self.id, 2, struct.pack("=IIII", mask, 0, 0, 0))

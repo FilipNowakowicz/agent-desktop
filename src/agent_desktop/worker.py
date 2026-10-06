@@ -345,6 +345,7 @@ class Worker:
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.ui_counter = 0
         self.frames = {}  # recent raw frames for change detection, oldest first
+        self.typed_at = None  # monotonic end of the last `type`
         self.virtual_pointer = None
         self.virtual_keyboard = None
         self.toplevels = None
@@ -882,6 +883,23 @@ class Worker:
             result["changed"] = changed_box(previous[2], pixels, width, height)
         return result
 
+    def settle(self, quiet=0.15, limit=1.0):
+        """Wait until the screen has not changed for `quiet` seconds, at most `limit`.
+
+        A key sent while an application is still working through typed text can
+        overtake it: LibreOffice applied Home and Down after the text sent before
+        them (F006). A settled screen shows that the text has been handled.
+        """
+        deadline = time.monotonic() + limit
+        token = self.frame(None)["frame"]
+        quiet_since = time.monotonic()
+        while time.monotonic() - quiet_since < quiet and time.monotonic() < deadline:
+            time.sleep(0.03)
+            latest = self.frame(token)
+            token, box = latest["frame"], latest["changed"]
+            if box == "unknown" or (box and box[2] * box[3] > SETTLE_AREA):
+                quiet_since = time.monotonic()
+
     def observation(self):
         """Token for the window layout: output, windows, focus and states.
 
@@ -1400,7 +1418,13 @@ class Worker:
             text = request.get("text")
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("Text must be a string of at most 10000 characters")
-            self.keyboard().type(text)
+            # Characters and Tab/Return runs are sent separately, each after the
+            # screen settles, so a Tab cannot overtake the text before or after it.
+            for index, part in enumerate(re.findall(r"[\t\n]+|[^\t\n]+", text)):
+                if index and not host:
+                    self.settle()
+                self.keyboard().type(part)
+            self.typed_at = time.monotonic()
         elif operation == "key":
             key = request.get("key")
             modifiers = request.get("modifiers", [])
@@ -1417,6 +1441,9 @@ class Worker:
                 or not (1 <= repeat <= 100)
             ):
                 raise ValueError("Repeat must be an integer from 1 to 100")
+            if self.typed_at and time.monotonic() - self.typed_at < 1 and not host:
+                self.settle()
+            self.typed_at = None
             self.keyboard().key(self.keysyms.resolve(key), modifiers, repeat)
         elif operation == "scroll":
             dx, dy = request.get("dx", 0), request.get("dy", 0)
@@ -1701,6 +1728,10 @@ def first_difference(a, b):
         else:
             low = middle
     return low
+
+
+# Changes of at most this many square pixels (a blinking caret) count as settled.
+SETTLE_AREA = 400
 
 
 def changed_box(before, after, width, height):

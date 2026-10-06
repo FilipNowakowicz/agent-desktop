@@ -177,7 +177,11 @@ def request(session, operation, controller=None, **arguments):
     sent = False
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-            connection.settimeout(30)
+            # Typing is paced (about 8 ms per key), so long text takes longer.
+            text = arguments.get("text") if operation == "type" else None
+            connection.settimeout(
+                30 + (len(text) * 0.03 if isinstance(text, str) else 0)
+            )
             connection.connect(endpoint)
             connection.sendall((json.dumps(message) + "\n").encode())
             sent = True

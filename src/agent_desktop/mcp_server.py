@@ -258,7 +258,10 @@ def desktop_screenshot(
 
 @tool()
 def desktop_type(session: str, text: str, observation: str | None = None) -> dict:
-    """Type up to 10000 characters into the private focused app. Verify the result afterward."""
+    """Type up to 10000 characters into the private focused app, about 8 ms per key.
+
+    Verify the result afterward. Paste long text instead of typing it.
+    """
     return call(session, "type", text=text, observation=observation)
 
 

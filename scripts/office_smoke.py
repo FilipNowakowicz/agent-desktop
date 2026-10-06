@@ -40,8 +40,26 @@ def active(session):
     )
 
 
+# Settings a new profile would otherwise get from its first-run dialogs, which
+# can appear seconds after the document under load and take the input.
+FIRST_RUN_DONE = """<?xml version="1.0" encoding="UTF-8"?>
+<oor:items xmlns:oor="http://openoffice.org/2001/registry"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="FirstRun" oor:op="fuse"><value>false</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="ShowTipOfTheDay" oor:op="fuse"><value>false</value></prop></item>
+<item oor:path="/org.openoffice.Setup/Product"><prop oor:name="ooSetupLastVersion" oor:op="fuse"><value>99.0</value></prop></item>
+</oor:items>
+"""
+
+
 def launch(session, component, files=()):
-    profile = (core.session_path(session) / "home/office-profile").as_uri()
+    directory = core.session_path(session) / "home/office-profile"
+    seed = directory / "user/registrymodifications.xcu"
+    if not seed.exists():
+        seed.parent.mkdir(parents=True)
+        seed.write_text(FIRST_RUN_DONE)
+    profile = directory.as_uri()
     core.request(
         session,
         "launch",
@@ -172,6 +190,87 @@ def calc_matches(path):
         and values[1:] == ["12", "8", "20"]
         and formula == "of:=SUM([.B2:.B3])"
     )
+
+
+def cells(path):
+    """{"A1": text or formula} for the first table, expanding repeated cells."""
+    root = content(path)
+    if root is None:
+        return None
+    result = {}
+    table = root.find(".//table:table", NS)
+    row_number = 0
+    for row in table.findall("table:table-row", NS):
+        rows = int(row.get("{" + NS["table"] + "}number-rows-repeated", 1))
+        column = 0
+        for cell in row.findall("table:table-cell", NS):
+            columns = int(cell.get("{" + NS["table"] + "}number-columns-repeated", 1))
+            value = cell.get("{" + NS["table"] + "}formula") or "".join(cell.itertext())
+            if value and rows == 1:
+                for offset in range(min(columns, 26 - column)):
+                    result[f"{chr(65 + column + offset)}{row_number + 1}"] = value
+            column += columns
+        row_number += rows
+    return result
+
+
+ROWS_START = 10
+ROWS = (("Paper", "4", "2"), ("Pens", "1", "9"), ("Stapler", "12", "2"))
+
+
+def calc_rows(session, directory):
+    """Type rows with Tab, Home and Down in one sequence, as an agent would."""
+    target = directory / "rows.ods"
+    spreadsheet(target)
+    launch(session, "Calc", [target])
+    core.request(session, "key", key="F5", modifiers=["ctrl", "shift"])
+    time.sleep(0.2)
+    core.request(session, "key", key="a", modifiers=["ctrl"])
+    core.request(session, "type", text=f"A{ROWS_START}")
+    core.request(session, "key", key="Return")
+    time.sleep(0.2)
+    steps = [{"action": "type", "text": "Item\tPrice\tQty\tCost\t"}]
+    for offset, (item, price, quantity) in enumerate(ROWS, 1):
+        row = ROWS_START + offset
+        steps += [
+            {"action": "key", "key": "Home"},
+            {"action": "key", "key": "Down"},
+            {
+                "action": "type",
+                "text": f"{item}\t{price}\t{quantity}\t=B{row}*C{row}\t",
+            },
+        ]
+    last = ROWS_START + len(ROWS)
+    steps += [
+        {"action": "key", "key": "Home"},
+        {"action": "key", "key": "Down"},
+        {"action": "type", "text": f"Total\t\t\t=SUM(D{ROWS_START + 1}:D{last})\t"},
+    ]
+    core.run_actions(session, steps)
+    core.request(session, "key", key="s", modifiers=["ctrl"])
+    try:
+        wait_for(lambda: calc_rows_match(cells(target) or {}), timeout=20)
+    except RuntimeError:
+        pass  # The caller compares and reports what was saved.
+    return cells(target)
+
+
+def calc_rows_match(found):
+    expected = {f"A{ROWS_START}": "Item", f"D{ROWS_START}": "Cost"}
+    for offset, (item, price, quantity) in enumerate(ROWS, 1):
+        row = ROWS_START + offset
+        expected.update(
+            {
+                f"A{row}": item,
+                f"B{row}": price,
+                f"C{row}": quantity,
+                f"D{row}": f"of:=[.B{row}]*[.C{row}]",
+            }
+        )
+    last = ROWS_START + len(ROWS)
+    expected[f"A{last + 1}"] = "Total"
+    expected[f"D{last + 1}"] = f"of:=SUM([.D{ROWS_START + 1}:.D{last}])"
+    return {k: found.get(k) for k in expected} == expected
 
 
 def calc(session, directory):

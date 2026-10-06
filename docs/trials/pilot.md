@@ -4,8 +4,11 @@ Plan step 5. Tasks and pass threshold are in
 `docs/reviews/2026-10-05-project-review/decisions.md` (decisions 1 and 8):
 (a) research in Chromium, (b) a GUI configuration change verified on disk,
 (c) data entry in LibreOffice Calc verified in the saved file. The operator is an
-interactive coding agent using the documented interfaces. The goal is at least
-20 sessions over at least 10 working days. Elapsed times are wall-clock, including
+interactive coding agent using the documented interfaces. The goal is 20 sessions
+with varied tasks and applications, including reuse of a named profile across
+sessions. The original 10-working-day requirement was dropped on 2026-10-06
+(decisions.md, later decisions): for an agent operator, days add waiting rather
+than evidence, and the maintainer's own continued use is tracked separately. Elapsed times are wall-clock, including
 the operator's own thinking between calls.
 
 Count: **9 sessions over 2 days, 9 completed, 0 developer changes needed mid-task, 0 human

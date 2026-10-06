@@ -63,7 +63,8 @@ Welcome dialog appears; it fails on the old code (A1 = "D6marker") and passed
 mode). The 30-minute soak of #76 with 12 busy processes (before this change):
 2,076 lines exact, 207 short sessions, 0 failures; type p50 195 ms for about 25
 characters, key p50 225 ms (settle), worker CPU about 26% of a core while
-typing continuously.
+typing continuously. Worker RSS stayed at 32–37 MB and the process count at 8
+throughout; screenshot p95 94 ms, create p50 302 ms, destroy p50 626 ms.
 
 First Checks run (37482451325): Nix, Fedora and Arch passed; Ubuntu (LibreOffice
 24.2) failed the new test with "marker" in A1, so on that runner the settle wait

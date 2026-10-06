@@ -709,7 +709,14 @@ def wait(
         if satisfied:
             return result(True, "ok", windows, elements)
         if time.monotonic() >= deadline:
-            return result(False, reason, windows, elements)
+            failed = result(False, reason, windows, elements)
+            if reason == "no window":
+                # Distinguish a wrong title or app_id from a window not yet open.
+                failed["open_windows"] = [
+                    {"title": w["title"], "app_id": w["app_id"]}
+                    for w in request(session, "windows", controller)["windows"]
+                ]
+            return failed
         time.sleep(0.2 if wants_element else 0.05)
 
 

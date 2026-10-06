@@ -146,7 +146,8 @@ def desktop_wait(
     disappear when gone is true and no window is given. With stable_ms, then wait
     until the screen has not changed for that long (a blinking caret is ignored).
     seconds (up to 30) pauses first, for changes no condition describes.
-    Returns satisfied=false at the timeout (at most 120 s).
+    Returns satisfied=false at the timeout (at most 120 s); when no window
+    matched, open_windows lists the titles and app_ids that do exist.
     """
     return core.wait(
         session,

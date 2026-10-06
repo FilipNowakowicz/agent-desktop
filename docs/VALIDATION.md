@@ -15,6 +15,10 @@ uv run python -m unittest discover -s tests -v
 DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
 # Repeated lifecycle cycles, optionally with busy CPU processes.
 uv run scripts/lifecycle_stress.py --cycles 20 --load 4
+# Soak: typing receipt, screenshots and short sessions; --load adds busy CPU
+# processes, --interval idles between iterations.
+uv run scripts/soak.py --minutes 60 --load 4
+uv run scripts/soak.py --minutes 240 --interval 600
 ```
 
 Integration tests skip when desktop tools are missing; passing unit-only checks

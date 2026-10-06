@@ -9,6 +9,7 @@ and leftover processes are sampled into a JSON report.
 import argparse
 import json
 import os
+import shutil
 import statistics
 import sys
 import tempfile
@@ -90,6 +91,13 @@ def main():
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="soak-"))
+    try:
+        run(args, report_path, work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def run(args, report_path, work):
     latencies, samples, failures = {}, [], []
     persistent = core.create()["session"]
     info = core.manifest(persistent)

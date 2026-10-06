@@ -12,6 +12,25 @@ from agent_desktop import core
 from agent_desktop.worker import find_registryd, owned_processes
 
 
+def snap_firefox():
+    """Whether `firefox` is Ubuntu's snap (or its /usr/bin wrapper script).
+
+    It opened no window in a private session: snap confinement keeps it out of
+    hidden directories such as the session home under ~/.local/state.
+    """
+    path = shutil.which("firefox")
+    if not path:
+        return False
+    real = os.path.realpath(path)
+    try:
+        return (
+            real.startswith("/snap/")
+            or b"/snap/bin/firefox" in (Path(real).read_bytes()[:4096])
+        )
+    except OSError:
+        return False
+
+
 class UISessionTest(unittest.TestCase):
     environment = {}
 
@@ -277,8 +296,9 @@ class ChromiumUITests(UISessionTest):
 @unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "firefox"))
     and find_registryd()
-    and os.geteuid() != 0,
-    "desktop tools, Firefox or at-spi2-core unavailable",
+    and os.geteuid() != 0
+    and not snap_firefox(),
+    "desktop tools, a non-snap Firefox or at-spi2-core unavailable",
 )
 class FirefoxUITests(UISessionTest):
     def test_firefox_exposes_its_page(self):

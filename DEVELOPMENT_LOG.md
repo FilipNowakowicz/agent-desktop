@@ -1,5 +1,40 @@
 # Development log
 
+## 2026-10-06 — Graphical Ubuntu desktop check; keyring mask under umask 002
+
+A disposable QEMU/KVM VM from the official Ubuntu 24.04 cloud image (SHA-256
+verified) got `ubuntu-desktop-minimal` with GDM autologin into GNOME Shell 46
+on Wayland. The checkout arrived as a git bundle; only the documented apt
+install and uv steps were used (packages: labwc 0.7.1, wlroots 0.17.1, wayvnc
+0.7.2, grim 1.4.0, Xwayland 23.2.6, TigerVNC 1.13.1). Screens were captured
+through QEMU's QMP `screendump`. Results: doctor and its smoke check passed;
+a headless session received `hello café λ 123` exactly; visible mode opened a
+nested labwc window on the GNOME desktop, received the same text exactly, and
+closing it ended the session with nothing left; `view` worked with Xwayland's
+`DISPLAY` and failed with a clear error without one (documented); `take`
+refused agent screenshots and input while the person had control, `release`
+returned control, and input before a new screenshot was refused as stale.
+
+The suite (with `DESKTOP_TEST_VISIBLE=1`) first had two failures:
+
+- test_keyring_is_not_activated: the private bus started the real
+  gnome-keyring. dbus-daemon 1.14.10 logged `Unable to set up transient service
+  directory: ... "dbus-1" can be written by others (mode 040775)`: Ubuntu's
+  default umask 002 made the mask directory group-writable, so it was ignored.
+  The worker now sets 0700 on `dbus-1` and `dbus-1/services`. The test now
+  creates its session under umask 002; it failed on the old code on NixOS too,
+  and passes now, also in the VM.
+- test_firefox_exposes_its_page: `/usr/bin/firefox` is a wrapper for the snap,
+  which opened no window in a private session (snap confinement keeps it out
+  of hidden directories such as the session home under ~/.local/state; not
+  investigated further). The test skips the snap.
+
+With both changes the suite in the VM: 116 OK, 9 skipped (Chromium,
+LibreOffice, kdialog and the snap Firefox are not installed or not usable
+there). Part of this check was run by a helper agent that stopped on the
+account's usage limit before writing its report; its logs and screenshots were
+read and the failures diagnosed afterwards. Evidence stayed on the local
+machine (VM image, logs and screenshots under a temporary directory).
 ## 2026-10-06 — Settle before text that follows a key
 
 Pilot session 29: after closing Calc's Welcome dialog, Ctrl+Shift+F5 (Name

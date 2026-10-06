@@ -220,7 +220,12 @@ class GuardTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("dbus-send"), "dbus-send unavailable")
     def test_keyring_is_not_activated(self):
         # A host keyring service would prompt for a new keyring password.
-        session = core.create()["session"]
+        # Ubuntu's default umask 002 once made dbus-daemon ignore the mask.
+        previous = os.umask(0o002)
+        try:
+            session = core.create()["session"]
+        finally:
+            os.umask(previous)
         self.sessions.append(session)
         self.assertFalse(core.request(session, "status")["secret_service"])
         app = core.request(session, "launch", argv=["sh", "-c", SECRETS_PROBE])

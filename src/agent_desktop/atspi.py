@@ -136,8 +136,11 @@ class Accessibility:
         if "org.a11y.atspi.Text" in interfaces and (
             role in TEXT_ROLES or "editable" in record["states"]
         ):
-            text = self.call(node, "org.a11y.atspi.Text", "GetText", "ii", (0, 500))[0]
-            record["text"] = text
+            # Firefox returns nothing for an end offset past the text; GTK clamps.
+            count = self.get(node, "org.a11y.atspi.Text", "CharacterCount")
+            record["text"] = self.call(
+                node, "org.a11y.atspi.Text", "GetText", "ii", (0, min(count, 500))
+            )[0]
         if "org.a11y.atspi.Value" in interfaces:
             record["value"] = self.get(node, "org.a11y.atspi.Value", "CurrentValue")
         if "org.a11y.atspi.Action" in interfaces:
@@ -148,7 +151,11 @@ class Accessibility:
                 for n in self.action_names(node)
                 if n and "." not in n and n not in HIDDEN_ACTIONS
             ]
-        if "org.a11y.atspi.EditableText" in interfaces:
+        # Firefox offers EditableText on every web node; only editable ones count.
+        if (
+            "org.a11y.atspi.EditableText" in interfaces
+            and "editable" in record["states"]
+        ):
             record.setdefault("actions", []).append("set_text")
         return record, SHOWING in bits
 

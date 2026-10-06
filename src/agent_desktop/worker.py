@@ -474,12 +474,11 @@ class Worker:
         self.info["home_removed_variables"] = removed
         if self.info.get("home"):
             home = Path(self.info["home"])
-            # Held for the session's lifetime; released by the kernel if it dies.
-            self.profile_lock = Path(self.info["profile_lock"]).open("a")
-            try:
-                fcntl.flock(self.profile_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise RuntimeError("Profile is in use by another session") from None
+            # Taken by the guardian and shared with this process, so it is held
+            # until the guardian has stopped everything the session left behind.
+            if GUARDIAN_PROFILE_LOCK is None:
+                raise RuntimeError("Profile is in use by another session")
+            self.profile_lock = GUARDIAN_PROFILE_LOCK
             if not home.is_dir():
                 raise RuntimeError("Profile was deleted while the session started")
         else:
@@ -1945,11 +1944,33 @@ def guard(root, worker):
     return 1
 
 
+# The profile lock as an open file, taken before the worker is forked. Both
+# processes share it, so the kernel releases it only when both have exited: a
+# worker that dies abnormally cannot free the profile while the guardian is
+# still stopping the session's applications.
+GUARDIAN_PROFILE_LOCK = None
+
+
+def take_profile_lock(root):
+    info = json.loads((root / "session.json").read_text())
+    if not info.get("profile_lock"):
+        return None
+    lock = Path(info["profile_lock"]).open("a")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.close()
+        return None  # the worker reports the profile as in use
+    return lock
+
+
 def main():
+    global GUARDIAN_PROFILE_LOCK
     root = Path(sys.argv[1])
     # Both processes are subreapers: orphans stay with the worker while it lives,
     # then fall to the guardian, never to init or a host service manager.
     become_subreaper()
+    GUARDIAN_PROFILE_LOCK = take_profile_lock(root)
     worker = os.fork()
     if worker == 0:
         code = 1

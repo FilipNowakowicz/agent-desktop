@@ -1,5 +1,6 @@
 """Teardown never signals a process number that now belongs to another process."""
 
+import os
 import signal
 import subprocess
 import time
@@ -52,3 +53,32 @@ class ProcessIdentityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReapOrphansTests(unittest.TestCase):
+    def zombie(self):
+        # A bare fork: subprocess would reap abandoned Popen children itself.
+        pid = os.fork()
+        if pid == 0:
+            os._exit(0)
+        deadline = time.monotonic() + 5
+        while worker.process_state(pid) != "Z":
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(0.01)
+        return pid
+
+    def check(self):
+        orphan, tracked = self.zombie(), self.zombie()
+        self.assertIn(orphan, worker.child_pids(os.getpid()) or {orphan})
+        worker.reap_orphans(tracked={tracked})
+        self.assertIsNone(worker.process_state(orphan))
+        # A tracked child keeps its exit status for its Popen object.
+        self.assertEqual(worker.process_state(tracked), "Z")
+        os.waitpid(tracked, 0)
+
+    def test_reaps_untracked_children(self):
+        self.check()
+
+    def test_falls_back_to_scanning_without_children_lists(self):
+        with mock.patch.object(worker, "child_pids", return_value=None):
+            self.check()

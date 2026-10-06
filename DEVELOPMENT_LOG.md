@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-06 — Idle worker CPU
+
+The idle-session soak (`soak.py --minutes 240 --interval 600`) showed the
+persistent session's worker using about 2.3 s of CPU per idle minute (22 s per
+10 minutes, about 4% of a core) at a steady RSS of 31–37 MB. Cause: the serve
+loop wakes every 0.5 s and `reap_orphans` read `/proc/PID/stat` of every process
+on the machine (`process_table`, 11 ms per call with 370 processes), so the cost
+grows with the machine's process count and the number of sessions. It now reads
+the worker's own children from `/proc/self/task/*/children` and checks only
+those, falling back to the full scan where the kernel does not provide the
+list. An empty session's worker then used 0.10 s of CPU in 60 s (10 ticks),
+against 2.3 s before. Tests: an untracked zombie child is reaped and a tracked
+one is left for its Popen object, on both paths. Full suite with the optional
+applications: 114 OK, 1 skipped (visible mode).
+
 ## 2026-10-06 — Firefox accessibility; observed AT-SPI exceptions
 
 Firefox 156 exposed no accessibility tree in sessions (pilot session 10). It

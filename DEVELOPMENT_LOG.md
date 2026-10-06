@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-06 — Settle before text that follows a key
+
+Pilot session 29: after closing Calc's Welcome dialog, Ctrl+Shift+F5 (Name
+Box) was followed at once by `type "D1\n"`; the text went into A1 and the next
+rows overwrote column A. The settle wait added in #76 ran only before a key that
+follows text. It now runs at every switch between `type` and `key` within a
+second (`settle_after`), in both directions; consecutive keys or consecutive
+texts are not delayed. Reproduction (close Welcome, shortcut, type at once):
+old code 3 of 3 wrong (text in A1), new code 3 of 3 right (D6). New test
+test_calc_text_after_a_shortcut_reaches_its_target uses a new profile so the
+Welcome dialog appears; it fails on the old code (A1 = "D6marker") and passed
+3 of 3. Full suite with the optional applications: 117 OK, 1 skipped (visible
+mode). The 30-minute soak of #76 with 12 busy processes (before this change):
+2,076 lines exact, 207 short sessions, 0 failures; type p50 195 ms for about 25
+characters, key p50 225 ms (settle), worker CPU about 26% of a core while
+typing continuously.
+
 ## 2026-10-06 — Profile lock held until the guardian has cleaned up (F025)
 
 The worker took a named profile's lock itself, so when it died abnormally the

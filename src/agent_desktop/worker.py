@@ -145,15 +145,46 @@ def session_processes(token, tree=True):
     return sorted(session_process_starts(token, tree))
 
 
+def child_pids(pid):
+    """Direct children of a process, or None when the kernel does not list them.
+
+    Much cheaper than scanning every process, which the worker's twice-a-second
+    loop otherwise did (about 11 ms per scan with 370 processes).
+    """
+    children = set()
+    try:
+        for task in Path(f"/proc/{pid}/task").iterdir():
+            children.update(int(c) for c in (task / "children").read_text().split())
+    except OSError:
+        return None
+    return children
+
+
+def process_state(pid):
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    return stat[stat.rindex(")") + 2 :].split()[0]
+
+
 def reap_orphans(tracked=()):
     """Collect adopted orphans without stealing exit codes from Popen objects."""
     me = os.getpid()
-    for pid, (parent, state, _start) in process_table().items():
-        if parent == me and state == "Z" and pid not in tracked:
-            try:
-                os.waitpid(pid, os.WNOHANG)
-            except ChildProcessError:
-                pass
+    children = child_pids(me)
+    if children is None:
+        zombies = {
+            pid
+            for pid, (parent, state, _start) in process_table().items()
+            if parent == me and state == "Z"
+        }
+    else:
+        zombies = {pid for pid in children if process_state(pid) == "Z"}
+    for pid in zombies - set(tracked):
+        try:
+            os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            pass
 
 
 def cleanup_processes(token, tracked=(), spare=(), tree=True):

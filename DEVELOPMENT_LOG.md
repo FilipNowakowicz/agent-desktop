@@ -1,5 +1,36 @@
 # Development log
 
+## 2026-10-06 — Settle before text that follows a key
+
+Pilot session 29: after closing Calc's Welcome dialog, Ctrl+Shift+F5 (Name
+Box) was followed at once by `type "D1\n"`; the text went into A1 and the next
+rows overwrote column A. The settle wait added in #76 ran only before a key that
+follows text. It now runs at every switch between `type` and `key` within a
+second (`settle_after`), in both directions; consecutive keys or consecutive
+texts are not delayed. Reproduction (close Welcome, shortcut, type at once):
+old code 3 of 3 wrong (text in A1), new code 3 of 3 right (D6). New test
+test_calc_text_after_a_shortcut_reaches_its_target uses a new profile so the
+Welcome dialog appears; it fails on the old code (A1 = "D6marker") and passed
+3 of 3. Full suite with the optional applications: 117 OK, 1 skipped (visible
+mode). The 30-minute soak of #76 with 12 busy processes (before this change):
+2,076 lines exact, 207 short sessions, 0 failures; type p50 195 ms for about 25
+characters, key p50 225 ms (settle), worker CPU about 26% of a core while
+typing continuously.
+
+First Checks run (37482451325): Nix, Fedora and Arch passed; Ubuntu (LibreOffice
+24.2) failed the new test with "marker" in A1, so on that runner the settle wait
+did not cover the shortcut. The test now runs only when the Welcome dialog
+appears (the reproduced condition) and skips otherwise. The second run
+(37504822099, all four passed) skipped it on Ubuntu: no Welcome dialog appeared
+there, so the first failure happened without one. On that runner the settle
+wait did not cover the shortcut; it is a heuristic, not a guarantee, and a
+short explicit wait after a focus-moving shortcut remains advisable.
+
+Idle soak (`soak.py --minutes 240 --interval 600`, started before #74): 24
+checks over 4 hours, 24 lines received exactly, 2 short sessions, 0 failures;
+worker RSS 28–37 MB with no upward trend, 8 processes throughout; worker CPU
+2.0–2.7 s per idle minute, the cost #74 removed.
+
 ## 2026-10-06 — Profile lock held until the guardian has cleaned up (F025)
 
 The worker took a named profile's lock itself, so when it died abnormally the

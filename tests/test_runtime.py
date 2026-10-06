@@ -665,6 +665,16 @@ class RuntimeTests(unittest.TestCase):
         found = office_smoke.calc_rows(session, self.root)
         self.assertTrue(office_smoke.calc_rows_match(found), found)
 
+    @unittest.skipUnless(shutil.which("libreoffice"), "LibreOffice unavailable")
+    def test_calc_text_after_a_shortcut_reaches_its_target(self):
+        # Typed right after Ctrl+Shift+F5, the reference went into A1 (pilot 29).
+        session = self.new_session()
+        found = office_smoke.calc_name_box(session, self.root)
+        if found is None:
+            self.skipTest("LibreOffice showed no Welcome dialog")
+        self.assertEqual(found.get("D6"), "marker", found)
+        self.assertEqual(found.get("A1"), "Item", found)
+
     @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
     def test_xwayland_application_receives_input(self):
         session = self.new_session()

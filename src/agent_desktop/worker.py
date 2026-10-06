@@ -345,7 +345,8 @@ class Worker:
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.ui_counter = 0
         self.frames = {}  # recent raw frames for change detection, oldest first
-        self.typed_at = None  # monotonic end of the last `type`
+        # ("type" or "key", monotonic end) of the last keyboard input.
+        self.last_keys = (None, 0.0)
         self.virtual_pointer = None
         self.virtual_keyboard = None
         self.toplevels = None
@@ -882,6 +883,17 @@ class Worker:
             result["changed"] = changed_box(previous[2], pixels, width, height)
         return result
 
+    def settle_after(self, kind, host):
+        """Settle when switching between `type` and `key` within a second.
+
+        Text sent right after a shortcut can arrive before the shortcut has
+        moved focus (Calc's Name Box), and a key right after text can overtake
+        it. Consecutive keys or consecutive texts are not delayed.
+        """
+        last, at = self.last_keys
+        if last == kind and time.monotonic() - at < 1 and not host:
+            self.settle()
+
     def settle(self, quiet=0.15, limit=1.0):
         """Wait until the screen has not changed for `quiet` seconds, at most `limit`.
 
@@ -1417,13 +1429,14 @@ class Worker:
             text = request.get("text")
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("Text must be a string of at most 10000 characters")
+            self.settle_after("key", host)
             # Characters and Tab/Return runs are sent separately, each after the
             # screen settles, so a Tab cannot overtake the text before or after it.
             for index, part in enumerate(re.findall(r"[\t\n]+|[^\t\n]+", text)):
                 if index and not host:
                     self.settle()
                 self.keyboard().type(part)
-            self.typed_at = time.monotonic()
+            self.last_keys = ("type", time.monotonic())
         elif operation == "key":
             key = request.get("key")
             modifiers = request.get("modifiers", [])
@@ -1440,10 +1453,9 @@ class Worker:
                 or not (1 <= repeat <= 100)
             ):
                 raise ValueError("Repeat must be an integer from 1 to 100")
-            if self.typed_at and time.monotonic() - self.typed_at < 1 and not host:
-                self.settle()
-            self.typed_at = None
+            self.settle_after("type", host)
             self.keyboard().key(self.keysyms.resolve(key), modifiers, repeat)
+            self.last_keys = ("key", time.monotonic())
         elif operation == "scroll":
             dx, dy = request.get("dx", 0), request.get("dy", 0)
             if not all(

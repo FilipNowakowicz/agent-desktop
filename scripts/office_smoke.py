@@ -255,6 +255,50 @@ def calc_rows(session, directory):
     return cells(target)
 
 
+def calc_name_box(session, directory):
+    """Close the Welcome dialog, then jump with the Name Box and type at once.
+
+    In pilot session 29 the text arrived before the shortcut had moved focus,
+    while Calc was still returning focus from the closed dialog. This uses a
+    new profile (no seed) so that the dialog appears.
+    """
+    target = directory / "jump.ods"
+    spreadsheet(target)
+    profile = (core.session_path(session) / "home/fresh-profile").as_uri()
+    core.request(
+        session,
+        "launch",
+        argv=[
+            "env",
+            "GDK_BACKEND=wayland",
+            "SAL_USE_VCLPLUGIN=gtk3",
+            "libreoffice",
+            "-env:UserInstallation=" + profile,
+            "--norestore",
+            "--calc",
+            str(target),
+        ],
+    )
+    welcome = core.wait(session, title="Welcome", timeout=60, stable_ms=500)
+    if not welcome["satisfied"]:
+        return None  # the condition under test did not arise
+    steps = [
+        {"action": "key", "key": "Escape"},
+        {"action": "wait", "title": "Welcome", "gone": True, "timeout": 10},
+        {"action": "key", "key": "F5", "modifiers": ["ctrl", "shift"]},
+        {"action": "type", "text": "D6\n"},
+        {"action": "type", "text": "marker\n"},
+        {"action": "key", "key": "s", "modifiers": ["ctrl"]},
+    ]
+    core.run_actions(session, steps)
+    # Saving an .ods asks nothing; wait for the file to show the marker.
+    try:
+        wait_for(lambda: (cells(target) or {}).get("D6") == "marker", timeout=20)
+    except RuntimeError:
+        pass  # The caller compares and reports what was saved.
+    return cells(target)
+
+
 def calc_rows_match(found):
     expected = {f"A{ROWS_START}": "Item", f"D{ROWS_START}": "Cost"}
     for offset, (item, price, quantity) in enumerate(ROWS, 1):

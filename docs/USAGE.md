@@ -29,11 +29,11 @@ uv run agent-desktop list
 ```
 
 Typing is paced at about 8 ms per key (`AGENT_DESKTOP_KEY_INTERVAL_MS`), so
-1,000 characters take about 8 s. In private sessions a `key` sent within a
-second of `type`, and each switch between characters and Tab/Return inside a
-`type` text, first waits up to 1 s for the screen to stop changing. Without
-this, LibreOffice applied Home, Down and Tab after text sent later, so rows
-landed in the wrong cells. Host sessions skip the wait. Paste long text instead
+1,000 characters take about 8 s. In private sessions each switch between `type`
+and `key` within a second, and each switch between characters and Tab/Return
+inside a `type` text, first waits up to 1 s for the screen to stop changing. Without
+this, LibreOffice applied Home, Down and Tab after text sent later, and text
+sent right after a shortcut reached the cell instead of the Name Box. Host sessions skip the wait. Paste long text instead
 of typing it.
 
 Headless mode never opens a host window. Visible mode requires a Wayland host and

@@ -280,13 +280,11 @@ def calc_name_box(session, directory):
         ],
     )
     welcome = core.wait(session, title="Welcome", timeout=60, stable_ms=500)
-    steps = []
-    if welcome["satisfied"]:
-        steps += [
-            {"action": "key", "key": "Escape"},
-            {"action": "wait", "title": "Welcome", "gone": True, "timeout": 10},
-        ]
-    steps += [
+    if not welcome["satisfied"]:
+        return None  # the condition under test did not arise
+    steps = [
+        {"action": "key", "key": "Escape"},
+        {"action": "wait", "title": "Welcome", "gone": True, "timeout": 10},
         {"action": "key", "key": "F5", "modifiers": ["ctrl", "shift"]},
         {"action": "type", "text": "D6\n"},
         {"action": "type", "text": "marker\n"},

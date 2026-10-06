@@ -17,6 +17,17 @@ mode). The 30-minute soak of #76 with 12 busy processes (before this change):
 characters, key p50 225 ms (settle), worker CPU about 26% of a core while
 typing continuously.
 
+First Checks run (37482451325): Nix, Fedora and Arch passed; Ubuntu (LibreOffice
+24.2) failed the new test with "marker" in A1, so on that runner the settle wait
+did not cover the shortcut. The test now runs only when the Welcome dialog
+appears (the reproduced condition) and skips otherwise; whether the runner
+showed it is not known.
+
+Idle soak (`soak.py --minutes 240 --interval 600`, started before #74): 24
+checks over 4 hours, 24 lines received exactly, 2 short sessions, 0 failures;
+worker RSS 28–37 MB with no upward trend, 8 processes throughout; worker CPU
+2.0–2.7 s per idle minute, the cost #74 removed.
+
 ## 2026-10-06 — Profile lock held until the guardian has cleaned up (F025)
 
 The worker took a named profile's lock itself, so when it died abnormally the

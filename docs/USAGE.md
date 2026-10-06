@@ -55,7 +55,8 @@ inside the private desktop remain native Wayland. Override optional tools with
 `desktop_wait`) waits for a window whose title contains the text (or `--app-id`,
 or `--gone` for its disappearance), then until the screen has not changed for
 `--stable-ms`, ignoring changes of at most 400 px² such as a blinking caret. It
-returns `satisfied: false` at the timeout instead of failing.
+returns `satisfied: false` at the timeout instead of failing; when no window
+matched, `open_windows` lists the titles and app ids that do exist.
 With accessibility, `--element NAME`, `--role ROLE` and `--text TEXT` wait for a
 matching UI element (e.g. a "Saved" label or a field containing a value), or for
 its disappearance with `--gone`, so an action's outcome can be verified without a

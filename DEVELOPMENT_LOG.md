@@ -1,5 +1,38 @@
 # Development log
 
+## 2026-10-06 — Pilot day 2; loaded repetitions; failed window waits list windows
+
+Pilot sessions 7–9 (all MCP, all completed, see docs/trials/pilot.md): Rust
+release from the Rust blog in Chromium, LibreOffice AutoRecovery interval
+verified in `registrymodifications.xcu`, and a Calc table with `MAX` verified in
+the saved .ods. Session 7 found a misleading result: `desktop_wait` for the title
+"Rust Blog" timed out with `no window` and an empty `windows` list while Chromium
+was open as "The Rust Programming Language Blog". `windows` lists only matches,
+so a wrong title looked like a missing application. A window wait that fails
+with `no window` now also returns `open_windows` (title and app id of every
+window). test_wait checks it.
+
+`scripts/soak.py` gains `--load N` (busy CPU processes, as in lifecycle_stress)
+and `--interval S` (idle seconds between iterations, for an idle-session soak),
+selects the installed runtime like the CLI does, and writes its report on
+interruption too. Loaded run (`--minutes 20 --load 12`, 12 CPUs): stopped by
+interrupt after about 6 minutes because the maintainer's own interactive
+workload was running and the load would degrade it. Its report covers 5.1
+minutes: 681 mixed-script lines typed and received exactly, 68 short sessions,
+0 failures. Each busy process got only about 35% of a core, so this was
+contention but not saturation. Latencies rose modestly (screenshot p95 87 ms,
+type p95 23 ms, create p50 302 ms, destroy p50 521 ms). The persistent session
+reported 8 processes at the 5-minute sample against 4 in the unloaded runs;
+not investigated. During the same load, `scripts/browser_smoke.py` (Chromium
+Unicode typing, submit, drag) passed 20 of 20 runs. These are F006-style typing
+repetitions under contention on this machine; they do not explain the earlier
+Fedora Chromium failure.
+
+Full suite inside `nix shell` xterm, wlr-randr, at-spi2-core, zenity, mousepad,
+xev, kdialog, plus the installed runtime and LibreOffice 26.8: 109 OK,
+1 skipped (visible mode). An idle-session soak (`--minutes 240 --interval 600`)
+is running.
+
 ## 2026-10-06 — Eight-hour soak
 
 `scripts/soak.py --minutes 480` (local Nix labwc 0.20.2, 2026-10-05 18:00 to

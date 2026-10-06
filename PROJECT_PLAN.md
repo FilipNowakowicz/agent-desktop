@@ -1,6 +1,6 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-05. This document records the chosen direction, implemented
+Updated: 2026-10-06. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
@@ -16,7 +16,7 @@ update this status and the development log with completed work and remaining gap
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
 | M1 | Implemented and repeatedly tested; hardening continues | Loaded repetitions of the unexplained typing symptoms (F006), remaining lifecycle edges (both supervisors dead, profile recovery state) |
 | M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
-| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, plus a fresh-VM check); runtime selected automatically; pilot started (3/3 sessions, docs/trials/pilot.md) | Pilot to at least 20 sessions over 10 working days, including runs through MCP; a graphical Ubuntu desktop install |
+| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, plus a fresh-VM check); runtime selected automatically; pilot in progress (9/9 sessions over 2 days, docs/trials/pilot.md) | Pilot to at least 20 sessions over 10 working days, including runs through MCP; a graphical Ubuntu desktop install |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |

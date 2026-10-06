@@ -77,6 +77,11 @@ class WaitTests(unittest.TestCase):
         self.launch("Quiet window", "printf ready; sleep 60")
         found = core.wait(self.session, title="Quiet", stable_ms=500, timeout=15)
         self.assertTrue(found["satisfied"], found)
+        wrong = core.wait(self.session, title="Loud", timeout=0.3)
+        self.assertEqual(wrong["reason"], "no window")
+        self.assertEqual(
+            wrong["open_windows"], [{"title": "Quiet window", "app_id": "foot"}]
+        )
         self.assertEqual(found["windows"][0]["app_id"], "foot")
         self.assertGreaterEqual(found["elapsed_ms"], 500)
         self.assertTrue(core.wait(self.session, app_id="foot", timeout=1)["satisfied"])

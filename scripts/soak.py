@@ -4,10 +4,15 @@ The persistent session types numbered lines into a terminal fixture and checks
 every line arrives exactly, takes screenshots and waits; short sessions are
 created, exercised and destroyed. Latencies, worker memory/CPU, state bytes
 and leftover processes are sampled into a JSON report.
+
+``--interval`` pauses between iterations, so a long run with a large interval
+tests a mostly idle session. ``--load`` keeps that many busy CPU processes
+running throughout, for typing repetitions under load.
 """
 
 import argparse
 import json
+import multiprocessing
 import os
 import shutil
 import statistics
@@ -29,6 +34,11 @@ for line in sys.stdin:
     with out.open("a") as f:
         f.write(line)
 """
+
+
+def busy(stop):
+    while not stop.is_set():
+        pass
 
 
 def timed(latencies, name, function, *args, **kwargs):
@@ -87,13 +97,28 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--minutes", type=float, default=60)
     parser.add_argument("--report", default="artifacts/soak/report.json")
+    parser.add_argument(
+        "--interval", type=float, default=0, help="idle seconds between iterations"
+    )
+    parser.add_argument("--load", type=int, default=0, help="busy CPU processes")
     args = parser.parse_args()
+    core.use_runtime()
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="soak-"))
+    stop = multiprocessing.Event()
+    load = [
+        multiprocessing.Process(target=busy, args=(stop,), daemon=True)
+        for _ in range(args.load)
+    ]
+    for process in load:
+        process.start()
     try:
         run(args, report_path, work)
     finally:
+        stop.set()
+        for process in load:
+            process.join(timeout=5)
         shutil.rmtree(work, ignore_errors=True)
 
 
@@ -188,9 +213,13 @@ def run(args, report_path, work):
                 write_report(
                     report_path, args, sent, short_cycles, latencies, samples, failures
                 )
+            time.sleep(args.interval)
     finally:
+        # Also on interruption: keep what was measured so far.
+        write_report(
+            report_path, args, sent, short_cycles, latencies, samples, failures
+        )
         core.destroy(persistent)
-    write_report(report_path, args, sent, short_cycles, latencies, samples, failures)
     print(json.dumps(json.loads(report_path.read_text())["summary"], indent=2))
 
 
@@ -209,6 +238,9 @@ def write_report(path, args, sent, short_cycles, latencies, samples, failures):
     report = {
         "summary": {
             "minutes": args.minutes,
+            "interval_s": args.interval,
+            "load_processes": args.load,
+            "cpu_count": os.cpu_count(),
             "lines_sent": sent,
             "short_sessions": short_cycles,
             "failures": len(failures),

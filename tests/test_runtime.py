@@ -658,6 +658,13 @@ class RuntimeTests(unittest.TestCase):
             Path(result["after"]["path"]).read_bytes(),
         )
 
+    @unittest.skipUnless(shutil.which("libreoffice"), "LibreOffice unavailable")
+    def test_calc_rows_typed_with_navigation_keys(self):
+        # Sent as one burst, Home and Down took effect after all the text (F006).
+        session = self.new_session()
+        found = office_smoke.calc_rows(session, self.root)
+        self.assertTrue(office_smoke.calc_rows_match(found), found)
+
     @unittest.skipUnless(shutil.which("xterm"), "xterm unavailable")
     def test_xwayland_application_receives_input(self):
         session = self.new_session()

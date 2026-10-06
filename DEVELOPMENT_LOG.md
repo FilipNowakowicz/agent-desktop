@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-06 — Eight-hour soak
+
+`scripts/soak.py --minutes 480` (local Nix labwc 0.20.2, 2026-10-05 18:00 to
+2026-10-06 02:00) passed with 0 failures. The persistent session typed 74,200
+numbered mixed-script lines, all received exactly, and 7,420 short sessions were
+created, captured and destroyed with no leftover processes. Worker RSS stayed
+between 27 and 34 MB with no upward trend, the process count stayed at 4, and
+latencies matched the 60-minute run throughout (screenshot p95 65 ms, type/key
+p95 18 ms, wait p95 243 ms, create p50 202 ms, destroy p50 415 ms; maxima 168,
+75, 309, 515 and 739 ms). Worker CPU averaged about 34% of one core. Session state
+grew from 22.9 MB to 67.1 MB: the persistent session's screenshots, which are
+capped at 200 (13 MB), plus the state of the destroyed short sessions, which is
+kept until `prune`. The script left its temporary fixture directory in `/tmp`;
+it now removes it on exit. An idle-session soak remains.
+
 ## 2026-10-05 — Host trial through MCP; wheel-notch scrolling
 
 After `/mcp` reconnect, `desktop_request_host` was approved by notification

@@ -14,7 +14,7 @@ update this status and the development log with completed work and remaining gap
 | Stage | State (after the 2026-10-05 review) | Release gate still open |
 | --- | --- | --- |
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
-| M1 | Implemented and repeatedly tested; hardening continues | Eight-hour soak (running), loaded repetitions of the unexplained typing symptoms (F006), remaining lifecycle edges (both supervisors dead, profile recovery state) |
+| M1 | Implemented and repeatedly tested; hardening continues | Loaded repetitions of the unexplained typing symptoms (F006), remaining lifecycle edges (both supervisors dead, profile recovery state) |
 | M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
 | M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, plus a fresh-VM check); runtime selected automatically; pilot started (3/3 sessions, docs/trials/pilot.md) | Pilot to at least 20 sessions over 10 working days, including runs through MCP; a graphical Ubuntu desktop install |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
@@ -27,8 +27,7 @@ with the review's open questions decided in
 correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), environment
 hygiene (#49), the two installation paths with automatic runtime selection (#52), the
 controller lease (#55), no keyring prompts (#56) and the action trace (#58). Remaining:
-the pilot ([diary](docs/trials/pilot.md)), the eight-hour soak and loaded typing
-repetitions, a user-run login handoff, and submitting the wlroots fix upstream
+the pilot ([diary](docs/trials/pilot.md)), loaded typing repetitions, a user-run login handoff, and submitting the wlroots fix upstream
 ([runtime/UPSTREAM.md](runtime/UPSTREAM.md), which needs the maintainer's account).
 Extensions should follow observed pilot needs.
 

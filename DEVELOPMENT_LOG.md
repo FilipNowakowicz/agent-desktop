@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-06 — CI unavailable; merges validated locally
+
+GitHub Actions stopped starting jobs ("recent account payments have failed or
+your spending limit needs to be increased"), so the required Lint check could
+not run on #79–#81. At the maintainer's instruction ("verify them locally"),
+each was checked locally and merged with an administrator override of the
+required check: ruff check, ruff format --check, compileall and the unit
+tests on every branch; the full desktop suite with the optional applications
+(117 OK, 1 skipped: visible mode) on #79 and on #81 rebased onto it, and again
+on main after all three merges. #79 and #81 had also passed the full Checks
+matrix on all four platforms before the outage (runs 37504822099 and
+37506015397). Until CI is restored, this local procedure replaces Lint.
+
 ## 2026-10-06 — Graphical Ubuntu desktop check; keyring mask under umask 002
 
 A disposable QEMU/KVM VM from the official Ubuntu 24.04 cloud image (SHA-256

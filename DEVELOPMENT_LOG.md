@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-06 — Profile lock held until the guardian has cleaned up (F025)
+
+The worker took a named profile's lock itself, so when it died abnormally the
+kernel released the lock at once, while the guardian was still stopping the
+session's applications. A new session could then open the profile while old
+processes were still writing to it. The guardian now takes the lock before it
+forks the worker; both share the open file, so the lock lasts until both have
+exited. If the guardian cannot take it, the worker refuses as before ("Profile
+is in use"). Test: with the guardian stopped (SIGSTOP), SIGKILL of the worker
+leaves the profile `in_use` and a new session on it is refused; after SIGCONT
+the session is marked failed, the profile frees, and a new session starts. On
+the old code the profile was free while the guardian was stopped. Full suite
+with the optional applications: 115 OK, 1 skipped (visible mode).
+
+Still open from F025: if both supervisors are killed, processes that cleared
+their environment escape recovery; only a cgroup would close that, and it stays
+deferred for portability.
+
 ## 2026-10-06 — Firefox text in UI listings
 
 Pilot session 19 waited for `text="stable"` on debian.org in Firefox and found

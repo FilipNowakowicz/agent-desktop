@@ -3,6 +3,7 @@
 import http.server
 import os
 import shutil
+import signal
 import tempfile
 import threading
 import unittest
@@ -11,7 +12,7 @@ from pathlib import Path
 from test_runtime import CHROMIUM, wait_for
 
 from agent_desktop import core
-from agent_desktop.worker import owned_processes
+from agent_desktop.worker import owned_processes, process_state
 
 
 class ProfileNameTests(unittest.TestCase):
@@ -112,6 +113,24 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(core.profiles(), [])
         with self.assertRaises(core.DesktopError):
             core.delete_profile("work")
+
+    def test_profile_stays_locked_until_the_guardian_has_cleaned_up(self):
+        session = self.create("crash")
+        info = core.manifest(session)
+        guardian, worker = info["guardian_pid"], info["worker_pid"]
+        os.kill(guardian, signal.SIGSTOP)
+        try:
+            os.kill(worker, signal.SIGKILL)
+            wait_for(lambda: process_state(worker) in (None, "Z"))
+            # The worker is gone, but its applications may still be running.
+            self.assertTrue(core.profiles()[0]["in_use"])
+            with self.assertRaisesRegex(core.DesktopError, "in use"):
+                core.create(profile="crash")
+        finally:
+            os.kill(guardian, signal.SIGCONT)
+        wait_for(lambda: core.manifest(session)["status"] == "failed", timeout=15)
+        wait_for(lambda: not core.profiles()[0]["in_use"], timeout=15)
+        self.create("crash")
 
     @unittest.skipUnless(CHROMIUM, "chromium unavailable")
     def test_browser_cookie_survives_sessions(self):

@@ -1,5 +1,33 @@
 # Development log
 
+## 2026-10-07 — Next-direction research and finite abstraction experiment
+
+Reviewed the current source, pilot and benchmark records at `328b51f`, plus
+primary competitor documentation and mathematical/computer-use literature.
+Saved the recommendation in
+`docs/research/2026-10-07-next-direction.md`: precise observations and checked
+actions first, reusable procedures as the longer-term product hypothesis, and
+counterexample-refined task abstractions as the mathematical research hypothesis.
+The plan links this as a proposal, not a committed product pivot.
+
+The new finite model enumerates 128 states and five actions. Its eight-class
+summary fails goal and transition preservation. Refinement gives 94 classes;
+all 60 remaining equivalent state pairs and 300 action comparisons preserve the
+specified goal/transition relation. This establishes only the toy-model result,
+not desktop reliability, token savings or novelty. Script and deterministic JSON
+are alongside the report. No new desktop comparisons, paid model calls, host
+changes, personal-profile access or outreach were performed.
+
+Validation: `uv run python docs/research/abstraction_experiment.py` passed; a
+second execution parsed equal to the saved JSON. All report-relative links
+resolved. `uv run ruff check src scripts tests benchmarks
+docs/research/abstraction_experiment.py`, `uv run ruff format --check` on the
+same paths (57 files), and `uv run python -m compileall -q` on the same paths
+passed. `git diff --check` passed. Runtime tests were not rerun for this
+documentation and standalone finite-model change; no desktop behaviour changed.
+Remaining gaps: measured gains on real tasks, external user demand, competitor
+execution comparisons and maintainer selection of a next stage.
+
 ## 2026-10-06 — CI unavailable; merges validated locally
 
 GitHub Actions stopped starting jobs ("recent account payments have failed or

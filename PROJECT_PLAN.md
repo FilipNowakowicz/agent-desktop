@@ -1,6 +1,6 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-06. This document records the chosen direction, implemented
+Updated: 2026-10-07. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
@@ -31,6 +31,16 @@ two pilot batches with their fixes (#72–#79, [diary](docs/trials/pilot.md)).
 Remaining: the maintainer's own use, a user-run login handoff, and submitting the wlroots fix upstream
 ([runtime/UPSTREAM.md](runtime/UPSTREAM.md), which needs the maintainer's account).
 Extensions should follow observed pilot needs.
+
+Research for the next direction: the
+[2026-10-07 recommendation](docs/research/2026-10-07-next-direction.md) proposes
+precise UI queries and checked actions as a bounded next experiment, followed by
+reusable procedures if they improve verified outcomes. It compares alternatives,
+develops the algebraic research options and specifies evaluation/stop criteria.
+This is a proposal for review, not an adopted expansion: the existing daily-use
+and handoff gates remain open. Broad platform fleets and model training remain
+deferred; task-workspace review and scientific workflows are candidate later
+experiments.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

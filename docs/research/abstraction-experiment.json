@@ -1,0 +1,72 @@
+{
+  "state_fields": [
+    "document",
+    "focus",
+    "modal",
+    "left",
+    "right",
+    "disk_left",
+    "disk_right"
+  ],
+  "states": 128,
+  "actions": [
+    "focus_left",
+    "focus_right",
+    "write_one",
+    "save",
+    "close_modal"
+  ],
+  "coarse_classes": 8,
+  "goal_counterexample": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0
+    ]
+  ],
+  "transition_counterexample": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0
+    ],
+    "write_one"
+  ],
+  "refinement_class_counts": [
+    12,
+    20,
+    50,
+    82,
+    93,
+    94
+  ],
+  "equivalent_pairs_checked": 60,
+  "transition_comparisons": 300,
+  "goal_and_transition_compatibility": "passed"
+}

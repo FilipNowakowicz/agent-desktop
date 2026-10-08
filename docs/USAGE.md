@@ -141,12 +141,18 @@ input, and all earlier observation tokens are stale. The agent can wait for this
 with `desktop_control(session, wait_seconds=...)`; release is a cooperative user handoff, not an authentication check.
 The session's clipboard is never copied to your host. `take --paste` sends your
 host clipboard into the session (e.g. a password from your password manager);
-without it nothing is transferred. Whenever control returns, the session's
+without it nothing is transferred. `desktop_request_human` and `desktop_control`
+return both commands (`take_command`, `paste_command`). Whenever control returns, the session's
 clipboard and primary selection are cleared first, so a pasted secret is not left
 for the agent; if clearing fails, control stays with you and `release` reports
 the error (`release --force` hands back anyway). The session keymap is US, so
 characters missing from that layout may not reach the session when typed
 (pasting avoids this).
+
+To keep a website login after the browser closes, tick its "Remember me" box.
+Some sites, such as freedesktop.org GitLab, have a separate one for "sign in
+with" buttons; otherwise the login is a session cookie that the browser drops
+on exit, even in a saved profile.
 
 Applications start in the session's private home directory unless `launch`
 is given an absolute `cwd`; the CLI passes your current directory, so relative

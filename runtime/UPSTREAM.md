@@ -1,7 +1,11 @@
 # Upstream proposal for the wlroots mapping repair
 
-Status: prepared, not submitted. Submitting needs a freedesktop GitLab account
-(the user's). `runtime/patches/wlroots-map-at-associate.patch` applies to wlroots
+Status: prepared, not submitted. The maintainer has a freedesktop GitLab account
+(2026-10-08, signed in with Google), but a fork attempt was refused ("Limit
+reached. You cannot create projects in your personal namespace"): new accounts
+must first request fork permission, as the sign-in page says. After that, fork
+`wlroots/wlroots`, replace `xwayland/xwm.c` on a branch with the patched file (or
+push the commit) and open the merge request below. Not a release gate. `runtime/patches/wlroots-map-at-associate.patch` applies to wlroots
 master `c5c57cd3` (2026-09-26) with a 110-line offset, and to 0.19.3 and 0.20.2.
 
 Retire the local patch once a packaged wlroots release contains an equivalent

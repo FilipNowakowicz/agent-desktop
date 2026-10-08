@@ -1,5 +1,43 @@
 # Development log
 
+## 2026-10-08 — Login handoff and Dvorak takeover by the maintainer; alpha gates closed
+
+One headless session with the profile `freedesktop` showed a keyboard-check
+terminal (a shell `read` into a file) above Chromium on
+`gitlab.freedesktop.org/users/sign_in`. The agent opened the takeover viewer
+on the maintainer's screen (`agent-desktop take`, run by the agent) after
+`desktop_request_human`.
+
+- **Dvorak.** The host layout was detected (`keyboard: us-dvorak`). The
+  maintainer typed `Dvorak check: Hello, World! 42 ;:"<>?`; the received file
+  matched byte for byte. The first attempt was interrupted (the terminal got
+  Ctrl+C), and agent launches were refused while the maintainer held control,
+  as designed; the agent relaunched the terminal after release.
+- **Login.** The site's anti-bot page ("type apple") and the sign-in were done
+  by the maintainer (with Google). Paste did not work: the viewer had been opened
+  without `--paste`, so the host clipboard was not sent, by design. Control
+  returned with the clipboard cleared.
+- **Persistence.** A new session on the profile reached GitLab signed out. Cookie
+  metadata (names, expiry; no values read) showed every persistent cookie kept,
+  including Google's login and the anti-bot pass, but GitLab's own login had been
+  a session cookie. Ticking the password form's "Remember me" and clicking
+  "Google" (no credentials; Google was still signed in) again did not persist.
+  The page has a second "Remember me" for its "sign in with" buttons; with that
+  one ticked, the next new session was signed in. Profile persistence works; the
+  site decides whether its login outlives the browser.
+- **Upstream.** Forking wlroots was refused for the new account ("Limit reached");
+  freedesktop requires new accounts to request fork permission. Nothing was
+  submitted. The commit is prepared locally, and the patch still applies to master
+  `c5c57cd3` (offset 110 lines).
+
+Changes from this: `desktop_request_human`/`desktop_control` also return
+`paste_command` (`agent-desktop take --paste SESSION`), and the MCP instructions
+tell agents to offer it for logins and to suggest "Remember me". The usage guide
+records the session-cookie behaviour.
+
+Decisions (decisions.md): M2 and M3 gates closed; the maintainer's continued use is
+feedback, not a gate; upstreaming is not a gate. Next focus: the research direction.
+
 ## 2026-10-08 — Profile recovery state; M1 closed
 
 The last F025 gap for profiles: when both supervisors were killed, the profile

@@ -15,8 +15,8 @@ update this status and the development log with completed work and remaining gap
 | --- | --- | --- |
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
 | M1 | Complete. F006 explained and fixed (#76); the Fedora Chromium typing failure is not reproduced (20 of 20 under load); profiles record how their last session ended and recover one whose supervisors both died | None. Accepted limit: after both supervisors are killed, processes that cleared their environment escape token recovery (decisions.md, 2026-10-08) |
-| M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
-| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, a fresh-VM check and a GNOME desktop VM check); runtime selected automatically; pilot: first batch 17/20, second batch 20/20 on the fixed build, which meets the bar of 18 (docs/trials/pilot.md) | The maintainer's own continued use |
+| M2 | Complete. MCP and viewer tested; cooperative takeover, profiles and the controller lease implemented; the maintainer's real login handoff persisted across sessions and their US Dvorak typing arrived exactly during takeover (2026-10-08) | None. Takeover is not a confidentiality boundary (decision 3) |
+| M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, a fresh-VM check and a GNOME desktop VM check); runtime selected automatically; pilot: first batch 17/20, second batch 20/20 on the fixed build, which meets the bar of 18 (docs/trials/pilot.md) | None. The maintainer's own use continues as feedback, not a gate (decisions.md, 2026-10-08) |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
@@ -28,17 +28,18 @@ correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), e
 hygiene (#49), the two installation paths with automatic runtime selection (#52), the
 controller lease (#55), no keyring prompts (#56), the action trace (#58), and the
 two pilot batches with their fixes (#72–#79, [diary](docs/trials/pilot.md)).
-Remaining: the maintainer's own use, a user-run login handoff, and submitting the wlroots fix upstream
-([runtime/UPSTREAM.md](runtime/UPSTREAM.md), which needs the maintainer's account).
-Extensions should follow observed pilot needs.
+The daily-use alpha gates are closed (2026-10-08). Open but not gating: the
+wlroots fix upstream ([runtime/UPSTREAM.md](runtime/UPSTREAM.md)); the maintainer's
+freedesktop account needs fork permission first. Next work is the research direction
+below. Extensions should follow observed needs.
 
 Research for the next direction: the
 [2026-10-07 recommendation](docs/research/2026-10-07-next-direction.md) proposes
 precise UI queries and checked actions as a bounded next experiment, followed by
 reusable procedures if they improve verified outcomes. It compares alternatives,
 develops the algebraic research options and specifies evaluation/stop criteria.
-This is a proposal for review, not an adopted expansion: the existing daily-use
-and handoff gates remain open. Broad platform fleets and model training remain
+The maintainer adopted it as the next focus on 2026-10-08, once the alpha gates
+closed. Broad platform fleets and model training remain
 deferred; task-workspace review and scientific workflows are candidate later
 experiments.
 

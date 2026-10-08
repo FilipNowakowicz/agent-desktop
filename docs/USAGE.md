@@ -236,6 +236,14 @@ hold login cookies and tokens on disk, readable by any process running as your
 user and by any agent given that profile; they are never your personal browser
 profile. Deleting a profile is CLI-only.
 
+`profiles` and a `create` with a profile report the profile's previous session
+(`last_session` / `previous_session`): its id and whether it ended `stopped`,
+`failed` (with the error) or `recovered`. After a failed or recovered end,
+applications may offer to restore a crashed session. If both of that session's
+supervisors were killed (`abandoned`), the next `create` on the profile first
+stops the old session's processes by token, as `destroy` would, so they cannot
+keep writing to the profile.
+
 Each session has private display sockets, D-Bus, configuration and application
 profiles. The session supervisor is a child subreaper and starts the private bus
 itself, so daemonizing applications and D-Bus-activated services remain in its

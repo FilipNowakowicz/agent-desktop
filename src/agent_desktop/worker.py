@@ -952,6 +952,8 @@ class Worker:
             **self.control,
             "needs_screenshot": self.needs_screenshot,
             "take_command": f"agent-desktop take {self.info['id']}",
+            # Sends the host clipboard in once, e.g. a password-manager entry.
+            "paste_command": f"agent-desktop take --paste {self.info['id']}",
             "lease": self.lease_state(),
         }
 

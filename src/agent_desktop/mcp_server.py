@@ -19,7 +19,10 @@ with another screenshot, and destroy the session when finished.
 Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
 passwords or codes in chat and never type guessed credentials. Call
 desktop_request_human with a short reason, tell the user that reason and the
-returned take_command, then wait with desktop_control. While the user has control,
+returned take_command, then wait with desktop_control. For a login, also give
+paste_command, which lets them paste a password from their own clipboard, and
+suggest ticking "Remember me" (on some sites a separate one for "sign in with"
+buttons) so the login survives the browser closing. While the user has control,
 your input and screenshots are refused. When control returns, take a new screenshot
 before acting. To keep a login for later tasks, create sessions with the same
 profile name (one session per profile at a time).
@@ -338,7 +341,7 @@ def desktop_request_human(session: str, reason: str) -> dict:
     """Ask the user to take control, e.g. to log in, enter a 2FA code or pass a CAPTCHA.
 
     Do not ask the user for passwords or codes. Tell them the reason and the
-    returned take_command, then wait with desktop_control. While they have
+    returned take_command (paste_command for a login), then wait with desktop_control. While they have
     control, input and screenshots are refused; afterwards take a new screenshot.
     """
     return call(session, "request_human", reason=reason)

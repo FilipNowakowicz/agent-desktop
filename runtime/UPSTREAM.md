@@ -1,14 +1,12 @@
 # Upstream proposal for the wlroots mapping repair
 
-Status: prepared, not submitted. The maintainer has a freedesktop GitLab account
-(2026-10-08, signed in with Google), but a fork attempt was refused ("Limit
-reached. You cannot create projects in your personal namespace"): new accounts
-must first request fork permission, as the sign-in page says. Requested on
-2026-10-08: [freedesktop/freedesktop#4178](https://gitlab.freedesktop.org/freedesktop/freedesktop/-/work_items/4178)
-("User verification" template). After that, fork
-`wlroots/wlroots`, replace `xwayland/xwm.c` on a branch with the patched file (or
-push the commit) and open the merge request below. Not a release gate. `runtime/patches/wlroots-map-at-associate.patch` applies to wlroots
-master `c5c57cd3` (2026-09-26) with a 110-line offset, and to 0.19.3 and 0.20.2.
+Status: submitted 2026-10-08 as
+[wlroots/wlroots!5477](https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5477)
+from `filip.nowakowicz/wlroots:xwm-map-at-associate` (one commit on master
+`c5c57cd3`, `xwayland/xwm.c` +6). Fork permission came from
+[freedesktop/freedesktop#4178](https://gitlab.freedesktop.org/freedesktop/freedesktop/-/work_items/4178).
+The description below was submitted with a short test plan added. Respond to
+review there; keep the local patch until a packaged release contains the fix.
 
 Retire the local patch once a packaged wlroots release contains an equivalent
 fix. Check each new wlroots release's `xwayland_surface_associate`.

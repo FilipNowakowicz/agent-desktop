@@ -30,8 +30,8 @@ The [2026-10-05 review](docs/reviews/2026-10-05-project-review/report.md) recomm
 finishing a daily-use alpha before adding more features. The plan tracks current
 progress; the review remains a dated assessment. Its open questions (threat model,
 supported installations, pilot tasks, controller policy) are decided in
-[decisions.md](docs/reviews/2026-10-05-project-review/decisions.md). A real login
-handoff still needs the maintainer. Benchmark results include measured tool profiles; consult
+[decisions.md](docs/reviews/2026-10-05-project-review/decisions.md). The alpha gates,
+including the maintainer's login handoff, closed on 2026-10-08. Benchmark results include measured tool profiles; consult
 the [report](docs/BENCHMARK.md) rather than older handoff notes.
 
 General computer use remains the product goal. GUI testing and diagnostics can

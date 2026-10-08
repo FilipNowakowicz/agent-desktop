@@ -43,6 +43,14 @@ closed. Broad platform fleets and model training remain
 deferred; task-workspace review and scientific workflows are candidate later
 experiments.
 
+First result (2026-10-08, [effect ledger](docs/research/2026-10-08-effect-ledger.md)):
+an experimental per-action report of files, windows and processes changed
+(`AGENT_DESKTOP_EFFECTS=1`) cut Claude Code's input tokens by 25% on five
+file-producing tasks (p = 0.016) without changing success, and showed that a
+GUI setting's effect can be learned once and applied directly (a small,
+verified settings map for Calc). Ranked next steps are in that report; the
+ledger stays experimental until the open items there are done.
+
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from

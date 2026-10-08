@@ -44,6 +44,21 @@ stable_ms. Call
 desktop_destroy on that session as soon as you are done; it never closes their
 applications. Use private sessions for everything else."""
 
+EFFECTS_INSTRUCTIONS = """
+
+Effects (experimental, on for these sessions): replies to input, launch, focus
+and ui_action include `effects`: files written in the session home (documents
+under "files" with a line diff, spreadsheet cells as "Sheet!B2: value",
+application state under "app_state"), windows opened, closed or retitled, focus
+and processes started or exited, observed during the action. Use them to check
+file and dialog outcomes instead of a screenshot; take a screenshot when the
+question is visual. Applications often write after the reply: call
+desktop_effects with the action's effect_id, and wait_for_file (e.g. "~/*.ods")
+to wait for a save. "Nothing observed" is evidence only for its time window."""
+
+if os.environ.get("AGENT_DESKTOP_EFFECTS") == "1":
+    INSTRUCTIONS += EFFECTS_INSTRUCTIONS
+
 # One controller id for this server's lifetime (AGENT_DESKTOP_CONTROLLER overrides).
 CONTROLLER = os.environ.get("AGENT_DESKTOP_CONTROLLER") or (
     f"mcp-{os.getpid()}-{uuid.uuid4().hex[:8]}"
@@ -125,6 +140,25 @@ def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dic
 def desktop_windows(session: str) -> dict:
     """List private desktop windows: id, title, app_id, states and parent."""
     return call(session, "windows")
+
+
+@tool()
+def desktop_effects(
+    session: str,
+    effect_id: int,
+    wait_for_file: str | None = None,
+    timeout: float = 10,
+) -> dict:
+    """Effects observed since an earlier action (by its effect_id), including
+    files written after its reply. With wait_for_file (a "~/..." glob such as
+    "~/*.ods"), first wait up to timeout seconds for a matching file to be
+    written and go quiet; satisfied says whether it was. Experimental: only for
+    sessions created with AGENT_DESKTOP_EFFECTS=1."""
+    if wait_for_file is None:
+        return call(session, "effects", effect_id=effect_id)
+    return core.wait_effect(
+        session, effect_id, wait_for_file, timeout=timeout, controller=CONTROLLER
+    )
 
 
 @tool()

@@ -111,6 +111,18 @@ Between runs 1 and 2:
   create and launch).
 - No baseline comparison with other computer-use runtimes has been run yet.
 
+## Effect-ledger A/B (2026-10-08)
+
+`--effects` enables the experimental effect ledger in harness sessions and the
+MCP server, and watches each task's directory; transcripts are written to
+`RUN/agents/TASK/` outside it. `--suite effects` holds two trap tasks: Thunar
+"show hidden files" that cannot be saved here (an honest FAILED passes) and a
+Calc CSV export through the format dialogs. Results and limits are in the
+[effect-ledger report](research/2026-10-08-effect-ledger.md#agent-ab);
+`scripts/effects_ab_summary.py` compares runs. The office tasks now keep their
+LibreOffice profile in `~/.office-profile` (formerly `~/office-profile`), so
+the ledger treats it as application state.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

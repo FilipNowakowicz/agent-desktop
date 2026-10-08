@@ -119,6 +119,26 @@ and reports the step and reason. `wait` and `focus` steps expect a change and ta
 a new baseline. Popups and changes inside a window are not detected, and the
 result carries no observation token, so take a screenshot to verify.
 
+## Effect ledger (experimental)
+
+Create sessions with `AGENT_DESKTOP_EFFECTS=1` in the environment of the CLI or
+MCP server (and optionally `AGENT_DESKTOP_EFFECT_DIRS=/abs/dir:/other` for
+directories outside the session home). Replies to input, launch, focus,
+`ui_action` and action sequences then include `effects`: files written in the
+session home (documents under `files` with a short line diff, OpenDocument
+spreadsheet cells as `Sheet!B2: value [formula]`, application state under
+`app_state` or as per-directory counts), windows opened, closed or retitled,
+focus changes, and processes started or exited. Caches, locks and temporary
+files are only counted (`noise_files`).
+
+Applications often write after the reply. `desktop_effects(session, effect_id)`
+reports everything since that action, and `wait_for_file="~/*.ods"` (or an
+absolute glob) waits until a matching file has been written and gone quiet. An
+empty report means nothing was observed in that window, nothing more: effects
+outside the watched directories, in memory, in binary stores such as dconf, or
+over the network are not seen. Research notes and measurements:
+[docs/research/2026-10-08-effect-ledger.md](research/2026-10-08-effect-ledger.md).
+
 ## Taking control (logins, 2FA, CAPTCHAs)
 
 An agent that reaches a login page calls `desktop_request_human` with a reason

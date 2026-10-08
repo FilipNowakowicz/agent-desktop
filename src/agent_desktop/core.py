@@ -821,8 +821,19 @@ def run_actions(session, actions, observation=None, controller=None):
         request(session, "lease", controller)
     except DesktopError as error:
         return stopped(0, len(actions), str(error))
+    first = []  # effect_id of the first step, when the ledger is on
     try:
-        return run_steps(session, actions, observation, controller)
+        result = run_steps(session, actions, observation, controller, first)
+        if first:
+            # Everything the sequence changed, including writes after its last
+            # step's reply (experimental effect ledger).
+            try:
+                result["effects"] = request(
+                    session, "effects", controller, effect_id=first[0]
+                )
+            except DesktopError:
+                pass
+        return result
     finally:
         if temporary:
             try:
@@ -831,7 +842,7 @@ def run_actions(session, actions, observation=None, controller=None):
                 pass  # e.g. the session was destroyed; the lease went with it
 
 
-def run_steps(session, actions, observation, controller):
+def run_steps(session, actions, observation, controller, first=None):
     baseline = observation or request(session, "observe", controller)["observation"]
     # Keep a cropped or scaled screenshot's coordinate mapping for every step.
     mapping = "@" + observation.partition("@")[2] if "@" in (observation or "") else ""
@@ -847,9 +858,19 @@ def run_steps(session, actions, observation, controller):
                 if not waited["satisfied"]:
                     return stopped(index, len(actions), f"wait: {waited['reason']}")
             elif action == "focus":
-                request(session, "focus", controller, **arguments)
+                reply = request(session, "focus", controller, **arguments)
             else:
-                request(session, action, controller, observation=baseline, **arguments)
+                reply = request(
+                    session, action, controller, observation=baseline, **arguments
+                )
+            if (
+                first is not None
+                and not first
+                and action != "wait"
+                and isinstance(reply, dict)
+                and "effects" in reply
+            ):
+                first.append(reply["effects"]["effect_id"])
         except DeliveryUnknown as error:
             # Never retried: input such as typing or submitting may not be
             # idempotent. Report the step so the caller can check the desktop.
@@ -908,6 +929,26 @@ def render_tree(tree):
     if tree["truncated"]:
         lines.append("… truncated: filter by app or window, or raise max_nodes")
     return "\n".join(lines) or "(no accessible elements)"
+
+
+def wait_effect(session, effect_id, path, timeout=10, controller=None):
+    """Wait until a file matching `path` ("~/..." glob) has been written since
+    the action `effect_id` and has gone quiet; return that action's effects.
+
+    Experimental (AGENT_DESKTOP_EFFECTS=1). Returns satisfied=false at the
+    timeout with the effects observed so far.
+    """
+    if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 120:
+        raise DesktopError("Timeout must be between 0 and 120 seconds")
+    deadline = time.monotonic() + timeout
+    while True:
+        found = request(
+            session, "effects", controller, effect_id=effect_id, match=path
+        )["matched"]
+        if found or time.monotonic() >= deadline:
+            effects = request(session, "effects", controller, effect_id=effect_id)
+            return {"satisfied": found, "effects": effects}
+        time.sleep(0.1)
 
 
 def wait_for_agent_control(session, timeout, controller=None):

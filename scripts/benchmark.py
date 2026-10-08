@@ -20,11 +20,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import find_registryd, owned_processes  # noqa: E402
+from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS  # noqa: E402
 
-SUITES = {"standard": TASKS, "hard": HARD_TASKS, "office": OFFICE_TASKS}
+SUITES = {
+    "standard": TASKS,
+    "hard": HARD_TASKS,
+    "office": OFFICE_TASKS,
+    "effects": EFFECT_TASKS,
+}
 
 # Tool profiles for comparisons. "basic" is the tool set before waiting, action
 # sequences and semantic UI were added (screenshot region/scale arguments remain
@@ -165,13 +171,42 @@ def run_agent(
     }
 
 
+def effects_enabled():
+    return os.environ.get("AGENT_DESKTOP_EFFECTS") == "1"
+
+
+def agent_directory(root, task):
+    """The transcript lives outside the task directory, which the effect
+    ledger watches: otherwise the agent is shown its own transcript."""
+    path = root / "agents" / task.name
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def mcp_config_for(root):
+    """The MCP config, with the effect-ledger setting passed explicitly."""
+    path = root / "mcp.json"
+    if not path.exists():
+        config = json.loads(Path(".mcp.json").read_text())
+        for server in config["mcpServers"].values():
+            server["env"] = {
+                **server.get("env", {}),
+                "AGENT_DESKTOP_EFFECTS": os.environ.get("AGENT_DESKTOP_EFFECTS", "0"),
+            }
+        path.write_text(json.dumps(config, indent=2) + "\n")
+    return str(path)
+
+
 def run_task(task, root, budget, model, dry_run=False, profile="full"):
     directory = (root / task.name).resolve()
     directory.mkdir(parents=True)
     record = {"task": task.name, "passed": False}
+    # With --effects, the ledger also watches the task's output directory.
+    os.environ["AGENT_DESKTOP_EFFECT_DIRS"] = str(directory)
     session = core.create()["session"]
     info = core.manifest(session)
     context = Context(session, directory)
+    context.mcp_config = mcp_config_for(root)
     try:
         argv, goal = task.setup(context)
         # A task may launch several applications; the last one holds its answer.
@@ -192,16 +227,21 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
             record.update(
                 run_agent(
                     PROMPT.format(session=session, task=goal),
-                    directory,
+                    agent_directory(root, task),
                     budget,
                     model,
+                    mcp_config=context.mcp_config,
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
+                        + ([] if effects_enabled() else ["effects"])
                     ],
                 )
             )
         time.sleep(0.5)
+        # Some checks judge an honest FAILED reply (an impossible task).
+        context.reply = record.get("reply")
+        context.home = str(core.session_path(session) / "home")
         passed, detail = task.check(context)
         record["passed"] = bool(passed)
         record["detail"] = detail
@@ -234,8 +274,15 @@ def main():
     parser.add_argument(
         "--dry-run", action="store_true", help="set up and check without an agent"
     )
+    parser.add_argument(
+        "--effects",
+        action="store_true",
+        help="experimental effect ledger in sessions and MCP replies",
+    )
     args = parser.parse_args()
     random.seed(args.seed)
+    # Sessions inherit this from the harness; the MCP server from claude.
+    os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
     if not args.dry_run and not shutil.which("claude"):
         raise SystemExit("Requires the claude CLI")
     root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
@@ -275,6 +322,7 @@ def main():
     summary = {
         "seed": args.seed,
         "tools": args.tools,
+        "effects": args.effects,
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),

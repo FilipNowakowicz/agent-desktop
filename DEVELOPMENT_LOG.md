@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-08 — wlroots fix submitted upstream (!5477)
+
+freedesktop's bot approved account verification (#4178). The fork
+`filip.nowakowicz/wlroots` received one commit on master `c5c57cd3` through
+GitLab's file replace (no credentials or keys added); `git diff` of the fork
+branch against upstream master showed only `xwayland/xwm.c` +6. The merge
+request uses the prepared text from runtime/UPSTREAM.md plus a test plan, as
+wlroots' CONTRIBUTING.md asks. The subject is 73 characters against a
+guideline of 50; 27 of the last 50 upstream subjects exceed 50 (maximum 76).
+The commit author address is the maintainer's GitLab email (approved). During
+form filling, typed tab characters moved focus and triggered a GitLab search;
+the API showed no resulting MR, branch or setting change.
+
 ## 2026-10-08 — zsh first-run menu took the first typed key
 
 Found by the effect-ledger research prototype: a command typed into a terminal

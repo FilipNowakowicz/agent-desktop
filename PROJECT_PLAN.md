@@ -28,9 +28,9 @@ correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), e
 hygiene (#49), the two installation paths with automatic runtime selection (#52), the
 controller lease (#55), no keyring prompts (#56), the action trace (#58), and the
 two pilot batches with their fixes (#72–#79, [diary](docs/trials/pilot.md)).
-The daily-use alpha gates are closed (2026-10-08). Open but not gating: the
-wlroots fix upstream ([runtime/UPSTREAM.md](runtime/UPSTREAM.md)); the maintainer's
-freedesktop account needs fork permission first. Next work is the research direction
+The daily-use alpha gates are closed (2026-10-08). The wlroots fix is
+proposed upstream as wlroots!5477 ([runtime/UPSTREAM.md](runtime/UPSTREAM.md));
+the local patch stays until a release contains it. Next work is the research direction
 below. Extensions should follow observed needs.
 
 Research for the next direction: the

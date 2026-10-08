@@ -102,6 +102,42 @@ def profile_in_use(path):
     return False
 
 
+def profile_last_session(path):
+    """The session that most recently started on a profile, or None."""
+    try:
+        session = json.loads((path / "last-session.json").read_text())["session"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(session, str) or not re.fullmatch(r"[a-f0-9]{12}", session):
+        return None
+    return session
+
+
+def profile_state(path):
+    """How the profile's last session ended, or None if it has never been used.
+
+    "abandoned" means neither supervisor is alive but nothing marked the session
+    stopped or failed (both were killed): its applications may still be running.
+    "pruned" means the session's state has since been removed.
+    """
+    session = profile_last_session(path)
+    if session is None:
+        return None
+    try:
+        info = manifest(session)
+    except DesktopError:
+        return {"session": session, "status": "pruned"}
+    status = info.get("status")
+    if status not in ("stopped", "failed") and not supervisor_alive(info):
+        status = "abandoned"
+    state = {"session": session, "status": status}
+    if info.get("recovered"):
+        state["recovered"] = True
+    if info.get("error"):
+        state["error"] = info["error"]
+    return state
+
+
 def profiles():
     root = state_root() / "profiles"
     results = []
@@ -116,6 +152,7 @@ def profiles():
             {
                 "profile": profile.name,
                 "in_use": profile_in_use(profile),
+                "last_session": profile_state(profile),
                 "bytes": size,
                 "path": str(path),
             }
@@ -225,6 +262,12 @@ def create(
             raise DesktopError("Unsafe profile directory")
         if profile_in_use(home.parent):
             raise DesktopError(f"Profile {profile} is in use by another session")
+        previous = profile_state(home.parent)
+        if previous and previous["status"] == "abandoned":
+            # Both supervisors died, releasing the lock while the old session's
+            # applications may still write to the profile: stop them first.
+            recover(previous["session"], manifest(previous["session"]))
+            previous = profile_state(home.parent)
     paths = {}
     required = ("grim",) if mode == "host" else ("labwc", "grim", "dbus-daemon")
     for tool in required:
@@ -287,6 +330,10 @@ def create(
         info["host_wayland"] = parent
         info["expires_at"] = time.time() + _host_minutes * 60
     (root / "session.json").write_text(json.dumps(info, indent=2) + "\n")
+    if home:
+        (home.parent / "last-session.json").write_text(
+            json.dumps({"session": session}) + "\n"
+        )
     env = os.environ.copy()
     env["AGENT_DESKTOP_SESSION_TOKEN"] = info["token"]
     with (root / "session.log").open("ab") as log:
@@ -309,13 +356,17 @@ def create(
     while time.monotonic() < deadline:
         latest = json.loads((root / "session.json").read_text())
         if latest["status"] == "ready":
-            return {
+            result = {
                 "session": session,
                 "mode": mode,
                 "profile": profile,
                 "status": "ready",
                 "logs": str(root / "session.log"),
             }
+            if home:
+                # Applications may offer to restore after a failed or recovered end.
+                result["previous_session"] = previous
+            return result
         if process.poll() is not None or latest["status"] == "failed":
             detail = logs(session).get("session.log", "")[-4096:]
             raise DesktopError(

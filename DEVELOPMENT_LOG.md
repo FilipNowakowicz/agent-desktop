@@ -1,5 +1,35 @@
 # Development log
 
+## 2026-10-08 — Profile recovery state; M1 closed
+
+The last F025 gap for profiles: when both supervisors were killed, the profile
+lock was released while the old session's applications kept running, so a new
+session could share the profile with them. A profile now records the session
+that last started on it (`last-session.json` beside, not inside, its home).
+`profiles` reports that session's end (`ready`, `stopped`, `failed` with its
+error, `recovered`, `abandoned` when neither supervisor is alive but nothing
+marked it ended, or `pruned`), and `create` returns it as `previous_session`.
+A `create` on a profile whose last session is abandoned first runs the same
+token recovery as `destroy`.
+
+Found while testing: a killed supervisor's environment becomes unreadable
+before the kernel closes its files, so for a moment a session can read as
+abandoned while the lock is still held; `create` then refuses with "in use",
+which is the safe direction. The test waits for the lock instead.
+
+New tests: SIGKILL of both supervisors with an application (`sleep`) still
+running; the profile is free and reads `abandoned`, the next `create` stops the
+application, reports `{status: stopped, recovered: true}`, and no token process
+remains. SIGKILL of the worker only; the next session reports `failed` with the
+guardian's error. Profile tests passed 3 of 3 runs. Full suite with the
+repaired Nix runtime and the optional applications (`nix shell` xterm,
+wlr-randr, at-spi2-core, zenity, mousepad, xev, kdialog, LibreOffice,
+wl-clipboard): 119 OK, 1 skipped (visible mode), 233 s. Ruff check/format and
+compileall passed. CI remains unavailable; validated locally.
+
+Decision: escape of environment-clearing processes after double-supervisor loss
+is an accepted, documented limit (decisions.md), so M1 has no open gate.
+
 ## 2026-10-07 — Next-direction research and finite abstraction experiment
 
 Reviewed the current source, pilot and benchmark records at `328b51f`, plus

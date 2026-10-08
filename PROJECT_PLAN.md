@@ -14,7 +14,7 @@ update this status and the development log with completed work and remaining gap
 | Stage | State (after the 2026-10-05 review) | Release gate still open |
 | --- | --- | --- |
 | M0 | Demonstrated on the initial NixOS machine | Keep regression coverage; do not repeat reconnaissance |
-| M1 | Implemented and repeatedly tested; hardening continues | The Calc navigation part of F006 is explained and fixed (#76); the Fedora Chromium typing failure is not reproduced (20 of 20 under load). Remaining lifecycle edges (both supervisors dead, profile recovery state) |
+| M1 | Complete. F006 explained and fixed (#76); the Fedora Chromium typing failure is not reproduced (20 of 20 under load); profiles record how their last session ended and recover one whose supervisors both died | None. Accepted limit: after both supervisors are killed, processes that cleared their environment escape token recovery (decisions.md, 2026-10-08) |
 | M2 | MCP and viewer tested; cooperative takeover, profiles and one exclusive controller per session (lease) implemented | Real login/resume by the user; takeover with the user's US Dvorak layout; takeover is not a confidentiality boundary |
 | M3 | Two supported installs: Nix runtime with the X11 repair (CI `nix` job) and Ubuntu 24.04 apt recipe (CI, a fresh-VM check and a GNOME desktop VM check); runtime selected automatically; pilot: first batch 17/20, second batch 20/20 on the fixed build, which meets the bar of 18 (docs/trials/pilot.md) | The maintainer's own continued use |
 | M4 | Exploratory suites and restricted comparisons | Representative workflows, matched paired trials, provenance and uncertainty |

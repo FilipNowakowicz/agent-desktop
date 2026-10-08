@@ -132,6 +132,42 @@ class ProfileTests(unittest.TestCase):
         wait_for(lambda: not core.profiles()[0]["in_use"], timeout=15)
         self.create("crash")
 
+    def test_new_session_recovers_a_profile_whose_supervisors_died(self):
+        session = self.create("orphaned")
+        app = core.request(session, "launch", argv=["sleep", "300"])
+        info = core.manifest(session)
+        for pid in (info["guardian_pid"], info["worker_pid"]):
+            os.kill(pid, signal.SIGKILL)
+        # The lock goes with the supervisors, but the application still runs.
+        wait_for(lambda: not core.profiles()[0]["in_use"])
+        self.assertEqual(core.profiles()[0]["last_session"]["status"], "abandoned")
+        self.assertNotIn(process_state(app["pid"]), (None, "Z"))
+
+        result = core.create(profile="orphaned")
+        self.created.append(result["session"])
+        self.assertEqual(
+            result["previous_session"],
+            {"session": session, "status": "stopped", "recovered": True},
+        )
+        self.assertIn(process_state(app["pid"]), (None, "Z"))
+        self.assertEqual(owned_processes(info["token"]), [])
+        self.assertEqual(
+            core.profiles()[0]["last_session"],
+            {"session": result["session"], "status": "ready"},
+        )
+
+    def test_failed_end_is_reported_to_the_next_session(self):
+        session = self.create("failed")
+        os.kill(core.manifest(session)["worker_pid"], signal.SIGKILL)
+        wait_for(lambda: core.manifest(session)["status"] == "failed", timeout=15)
+        wait_for(lambda: not core.profiles()[0]["in_use"], timeout=15)
+        result = core.create(profile="failed")
+        self.created.append(result["session"])
+        previous = result["previous_session"]
+        self.assertEqual(previous["session"], session)
+        self.assertEqual(previous["status"], "failed")
+        self.assertIn("Supervisor exited unexpectedly", previous["error"])
+
     @unittest.skipUnless(CHROMIUM, "chromium unavailable")
     def test_browser_cookie_survives_sessions(self):
         CookieServer.seen = []

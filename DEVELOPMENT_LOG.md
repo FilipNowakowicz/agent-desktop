@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-08 — zsh first-run menu took the first typed key
+
+Found by the effect-ledger research prototype: a command typed into a terminal
+in a fresh session wrote an empty file, and the shell history read
+`cho hello > notes.txt`. Input delivery was not at fault (`zsh -f` and bash got
+the whole line). With no zsh startup files in the private home, interactive zsh
+shows `zsh-newuser-install`, which consumed the first key. It happened even
+5 s after the window appeared, so waiting did not help. Sessions now get a
+one-line `~/.zshrc` when the home has no zsh startup file; existing profile
+files are left alone. The pilot did not use terminals, so it had not shown up.
+
+Validation: before, 0 of 4 typed commands arrived whole in default zsh (two
+scenario runs and two probes); after, 3 of 3 wrote `hello`. New test
+`test_zsh_first_run_menu_is_answered`; guard tests 8 OK; ruff check and format
+passed.
+
 ## 2026-10-08 — Login handoff and Dvorak takeover by the maintainer; alpha gates closed
 
 One headless session with the profile `freedesktop` showed a keyboard-check

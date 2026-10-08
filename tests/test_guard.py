@@ -170,6 +170,13 @@ class GuardTests(unittest.TestCase):
             with self.subTest(cwd=bad), self.assertRaises(core.DesktopError):
                 core.request(session, "launch", argv=["true"], cwd=bad)
 
+    def test_zsh_first_run_menu_is_answered(self):
+        # zsh-newuser-install would otherwise take the first typed key.
+        session = core.create()["session"]
+        self.sessions.append(session)
+        zshrc = core.session_path(session) / "home" / ".zshrc"
+        self.assertEqual(zshrc.read_text(), "# Created by agent-desktop\n")
+
     def test_firefox_gets_a_profile_in_the_session_home(self):
         # A stand-in wrapper that, like home-manager's, names the person's profile.
         bin_dir = Path(self.temporary.name) / "bin"

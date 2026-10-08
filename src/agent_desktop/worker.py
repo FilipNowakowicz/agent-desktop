@@ -485,6 +485,15 @@ class Worker:
         else:
             home = self.root / "home"
             home.mkdir(mode=0o700)
+        if not any(
+            (home / name).exists()
+            for name in (".zshenv", ".zprofile", ".zshrc", ".zlogin")
+        ):
+            # Without startup files, an interactive zsh (the default shell of
+            # many terminals) shows its first-run menu, which takes the first
+            # key typed into it: "echo" arrived as "cho". This is that menu's
+            # own "create an empty ~/.zshrc" answer.
+            (home / ".zshrc").write_text("# Created by agent-desktop\n")
         config = self.root / "config"
         config.mkdir(mode=0o700)
         # Explicit window bindings only: labwc's defaults include Execute actions

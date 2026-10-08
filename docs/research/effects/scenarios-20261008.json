@@ -1,0 +1,1194 @@
+[
+ {
+  "scenario": "terminal-write",
+  "expectation": "Typing a shell command that writes a file reports that file with its content; a second command reports the appended line.",
+  "shown": true,
+  "notes": {
+   "first": {
+    "path": "~/notes.txt",
+    "change": "created",
+    "bytes": 0
+   },
+   "second": {
+    "path": "~/notes.txt",
+    "change": "modified",
+    "bytes": 6,
+    "diff": [
+     "+again"
+    ]
+   }
+  },
+  "final_screenshot": "/home/user/.local/state/agent-desktop/d5981abe5e28/screenshots/8ff021df1ff4438590dcda2250258f0f.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch foot",
+    "operation": "launch",
+    "ms": 217,
+    "effects": {
+     "observed_s": 0.16,
+     "windows": {
+      "opened": [
+       "'term' (foot)"
+      ],
+      "focus": "None → 'term' (foot)"
+     },
+     "processes": {
+      "started": [
+       "foot",
+       "zsh"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 38
+   },
+   {
+    "step": "terminal window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "shell ready",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type command",
+    "operation": "type",
+    "ms": 250,
+    "effects": {
+     "observed_s": 0.18,
+     "effect_id": 2
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 618,
+    "effects": {
+     "observed_s": 0.54,
+     "files": [
+      {
+       "path": "~/notes.txt",
+       "change": "created",
+       "bytes": 0
+      }
+     ],
+     "app_state": [
+      {
+       "path": "~/.zcompdump",
+       "change": "created",
+       "bytes": 80484,
+       "diff": [
+        "+#files: 3114\tversion: 5.9.2",
+        "+"
+       ]
+      },
+      {
+       "path": "~/.zsh_history",
+       "change": "created",
+       "bytes": 37,
+       "diff": [
+        "+: 1791488054:0;cho hello > notes.txt"
+       ]
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 3
+    },
+    "effect_tokens": 90
+   },
+   {
+    "step": "type append",
+    "operation": "type",
+    "ms": 425,
+    "effects": {
+     "observed_s": 0.38,
+     "effect_id": 4
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 416,
+    "effects": {
+     "observed_s": 0.35,
+     "files": [
+      {
+       "path": "~/notes.txt",
+       "change": "modified",
+       "bytes": 6,
+       "diff": [
+        "+again"
+       ]
+      }
+     ],
+     "app_state": [
+      {
+       "path": "~/.zsh_history",
+       "change": "modified",
+       "bytes": 76,
+       "diff": [
+        "+: 1791488055:0;echo again >> notes.txt"
+       ]
+      }
+     ],
+     "effect_id": 5
+    },
+    "effect_tokens": 64
+   }
+  ]
+ },
+ {
+  "scenario": "editor-save",
+  "expectation": "Saving a new document reports the save dialog opening and the created file with its text; typing alone writes no document (application state may change).",
+  "shown": true,
+  "letter": {
+   "path": "~/letter.txt",
+   "change": "created",
+   "bytes": 13,
+   "diff": [
+    "+hello effects"
+   ]
+  },
+  "final_screenshot": "/home/user/.local/state/agent-desktop/6391c0b362a5/screenshots/0f099e93404748b58fae4797dda6583d.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch mousepad",
+    "operation": "launch",
+    "ms": 208,
+    "effects": {
+     "observed_s": 0.16,
+     "processes": {
+      "started": [
+       ".mousepad-wrapp",
+       ".xdg-desktop-po",
+       ".xdg-document-p",
+       ".xdg-permission",
+       "fusermount3"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 39
+   },
+   {
+    "step": "editor window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type text",
+    "operation": "type",
+    "ms": 243,
+    "effects": {
+     "observed_s": 0.17,
+     "app_state": [
+      {
+       "path": "~/.config/Mousepad/settings.conf",
+       "change": "created",
+       "bytes": 238,
+       "diff": [
+        "+[org/xfce/mousepad/state/application]",
+        "+session=['1;file:///home/user/.local/state/agent-desktop/6391c0b362a5/home/.local/share/Mousepad/autosave-0;+']"
+       ]
+      }
+     ],
+     "noise_files": 1,
+     "windows": {
+      "retitled": [
+       "'Untitled 1 - Mousepad' → '*Untitled 1 - Mousepad'"
+      ],
+      "focus": "'Untitled 1 - Mousepad' (org.xfce.mousepad) → '*Untitled 1 - Mousepad' (org.xfce.mousepad)"
+     },
+     "effect_id": 2
+    },
+    "effect_tokens": 126
+   },
+   {
+    "step": "Ctrl+S",
+    "operation": "key",
+    "ms": 223,
+    "effects": {
+     "observed_s": 0.17,
+     "effect_id": 3
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "save dialog",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type name",
+    "operation": "type",
+    "ms": 323,
+    "effects": {
+     "observed_s": 0.27,
+     "effect_id": 4
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 697,
+    "effects": {
+     "observed_s": 0.61,
+     "app_state": [
+      {
+       "path": "~/.config/Mousepad/settings.conf",
+       "change": "rewritten unchanged",
+       "bytes": 238
+      }
+     ],
+     "noise_files": 4,
+     "effect_id": 5
+    },
+    "effect_tokens": 40
+   },
+   {
+    "step": "wait for ~/letter.txt",
+    "operation": "wait_effect",
+    "path": "~/letter.txt",
+    "satisfied": true,
+    "ms": 711,
+    "effects": {
+     "effect_id": 5,
+     "observed_s": 1.38,
+     "files": [
+      {
+       "path": "~/letter.txt",
+       "change": "created",
+       "bytes": 13,
+       "diff": [
+        "+hello effects"
+       ]
+      }
+     ],
+     "app_state": [
+      {
+       "path": "~/.config/Mousepad/settings.conf",
+       "change": "modified",
+       "bytes": 143,
+       "diff": [
+        "-session=['1;file:///home/user/.local/state/agent-desktop/6391c0b362a5/home/.local/share/Mousepad/autosave-0;+']",
+        "+session=['1;;+']"
+       ]
+      },
+      {
+       "path": "~/.config/dconf/user",
+       "change": "created",
+       "bytes": 907
+      }
+     ],
+     "noise_files": 9,
+     "windows": {
+      "closed": [
+       "'Save As' (org.xfce.mousepad)"
+      ],
+      "retitled": [
+       "'*Untitled 1 - Mousepad' → '~/letter.txt - Mousepad'"
+      ],
+      "focus": "'Save As' (org.xfce.mousepad) → '~/letter.txt - Mousepad' (org.xfce.mousepad)"
+     }
+    },
+    "effect_tokens": 171
+   }
+  ]
+ },
+ {
+  "scenario": "file-manager-hidden-files",
+  "expectation": "Pilot session 15: Ctrl+H shows hidden files in the window, but without xfconfd nothing is saved. The ledger should report no settings file.",
+  "shown": true,
+  "settings_files": [],
+  "toggled": {
+   "observed_s": 0.16,
+   "effect_id": 2
+  },
+  "late": {
+   "effect_id": 2,
+   "observed_s": 3.18
+  },
+  "final_screenshot": "/home/user/.local/state/agent-desktop/da3e68e9cea9/screenshots/66787737236f44a2818ef80e7a849d93.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch thunar",
+    "operation": "launch",
+    "ms": 216,
+    "effects": {
+     "observed_s": 0.16,
+     "processes": {
+      "started": [
+       ".thunar-wrapped",
+       ".xdg-desktop-po",
+       ".xdg-document-p",
+       ".xdg-permission",
+       "fusermount3"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 39
+   },
+   {
+    "step": "thunar window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "Ctrl+H",
+    "operation": "key",
+    "ms": 208,
+    "effects": {
+     "observed_s": 0.16,
+     "effect_id": 2
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "3 s later",
+    "operation": "effects",
+    "effects": {
+     "effect_id": 2,
+     "observed_s": 3.18
+    },
+    "effect_tokens": 9
+   }
+  ]
+ },
+ {
+  "scenario": "calc-save-and-format-dialog",
+  "expectation": "Saving as .ods reports the created document. Saving as .csv opens the 'Keep current format' dialog and writes no file until it is answered.",
+  "shown": true,
+  "ods": {
+   "path": "~/numbers.ods",
+   "change": "created",
+   "bytes": 7741,
+   "diff": [
+    "+Sheet1!A1: 42"
+   ]
+  },
+  "csv_windows": {
+   "opened": [
+    "'' (soffice)"
+   ],
+   "closed": [
+    "'Save' (soffice)"
+   ],
+   "focus": "'Save' (soffice) → '' (soffice)"
+  },
+  "csv_files": [],
+  "final_screenshot": "/home/user/.local/state/agent-desktop/1c3f2d915c87/screenshots/c092d748a63d447cba7c2e016a2dece3.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch calc",
+    "operation": "launch",
+    "ms": 357,
+    "effects": {
+     "observed_s": 0.31,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/config/javasettings_Linux_X86_64.xml",
+       "change": "created",
+       "bytes": 2564,
+       "diff": [
+        "+<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "+<!--This is a generated file. Do not alter this file!-->"
+       ]
+      }
+     ],
+     "processes": {
+      "started": [
+       "libreoffice",
+       "oosplash",
+       "soffice.bin"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 88
+   },
+   {
+    "step": "calc window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type value",
+    "operation": "type",
+    "ms": 248,
+    "effects": {
+     "observed_s": 0.17,
+     "effect_id": 2
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Return",
+    "operation": "key",
+    "ms": 224,
+    "effects": {
+     "observed_s": 0.17,
+     "effect_id": 3
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Ctrl+S",
+    "operation": "key",
+    "ms": 329,
+    "effects": {
+     "observed_s": 0.28,
+     "app_state": [
+      {
+       "path": "~/.config/dconf/user",
+       "change": "created",
+       "bytes": 348
+      }
+     ],
+     "noise_files": 1,
+     "windows": {
+      "opened": [
+       "'Save' (soffice)"
+      ],
+      "focus": "'Untitled 1 — LibreOffice Calc' (libreoffice-calc) → 'Save' (soffice)"
+     },
+     "processes": {
+      "started": [
+       "dconf-service"
+      ]
+     },
+     "effect_id": 4
+    },
+    "effect_tokens": 78
+   },
+   {
+    "step": "save dialog",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type name",
+    "operation": "type",
+    "ms": 326,
+    "effects": {
+     "observed_s": 0.24,
+     "effect_id": 5
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 218,
+    "effects": {
+     "observed_s": 0.17,
+     "effect_id": 6
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "wait for ~/numbers.ods",
+    "operation": "wait_effect",
+    "path": "~/numbers.ods",
+    "satisfied": true,
+    "ms": 1113,
+    "effects": {
+     "effect_id": 6,
+     "observed_s": 1.31,
+     "files": [
+      {
+       "path": "~/numbers.ods",
+       "change": "created",
+       "bytes": 7741,
+       "diff": [
+        "+Sheet1!A1: 42"
+       ]
+      }
+     ],
+     "app_state": [
+      {
+       "path": "~/.config/dconf/user",
+       "change": "modified",
+       "bytes": 907
+      },
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "created",
+       "bytes": 22567,
+       "diff": [
+        "+<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "+<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
+       ]
+      }
+     ],
+     "noise_files": 6,
+     "windows": {
+      "closed": [
+       "'Save' (soffice)"
+      ],
+      "retitled": [
+       "'Untitled 1 — LibreOffice Calc' → 'numbers.ods — LibreOffice Calc'"
+      ],
+      "focus": "'Save' (soffice) → 'numbers.ods — LibreOffice Calc' (libreoffice-calc)"
+     }
+    },
+    "effect_tokens": 196
+   },
+   {
+    "step": "saved",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "Ctrl+Shift+S",
+    "operation": "key",
+    "ms": 210,
+    "effects": {
+     "observed_s": 0.16,
+     "windows": {
+      "opened": [
+       "'Save' (soffice)"
+      ],
+      "focus": "'numbers.ods — LibreOffice Calc' (libreoffice-calc) → 'Save' (soffice)"
+     },
+     "effect_id": 7
+    },
+    "effect_tokens": 41
+   },
+   {
+    "step": "save as dialog",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "select name",
+    "operation": "key",
+    "ms": 210,
+    "effects": {
+     "observed_s": 0.16,
+     "effect_id": 8
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type csv name",
+    "operation": "type",
+    "ms": 315,
+    "effects": {
+     "observed_s": 0.25,
+     "effect_id": 9
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 227,
+    "effects": {
+     "observed_s": 0.18,
+     "effect_id": 10
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "wait for ~/numbers.csv",
+    "operation": "wait_effect",
+    "path": "~/numbers.csv",
+    "satisfied": false,
+    "ms": 4043,
+    "effects": {
+     "effect_id": 10,
+     "observed_s": 4.24,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "modified",
+       "bytes": 27314,
+       "diff": [
+        "+<item oor:path=\"/org.openoffice.Office.Common/Misc/FilePickerLastDirectory\"><node oor:name=\"CalcSaveAs\" oor:op=\"replace\"><prop oor:name=\"LastPath\" oor:op=\"fus…",
+        "+<item oor:path=\"/org.openoffice.Office.Histories/Histories/org.openoffice.Office.Histories:HistoryInfo['PickList']/ItemList\"><node oor:name=\"file:///home/user…"
+       ]
+      }
+     ],
+     "noise_files": 3,
+     "windows": {
+      "opened": [
+       "'' (soffice)"
+      ],
+      "closed": [
+       "'Save' (soffice)"
+      ],
+      "focus": "'Save' (soffice) → '' (soffice)"
+     }
+    },
+    "effect_tokens": 161
+   }
+  ]
+ },
+ {
+  "scenario": "calc-cell-diff",
+  "expectation": "Pilot session 20 lost data into wrong cells. After saving, the ledger lists every cell written (with formulas); changing one value and saving again shows that cell and the recalculated formula, nothing else.",
+  "shown": true,
+  "created": {
+   "path": "~/order.ods",
+   "change": "created",
+   "bytes": 8846,
+   "diff": [
+    "+Sheet1!A1: Item",
+    "+Sheet1!B1: Qty",
+    "+Sheet1!C1: Price",
+    "+Sheet1!A2: Widget",
+    "+Sheet1!B2: 3",
+    "+Sheet1!C2: 4",
+    "+Sheet1!D2: 12  [of:=[.B2]*[.C2]]"
+   ]
+  },
+  "changed": {
+   "path": "~/order.ods",
+   "change": "modified",
+   "bytes": 8857,
+   "diff": [
+    "-Sheet1!B2: 3",
+    "+Sheet1!B2: 7",
+    "-Sheet1!D2: 12  [of:=[.B2]*[.C2]]",
+    "+Sheet1!D2: 28  [of:=[.B2]*[.C2]]"
+   ]
+  },
+  "final_screenshot": "/home/user/.local/state/agent-desktop/ecd4af75b160/screenshots/9914520e6f1a40d0a8d8905d64beda41.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch calc",
+    "operation": "launch",
+    "ms": 353,
+    "effects": {
+     "observed_s": 0.28,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/config/javasettings_Linux_X86_64.xml",
+       "change": "created",
+       "bytes": 2564,
+       "diff": [
+        "+<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "+<!--This is a generated file. Do not alter this file!-->"
+       ]
+      }
+     ],
+     "processes": {
+      "started": [
+       "libreoffice",
+       "oosplash",
+       "soffice.bin"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 88
+   },
+   {
+    "step": "calc window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type A1",
+    "operation": "type",
+    "ms": 223,
+    "effects": {
+     "observed_s": 0.15,
+     "effect_id": 2
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 245,
+    "effects": {
+     "observed_s": 0.19,
+     "effect_id": 3
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type B1",
+    "operation": "type",
+    "ms": 328,
+    "effects": {
+     "observed_s": 0.27,
+     "effect_id": 4
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 235,
+    "effects": {
+     "observed_s": 0.18,
+     "effect_id": 5
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type C1",
+    "operation": "type",
+    "ms": 354,
+    "effects": {
+     "observed_s": 0.3,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "created",
+       "bytes": 22440,
+       "diff": [
+        "+<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        "+<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\" xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
+       ]
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 6
+    },
+    "effect_tokens": 100
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 242,
+    "effects": {
+     "observed_s": 0.19,
+     "effect_id": 7
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "next row",
+    "operation": "key",
+    "ms": 216,
+    "effects": {
+     "observed_s": 0.16,
+     "effect_id": 8
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type A2",
+    "operation": "type",
+    "ms": 515,
+    "effects": {
+     "observed_s": 0.47,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "modified",
+       "bytes": 22567,
+       "diff": [
+        "+<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+       ]
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 9
+    },
+    "effect_tokens": 80
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 259,
+    "effects": {
+     "observed_s": 0.2,
+     "effect_id": 10
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type B2",
+    "operation": "type",
+    "ms": 251,
+    "effects": {
+     "observed_s": 0.2,
+     "effect_id": 11
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 228,
+    "effects": {
+     "observed_s": 0.18,
+     "effect_id": 12
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type C2",
+    "operation": "type",
+    "ms": 273,
+    "effects": {
+     "observed_s": 0.22,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "rewritten unchanged",
+       "bytes": 22567
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 13
+    },
+    "effect_tokens": 47
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 244,
+    "effects": {
+     "observed_s": 0.19,
+     "effect_id": 14
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "type D2",
+    "operation": "type",
+    "ms": 280,
+    "effects": {
+     "observed_s": 0.23,
+     "effect_id": 15
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Tab",
+    "operation": "key",
+    "ms": 244,
+    "effects": {
+     "observed_s": 0.2,
+     "effect_id": 16
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "finish row",
+    "operation": "key",
+    "ms": 255,
+    "effects": {
+     "observed_s": 0.19,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "rewritten unchanged",
+       "bytes": 22567
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 17
+    },
+    "effect_tokens": 47
+   },
+   {
+    "step": "Ctrl+S",
+    "operation": "key",
+    "ms": 329,
+    "effects": {
+     "observed_s": 0.28,
+     "app_state": [
+      {
+       "path": "~/.config/dconf/user",
+       "change": "created",
+       "bytes": 348
+      }
+     ],
+     "noise_files": 1,
+     "windows": {
+      "opened": [
+       "'Save' (soffice)"
+      ],
+      "focus": "'Untitled 1 — LibreOffice Calc' (libreoffice-calc) → 'Save' (soffice)"
+     },
+     "processes": {
+      "started": [
+       "dconf-service"
+      ]
+     },
+     "effect_id": 18
+    },
+    "effect_tokens": 78
+   },
+   {
+    "step": "save dialog",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "type name",
+    "operation": "type",
+    "ms": 216,
+    "effects": {
+     "observed_s": 0.16,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "rewritten unchanged",
+       "bytes": 22567
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 19
+    },
+    "effect_tokens": 47
+   },
+   {
+    "step": "press Return",
+    "operation": "key",
+    "ms": 241,
+    "effects": {
+     "observed_s": 0.19,
+     "effect_id": 20
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "wait for ~/order.ods",
+    "operation": "wait_effect",
+    "path": "~/order.ods",
+    "satisfied": true,
+    "ms": 1112,
+    "effects": {
+     "effect_id": 20,
+     "observed_s": 1.33,
+     "files": [
+      {
+       "path": "~/order.ods",
+       "change": "created",
+       "bytes": 8846,
+       "diff": [
+        "+Sheet1!A1: Item",
+        "+Sheet1!B1: Qty",
+        "+Sheet1!C1: Price",
+        "+Sheet1!A2: Widget",
+        "+Sheet1!B2: 3",
+        "+Sheet1!C2: 4",
+        "+Sheet1!D2: 12  [of:=[.B2]*[.C2]]"
+       ]
+      }
+     ],
+     "app_state": [
+      {
+       "path": "~/.config/dconf/user",
+       "change": "modified",
+       "bytes": 907
+      },
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "modified",
+       "bytes": 23137,
+       "diff": [
+        "+<item oor:path=\"/org.openoffice.Office.Common/Misc/FilePickerLastDirectory\"><node oor:name=\"CalcSaveAs\" oor:op=\"replace\"><prop oor:name=\"LastPath\" oor:op=\"fus…",
+        "+<item oor:path=\"/org.openoffice.Office.Views/Dialogs\"><node oor:name=\"FilePicker_Save\" oor:op=\"replace\"><node oor:name=\"UserData\"><prop oor:name=\"UserItem\" oo…"
+       ]
+      }
+     ],
+     "noise_files": 6,
+     "windows": {
+      "closed": [
+       "'Save' (soffice)"
+      ],
+      "retitled": [
+       "'Untitled 1 — LibreOffice Calc' → 'order.ods — LibreOffice Calc'"
+      ],
+      "focus": "'Save' (soffice) → 'order.ods — LibreOffice Calc' (libreoffice-calc)"
+     }
+    },
+    "effect_tokens": 262
+   },
+   {
+    "step": "saved",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "go to B2",
+    "operation": "key",
+    "ms": 244,
+    "effects": {
+     "observed_s": 0.16,
+     "effect_id": 21
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "down",
+    "operation": "key",
+    "ms": 240,
+    "effects": {
+     "observed_s": 0.16,
+     "effect_id": 22
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "right",
+    "operation": "key",
+    "ms": 238,
+    "effects": {
+     "observed_s": 0.19,
+     "app_state": [
+      {
+       "path": "~/.config/libreoffice/4/user/registrymodifications.xcu",
+       "change": "modified",
+       "bytes": 33832,
+       "diff": [
+        "+<item oor:path=\"/org.openoffice.Office.Histories/Histories/org.openoffice.Office.Histories:HistoryInfo['PickList']/ItemList\"><node oor:name=\"file:///home/user…",
+        "+<item oor:path=\"/org.openoffice.Office.Histories/Histories/org.openoffice.Office.Histories:HistoryInfo['PickList']/OrderList\"><node oor:name=\"0\" oor:op=\"repla…"
+       ]
+      }
+     ],
+     "noise_files": 1,
+     "effect_id": 23
+    },
+    "effect_tokens": 130
+   },
+   {
+    "step": "type 7",
+    "operation": "type",
+    "ms": 246,
+    "effects": {
+     "observed_s": 0.2,
+     "effect_id": 24
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Return",
+    "operation": "key",
+    "ms": 247,
+    "effects": {
+     "observed_s": 0.2,
+     "effect_id": 25
+    },
+    "effect_tokens": 9
+   },
+   {
+    "step": "Ctrl+S",
+    "operation": "key",
+    "ms": 208,
+    "effects": {
+     "observed_s": 0.16,
+     "files": [
+      {
+       "path": "~/order.ods",
+       "change": "rewritten unchanged",
+       "bytes": 8846
+      }
+     ],
+     "noise_files": 2,
+     "effect_id": 26
+    },
+    "effect_tokens": 35
+   },
+   {
+    "step": "wait for ~/order.ods again",
+    "operation": "wait_effect",
+    "path": "~/order.ods",
+    "satisfied": true,
+    "ms": 405,
+    "effects": {
+     "effect_id": 26,
+     "observed_s": 0.59,
+     "files": [
+      {
+       "path": "~/order.ods",
+       "change": "modified",
+       "bytes": 8857,
+       "diff": [
+        "-Sheet1!B2: 3",
+        "+Sheet1!B2: 7",
+        "-Sheet1!D2: 12  [of:=[.B2]*[.C2]]",
+        "+Sheet1!D2: 28  [of:=[.B2]*[.C2]]"
+       ]
+      }
+     ],
+     "noise_files": 2
+    },
+    "effect_tokens": 62
+   }
+  ]
+ },
+ {
+  "scenario": "browser-start-noise",
+  "expectation": "Starting a browser and loading a page writes many profile files. The ledger should keep them as a noise count or a short list, not flood.",
+  "shown": true,
+  "listed": 0,
+  "noise": 506,
+  "listed_paths": [],
+  "final_screenshot": "/home/user/.local/state/agent-desktop/584dc9f41129/screenshots/7408cce5b3e84659b4bc98a2837dfccb.png",
+  "screenshot_tokens_full": 1229,
+  "steps": [
+   {
+    "step": "launch firefox",
+    "operation": "launch",
+    "ms": 666,
+    "effects": {
+     "observed_s": 0.61,
+     "app_state_dirs": {
+      "~/.mozilla/agent-desktop": 12
+     },
+     "noise_files": 21,
+     "processes": {
+      "started": [
+       ".firefox-wrappe",
+       ".xdg-desktop-po",
+       ".xdg-document-p",
+       ".xdg-permission",
+       "Chroot Helper",
+       "Socket Process",
+       "Xwayland",
+       "crashhelper",
+       "forkserver",
+       "fusermount3"
+      ]
+     },
+     "effect_id": 1
+    },
+    "effect_tokens": 76
+   },
+   {
+    "step": "browser window",
+    "operation": "wait",
+    "satisfied": true
+   },
+   {
+    "step": "5 s later",
+    "operation": "effects",
+    "effects": {
+     "effect_id": 1,
+     "observed_s": 9.24,
+     "app_state_dirs": {
+      "~/.mozilla/agent-desktop": 46
+     },
+     "noise_files": 506,
+     "windows": {
+      "opened": [
+       "'Mozilla Firefox' (firefox)"
+      ],
+      "focus": "None → 'Mozilla Firefox' (firefox)"
+     }
+    },
+    "effect_tokens": 53
+   }
+  ]
+ }
+]

@@ -1,0 +1,227 @@
+{
+ "summary": {
+  "menus": [
+   "View",
+   "Tools"
+  ],
+  "items": 8,
+  "with_effect": 8,
+  "verified": 4,
+  "noise_lines": 0,
+  "minutes": 5.8
+ },
+ "results": [
+  {
+   "menu": "View",
+   "item": "Formula Bar",
+   "states": [
+    "checked"
+   ],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.Views/Windows\"><node oor:name=\"scalc/26100\" oor:op=\"replace\"><prop oor:name=\"Visible\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop><node oor:name=\"UserData\"><prop oor:name=\"Data\" oor:op=\"fuse\" oor:type=\"xs:string\"><value>V2,H,20</value></prop></node><prop oor:name=\"WindowState\" oor:op=\"fuse\"><value></value></prop></node></item>"
+   ],
+   "removed": [
+    "<item oor:path=\"/org.openoffice.Office.Views/Windows\"><node oor:name=\"scalc/26100\" oor:op=\"replace\"><prop oor:name=\"Visible\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop><node oor:name=\"UserData\"><prop oor:name=\"Data\" oor:op=\"fuse\" oor:type=\"xs:string\"><value>V2,V,20</value></prop></node><prop oor:name=\"WindowState\" oor:op=\"fuse\"><value></value></prop></node></item>"
+   ],
+   "applied_states": [],
+   "verified": true
+  },
+  {
+   "menu": "View",
+   "item": "Status Bar",
+   "states": [
+    "checked"
+   ],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI.CalcWindowState/UIElements/States\"><node oor:name=\"private:resource/statusbar/statusbar\" oor:op=\"replace\"><prop oor:name=\"Pos\" oor:op=\"fuse\"><value>2147483647,2147483647</value></prop><prop oor:name=\"Size\" oor:op=\"fuse\"><value>0,0</value></prop><prop oor:name=\"Style\" oor:op=\"fuse\"><value>0</value></prop><prop oor:name=\"Docked\" oor:op=\"fuse\"><value>true</value></prop><prop oor:name=\"Locked\" oor:op=\"fuse\"><value>false</value></prop><prop oor:name=\"UIName\" oor:op=\"fuse\"><value xml:lang=\"en-GB\"></value></prop><prop oor:name=\"DockPos\" oor:op=\"fuse\"><value>2147483647,2147483647</value></prop><prop oor:name=\"HelpURL\" oor:op=\"fuse\"><value></value></prop><prop oor:name=\"NoClose\" oor:op=\"fuse\"><value>false</value></prop><prop oor:name=\"Visible\" oor:op=\"fuse\"><value>false</value></prop><prop oor:name=\"DockSize\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop><prop oor:name=\"ImageURL\" oor:op=\"fuse\"><value></value></prop><prop oor:name=\"SoftClose\" oor:op=\"fuse\"><value>false</value></prop><prop oor:name=\"DockingArea\" oor:op=\"fuse\"><value>0</value></prop><prop oor:name=\"ContextActive\" oor:op=\"fuse\"><value>true</value></prop><prop oor:name=\"InternalState\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop><prop oor:name=\"ContextSensitive\" oor:op=\"fuse\"><value>false</value></prop><prop oor:name=\"HideFromToolbarMenu\" oor:op=\"fuse\"><value>false</value></prop></node></item>"
+   ],
+   "removed": [],
+   "applied_states": [],
+   "verified": true
+  },
+  {
+   "menu": "View",
+   "item": "View Headers",
+   "states": [
+    "checked"
+   ],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [
+    "checked"
+   ],
+   "verified": false
+  },
+  {
+   "menu": "View",
+   "item": "View Grid Lines",
+   "states": [
+    "checked"
+   ],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [
+    "checked"
+   ],
+   "verified": false
+  },
+  {
+   "menu": "View",
+   "item": "Value Highlighting",
+   "states": [],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [],
+   "verified": false
+  },
+  {
+   "menu": "View",
+   "item": "Column/Row Highlighting",
+   "states": [],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Calc/Content/Display\"><prop oor:name=\"ColumnRowHighlighting\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [
+    "checked"
+   ],
+   "verified": true
+  },
+  {
+   "menu": "View",
+   "item": "Hidden Row/Column Indicator",
+   "states": [],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme\"><prop oor:name=\"CurrentColorScheme\" oor:op=\"fuse\"><value>COLOR_SCHEME_LIBREOFFICE_AUTOMATIC</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/AccentColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ActiveBorderColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ActiveColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ActiveTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/AppBackground\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author1\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author2\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author3\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author4\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author5\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author6\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author7\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author8\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Author9\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICComment\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICEditor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICError\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICIdentifier\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICKeyword\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICNumber\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICOperator\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BASICString\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/BaseColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ButtonColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ButtonTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcCellFocus\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcComments\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcDBFocus\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcDetective\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcDetectiveError\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcFormula\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcGrid\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcHiddenColRow\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcHiddenColRow\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcNotesBackground\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcPageBreak\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcPageBreakAutomatic\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcPageBreakManual\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcProtectedBackground\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcReference\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcText\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcTextOverflow\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcTextOverflow\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/CalcValue\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DisabledColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DisabledTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DocBoundaries\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DocColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DrawGrid\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/DrawGrid\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/FaceColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/FieldColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/FontColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Grammar\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/HTMLComment\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/HTMLKeyword\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/HTMLSGML\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/HTMLUnknown\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/InactiveBorderColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/InactiveColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/InactiveTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Links\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Links\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>false</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/LinksVisited\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/LinksVisited\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>false</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuBarColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuBarHighlightColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuBarHighlightTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuBarTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuBorderColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuHighlightColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuHighlightTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/MenuTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLComment\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLIdentifier\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLKeyword\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLNumber\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLOperator\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLParameter\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SQLString\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SeparatorColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Shadow\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Shadow\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/ShadowColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/SmartTags\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/Spell\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/TableBoundaries\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WindowColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WindowTextColor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterBaselineGrid\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterDirectCursor\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterDirectCursor\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterFieldShadings\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterFieldShadings\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterHeaderFooterMark\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterIdxShadings\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterIdxShadings\"><prop oor:name=\"IsVisible\" oor:op=\"fuse\"><value>true</value></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterNonPrintChars\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterPageBreaks\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterSectionBoundaries\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>",
+    "<item oor:path=\"/org.openoffice.Office.UI/ColorScheme/ColorSchemes/org.openoffice.Office.UI:ColorScheme['COLOR_SCHEME_LIBREOFFICE_AUTOMATIC']/WriterTextGrid\"><prop oor:name=\"Color\" oor:op=\"fuse\"><value xsi:nil=\"true\"/></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [
+    "checked"
+   ],
+   "verified": true
+  },
+  {
+   "menu": "View",
+   "item": "Show Formulae",
+   "states": [],
+   "learned": [
+    "<item oor:path=\"/org.openoffice.Office.Common/Misc\"><prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop></item>"
+   ],
+   "removed": [],
+   "applied_states": [],
+   "verified": false
+  }
+ ]
+}

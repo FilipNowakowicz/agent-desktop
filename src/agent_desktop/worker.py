@@ -20,6 +20,7 @@ import uuid
 from pathlib import Path
 
 from .atspi import Accessibility, Unsupported, wait_for_registry
+from .effects import EffectLedger
 from .wayland import (
     BUTTONS,
     InputActivity,
@@ -229,6 +230,7 @@ MUTATING_OPERATIONS = (
 KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
+EFFECT_OPERATIONS = (*INPUT_OPERATIONS, "launch", "focus", "ui_action")
 TRACED_OPERATIONS = (*MUTATING_OPERATIONS, "screenshot", "lease", "take", "release")
 TRACE_FIELDS = (
     *("x", "y", "to_x", "to_y", "dx", "dy", "button", "repeat", "modifiers"),
@@ -350,6 +352,7 @@ class Worker:
         self.virtual_pointer = None
         self.virtual_keyboard = None
         self.toplevels = None
+        self.effects = None
         self.keysyms = None
         self.stop = False
         self.profile_lock = None
@@ -573,6 +576,20 @@ class Worker:
                 self.virtual_keyboard = VirtualKeyboard(display, self.root)
                 self.keysyms = Keysyms(self.compositor.pid)
                 self.toplevels = Toplevels(display)
+                if os.environ.get("AGENT_DESKTOP_EFFECTS") == "1":
+                    # Experimental: report observed effects with each action.
+                    self.effects = EffectLedger(
+                        self.env["HOME"],
+                        self.toplevels.current,
+                        lambda: session_process_starts(self.info["token"]),
+                        extra=[
+                            d
+                            for d in os.environ.get(
+                                "AGENT_DESKTOP_EFFECT_DIRS", ""
+                            ).split(":")
+                            if os.path.isabs(d)
+                        ],
+                    )
                 self.start_xwayland_environment(
                     display_file_deadline=time.monotonic() + 5
                 )
@@ -1401,6 +1418,18 @@ class Worker:
                     "delivered": True,
                     "method": "keyboard",
                 }
+        if operation == "effects":
+            if not self.effects:
+                raise ValueError(
+                    "Effects are off; create the session with AGENT_DESKTOP_EFFECTS=1"
+                )
+            if request.get("match") is not None:
+                return {
+                    "matched": self.effects.matches(
+                        request.get("effect_id"), request["match"]
+                    )
+                }
+            return self.effects.since(request.get("effect_id"))
         if operation == "observe":
             return {"observation": self.observation()}
         if operation == "frame":
@@ -1531,7 +1560,16 @@ class Worker:
                         request = json.loads(line)
                         trace = self.trace_start(request)
                         started = time.monotonic()
+                        effects = (
+                            self.effects.begin()
+                            if self.effects
+                            and request.get("operation") in EFFECT_OPERATIONS
+                            and self.control["owner"] == "agent"
+                            else None
+                        )
                         result = self.handle(request)
+                        if effects and isinstance(result, dict):
+                            result["effects"] = self.effects.finish(effects)
                         if self.activity and request.get("operation") in (
                             *INPUT_OPERATIONS,
                             "focus",
@@ -1681,6 +1719,8 @@ class Worker:
             return self.cleanup_host()
         if self.toplevels and self.compositor and self.compositor.poll() is None:
             self.stop_applications()
+        if self.effects:
+            self.effects.close()
         for device in (
             self.virtual_pointer,
             self.virtual_keyboard,

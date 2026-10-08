@@ -1,5 +1,36 @@
 # Development log
 
+## 2026-10-08 — Effect ledger research prototype and agent A/B
+
+Prototype `src/agent_desktop/effects.py` behind `AGENT_DESKTOP_EFFECTS=1`:
+inotify on the session home (plus `AGENT_DESKTOP_EFFECT_DIRS`), line diffs of
+small text files, OpenDocument cells and paragraphs as lines, window and
+process changes per input/launch/focus/ui_action and per action sequence,
+`effects` / `wait_effect` for late writes, MCP `desktop_effects`. Findings,
+prior art and next steps: docs/research/2026-10-08-effect-ledger.md.
+
+Results: six scripted scenarios (foot, Mousepad, Thunar, Calc ×2, Firefox)
+matched their written expectations, including pilot sessions 15 and 20 shapes;
+median report 9 tokens (max 262) vs about 1,229 for a full screenshot; +28 ms
+median per action (227 → 255 ms, 80 actions each). The terminal scenario found
+the zsh first-run bug (#89). Effect induction: Calc AutoInput learned from one
+GUI change, applied alone to a fresh profile, verified against a control. A
+settings-map explorer mapped and verified all 4 of 8 View-menu items that have
+profile settings (5.8 min) and found the other 4 to be per-document. Agent A/B
+(claude-opus-5-5, five tasks, round 3: 3 runs per arm): input tokens 25% lower
+with the ledger (p = 0.016); all runs correct in both arms. Round 1 was an
+accidental A/A test (batches carried no effects); round 2 had two harness
+flaws, fixed before round 3 and described in the report.
+
+Harness: `--effects`, `--suite effects` (two trap tasks), transcripts moved to
+`RUN/agents/TASK/`, `context.reply` and `context.home` for checks, office
+profile now `~/.office-profile`. New unit tests `tests/test_effects.py`.
+
+Validation: ruff check and format (64 files), compileall; `test_effects` 3 of 3
+runs; full suite with the repaired Nix runtime and the optional applications:
+130 OK, 1 skipped (visible mode). Agent runs: 63 today (three A/B rounds, dry-run checks
+excluded, one probe), $7.59 reported by the CLI against the operator's allowance.
+
 ## 2026-10-08 — wlroots fix submitted upstream (!5477)
 
 freedesktop's bot approved account verification (#4178). The fork

@@ -9,7 +9,7 @@ from .tasks import Task
 
 
 def command(context, component, files=()):
-    profile = (core.session_path(context.session) / "home/office-profile").as_uri()
+    profile = (core.session_path(context.session) / "home/.office-profile").as_uri()
     return [
         "env",
         "GDK_BACKEND=wayland",

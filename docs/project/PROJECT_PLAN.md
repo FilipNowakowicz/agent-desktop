@@ -76,8 +76,9 @@ model turns 31% and input tokens 20% in a matched A/B
 ([act and observe](../research/2026-10-09-act-and-observe.md)). S2 guarded steps did not
 meet their speed gate (turns −8%, not significant) and are kept for
 reliability ([guarded steps](../research/2026-10-09-guarded-steps.md)). The private-Firefox
-[browser bridge](../research/2026-10-09-browser-bridge.md) is in; its speed
-advantage is not yet shown.
+[browser bridge](../research/2026-10-09-browser-bridge.md), with batched
+steps and row scoping, cut wall time 33% and input tokens 30% against pixels in
+Firefox; host sessions can use the person's own Firefox in background tabs.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

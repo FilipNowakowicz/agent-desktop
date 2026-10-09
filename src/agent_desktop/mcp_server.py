@@ -353,7 +353,7 @@ def desktop_browser(
     bridge, or connects to one already started in the session with
     --remote-debugging-port (other actions connect to that one too); a Firefox
     started without it must be closed first. Then: "open" a url
-    (new_tab for a new tab), "tabs", "text" (visible text of the page or
+    (new_tab for a new tab), "close" (the current tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
     placeholder; exact for the whole text), "wait" (until found, or gone; up to
     60 s), "click", "fill" (replace a field's text with value, typed as real
@@ -369,6 +369,11 @@ def desktop_browser(
     "Dashboard"}]) and stops at the first failure or unmet wait: plan several
     actions per call. Faster and more exact than pixels for web pages; use
     screenshots for visual questions.
+
+    On a host session it uses the person's own Firefox, if they started it with
+    --remote-debugging-port ("start" only connects): read any tab, but open
+    your own with new_tab (it opens in the background) and act only there, or
+    in a tab they name. This does not move their pointer or keyboard.
     """
     arguments = {
         "url": url,

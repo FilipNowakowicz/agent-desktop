@@ -126,6 +126,7 @@ def main():
             "start",
             "tabs",
             "open",
+            "close",
             "text",
             "find",
             "wait",

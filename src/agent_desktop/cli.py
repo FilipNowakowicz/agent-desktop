@@ -26,6 +26,13 @@ from .doctor import doctor
 from .viewer import take, view
 
 
+def settled_screenshot(session, controller):
+    """A screenshot once the screen has been still for 0.3 s (at most 3 s)."""
+    return request(
+        session, "screenshot", controller, settle_ms=300, settle_timeout_ms=3000
+    )
+
+
 def main():
     use_runtime()
     parser = argparse.ArgumentParser(
@@ -113,6 +120,12 @@ def main():
     steps.add_argument("session")
     steps.add_argument("actions", type=json.loads)
     steps.add_argument("--observation")
+    steps.add_argument(
+        "--screenshot",
+        action="store_true",
+        help="after the input, wait until the screen is still (0.3 s, at most 3 s) "
+        "and include a screenshot",
+    )
     leasing = sub.add_parser(
         "lease", help="take, renew or release this controller's session lease"
     )
@@ -198,10 +211,19 @@ def main():
                 help="x,y,width,height in desktop coordinates",
             )
             operation.add_argument("--scale", type=float)
+            operation.add_argument(
+                "--settle-ms",
+                type=int,
+                help="first wait until the screen is still this long (at most 3 s)",
+            )
         if command in ("click", "move", "drag", "type", "key", "scroll"):
             operation.add_argument(
                 "--observation",
                 help="screenshot token; refuse input if windows or output changed",
+            )
+            operation.add_argument(
+                "--screenshot",
+                action="store_true",
             )
     args = vars(parser.parse_args())
     command = args.pop("command")
@@ -251,7 +273,10 @@ def main():
             session = args.pop("session")
             result = request(session, command.replace("-", "_"), controller, **args)
         elif command == "actions":
+            look = args.pop("screenshot")
             result = run_actions(**args, controller=controller)
+            if look:
+                result["screenshot"] = settled_screenshot(args["session"], controller)
         elif command == "wait":
             result = wait(**args, controller=controller)
         elif command == "lease":
@@ -269,12 +294,19 @@ def main():
             )
         else:
             session = args.pop("session")
+            look = args.pop("screenshot", False)
+            if command == "screenshot" and args.get("settle_ms") is not None:
+                args["settle_timeout_ms"] = 3000
+            elif command == "screenshot":
+                args.pop("settle_ms")
             if command == "launch" and args["argv"][:1] == ["--"]:
                 args["argv"] = args["argv"][1:]
             if command == "launch":
                 # Relative paths on the command line mean the caller's directory.
                 args["cwd"] = os.getcwd()
             result = request(session, command, controller, **args)
+            if look:
+                result["screenshot"] = settled_screenshot(session, controller)
         print(json.dumps(result, indent=2))
     except DesktopError as error:
         print(json.dumps({"error": str(error)}))

@@ -3,6 +3,7 @@
 import functools
 import json
 import os
+import re
 import uuid
 
 import anyio
@@ -14,7 +15,10 @@ from . import core
 INSTRUCTIONS = """\
 Private Linux desktops that do not touch the user's own screen. Create a session,
 launch applications, take a screenshot, act using its observation token, verify
-with another screenshot, and destroy the session when finished.
+the result, and destroy the session when finished. Input tools and
+desktop_actions accept screenshot=true to return the settled screen in the same
+reply: prefer that to a separate screenshot call, and batch predictable steps in
+desktop_actions.
 
 Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
 passwords or codes in chat and never type guessed credentials. Call
@@ -56,6 +60,20 @@ question is visual. Applications often write after the reply: call
 desktop_effects with the action's effect_id, and wait_for_file (e.g. "~/*.ods")
 to wait for a save. "Nothing observed" is evidence only for its time window."""
 
+# Experiment baseline (AGENT_DESKTOP_LOOK=0): the server as it was before input
+# could return a screenshot, for matched comparisons.
+LOOK = os.environ.get("AGENT_DESKTOP_LOOK") != "0"
+if not LOOK:
+    INSTRUCTIONS = INSTRUCTIONS.replace(
+        """verify
+the result, and destroy the session when finished. Input tools and
+desktop_actions accept screenshot=true to return the settled screen in the same
+reply: prefer that to a separate screenshot call, and batch predictable steps in
+desktop_actions.""",
+        """verify
+with another screenshot, and destroy the session when finished.""",
+    )
+
 if os.environ.get("AGENT_DESKTOP_EFFECTS") == "1":
     INSTRUCTIONS += EFFECTS_INSTRUCTIONS
 
@@ -82,6 +100,27 @@ def call(session, operation, **arguments):
 
 
 mcp = FastMCP("Agent Desktop", instructions=INSTRUCTIONS)
+
+# After input with screenshot=true: capture once the screen has been still for
+# SETTLE_MS (blinking carets ignored), or after SETTLE_TIMEOUT_MS regardless.
+SETTLE_MS = 300
+SETTLE_TIMEOUT_MS = 3000
+
+
+def looked(session, result, screenshot):
+    """`result`, plus the settled screen when `screenshot` is true."""
+    if not screenshot:
+        return result
+    capture = call(
+        session,
+        "screenshot",
+        settle_ms=SETTLE_MS,
+        settle_timeout_ms=SETTLE_TIMEOUT_MS,
+    )
+    return [
+        TextContent(type="text", text=json.dumps({**result, "screenshot": capture})),
+        Image(path=capture["path"]),
+    ]
 
 
 def tool(**options):
@@ -239,10 +278,13 @@ def desktop_wait(
     )
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_actions(
-    session: str, actions: list[dict], observation: str | None = None
-) -> dict:
+    session: str,
+    actions: list[dict],
+    observation: str | None = None,
+    screenshot: bool = False,
+) -> dict | list:
     """Run up to 50 steps in one call, e.g. click a field, type, press Return.
 
     Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
@@ -252,12 +294,17 @@ def desktop_actions(
     from; coordinates in every step are then in that screenshot's image. Input is sent only while windows and focus are
     as they were after the previous step; otherwise the run stops and reports
     which step and why. Insert a wait step where you expect a window to open or
-    close. Popups and changes inside a window are not detected, so take a
-    screenshot afterwards to verify the result. No other client can send input
+    close. Popups and changes inside a window are not detected, so verify the
+    result afterwards. No other client can send input
     while the steps run. Steps are never retried: a step reported with
     "uncertain": true may or may not have happened, so check before repeating it.
+
+    With screenshot=true the reply ends with the screen after the last step run
+    (also when the run stopped early), once it has been still for 0.3 s (at most
+    3 s; "settled" says which).
     """
-    return core.run_actions(session, actions, observation, CONTROLLER)
+    result = core.run_actions(session, actions, observation, CONTROLLER)
+    return looked(session, result, screenshot)
 
 
 @tool()
@@ -279,21 +326,24 @@ def desktop_ui(
     )
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_ui_action(
     session: str,
     node: str,
     action: str,
     text: str | None = None,
     observation: str | None = None,
-) -> dict:
+    screenshot: bool = False,
+) -> dict | list:
     """Act on a desktop_ui node: "press" (click/activate/toggle), "focus",
     "set_text" (replace an editable field's text), "select" (choose a tab or
     list item within its parent) or a listed action name.
 
     Works without coordinates. Verify the result with desktop_ui or a screenshot.
+
+    With screenshot=true the reply also contains the settled screen.
     """
-    return call(
+    result = call(
         session,
         "ui_action",
         node=node,
@@ -301,6 +351,7 @@ def desktop_ui_action(
         text=text,
         observation=observation,
     )
+    return looked(session, result, screenshot)
 
 
 @tool()
@@ -332,26 +383,45 @@ def desktop_screenshot(
     ]
 
 
-@tool()
-def desktop_type(session: str, text: str, observation: str | None = None) -> dict:
+@tool(structured_output=False)
+def desktop_type(
+    session: str,
+    text: str,
+    observation: str | None = None,
+    screenshot: bool = False,
+) -> dict | list:
     """Type up to 10000 characters into the private focused app, about 8 ms per key.
 
     Verify the result afterward. Paste long text instead of typing it.
+
+    With screenshot=true the reply also contains the screen once it has been still
+    for 0.3 s (at most 3 s; "settled" says which), with its observation token,
+    so no separate desktop_screenshot call is needed. Still means repainted, not
+    necessarily finished: check that the result is what you expected.
     """
-    return call(session, "type", text=text, observation=observation)
+    return looked(
+        session, call(session, "type", text=text, observation=observation), screenshot
+    )
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_key(
     session: str,
     key: str,
     modifiers: list[str] | None = None,
     repeat: int = 1,
     observation: str | None = None,
-) -> dict:
+    screenshot: bool = False,
+) -> dict | list:
     """Send a keysym such as Return or Right, optionally with ctrl/alt/shift/logo
-    modifiers and repeated up to 100 times."""
-    return call(
+    modifiers and repeated up to 100 times.
+
+    With screenshot=true the reply also contains the screen once it has been still
+    for 0.3 s (at most 3 s; "settled" says which), with its observation token,
+    so no separate desktop_screenshot call is needed. Still means repainted, not
+    necessarily finished: check that the result is what you expected.
+    """
+    result = call(
         session,
         "key",
         key=key,
@@ -359,15 +429,28 @@ def desktop_key(
         repeat=repeat,
         observation=observation,
     )
+    return looked(session, result, screenshot)
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_click(
-    session: str, x: int, y: int, button: str = "left", observation: str | None = None
-) -> dict:
+    session: str,
+    x: int,
+    y: int,
+    button: str = "left",
+    observation: str | None = None,
+    screenshot: bool = False,
+) -> dict | list:
     """Click at x/y: coordinates in the screenshot whose observation is passed,
-    otherwise desktop pixels. Fails outside the desktop."""
-    return call(session, "click", x=x, y=y, button=button, observation=observation)
+    otherwise desktop pixels. Fails outside the desktop.
+
+    With screenshot=true the reply also contains the screen once it has been still
+    for 0.3 s (at most 3 s; "settled" says which), with its observation token,
+    so no separate desktop_screenshot call is needed. Still means repainted, not
+    necessarily finished: check that the result is what you expected.
+    """
+    result = call(session, "click", x=x, y=y, button=button, observation=observation)
+    return looked(session, result, screenshot)
 
 
 @tool()
@@ -376,7 +459,7 @@ def desktop_move(session: str, x: int, y: int, observation: str | None = None) -
     return call(session, "move", x=x, y=y, observation=observation)
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_drag(
     session: str,
     x: int,
@@ -385,10 +468,13 @@ def desktop_drag(
     to_y: int,
     button: str = "left",
     observation: str | None = None,
-) -> dict:
+    screenshot: bool = False,
+) -> dict | list:
     """Press at (x, y), move in steps to (to_x, to_y) and release (coordinates as
-    for desktop_click)."""
-    return call(
+    for desktop_click).
+
+    With screenshot=true the reply also contains the settled screen."""
+    result = call(
         session,
         "drag",
         x=x,
@@ -398,15 +484,23 @@ def desktop_drag(
         button=button,
         observation=observation,
     )
+    return looked(session, result, screenshot)
 
 
-@tool()
+@tool(structured_output=False)
 def desktop_scroll(
-    session: str, dy: int, dx: int = 0, observation: str | None = None
-) -> dict:
+    session: str,
+    dy: int,
+    dx: int = 0,
+    observation: str | None = None,
+    screenshot: bool = False,
+) -> dict | list:
     """Scroll at the current pointer location by mouse-wheel notches: dy > 0
-    scrolls down, dx > 0 right (a notch is usually about three lines)."""
-    return call(session, "scroll", dy=dy, dx=dx, observation=observation)
+    scrolls down, dx > 0 right (a notch is usually about three lines).
+
+    With screenshot=true the reply also contains the settled screen."""
+    result = call(session, "scroll", dy=dy, dx=dx, observation=observation)
+    return looked(session, result, screenshot)
 
 
 @tool()
@@ -456,6 +550,14 @@ def desktop_logs(session: str) -> dict:
 def desktop_destroy(session: str) -> dict:
     """Stop a session's owned processes and remove its private runtime/configuration."""
     return core.destroy(session)
+
+
+if not LOOK:
+    for registered in mcp._tool_manager.list_tools():
+        if registered.parameters.get("properties", {}).pop("screenshot", None):
+            registered.description = re.split(
+                r"\n\s*\n\s*With screenshot=true", registered.description
+            )[0]
 
 
 def main():

@@ -1,4 +1,5 @@
-"""Compare benchmark runs with and without the effect ledger.
+"""Compare benchmark runs with and without a treatment: the effect ledger,
+the atlas, or input that returns a screenshot (runs without --no-look).
 
     uv run scripts/effects_ab_summary.py artifacts/benchmark/RUN [...]
 
@@ -48,11 +49,13 @@ groups = {}
 for run in sys.argv[1:]:
     data = json.loads((Path(run) / "summary.json").read_text())
     summary = data["summary"]
-    arm = (
-        "atlas"
-        if summary.get("atlas")
-        else ("effects" if summary.get("effects") else "baseline")
-    )
+    if summary.get("atlas"):
+        arm = "atlas"
+    elif summary.get("effects"):
+        arm = "effects"
+    else:
+        # Runs before the screenshot option existed have no "look" key.
+        arm = "look" if summary.get("look") else "baseline"
     for record in data["records"]:
         if "skipped" in record:
             continue
@@ -91,6 +94,9 @@ for (task, arm), records in sorted(groups.items()):
             "screenshots": median(
                 [r.get("tools", {}).get("desktop_screenshot", 0) for r in records]
             ),
+            "inline_screenshots": median(
+                [r.get("inline_screenshots") or 0 for r in records]
+            ),
             "tool_calls": median([r.get("tool_calls") or 0 for r in records]),
             "effects_calls": median(
                 [r.get("tools", {}).get("desktop_effects", 0) for r in records]
@@ -102,20 +108,31 @@ for (task, arm), records in sorted(groups.items()):
             "seconds": median([r.get("elapsed_seconds") or 0 for r in records]),
         }
     )
-# Pooled comparison: each run's input tokens relative to its task's baseline
-# median, then a two-sided permutation test on the difference of mean ratios.
-treated = "atlas" if any(arm == "atlas" for _task, arm in groups) else "effects"
-ratios = {"baseline": [], treated: []}
-for task in sorted({task for task, _arm in groups}):
-    base = median([tokens(r)[0] for r in groups.get((task, "baseline"), [])])
-    if not base:
-        continue
-    for arm in ratios:
-        ratios[arm] += [tokens(r)[0] / base for r in groups.get((task, arm), [])]
-pooled = {}
-if ratios["baseline"] and ratios[treated]:
+# Pooled comparison: each run's value relative to its task's baseline median,
+# then a two-sided permutation test on the difference of mean ratios.
+treated = next(
+    (t for t in ("atlas", "effects", "look") if any(a == t for _k, a in groups)),
+    "effects",
+)
+METRICS = {
+    "input_tokens": lambda r: tokens(r)[0],
+    "turns": lambda r: r.get("turns") or 0,
+    "seconds": lambda r: r.get("elapsed_seconds") or 0,
+}
+
+
+def pooled_test(value):
     import random
 
+    ratios = {"baseline": [], treated: []}
+    for task in sorted({task for task, _arm in groups}):
+        base = median([value(r) for r in groups.get((task, "baseline"), [])])
+        if not base:
+            continue
+        for arm in ratios:
+            ratios[arm] += [value(r) / base for r in groups.get((task, arm), [])]
+    if not (ratios["baseline"] and ratios[treated]):
+        return {}
     observed = statistics.mean(ratios[treated]) - statistics.mean(ratios["baseline"])
     values = ratios["baseline"] + ratios[treated]
     split = len(ratios["baseline"])
@@ -126,9 +143,19 @@ if ratios["baseline"] and ratios[treated]:
         generator.shuffle(values)
         difference = statistics.mean(values[split:]) - statistics.mean(values[:split])
         extreme += abs(difference) >= abs(observed)
-    pooled = {
+    return {
         "runs": {arm: len(v) for arm, v in ratios.items()},
         "mean_ratio": {arm: round(statistics.mean(v), 3) for arm, v in ratios.items()},
         "p_value": round(extreme / trials, 4),
     }
-print(json.dumps({"tasks": rows, "pooled_input_tokens": pooled}, indent=1))
+
+
+print(
+    json.dumps(
+        {
+            "tasks": rows,
+            **{f"pooled_{name}": pooled_test(value) for name, value in METRICS.items()},
+        },
+        indent=1,
+    )
+)

@@ -119,6 +119,31 @@ input leaves the screen still too, so check the image. On their own,
 waits the same way before capturing. This saves a model round trip after most
 inputs; `AGENT_DESKTOP_LOOK=0` hides the option (an experiment baseline).
 
+## Web pages through the DOM (browser bridge)
+
+`desktop_browser` (CLI: `agent-desktop browser SESSION ACTION ...`) drives Firefox
+in a private session through WebDriver BiDi instead of pixels. `start` launches
+Firefox (with the session's pinned profile) and `--remote-debugging-port=0`,
+which listens on a free localhost port; Firefox must not already run in that
+session. Then:
+
+| Action | Does |
+| --- | --- |
+| `open` | navigate to `url` and wait for the load (`new_tab` for a new tab) |
+| `tabs` | list tabs with url and title; `tab` picks one for later calls |
+| `text` | visible text of the page or of `selector` (up to 8000 characters) |
+| `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
+| `wait` | until an element is found, or `gone` (up to 60 s) |
+| `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
+
+Clicks and keys are trusted input events from Firefox itself. If several
+elements match, or the match is disabled, nothing happens and the matches are
+listed. Replies carry the page url and title and the element's value afterwards,
+never a password's. The bridge is a worker operation: it needs the controller
+lease, is refused while a person has control and on host sessions. Any local
+process of the same user could also connect to the port while Firefox runs,
+like any other process of that user can control the session.
+
 ## Action sequences
 
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)

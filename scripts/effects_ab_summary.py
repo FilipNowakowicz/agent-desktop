@@ -55,6 +55,8 @@ for run in sys.argv[1:]:
         arm = "atlas"
     elif summary.get("effects"):
         arm = "effects"
+    elif os.environ.get("AB_ARM") == "bridge":
+        arm = "bridge" if summary.get("bridge") else "baseline"
     elif os.environ.get("AB_ARM") == "guards":
         # Guarded steps compared with both arms able to look.
         arm = "guards" if summary.get("guards") else "baseline"
@@ -118,7 +120,7 @@ for (task, arm), records in sorted(groups.items()):
 treated = next(
     (
         t
-        for t in ("atlas", "effects", "guards", "look")
+        for t in ("atlas", "effects", "bridge", "guards", "look")
         if any(a == t for _k, a in groups)
     ),
     "effects",

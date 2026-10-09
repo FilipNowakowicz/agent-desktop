@@ -227,11 +227,15 @@ MUTATING_OPERATIONS = (
     "ui_action",
     "request_human",
     "set",
+    "browser",
 )
 KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
-EFFECT_OPERATIONS = (*INPUT_OPERATIONS, "launch", "focus", "ui_action", "set")
+EFFECT_OPERATIONS = (
+    *INPUT_OPERATIONS,
+    *("launch", "focus", "ui_action", "set", "browser"),
+)
 TRACED_OPERATIONS = (*MUTATING_OPERATIONS, "screenshot", "lease", "take", "release")
 TRACE_FIELDS = (
     *("x", "y", "to_x", "to_y", "dx", "dy", "button", "repeat", "modifiers"),
@@ -286,6 +290,7 @@ HOST_UNSUPPORTED = (
     "ui",
     "ui_action",
     "set",
+    "browser",
 )
 # Pause agent input this long after the person last used the computer.
 HOST_PAUSE_SECONDS = 3.0
@@ -390,6 +395,7 @@ class Worker:
         self.toplevels = None
         self.effects = None
         self.keysyms = None
+        self.browser = None  # (BiDi connection, Firefox pid) once started
         self.stop = False
         self.profile_lock = None
         self.activity = None  # host sessions: the person's input
@@ -778,6 +784,184 @@ class Worker:
             self.ui_ids[short] = node
             self.ui_names[node] = short
         return self.ui_names[node]
+
+    def start_browser(self, url):
+        """Firefox with WebDriver BiDi on a free localhost port: the bridged one,
+        one started in the session with --remote-debugging-port, or a new one."""
+        from . import browser
+
+        if self.browser and self.browser[1].poll() is None:
+            return self.browser[0]
+        if self.browser:
+            self.browser[0].close()
+            self.browser = None
+        # A Firefox launched in this session with --remote-debugging-port.
+        for app, process in self.apps.items():
+            log = self.root / f"app-{app}.log"
+            if process.poll() is None and log.exists():
+                found = BIDI_LISTENING.search(log.read_text(errors="replace"))
+                if found:
+                    self.browser = (browser.Browser(found.group(1)), process)
+                    if url:
+                        self.browser[0].command(
+                            "browsingContext.navigate",
+                            {"context": self.browser[0].target(), "url": url},
+                        )
+                    return self.browser[0]
+        started = self.handle(
+            {
+                "operation": "launch",
+                "argv": ["firefox", "--remote-debugging-port=0", url or "about:blank"],
+            }
+        )
+        process = self.apps[started["application"]]
+        log = Path(started["logs"])
+        deadline = time.monotonic() + 30
+        while True:
+            found = BIDI_LISTENING.search(log.read_text(errors="replace"))
+            if found:
+                break
+            if process.poll() is not None:
+                raise ValueError(
+                    "Firefox exited at once: it is probably already running in "
+                    "this session without the browser bridge. Close it and retry."
+                )
+            if time.monotonic() > deadline:
+                raise TimeoutError("Firefox did not open its BiDi port in 30 s")
+            time.sleep(0.2)
+        self.browser = (browser.Browser(found.group(1)), process)
+        return self.browser[0]
+
+    def browser_request(self, request):
+        """Read and act on pages of a private Firefox through WebDriver BiDi."""
+        from websockets.exceptions import ConnectionClosed
+
+        from . import browser
+
+        action = request.get("action")
+        target = {
+            "selector": request.get("selector"),
+            "text": request.get("text"),
+            "exact": request.get("exact") is True,
+        }
+        try:
+            if action == "start":
+                bridge = self.start_browser(request.get("url"))
+                return {"tabs": bridge.tabs()[1]}
+            if not self.browser or self.browser[1].poll() is not None:
+                raise ValueError('No bridged Firefox; use action "start" first')
+            bridge = self.browser[0]
+            context = bridge.target(request.get("tab"))
+            if action == "tabs":
+                return {"tabs": bridge.tabs()[1]}
+            if action == "open":
+                url = request.get("url")
+                if not isinstance(url, str) or not url:
+                    raise ValueError("open needs a url")
+                if request.get("new_tab"):
+                    context = bridge.command("browsingContext.create", {"type": "tab"})[
+                        "context"
+                    ]
+                    bridge.context = context
+                bridge.command(
+                    "browsingContext.navigate",
+                    {"context": context, "url": url, "wait": "complete"},
+                    timeout=60,
+                )
+                return self.page_state(bridge, context)
+            if action == "find":
+                return bridge.find(context, **target)
+            if action == "text":
+                text = bridge.call(
+                    "(s) => (s ? document.querySelector(s) : document.body)"
+                    "?.innerText ?? null",
+                    [request.get("selector")],
+                    context,
+                )
+                text = browser.remote_value(text)
+                if text is None:
+                    raise ValueError("No element matches that selector")
+                return {
+                    "text": text[: browser.MAX_TEXT],
+                    "truncated": len(text) > browser.MAX_TEXT,
+                    **self.page_state(bridge, context),
+                }
+            if action == "wait":
+                timeout = request.get("timeout", 10)
+                if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 60:
+                    raise ValueError("timeout must be between 0 and 60 seconds")
+                gone = request.get("gone") is True
+                deadline = time.monotonic() + timeout
+                while True:
+                    found = bridge.find(context, **target)
+                    if bool(found["count"]) != gone:
+                        return {"satisfied": True, **found}
+                    if time.monotonic() >= deadline:
+                        return {"satisfied": False, **found}
+                    time.sleep(0.2)
+            if action in ("click", "fill", "select"):
+                element, described = bridge.element(context, **target)
+                if described.get("disabled"):
+                    raise ValueError(f"The element is disabled: {described}")
+                if action == "click":
+                    bridge.click(context, element)
+                elif action == "fill":
+                    value = request.get("value")
+                    if not isinstance(value, str) or len(value) > 2000:
+                        raise ValueError(
+                            "fill needs a value of at most 2000 characters"
+                        )
+                    bridge.click(context, element)
+                    bridge.keys(context, value, select_all=True)
+                else:
+                    option = request.get("value")
+                    chosen = bridge.call(
+                        "(e, o) => { const m = [...e.options].find((x) => "
+                        "x.text.trim() === o || x.value === o); if (!m) return null; "
+                        "e.value = m.value; e.dispatchEvent(new Event('input', "
+                        "{bubbles: true})); e.dispatchEvent(new Event('change', "
+                        "{bubbles: true})); return m.text.trim(); }",
+                        [element, option],
+                        context,
+                    )
+                    if browser.remote_value(chosen) is None:
+                        raise ValueError(f"No option {option!r}: {described}")
+                after = bridge.call(
+                    "(e) => e.isConnected ? JSON.stringify({value: e.type === "
+                    "'password' ? undefined : e.value, checked: e.checked}) : null",
+                    [element],
+                    context,
+                )
+                result = {
+                    "element": described,
+                    "delivered": True,
+                    **self.page_state(bridge, context),
+                }
+                after = browser.remote_value(after)
+                if isinstance(after, str):
+                    result["now"] = {
+                        k: v for k, v in json.loads(after).items() if v is not None
+                    }
+                return result
+            raise ValueError(
+                "action must be start, tabs, open, find, text, wait, click, fill "
+                "or select"
+            )
+        except browser.BrowserError as error:
+            raise ValueError(str(error)) from None
+        except ConnectionClosed:
+            self.browser = None
+            raise ValueError("Firefox closed the bridge; start it again") from None
+
+    def page_state(self, bridge, context):
+        from . import browser
+
+        state = bridge.call(
+            "() => JSON.stringify({url: location.href, title: document.title})",
+            [],
+            context,
+        )
+        return json.loads(browser.remote_value(state))
 
     def accessibility(self):
         if not self.info.get("accessibility"):
@@ -1482,6 +1666,8 @@ class Worker:
                     "delivered": True,
                     "method": "keyboard",
                 }
+        if operation == "browser":
+            return self.browser_request(request)
         if operation == "set":
             from . import atlas
 
@@ -1801,6 +1987,8 @@ class Worker:
             self.stop_applications()
         if self.effects:
             self.effects.close()
+        if self.browser:
+            self.browser[0].close()
         for device in (
             self.virtual_pointer,
             self.virtual_keyboard,
@@ -1957,6 +2145,7 @@ def credential_variable(name):
     ) and not upper.startswith("AGENT_DESKTOP_")
 
 
+BIDI_LISTENING = re.compile(r"WebDriver BiDi listening on (ws://127\.0\.0\.1:[0-9]+)")
 FIREFOX_NAMES = ("firefox", "firefox-esr", "firefox-devedition", "firefox-nightly")
 # Arguments by which the caller already chose a profile (shell case patterns).
 FIREFOX_PROFILE_PATTERNS = (

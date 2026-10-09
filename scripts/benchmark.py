@@ -246,6 +246,11 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
                         + ([] if effects_enabled() else ["effects"])
                         + (
                             []
+                            if os.environ.get("AGENT_DESKTOP_BENCH_BRIDGE") == "1"
+                            else ["browser"]
+                        )
+                        + (
+                            []
                             if os.environ.get("AGENT_DESKTOP_ATLAS")
                             else ["atlas", "set"]
                         )
@@ -308,9 +313,22 @@ def main():
         action="store_true",
         help="baseline: desktop_actions without the guarded-step description",
     )
+    parser.add_argument(
+        "--firefox",
+        action="store_true",
+        help="web tasks in Firefox (with a WebDriver BiDi port) instead of Chromium",
+    )
+    parser.add_argument(
+        "--bridge",
+        action="store_true",
+        help="let the agent use desktop_browser (needs --firefox)",
+    )
     args = parser.parse_args()
     random.seed(args.seed)
     os.environ["AGENT_DESKTOP_GUARDS"] = "0" if args.no_guards else "1"
+    if args.firefox:
+        os.environ["AGENT_DESKTOP_BENCH_BROWSER"] = "firefox"
+    os.environ["AGENT_DESKTOP_BENCH_BRIDGE"] = "1" if args.bridge else "0"
     os.environ["AGENT_DESKTOP_LOOK"] = "0" if args.no_look else "1"
     # Sessions inherit this from the harness; the MCP server from claude.
     os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
@@ -360,6 +378,8 @@ def main():
         "effects": args.effects,
         "look": not args.no_look,
         "guards": not args.no_guards,
+        "firefox": args.firefox,
+        "bridge": args.bridge,
         "atlas": bool(args.atlas),
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),

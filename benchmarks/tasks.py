@@ -4,6 +4,7 @@ Each task launches its application in a harness-created session, gives the agent
 a goal, and verifies the result without trusting the agent's reply.
 """
 
+import os
 import random
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -14,8 +15,12 @@ def code(length=6):
 
 
 def chromium(context, page):
+    """The browser command for a page: Chromium, or Firefox with a WebDriver
+    BiDi port when the harness runs with --firefox."""
     path = context.directory / "page.html"
     path.write_text(page)
+    if os.environ.get("AGENT_DESKTOP_BENCH_BROWSER") == "firefox":
+        return ["firefox", "--remote-debugging-port=0", path.as_uri()]
     return [
         "chromium",
         f"--user-data-dir={context.directory / 'profile'}",

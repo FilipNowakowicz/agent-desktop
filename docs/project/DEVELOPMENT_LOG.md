@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-10-09 — S3: browser bridge for private Firefox
+
+New worker operation `browser` (MCP `desktop_browser`, CLI `browser`): `start`
+launches Firefox in the private session with `--remote-debugging-port=0`, reads
+the port from its log and opens a WebDriver BiDi session (new dependency:
+`websockets`). Actions: open, tabs, text, find, wait, click, fill, select.
+Targets are CSS selectors or visible text/label/placeholder and must match one
+visible element; disabled targets are refused; password values are never
+returned. Clicks and keys are BiDi `input.performActions` (trusted events). It
+is mutating for the lease, refused during takeover and on host sessions, and
+recorded by the effect ledger. The person's own Firefox is not touched.
+
+Validation: tests/test_browser.py (Firefox 156): form fill with Unicode,
+password redaction, select, check box, ambiguous and disabled refusals, page
+text, new tab; full suite (see PR).
 ## 2026-10-09 — S2: guarded steps (kept for reliability, not speed)
 
 `desktop_actions` steps take `expect`; `ui_action` steps can name a target found

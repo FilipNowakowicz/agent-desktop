@@ -792,22 +792,13 @@ class Worker:
 
         if self.browser and self.browser[1].poll() is None:
             return self.browser[0]
-        if self.browser:
-            self.browser[0].close()
-            self.browser = None
-        # A Firefox launched in this session with --remote-debugging-port.
-        for app, process in self.apps.items():
-            log = self.root / f"app-{app}.log"
-            if process.poll() is None and log.exists():
-                found = BIDI_LISTENING.search(log.read_text(errors="replace"))
-                if found:
-                    self.browser = (browser.Browser(found.group(1)), process)
-                    if url:
-                        self.browser[0].command(
-                            "browsingContext.navigate",
-                            {"context": self.browser[0].target(), "url": url},
-                        )
-                    return self.browser[0]
+        if self.attach_browser():
+            if url:
+                self.browser[0].command(
+                    "browsingContext.navigate",
+                    {"context": self.browser[0].target(), "url": url},
+                )
+            return self.browser[0]
         started = self.handle(
             {
                 "operation": "launch",
@@ -832,6 +823,25 @@ class Worker:
         self.browser = (browser.Browser(found.group(1)), process)
         return self.browser[0]
 
+    def attach_browser(self):
+        """Connect to a Firefox launched in this session with
+        --remote-debugging-port, if one is running. Returns whether connected."""
+        from . import browser
+
+        if self.browser and self.browser[1].poll() is None:
+            return True
+        if self.browser:
+            self.browser[0].close()
+            self.browser = None
+        for app, process in self.apps.items():
+            log = self.root / f"app-{app}.log"
+            if process.poll() is None and log.exists():
+                found = BIDI_LISTENING.search(log.read_text(errors="replace"))
+                if found:
+                    self.browser = (browser.Browser(found.group(1)), process)
+                    return True
+        return False
+
     def browser_request(self, request):
         """Read and act on pages of a private Firefox through WebDriver BiDi."""
         from websockets.exceptions import ConnectionClosed
@@ -848,7 +858,7 @@ class Worker:
             if action == "start":
                 bridge = self.start_browser(request.get("url"))
                 return {"tabs": bridge.tabs()[1]}
-            if not self.browser or self.browser[1].poll() is not None:
+            if not self.attach_browser():
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
             context = bridge.target(request.get("tab"))

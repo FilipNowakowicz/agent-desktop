@@ -346,7 +346,9 @@ def desktop_browser(
     """Use Firefox in a private session through its DOM, without screenshots.
 
     action "start" opens Firefox (url optional) with a local WebDriver BiDi
-    bridge; Firefox must not already run in this session. Then: "open" a url
+    bridge, or connects to one already started in the session with
+    --remote-debugging-port (other actions connect to that one too); a Firefox
+    started without it must be closed first. Then: "open" a url
     (new_tab for a new tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
     placeholder; exact for the whole text), "wait" (until found, or gone; up to

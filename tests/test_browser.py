@@ -105,6 +105,9 @@ class BrowserTests(unittest.TestCase):
             lambda: "WebDriver BiDi listening" in Path(launched["logs"]).read_text(),
             timeout=30,
         )
+        # Any action attaches; "start" is not needed for it.
+        tabs = self.browser("tabs")
+        self.assertEqual(tabs["tabs"][0]["url"], self.page.as_uri())
         started = self.browser("start")
         self.assertEqual(started["tabs"][0]["url"], self.page.as_uri())
         self.assertEqual(len(core.request(self.session, "status")["applications"]), 1)

@@ -62,6 +62,11 @@ host trial, 97–99% of wall time was outside the tool (model round trips), and 
 of 59 screenshots directly followed an input. Proposed next experiment: input
 that returns the settled result (act and see), then guarded action plans with
 targets resolved at run time and expectations, measured against matched arms.
+The full plan, [beyond human speed](../research/2026-10-09-beyond-human-speed.md),
+adds delta-coded observation (damage, keyframes, text deltas, surprise only),
+navigation maps from model-free exploration, a browser bridge and verified
+procedures, with stages S1–S6 and stop criteria. S1 (settled deltas) and S2
+(guarded plans) are the next work.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

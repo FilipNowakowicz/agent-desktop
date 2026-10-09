@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-09 — Plan: beyond human speed
+
+docs/research/2026-10-09-beyond-human-speed.md records the plan agreed with the
+maintainer: the ideal agent in a new environment, mechanisms (delta-coded
+observation, guarded plans, navigation maps, GUI bypass, procedures,
+parallelism, live applications without the person's screen), reachability, a
+staged roadmap S1–S6 with measurements and stop criteria, and the authorisation
+rules for unattended testing. Prior art checked: anticipatory policy trees
+(arXiv 2607.28399), speculative actions and macro commit, wlr-screencopy damage,
+Firefox WebDriver BiDi, Hyprland headless outputs. Correction to the speed note:
+`desktop_actions` wait steps already accept title, element and text conditions.
+No implementation yet.
+
 ## 2026-10-09 — Speed: where the time goes
 
 Research note docs/research/2026-10-09-speed.md. From the host trial traces

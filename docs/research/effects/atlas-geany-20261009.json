@@ -1,0 +1,2028 @@
+{
+ "summary": {
+  "app": "geany",
+  "controls": 93,
+  "with_effect": 76,
+  "verified": 75,
+  "errors": 3,
+  "noise_keys": 1,
+  "interaction_keys": [],
+  "minutes": 23.0
+ },
+ "atlas": [
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Markers Margin",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_markers_margin",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Line Numbers",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_linenumber_margin",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show White Space",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_white_space",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Line Endings",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_line_endings",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Indentation Guides",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_indent_guide",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Toggle All Additional Widgets",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] msgwindow_visible",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_toolbar_show",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_notebook_tabs",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Message Window",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] msgwindow_visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Toolbar",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_toolbar_show",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[geany] msgwindow_position",
+     "from": "368",
+     "to": "410"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show Sidebar",
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] sidebar_visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Zoom In",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Zoom Out",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Normal Size",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Line Wrapping",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Line Breaking",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Auto-indentation",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Read Only",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Write Unicode BOM",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Clone",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Strip Trailing Spaces",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Replace Tabs with Spaces",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Fold All",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Unfold All",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Remove Markers",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Remove Error Indicators",
+   "effect": []
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Load files from the last session",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_load_session",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Load virtual terminal support",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[VTE] load_vte",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Enable plugin support",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[plugins] load_plugins",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Save window size",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_save_wingeom",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Save window position",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_save_winpos",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Startup"
+    ]
+   ],
+   "label": "Confirm exit",
+   "default": false,
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Beep on errors or when compilation has finished",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] beep_on_errors",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Switch to status message list at new message",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] switch_msgwin_pages",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Suppress status messages in the status bar",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_suppress_status_messages",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Auto-focus widgets (focus follows mouse)",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] auto_focus",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Use platform-native file dialogs",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] use_native_dialogs",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Always wrap search",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[search] pref_search_hide_find_dialog",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Hide the Find dialog",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[search] pref_search_always_wrap",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Use the current word under the cursor for Find dialogues",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_search_use_current_word",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Use the current file's directory for Find in Files",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[search] pref_search_current_file_dir",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ],
+    [
+     5,
+     "Miscellaneous"
+    ]
+   ],
+   "label": "Store project file inside the project base directory",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_main_project_file_in_basedir",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Interface"
+    ]
+   ],
+   "label": "Show symbol list",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] sidebar_symbol_visible",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[geany] sidebar_page",
+     "from": "0",
+     "to": "1"
+    }
+   ],
+   "verified": false,
+   "state_shown": true,
+   "restored_by_click": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Interface"
+    ]
+   ],
+   "label": "Show documents list",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] sidebar_openfiles_visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Interface"
+    ]
+   ],
+   "label": "Show sidebar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] sidebar_visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Interface"
+    ]
+   ],
+   "label": "Show status bar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] statusbar_visible",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[geany] msgwindow_position",
+     "from": "368",
+     "to": "409"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Notebook tabs"
+    ]
+   ],
+   "label": "Show editor tabs",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_notebook_tabs",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Notebook tabs"
+    ]
+   ],
+   "label": "Show close buttons",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_tab_cross",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Notebook tabs"
+    ]
+   ],
+   "label": "Next to current",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] tab_order_beside",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Notebook tabs"
+    ]
+   ],
+   "label": "Double-clicking hides all additional widgets",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] notebook_double_click_hides_widgets",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Notebook tabs"
+    ]
+   ],
+   "label": "Switch to last used document after closing a tab",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] tab_close_switch_to_mru",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Toolbar"
+    ]
+   ],
+   "label": "Show toolbar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_toolbar_show",
+     "from": "true",
+     "to": "false"
+    },
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[geany] msgwindow_position",
+     "from": "368",
+     "to": "410"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Interface"
+    ],
+    [
+     5,
+     "Toolbar"
+    ]
+   ],
+   "label": "Append toolbar to the menu",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_toolbar_append_to_menu",
+     "from": "false",
+     "to": "true"
+    },
+    {
+     "file": "~/.config/geany/session.conf",
+     "key": "[geany] msgwindow_position",
+     "from": "368",
+     "to": "397"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Line wrapping",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] line_wrapping",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "\"Smart\" home key",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_smart_home_key",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Disable Drag and Drop",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_disable_dnd",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Code folding",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] use_folding",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Fold/unfold all children of a fold point",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] unfold_all_children",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Use indicators to show compile errors",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] use_indicators",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Features"
+    ]
+   ],
+   "label": "Newline strips trailing spaces",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_newline_strip",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Indentation"
+    ]
+   ],
+   "label": "Detect width from file",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] detect_indent_width",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Indentation"
+    ]
+   ],
+   "label": "Detect type from file",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] check_detect_indent",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Indentation"
+    ]
+   ],
+   "label": "Tab key indents",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] use_tab_to_indent",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Indentation"
+    ]
+   ],
+   "label": "Backspace key unindents",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] backspace_unindent",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Snippet completion",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] complete_snippets",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "XML/HTML tag auto-closing",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] auto_close_xml_tags",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Automatic continuation of multi-line comments",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] auto_continue_multiline",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Autocomplete symbols",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] auto_complete_symbols",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Autocomplete all words in document",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autocomplete_doc_words",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Drop rest of word on completion",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] completion_drops_rest_of_word",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Brackets ( )",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autoclose_chars",
+     "from": "0",
+     "to": "1"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Curly brackets { }",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autoclose_chars",
+     "from": "0",
+     "to": "2"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Square brackets [ ]",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autoclose_chars",
+     "from": "0",
+     "to": "4"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Single quotes ' '",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autoclose_chars",
+     "from": "0",
+     "to": "8"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Completions"
+    ]
+   ],
+   "label": "Double quotes \" \"",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] autoclose_chars",
+     "from": "0",
+     "to": "16"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Invert syntax highlighting colours",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] highlighting_invert_all",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show indentation guides",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_indent_guide",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show white space",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_white_space",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show only non-default line endings",
+   "default": false,
+   "effect": []
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show line endings",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_line_endings",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show line numbers",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_linenumber_margin",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show markers margin",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] show_markers_margin",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Stop scrolling at last line",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] scroll_stop_at_last_line",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Enabled",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] long_line_enabled",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show in markers margin",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] change_history_markers",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ],
+    [
+     5,
+     "Display"
+    ]
+   ],
+   "label": "Show as underline indicators",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] change_history_indicators",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Files"
+    ]
+   ],
+   "label": "Open new documents from the command-line",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] cmdline_new_files",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Files"
+    ]
+   ],
+   "label": "Ensure new line at file end",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_new_line",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Files"
+    ]
+   ],
+   "label": "Ensure consistent line endings",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_ensure_convert_line_endings",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Files"
+    ]
+   ],
+   "label": "Strip trailing spaces and tabs",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_trail_space",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Files"
+    ]
+   ],
+   "label": "Replace tabs with space",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[geany] pref_editor_replace_tabs",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Printing"
+    ]
+   ],
+   "label": "Print line numbers",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[printing] print_line_numbers",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Printing"
+    ]
+   ],
+   "label": "Print page numbers",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[printing] print_page_numbers",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Printing"
+    ]
+   ],
+   "label": "Print page header",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[printing] print_page_header",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Printing"
+    ]
+   ],
+   "label": "Use the basename of the printed file",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/geany/geany.conf",
+     "key": "[printing] page_header_basename",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  }
+ ]
+}

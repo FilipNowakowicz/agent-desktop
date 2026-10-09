@@ -1,0 +1,722 @@
+{
+ "summary": {
+  "app": "mousepad",
+  "controls": 37,
+  "with_effect": 32,
+  "verified": 30,
+  "errors": 3,
+  "noise_keys": 0,
+  "interaction_keys": [],
+  "minutes": 7.7
+ },
+ "atlas": [
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Line Numbers",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] show-line-numbers",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Menubar",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] menubar-visible",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verify_error": "RuntimeError: menu View not found in []"
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Toolbar",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] toolbar-visible",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Statusbar",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] statusbar-visible",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Word Wrap",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] word-wrap",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Auto Indent",
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] auto-indent",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Write Unicode BOM",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Viewer Mode",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Previous Tab",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Next Tab",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Document",
+   "label": "Untitled 1",
+   "effect": []
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Show line numbers",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] show-line-numbers",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display whitespace",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] show-whitespace",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display line endings",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] show-line-endings",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Long line margin at column:",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] show-right-margin",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Highlight current line",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] highlight-current-line",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Highlight matching brackets",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] match-braces",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Wrap long lines",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] word-wrap",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Use system monospace font",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] use-default-monospace-font",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Enable automatic indentation",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] auto-indent",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Tab: Indent selection (Shift+Tab: Unindent)",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] indent-on-tab",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Backspace: Delete indent spaces as tabs",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/view] smart-backspace",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Client-side decorations (restart required)",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] client-side-decorations",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Show full filename in title bar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] path-in-title",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Show application name in title bar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] app-name-in-title",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Remember window size",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] remember-size",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Remember window position",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] remember-position",
+     "from": null,
+     "to": "true"
+    },
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/state/window] left",
+     "from": null,
+     "to": "0"
+    },
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/state/window] top",
+     "from": null,
+     "to": "0"
+    }
+   ],
+   "verified": false,
+   "state_shown": true,
+   "restored_by_click": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Remember window state",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] remember-state",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Show toolbar",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] toolbar-visible",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Always show tabs even with one file",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] always-show-tabs",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Expand tabs to fill available space",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] expand-tabs",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Window"
+    ]
+   ],
+   "label": "Cycled notebook tab switching",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/window] cycle-tabs",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "File"
+    ]
+   ],
+   "label": "Ensure new line at file end",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/file] add-last-end-of-line",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "File"
+    ]
+   ],
+   "label": "Make a copy with '~' suffix",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/file] make-backup",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "File"
+    ]
+   ],
+   "label": "Automatic reloading",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/preferences/file] auto-reload",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Plugins"
+    ]
+   ],
+   "label": "Shortcuts Editor",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/state/application] enabled-plugins",
+     "from": null,
+     "to": "['mousepad-plugin-shortcuts']"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Plugins"
+    ]
+   ],
+   "label": "Spell Checking",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/Mousepad/settings.conf",
+     "key": "[org/xfce/mousepad/state/application] enabled-plugins",
+     "from": null,
+     "to": "['mousepad-plugin-gspell']"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true
+  }
+ ]
+}

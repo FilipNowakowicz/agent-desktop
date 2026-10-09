@@ -123,6 +123,13 @@ Calc CSV export through the format dialogs. Results and limits are in the
 LibreOffice profile in `~/.office-profile` (formerly `~/office-profile`), so
 the ledger treats it as application state.
 
+## Effect-atlas A/B (2026-10-09)
+
+`--suite atlas` holds four Mousepad settings tasks in everyday words, checked in
+Mousepad's settings file. `--atlas DIR` enables the experimental
+`desktop_atlas` and `desktop_set` tools with that atlas directory; without it
+both tools are disabled. Results: [effect-atlas report](research/2026-10-09-effect-atlas.md#agent-ab).
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

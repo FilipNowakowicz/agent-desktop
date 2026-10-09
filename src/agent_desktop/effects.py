@@ -62,6 +62,7 @@ TEXT_LIMIT = 256 * 1024
 TEXT_BUDGET = 32 * 1024 * 1024
 DIFF_LINES = 20
 STATE_LIST = 8
+VERSIONS = 6
 LINE_CHARS = 160
 
 
@@ -174,8 +175,8 @@ def line_diff(before, after):
     for line in difflib.unified_diff(
         before.splitlines(), after.splitlines(), lineterm="", n=0
     ):
-        if line.startswith(("---", "+++", "@@")):
-            continue
+        if line.startswith(("---", "+++", "@@")) or not line[1:].strip():
+            continue  # headers and blank lines say nothing
         if len(line) > LINE_CHARS:
             line = line[: LINE_CHARS - 1] + "…"
         lines.append(line)
@@ -198,9 +199,12 @@ class FileRecorder:
         self.watches = {}  # watch descriptor -> directory
         self.events = []  # (monotonic time, kind, path relative to root)
         self.overflowed = False
-        self.texts = {}
+        # relative path -> [(time observed, exists, text or None)], oldest first,
+        # so a report can diff against the state before any given action.
+        self.versions = {}
         self.text_bytes = 0
-        self.known = set()  # paths that existed when last reported
+        self.pending = {}  # relative path -> time of its latest unobserved event
+        self.state_lock = threading.RLock()
         self.lock = threading.Lock()
         self.stopped = False
         started = time.monotonic()
@@ -209,14 +213,19 @@ class FileRecorder:
         self.thread = threading.Thread(target=self.run, daemon=True)
         self.thread.start()
 
-    def add_tree(self, directory, index=False):
+    def add_tree(self, directory, index=False, found=None):
+        """Watch a tree. `index` remembers existing files (start); `found` is the
+        time a new directory appeared: files already inside it were written
+        before its watch existed, so they are recorded as created then."""
         for current, _directories, files in os.walk(directory):
             self.add_watch(Path(current))
-            if index:
-                for name in files:
-                    path = Path(current) / name
-                    self.known.add(self.relative(path))
-                    self.remember(path)
+            for name in files:
+                path = Path(current) / name
+                if index:
+                    self.record(self.relative(path), 0.0)
+                elif found is not None:
+                    with self.lock:
+                        self.events.append((found, "created", self.relative(path)))
 
     def add_watch(self, directory):
         descriptor = self.libc.inotify_add_watch(
@@ -228,23 +237,49 @@ class FileRecorder:
     def relative(self, path):
         return str(path.relative_to(self.root))
 
-    def remember(self, path):
-        relative = self.relative(path)
-        if NOISE.search(relative):
-            return
-        text = read_document(path)
-        if text is None:
-            return
-        previous = self.texts.get(relative)
-        growth = len(text) - (len(previous) if previous is not None else 0)
-        if self.text_bytes + growth > TEXT_BUDGET:
-            return
-        self.texts[relative] = text
-        self.text_bytes += growth
+    def record(self, relative, at):
+        """Observe a file now and keep it as a version (bounded history)."""
+        with self.state_lock:
+            return self._record(relative, at)
+
+    def _record(self, relative, at):
+        path = self.root / relative
+        exists = path.is_file() and not path.is_symlink()
+        text = read_document(path) if exists and not NOISE.search(relative) else None
+        if text is not None and self.text_bytes + len(text) > TEXT_BUDGET:
+            text = None
+        history = self.versions.setdefault(relative, [])
+        history.append((at, exists, text))
+        self.text_bytes += len(text or "")
+        while len(history) > VERSIONS:
+            self.text_bytes -= len(history.pop(0)[2] or "")
+        return exists, text
+
+    def before(self, relative, start):
+        """(existed, text) as last observed before `start`."""
+        with self.state_lock:
+            for at, exists, text in reversed(self.versions.get(relative, [])):
+                if at < start:
+                    return exists, text
+        return False, None
+
+    def observe_quiet(self, quiet=0.1):
+        """Version files whose events stopped `quiet` seconds ago, stamped with
+        their last event time: the state they reached then."""
+        now = time.monotonic()
+        with self.lock:
+            ready = [(r, at) for r, at in self.pending.items() if now - at >= quiet]
+            for relative, _at in ready:
+                del self.pending[relative]
+        for relative, at in ready:
+            self.record(relative, at)
 
     def run(self):
         while not self.stopped:
-            ready, _, _ = select.select([self.fd], [], [], 0.5)
+            ready, _, _ = select.select(
+                [self.fd], [], [], 0.05 if self.pending else 0.5
+            )
+            self.observe_quiet()
             if not ready:
                 continue
             try:
@@ -273,7 +308,7 @@ class FileRecorder:
         path = directory / name if name else directory
         if mask & IN_ISDIR:
             if mask & (IN_CREATE | IN_MOVED_TO):
-                self.add_tree(path)
+                self.add_tree(path, found=now)
             return
         if mask & (IN_CREATE | IN_MOVED_TO):
             kind = "created"
@@ -281,8 +316,10 @@ class FileRecorder:
             kind = "deleted"
         else:
             kind = "modified"
+        relative = self.relative(path)
         with self.lock:
-            self.events.append((now, kind, self.relative(path)))
+            self.events.append((now, kind, relative))
+            self.pending[relative] = now
 
     def since(self, start, end=None):
         with self.lock:
@@ -294,24 +331,20 @@ class FileRecorder:
         with self.lock:
             return self.events[-1][0] if self.events else None
 
-    def summarize(self, events):
-        """Net change per path since it was last reported; text gets a line diff.
-
-        A file created and removed within the window (a temporary file) is
-        counted as noise, not listed.
-        """
+    def summarize(self, events, start):
+        """Net change per path relative to its state before `start`; text gets a
+        line diff. A file created and removed within the window (a temporary
+        file) is counted as noise, not listed. Repeated reports for the same
+        start give the same answer (versions, not a single moving baseline)."""
         paths = dict.fromkeys(relative for _at, _kind, relative in events)
         files, noise = [], 0
+        now = time.monotonic()
         for relative in paths:
-            path = self.root / relative
-            existed, exists = relative in self.known, path.is_file()
+            existed, before = self.before(relative, start)
+            exists, after = self.record(relative, now)
             if NOISE.search(relative) or not (existed or exists):
                 noise += 1
                 continue
-            if exists:
-                self.known.add(relative)
-            else:
-                self.known.discard(relative)
             change = (
                 "modified"
                 if existed and exists
@@ -319,27 +352,19 @@ class FileRecorder:
             )
             entry = {"path": f"{self.label}/{relative}", "change": change}
             if exists:
-                before = self.texts.get(relative, "" if not existed else None)
-                after = read_document(path)
-                if after is None:
-                    try:
-                        entry["bytes"] = path.stat().st_size
-                    except OSError:
-                        pass
-                else:
-                    try:
-                        entry["bytes"] = path.stat().st_size
-                    except OSError:
-                        entry["bytes"] = len(after.encode())
+                try:
+                    entry["bytes"] = (self.root / relative).stat().st_size
+                except OSError:
+                    pass
+                if after is not None:
+                    if not existed:
+                        before = ""
                     if before is not None:
                         diff = line_diff(before, after)
                         if diff:
                             entry["diff"] = diff
                         elif existed:
                             entry["change"] = "rewritten unchanged"
-                    self.remember(path)
-            else:
-                self.texts.pop(relative, None)
             files.append(entry)
         files.sort(key=lambda e: e["path"])
         return files, noise
@@ -472,7 +497,7 @@ class EffectLedger:
     def report(self, start, end=None):
         files, noise = [], 0
         for recorder in self.recorders:
-            found, ignored = recorder.summarize(recorder.since(start, end))
+            found, ignored = recorder.summarize(recorder.since(start, end), start)
             files += found
             noise += ignored
         report = {"observed_s": round((end or time.monotonic()) - start, 2)}
@@ -484,7 +509,7 @@ class EffectLedger:
 
         documents = [f for f in files if not is_state(f)]
         state = [
-            {**f, "diff": f["diff"][:2]} if "diff" in f else f
+            {**f, "diff": f["diff"][:3]} if "diff" in f else f
             for f in files
             if is_state(f)
         ]

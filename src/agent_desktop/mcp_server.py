@@ -59,6 +59,17 @@ to wait for a save. "Nothing observed" is evidence only for its time window."""
 if os.environ.get("AGENT_DESKTOP_EFFECTS") == "1":
     INSTRUCTIONS += EFFECTS_INSTRUCTIONS
 
+ATLAS_INSTRUCTIONS = """
+
+Effect atlas (experimental): desktop_atlas(query, app) finds which control of an
+application changes a setting, where the control is, its default and the
+configuration key it changes, learned and verified automatically. Use it before
+searching menus and dialogs for a setting. desktop_set(session, app, control)
+applies a verified setting directly, without the GUI; check that it took effect."""
+
+if os.environ.get("AGENT_DESKTOP_ATLAS"):
+    INSTRUCTIONS += ATLAS_INSTRUCTIONS
+
 # One controller id for this server's lifetime (AGENT_DESKTOP_CONTROLLER overrides).
 CONTROLLER = os.environ.get("AGENT_DESKTOP_CONTROLLER") or (
     f"mcp-{os.getpid()}-{uuid.uuid4().hex[:8]}"
@@ -140,6 +151,33 @@ def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dic
 def desktop_windows(session: str) -> dict:
     """List private desktop windows: id, title, app_id, states and parent."""
     return call(session, "windows")
+
+
+@tool()
+def desktop_atlas(query: str, app: str | None = None) -> list[dict]:
+    """Find the control that changes a setting, e.g. query="highlight current
+    line", app="mousepad": its location (menu or dialog tab and label), default
+    state and the configuration key it changes. An empty query lists the app's
+    known controls. Experimental: needs AGENT_DESKTOP_ATLAS."""
+    from . import atlas
+
+    return atlas.search(query, app)
+
+
+@tool()
+def desktop_set(session: str, app: str, control: str) -> dict:
+    """Apply a verified atlas setting without the GUI: write the configuration
+    change learned for `control` (the control text from desktop_atlas) into the
+    private session's home. Many applications pick the change up while running;
+    others on their next start. Verify the result (e.g. desktop_ui). Not for
+    host sessions. Experimental: needs AGENT_DESKTOP_ATLAS."""
+    from . import atlas
+
+    info = core.manifest(session)
+    if info.get("mode") == "host":
+        raise core.DesktopError("desktop_set only writes private session homes")
+    home = info.get("home") or str(core.session_path(session) / "home")
+    return atlas.apply(home, app, control)
 
 
 @tool()
@@ -250,7 +288,8 @@ def desktop_ui_action(
     observation: str | None = None,
 ) -> dict:
     """Act on a desktop_ui node: "press" (click/activate/toggle), "focus",
-    "set_text" (replace an editable field's text) or a listed action name.
+    "set_text" (replace an editable field's text), "select" (choose a tab or
+    list item within its parent) or a listed action name.
 
     Works without coordinates. Verify the result with desktop_ui or a screenshot.
     """

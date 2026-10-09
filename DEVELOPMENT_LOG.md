@@ -1,5 +1,39 @@
 # Development log
 
+## 2026-10-09 — Effect atlas: model-free settings discovery, lookup and apply
+
+Research (docs/research/2026-10-09-effect-atlas.md). Prior art for "compile
+once, run free" (PreAct, AppAgent-Claw), declarative settings (DroidTool, DMI)
+and agent change review was checked first; differential settings discovery was
+the open direction.
+
+`scripts/effect_atlas.py` discovers menu toggles and preferences check boxes
+through accessibility, clicks each once in a fresh session, parses the
+configuration into keys (INI/keyfile, xcu, prefs.js, JSON), subtracts control
+and interaction noise, and verifies each effect by applying it alone. Mousepad
+0.7.0: 37 controls, 32 with effect, 30 verified, 7.7 min. Geany 2.1: 93
+controls, 76 with effect, 75 verified, 23 min. Geany stores "Always wrap
+search" and "Hide the Find dialog" under each other's key names (src/search.c
+197-200, still in master).
+
+Runtime: `ui_action` `select` (tab or list item through the parent's
+Selection); the effect ledger keeps per-file versions (repeatable reports; the
+watcher versions files when their events go quiet) and records files created in
+a new directory before its watch existed. Experimental `atlas` module with MCP
+`desktop_atlas` and `desktop_set` behind `AGENT_DESKTOP_ATLAS`; `desktop_set`
+refuses host sessions and unverified entries. Mousepad applies an externally
+written key live.
+
+Agent A/B (claude-opus-5-5, four Mousepad settings tasks, 3 runs per arm):
+lookup only, input tokens +20% (p = 0.0005), turns unchanged; lookup and
+apply, three tasks 10-13 → 3-4 turns at about half the cost, pooled -26%
+(p = 0.053). All runs succeeded. Harness: `--suite atlas`, `--atlas DIR`.
+
+Validation: ruff check and format, compileall; tests/test_atlas.py (10) and
+tests/test_effects.py (13) passed; full suite with the repaired Nix runtime and
+optional applications: 143 OK, 1 skipped (visible mode). Agent runs: 48,
+$5.09.
+
 ## 2026-10-08 — Effect ledger research prototype and agent A/B
 
 Prototype `src/agent_desktop/effects.py` behind `AGENT_DESKTOP_EFFECTS=1`:

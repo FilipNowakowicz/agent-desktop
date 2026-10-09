@@ -47,7 +47,12 @@ def honest_failure(reply):
 groups = {}
 for run in sys.argv[1:]:
     data = json.loads((Path(run) / "summary.json").read_text())
-    arm = "effects" if data["summary"].get("effects") else "baseline"
+    summary = data["summary"]
+    arm = (
+        "atlas"
+        if summary.get("atlas")
+        else ("effects" if summary.get("effects") else "baseline")
+    )
     for record in data["records"]:
         if "skipped" in record:
             continue
@@ -99,7 +104,8 @@ for (task, arm), records in sorted(groups.items()):
     )
 # Pooled comparison: each run's input tokens relative to its task's baseline
 # median, then a two-sided permutation test on the difference of mean ratios.
-ratios = {"baseline": [], "effects": []}
+treated = "atlas" if any(arm == "atlas" for _task, arm in groups) else "effects"
+ratios = {"baseline": [], treated: []}
 for task in sorted({task for task, _arm in groups}):
     base = median([tokens(r)[0] for r in groups.get((task, "baseline"), [])])
     if not base:
@@ -107,11 +113,11 @@ for task in sorted({task for task, _arm in groups}):
     for arm in ratios:
         ratios[arm] += [tokens(r)[0] / base for r in groups.get((task, arm), [])]
 pooled = {}
-if ratios["baseline"] and ratios["effects"]:
+if ratios["baseline"] and ratios[treated]:
     import random
 
-    observed = statistics.mean(ratios["effects"]) - statistics.mean(ratios["baseline"])
-    values = ratios["baseline"] + ratios["effects"]
+    observed = statistics.mean(ratios[treated]) - statistics.mean(ratios["baseline"])
+    values = ratios["baseline"] + ratios[treated]
     split = len(ratios["baseline"])
     generator = random.Random(0)
     extreme = 0

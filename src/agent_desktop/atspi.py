@@ -274,6 +274,20 @@ class Accessibility:
         node = self.parse(node_id)
         if action == "focus":
             done = self.call(node, "org.a11y.atspi.Component", "GrabFocus")[0]
+        elif action == "select":
+            # A tab or list item: select it within its parent (Selection).
+            parent = tuple(self.get(node, ACCESSIBLE, "Parent"))
+            index = self.call(node, ACCESSIBLE, "GetIndexInParent")[0]
+            try:
+                done = self.call(
+                    parent, "org.a11y.atspi.Selection", "SelectChild", "i", (index,)
+                )[0]
+            except AccessibilityError as error:
+                if "UnknownMethod" in str(error) or "NotSupported" in str(error):
+                    raise Unsupported(
+                        "The element's parent offers no selection"
+                    ) from None
+                raise
         elif action == "set_text":
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("set_text needs text of at most 10000 characters")

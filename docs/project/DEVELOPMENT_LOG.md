@@ -1,5 +1,30 @@
 # Development log
 
+## 2026-10-09 — Host-session browser trial; host sessions keep the computer awake
+
+The maintainer ran the first real host-mode task (userscript install and
+web-app settings in their Firefox, three sessions, 164 traced calls) and
+recorded it in docs/trials/2026-10-09-host-browser-task.md. The idle
+screensaver started mid-session and a Ctrl+T was traced `delivered` without
+effect (findings 1–2).
+
+Host sessions now hold a logind idle inhibitor (`systemd-inhibit --what=idle
+--mode=block`) from start until stop or expiry. It watches the worker's PID, so
+it also ends if the worker is killed; `AGENT_DESKTOP_HOST_KEEP_AWAKE=0` turns it
+off. The trial showed hypridle honours such an inhibitor. INTEGRATIONS.md shows
+user-scope MCP registration (finding 6).
+
+Validation: ruff check and format; `PATH=<nix runtime>/bin:$PATH uv run python
+-m unittest discover -s tests -p test_host.py -v` — 8 tests OK, including the
+new `test_keeps_the_computer_awake_until_it_ends` (inhibitor listed during the
+session, gone after `stop_host`); full suite with the Nix runtime only: 144 OK,
+17 skipped (optional applications absent: LibreOffice, zenity, kdialog, mousepad,
+xterm, xev, wlr-randr; visible mode).
+
+Still open from the trial: refusing input while locked or blanked, layer-shell
+focus in `delivered` (finding 2), window geometry/workspace, a fresh screenshot
+after `UserActive`, the session id in tokens, and CLI polish.
+
 ## 2026-10-09 — Prepare for public visibility
 
 The maintainer approved making the repository public. Planning records

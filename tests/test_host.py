@@ -6,6 +6,7 @@ never touch the real screen; notifications are disabled.
 
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -143,6 +144,22 @@ class HostTests(unittest.TestCase):
             core.request(host, "move", x=30, y=30)
         time.sleep(4.5)
         core.request(host, "move", x=40, y=40)
+
+    @unittest.skipUnless(shutil.which("systemd-inhibit"), "no systemd-inhibit")
+    def test_keeps_the_computer_awake_until_it_ends(self):
+        def inhibitors():
+            listing = subprocess.run(
+                ["systemd-inhibit", "--list", "--no-pager"],
+                capture_output=True,
+                text=True,
+            ).stdout
+            return f"Host session {host}" in listing
+
+        host = self.approved()
+        if not inhibitors():
+            self.skipTest("no logind inhibitors here")
+        core.stop_host()
+        wait_for(lambda: not inhibitors())
 
     def test_expires(self):
         host = self.approved(minutes=0.02)

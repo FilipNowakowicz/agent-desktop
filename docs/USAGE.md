@@ -221,6 +221,12 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
   Activity is noticed after a 0.3 s pause in the agent's input, so a fast burst of
   agent steps can finish before it stops.
 - **Notifications.** You get one when the session starts and ends.
+- **Stays awake.** The session holds a logind idle inhibitor (`systemd-inhibit
+  --what=idle`), so idle locking, screen blanking and idle suspend wait until it
+  ends or expires; it is released with the session, even if the worker is
+  killed. Lid close and manual suspend still work. Set
+  `AGENT_DESKTOP_HOST_KEEP_AWAKE=0` to disable it. Input is not yet refused while
+  the screen is locked, so lock the screen only after `host stop`.
 - **Your windows stay open.** Applications the agent starts open through your
   desktop (`hyprctl dispatch exec` on Hyprland, otherwise `systemd-run --user`).
   Ending the session never closes your windows.

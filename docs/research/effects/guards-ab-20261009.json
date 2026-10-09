@@ -1,0 +1,133 @@
+{
+ "tasks": [
+  {
+   "task": "hard-editor-open-edit",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 3,
+   "tool_calls": 4,
+   "effects_calls": 0,
+   "turns": 5,
+   "input_tokens": 77977,
+   "output_tokens": 930,
+   "cost_usd": 0.1130914,
+   "seconds": 21.3
+  },
+  {
+   "task": "hard-editor-open-edit",
+   "arm": "guards",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 2,
+   "tool_calls": 3,
+   "effects_calls": 0,
+   "turns": 4,
+   "input_tokens": 60723,
+   "output_tokens": 821,
+   "cost_usd": 0.09548000000000001,
+   "seconds": 18.4
+  },
+  {
+   "task": "hard-interrupting-modal",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 4,
+   "tool_calls": 5,
+   "effects_calls": 0,
+   "turns": 6,
+   "input_tokens": 98347,
+   "output_tokens": 875,
+   "cost_usd": 0.1282504,
+   "seconds": 17.0
+  },
+  {
+   "task": "hard-interrupting-modal",
+   "arm": "guards",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 4,
+   "tool_calls": 5,
+   "effects_calls": 0,
+   "turns": 6,
+   "input_tokens": 100236,
+   "output_tokens": 912,
+   "cost_usd": 0.1295226,
+   "seconds": 17.5
+  },
+  {
+   "task": "hard-web-admin",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 8,
+   "tool_calls": 9,
+   "effects_calls": 0,
+   "turns": 10,
+   "input_tokens": 195867,
+   "output_tokens": 1651,
+   "cost_usd": 0.21526140000000005,
+   "seconds": 28.4
+  },
+  {
+   "task": "hard-web-admin",
+   "arm": "guards",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 8,
+   "tool_calls": 9,
+   "effects_calls": 0,
+   "turns": 10,
+   "input_tokens": 197913,
+   "output_tokens": 1460,
+   "cost_usd": 0.21355739999999998,
+   "seconds": 27.5
+  }
+ ],
+ "pooled_input_tokens": {
+  "runs": {
+   "baseline": 9,
+   "guards": 9
+  },
+  "mean_ratio": {
+   "baseline": 1.019,
+   "guards": 0.92
+  },
+  "p_value": 0.132
+ },
+ "pooled_turns": {
+  "runs": {
+   "baseline": 9,
+   "guards": 9
+  },
+  "mean_ratio": {
+   "baseline": 1.011,
+   "guards": 0.922
+  },
+  "p_value": 0.1352
+ },
+ "pooled_seconds": {
+  "runs": {
+   "baseline": 9,
+   "guards": 9
+  },
+  "mean_ratio": {
+   "baseline": 0.994,
+   "guards": 1.001
+  },
+  "p_value": 0.9188
+ }
+}

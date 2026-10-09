@@ -73,7 +73,9 @@ adapter and three checked procedures, S4 host hardening; damage capture, host
 OCR and route memory only when a measured task needs them. General crawling and
 speculative mutations are cut. S1a is done: input with `screenshot=true` cut
 model turns 31% and input tokens 20% in a matched A/B
-([act and observe](../research/2026-10-09-act-and-observe.md)).
+([act and observe](../research/2026-10-09-act-and-observe.md)). S2 guarded steps did not
+meet their speed gate (turns −8%, not significant) and are kept for
+reliability ([guarded steps](../research/2026-10-09-guarded-steps.md)).
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

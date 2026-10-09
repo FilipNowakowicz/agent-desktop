@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-09 — S2: guarded steps (kept for reliability, not speed)
+
+`desktop_actions` steps take `expect`; `ui_action` steps can name a target found
+at run time (one exact match or nothing is sent); waits take `state` and
+`exact`; listings mark `disabled` controls (neither ENABLED nor SENSITIVE: GTK 4
+sets only SENSITIVE); `press` works on check-only Chromium check boxes; a run
+`timeout`. `AGENT_DESKTOP_GUARDS=0` hides the description (benchmark
+`--no-guards`).
+
+Agent A/B on three hard tasks with S1a in both arms
+(docs/research/2026-10-09-guarded-steps.md, 18 runs, all passed): turns −8%
+(p = 0.14), time unchanged. The 30% gate is not met; the agent rarely used
+expectations and never run-time targets. Kept as reliability features; speed
+work moves to the browser bridge and reuse. Agent runs used today: 36.
+
+Validation: ruff check and format; full desktop suite with zenity, kdialog and
+at-spi2-core from `nix shell`: 148 tests OK (10 skipped).
+
 ## 2026-10-09 — S1a: input returns the settled screen
 
 Input tools, `desktop_actions` and the CLI (`--screenshot`) accept

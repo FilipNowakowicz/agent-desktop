@@ -27,13 +27,9 @@ user-scope MCP registration (finding 6).
 Validation: ruff check and format; `PATH=<nix runtime>/bin:$PATH uv run python
 -m unittest discover -s tests -p test_host.py -v` — 8 tests OK, including the
 new `test_keeps_the_computer_awake_until_it_ends` (inhibitor listed during the
-<<<<<<< HEAD
 session, gone after `stop_host`); full suite with the Nix runtime only: 144 OK,
 17 skipped (optional applications absent: LibreOffice, zenity, kdialog, mousepad,
 xterm, xev, wlr-randr; visible mode).
-=======
-session, gone after `stop_host`); full suite: see the PR.
->>>>>>> 636335d (Research where desktop control time goes and how to approach human speed)
 
 Still open from the trial: refusing input while locked or blanked, layer-shell
 focus in `delivered` (finding 2), window geometry/workspace, a fresh screenshot

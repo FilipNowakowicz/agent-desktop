@@ -51,6 +51,12 @@ GUI setting's effect can be learned once and applied directly (a small,
 verified settings map for Calc). Ranked next steps are in that report; the
 ledger stays experimental until the open items there are done.
 
+Second result (2026-10-09, [effect atlas](docs/research/2026-10-09-effect-atlas.md)):
+model-free differential exploration mapped and verified 30 of Mousepad's and
+75 of Geany's settings to configuration keys (and found swapped key names in
+Geany). Applying a learned setting directly (`desktop_set`) halved the cost of
+three of four settings tasks; a lookup without applying did not help.
+
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from

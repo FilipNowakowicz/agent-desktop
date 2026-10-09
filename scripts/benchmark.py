@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import find_registryd, owned_processes  # noqa: E402
+from benchmarks.atlas import ATLAS_TASKS  # noqa: E402
 from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
@@ -30,6 +31,7 @@ SUITES = {
     "hard": HARD_TASKS,
     "office": OFFICE_TASKS,
     "effects": EFFECT_TASKS,
+    "atlas": ATLAS_TASKS,
 }
 
 # Tool profiles for comparisons. "basic" is the tool set before waiting, action
@@ -192,6 +194,7 @@ def mcp_config_for(root):
             server["env"] = {
                 **server.get("env", {}),
                 "AGENT_DESKTOP_EFFECTS": os.environ.get("AGENT_DESKTOP_EFFECTS", "0"),
+                "AGENT_DESKTOP_ATLAS": os.environ.get("AGENT_DESKTOP_ATLAS", ""),
             }
         path.write_text(json.dumps(config, indent=2) + "\n")
     return str(path)
@@ -235,6 +238,11 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
                         + ([] if effects_enabled() else ["effects"])
+                        + (
+                            []
+                            if os.environ.get("AGENT_DESKTOP_ATLAS")
+                            else ["atlas", "set"]
+                        )
                     ],
                 )
             )
@@ -275,6 +283,11 @@ def main():
         "--dry-run", action="store_true", help="set up and check without an agent"
     )
     parser.add_argument(
+        "--atlas",
+        type=Path,
+        help="directory of effect-atlas files for the desktop_atlas tool",
+    )
+    parser.add_argument(
         "--effects",
         action="store_true",
         help="experimental effect ledger in sessions and MCP replies",
@@ -283,6 +296,10 @@ def main():
     random.seed(args.seed)
     # Sessions inherit this from the harness; the MCP server from claude.
     os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
+    if args.atlas:
+        os.environ["AGENT_DESKTOP_ATLAS"] = str(args.atlas.resolve())
+    else:
+        os.environ.pop("AGENT_DESKTOP_ATLAS", None)
     if not args.dry_run and not shutil.which("claude"):
         raise SystemExit("Requires the claude CLI")
     root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
@@ -323,6 +340,7 @@ def main():
         "seed": args.seed,
         "tools": args.tools,
         "effects": args.effects,
+        "atlas": bool(args.atlas),
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),

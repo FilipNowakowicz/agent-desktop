@@ -149,11 +149,21 @@ class RecorderTests(unittest.TestCase):
         count = len(recorder.events)
         (self.root / "notes.txt").unlink()
         self.assertTrue(wait_for(lambda: len(recorder.events) > count))
-        recorder.summarize(recorder.since(0))
+        recorder.summarize(recorder.since(0), 0)
         state = ledger.begin()
         (self.root / "new.txt").unlink()
         report = ledger.finish(state)
         self.assertEqual(report["files"], [{"path": "~/new.txt", "change": "deleted"}])
+
+    def test_reports_are_repeatable(self):
+        # The action's own reply must not use up the diff for later queries.
+        ledger = self.ledger()
+        state = ledger.begin()
+        (self.root / "notes.txt").write_text("one\nchanged\n")
+        first = ledger.finish(state)
+        again = ledger.since(first["effect_id"])
+        self.assertEqual(first["files"], again["files"])
+        self.assertEqual(again["files"][0]["diff"], ["+changed"])
 
     def test_nothing_observed(self):
         ledger = self.ledger()
@@ -174,6 +184,18 @@ class RecorderTests(unittest.TestCase):
             ledger.matches(action, "*.csv")
         with self.assertRaises(ValueError):
             ledger.since(9999)
+
+    def test_files_written_before_a_new_directory_is_watched(self):
+        recorder = FileRecorder(self.root, "~")
+        self.addCleanup(recorder.close)
+        start = time.monotonic()
+        # mkdir -p and a write in one go, faster than the watch can be added.
+        deep = self.root / "x" / "y"
+        deep.mkdir(parents=True)
+        (deep / "keyfile").write_text("[a]\nb=1\n")
+        self.assertTrue(
+            wait_for(lambda: any(e[2] == "x/y/keyfile" for e in recorder.since(start)))
+        )
 
     def test_new_directories_are_watched(self):
         recorder = FileRecorder(self.root, "~")

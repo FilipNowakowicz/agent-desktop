@@ -264,6 +264,15 @@ Ranked by expected value:
    text files; a per-task "what changed" review with revert is a small step,
    and the AgentTrace interviews suggest people want this view.
 
+## Correction (2026-10-09)
+
+Two recorder bugs were found and fixed while building the
+[effect atlas](2026-10-09-effect-atlas.md): a second report about the same
+action (for example `desktop_effects` after the action's reply) diffed against
+an already updated baseline, and files written between reports were not
+versioned. Both could only make later queries in the A/B's ledger arm show
+less than happened, so the measured savings are not inflated by them.
+
 ## Reproduction
 
 ```sh

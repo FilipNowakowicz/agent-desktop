@@ -1,0 +1,289 @@
+{
+ "note": "Effect-atlas A/B, 2026-10-09, claude-opus-5-5 via claude -p, agent-desktop MCP tools only, effect ledger off in both arms. Four Mousepad settings tasks in everyday words; success read from ~/.config/Mousepad/settings.conf. 'lookup' arm: desktop_atlas only, task text ended 'Work through the GUI.'. 'lookup_and_set' arm: desktop_atlas + desktop_set, neutral task text, baseline rerun with the same text. 3 runs per task and arm, arms alternating. Atlas: artifacts copy of atlas-mousepad-20261009.json.",
+ "lookup": {
+  "runs": [
+   "artifacts/benchmark/20261009-015508-e1ca",
+   "artifacts/benchmark/20261009-015635-53f7",
+   "artifacts/benchmark/20261009-015841-0d46",
+   "artifacts/benchmark/20261009-020017-fa59",
+   "artifacts/benchmark/20261009-020209-5596",
+   "artifacts/benchmark/20261009-020342-fb19"
+  ],
+  "tasks": [
+   {
+    "task": "atlas-bracket-partner",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 98689,
+    "output_tokens": 1307,
+    "cost_usd": 0.10910380000000001,
+    "seconds": 23.1
+   },
+   {
+    "task": "atlas-bracket-partner",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 9,
+    "effects_calls": 0,
+    "turns": 10,
+    "input_tokens": 83062,
+    "output_tokens": 1161,
+    "cost_usd": 0.101505,
+    "seconds": 17.7
+   },
+   {
+    "task": "atlas-highlight-line",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 115356,
+    "output_tokens": 1360,
+    "cost_usd": 0.1141714,
+    "seconds": 20.5
+   },
+   {
+    "task": "atlas-highlight-line",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 4,
+    "tool_calls": 11,
+    "effects_calls": 0,
+    "turns": 12,
+    "input_tokens": 114579,
+    "output_tokens": 1449,
+    "cost_usd": 0.1265962,
+    "seconds": 22.5
+   },
+   {
+    "task": "atlas-monospace",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 113011,
+    "output_tokens": 1347,
+    "cost_usd": 0.1098496,
+    "seconds": 29.1
+   },
+   {
+    "task": "atlas-monospace",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 3,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 99207,
+    "output_tokens": 1314,
+    "cost_usd": 0.1118896,
+    "seconds": 21.9
+   },
+   {
+    "task": "atlas-visible-whitespace",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 100884,
+    "output_tokens": 1377,
+    "cost_usd": 0.1149436,
+    "seconds": 20.1
+   },
+   {
+    "task": "atlas-visible-whitespace",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 4,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 83425,
+    "output_tokens": 1289,
+    "cost_usd": 0.10570080000000001,
+    "seconds": 18.4
+   }
+  ],
+  "pooled_input_tokens": {
+   "runs": {
+    "baseline": 12,
+    "atlas": 12
+   },
+   "mean_ratio": {
+    "baseline": 0.966,
+    "atlas": 1.204
+   },
+   "p_value": 0.0005
+  }
+ },
+ "lookup_and_set": {
+  "runs": [
+   "artifacts/benchmark/20261009-020649-e3b2",
+   "artifacts/benchmark/20261009-020849-48e4",
+   "artifacts/benchmark/20261009-020951-1e4b",
+   "artifacts/benchmark/20261009-021137-f483",
+   "artifacts/benchmark/20261009-021307-b401",
+   "artifacts/benchmark/20261009-021447-c68f"
+  ],
+  "tasks": [
+   {
+    "task": "atlas-bracket-partner",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 0,
+    "tool_calls": 2,
+    "effects_calls": 0,
+    "turns": 3,
+    "input_tokens": 38344,
+    "output_tokens": 441,
+    "cost_usd": 0.053624000000000005,
+    "seconds": 17.5
+   },
+   {
+    "task": "atlas-bracket-partner",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "tool_calls": 9,
+    "effects_calls": 0,
+    "turns": 10,
+    "input_tokens": 83021,
+    "output_tokens": 1215,
+    "cost_usd": 0.10161039999999999,
+    "seconds": 21.2
+   },
+   {
+    "task": "atlas-highlight-line",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "tool_calls": 3,
+    "effects_calls": 0,
+    "turns": 4,
+    "input_tokens": 52965,
+    "output_tokens": 496,
+    "cost_usd": 0.0651594,
+    "seconds": 13.3
+   },
+   {
+    "task": "atlas-highlight-line",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 3,
+    "tool_calls": 12,
+    "effects_calls": 0,
+    "turns": 13,
+    "input_tokens": 114959,
+    "output_tokens": 1531,
+    "cost_usd": 0.1246214,
+    "seconds": 24.2
+   },
+   {
+    "task": "atlas-monospace",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 8,
+    "effects_calls": 0,
+    "turns": 9,
+    "input_tokens": 111577,
+    "output_tokens": 1156,
+    "cost_usd": 0.10270920000000001,
+    "seconds": 22.7
+   },
+   {
+    "task": "atlas-monospace",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 84050,
+    "output_tokens": 1317,
+    "cost_usd": 0.10697240000000001,
+    "seconds": 26.3
+   },
+   {
+    "task": "atlas-visible-whitespace",
+    "arm": "atlas",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "tool_calls": 3,
+    "effects_calls": 0,
+    "turns": 4,
+    "input_tokens": 53088,
+    "output_tokens": 524,
+    "cost_usd": 0.06598580000000001,
+    "seconds": 14.0
+   },
+   {
+    "task": "atlas-visible-whitespace",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 97355,
+    "output_tokens": 1301,
+    "cost_usd": 0.10729340000000001,
+    "seconds": 20.9
+   }
+  ],
+  "pooled_input_tokens": {
+   "runs": {
+    "baseline": 12,
+    "atlas": 12
+   },
+   "mean_ratio": {
+    "baseline": 1.026,
+    "atlas": 0.74
+   },
+   "p_value": 0.0532
+  }
+ }
+}

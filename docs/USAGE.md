@@ -139,6 +139,19 @@ outside the watched directories, in memory, in binary stores such as dconf, or
 over the network are not seen. Research notes and measurements:
 [docs/research/2026-10-08-effect-ledger.md](research/2026-10-08-effect-ledger.md).
 
+## Effect atlas (experimental)
+
+`scripts/effect_atlas.py APP` learns which configuration key each menu toggle
+and preferences check box of an application changes, by clicking each once in
+fresh private sessions, and verifies every entry. With `AGENT_DESKTOP_ATLAS`
+pointing to a directory of atlas files, the MCP server offers
+`desktop_atlas(query, app)` (where a setting is and which key it changes) and
+`desktop_set(session, app, control)`, which writes a verified entry into a
+private session's configuration without the GUI. Some applications apply such
+a change while running, others at their next start; check the result.
+`desktop_set` refuses host sessions. Details:
+[docs/research/2026-10-09-effect-atlas.md](research/2026-10-09-effect-atlas.md).
+
 ## Taking control (logins, 2FA, CAPTCHAs)
 
 An agent that reaches a login page calls `desktop_request_human` with a reason

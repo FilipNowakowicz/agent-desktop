@@ -4,7 +4,7 @@
 > documentation cleanup. Its file/line evidence describes the reviewed revision;
 > `prompt1.txt` and `prompt2.txt` remain available at Git commit
 > `1e9b20f21188b981b1a398e79aee10ccf924afc0`. Useful ideas now live in
-> [PROJECT_PLAN.md](../../../PROJECT_PLAN.md).
+> [PROJECT_PLAN.md](../../project/PROJECT_PLAN.md).
 
 **Verdict: a credible engineering alpha with an unfinished daily-use release. Stop adding capabilities for now.** The core private-desktop loop is real, and much of its complexity comes from diagnosing actual failures. What has not been earned is the stronger story: convenient installation, dependable long sessions, private credential handoff, broadly reliable applications or a measured performance advantage. Recommend **O1: harden and package for daily personal use**. The other directions should compete for investment after that pilot, not accumulate as another feature list.
 

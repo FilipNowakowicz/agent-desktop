@@ -3,7 +3,7 @@
 Evidence through 2026-10-05. These are observations from particular revisions
 and environments, not a support guarantee. CI containers do not establish desktop
 installation support. See the [validation guide](VALIDATION.md) to reproduce
-checks and the [development log](../DEVELOPMENT_LOG.md) for later changes.
+checks and the [development log](project/DEVELOPMENT_LOG.md) for later changes.
 
 | Environment | Observation |
 | --- | --- |

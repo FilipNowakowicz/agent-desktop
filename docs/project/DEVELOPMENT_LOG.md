@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-09 — Prepare for public visibility
+
+The maintainer approved making the repository public. Planning records
+(development log, project plan, research findings, start here) moved to
+`docs/project/`; Markdown links were rewritten repo-wide and checked (none
+broken), while plain-text file names in dated records stay as written. Added
+SECURITY.md with private advisory reporting; README status now reflects the
+closed alpha gates and summarizes the effect ledger and atlas research;
+AGENTS.md, CONTRIBUTING.md, START_HERE and the PR template no longer require
+private visibility. Disclosure scan repeated over all history: no tokens, keys
+or passwords; history is published as is (maintainer decision). The Geany key
+swap was reported as geany/geany#4677. Issue #6 (M3) closed as complete.
+
 ## 2026-10-09 — Effect atlas: model-free settings discovery, lookup and apply
 
 Research (docs/research/2026-10-09-effect-atlas.md). Prior art for "compile

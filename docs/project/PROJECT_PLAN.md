@@ -57,6 +57,12 @@ model-free differential exploration mapped and verified 30 of Mousepad's and
 Geany). Applying a learned setting directly (`desktop_set`) halved the cost of
 three of four settings tasks; a lookup without applying did not help.
 
+Speed (2026-10-09, [research note](../research/2026-10-09-speed.md)): in the
+host trial, 97–99% of wall time was outside the tool (model round trips), and 53
+of 59 screenshots directly followed an input. Proposed next experiment: input
+that returns the settled result (act and see), then guarded action plans with
+targets resolved at run time and expectations, measured against matched arms.
+
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from

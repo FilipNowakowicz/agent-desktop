@@ -1,5 +1,15 @@
 # Development log
 
+## 2026-10-09 — Speed: where the time goes
+
+Research note docs/research/2026-10-09-speed.md. From the host trial traces
+(164 calls, three sessions): time inside the tool was 0.4–2.6% of wall time,
+median gap between calls 2.1–3.6 s, and 53 of 59 screenshots came directly after
+an input. Proposals ranked: act-and-see input results with damage-based
+settling, guarded plans (run-time targets and expectations), replayed
+procedures, a fast grounding model, API paths, shorter round trips. No
+implementation or agent runs yet.
+
 ## 2026-10-09 — Host-session browser trial; host sessions keep the computer awake
 
 The maintainer ran the first real host-mode task (userscript install and
@@ -17,9 +27,13 @@ user-scope MCP registration (finding 6).
 Validation: ruff check and format; `PATH=<nix runtime>/bin:$PATH uv run python
 -m unittest discover -s tests -p test_host.py -v` — 8 tests OK, including the
 new `test_keeps_the_computer_awake_until_it_ends` (inhibitor listed during the
+<<<<<<< HEAD
 session, gone after `stop_host`); full suite with the Nix runtime only: 144 OK,
 17 skipped (optional applications absent: LibreOffice, zenity, kdialog, mousepad,
 xterm, xev, wlr-randr; visible mode).
+=======
+session, gone after `stop_host`); full suite: see the PR.
+>>>>>>> 636335d (Research where desktop control time goes and how to approach human speed)
 
 Still open from the trial: refusing input while locked or blanked, layer-shell
 focus in `delivered` (finding 2), window geometry/workspace, a fresh screenshot

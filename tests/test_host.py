@@ -145,6 +145,39 @@ class HostTests(unittest.TestCase):
         time.sleep(4.5)
         core.request(host, "move", x=40, y=40)
 
+    def test_old_screenshots_and_locked_screens_are_refused(self):
+        self.person_terminal()
+        host = self.approved()
+        time.sleep(1)
+        observation = core.request(host, "screenshot")["observation"]
+        core.request(self.person, "move", x=200, y=200)
+        time.sleep(3.5)  # the pause is over, but the screenshot predates it
+        with self.assertRaisesRegex(core.DesktopError, "after that screenshot"):
+            core.request(host, "move", x=30, y=30, observation=observation)
+        fresh = core.request(host, "screenshot")["observation"]
+        core.request(host, "move", x=30, y=30, observation=fresh)
+        # A screen locker is running: nothing is sent until it is gone.
+        locker = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "open('/proc/self/comm', 'w').write('swaylock'); "
+                "import time; time.sleep(30)",
+            ]
+        )
+        try:
+            wait_for(
+                lambda: (
+                    Path(f"/proc/{locker.pid}/comm").read_text().strip() == "swaylock"
+                )
+            )
+            with self.assertRaisesRegex(core.DesktopError, "screen is locked"):
+                core.request(host, "move", x=40, y=40)
+        finally:
+            locker.kill()
+            locker.wait()
+        core.request(host, "move", x=40, y=40)
+
     @unittest.skipUnless(shutil.which("systemd-inhibit"), "no systemd-inhibit")
     def test_keeps_the_computer_awake_until_it_ends(self):
         def inhibitors():

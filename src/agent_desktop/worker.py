@@ -280,6 +280,10 @@ class UserActive(RuntimeError):
     pass
 
 
+class ScreenUnavailable(RuntimeError):
+    """The person's screen is locked or off (host sessions)."""
+
+
 # Operations a host session refuses: the person is already at this screen, and
 # its accessibility bus and viewers belong to them.
 HOST_UNSUPPORTED = (
@@ -292,6 +296,8 @@ HOST_UNSUPPORTED = (
     "set",
     "browser",
 )
+# Processes that mean the person's screen is locked (host sessions).
+SCREEN_LOCKERS = {"hyprlock", "swaylock", "gtklock", "waylock", "i3lock"}
 # Pause agent input this long after the person last used the computer.
 HOST_PAUSE_SECONDS = 3.0
 
@@ -326,9 +332,9 @@ def notify(summary, body, env):
 def keep_awake(session, env):
     """Hold a logind idle inhibitor for a host session (best effort).
 
-    The screen locker, blanking and idle suspend wait while it is held, so input
-    cannot land on a lock screen. It ends with this worker even if the worker is
-    killed. AGENT_DESKTOP_HOST_KEEP_AWAKE=0 disables it.
+    Idle locking, blanking and idle suspend wait while it is held; a manual lock
+    still happens, and host input is then refused (host_unavailable). It ends
+    with this worker even if the worker is killed. AGENT_DESKTOP_HOST_KEEP_AWAKE=0 disables it.
     """
     if env.get("AGENT_DESKTOP_HOST_KEEP_AWAKE") == "0":
         return None
@@ -396,6 +402,7 @@ class Worker:
         self.effects = None
         self.keysyms = None
         self.browser = None  # (BiDi connection, Firefox pid) once started
+        self.screenshot_at = 0.0  # monotonic start of the latest screenshot
         self.stop = False
         self.profile_lock = None
         self.activity = None  # host sessions: the person's input
@@ -445,15 +452,47 @@ class Worker:
             self.env,
         )
 
-    def user_active(self):
-        """Whether the person used the computer recently (host sessions)."""
-        now = time.monotonic()
+    def person_input(self):
+        """Times the person (not the agent) resumed using the computer."""
         ours = self.agent_input
-        theirs = [
+        return [
             moment
             for moment in self.activity.resumed_at
             if not any(start - 0.05 <= moment <= end + 0.5 for start, end in ours)
         ]
+
+    def host_unavailable(self):
+        """Why the person's screen cannot take input now, or None: a screen
+        locker is running, or Hyprland reports every display switched off."""
+        for entry in Path("/proc").iterdir():
+            if entry.name.isdigit():
+                try:
+                    name = (entry / "comm").read_text().strip()
+                except OSError:
+                    continue
+                if name in SCREEN_LOCKERS:
+                    return f"the screen is locked ({name})"
+        if self.env.get("HYPRLAND_INSTANCE_SIGNATURE") and shutil.which(
+            "hyprctl", path=self.env.get("PATH")
+        ):
+            try:
+                result = subprocess.run(
+                    ["hyprctl", "-j", "monitors"],
+                    env=self.env,
+                    capture_output=True,
+                    timeout=2,
+                )
+                monitors = json.loads(result.stdout or b"[]")
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                return None
+            if monitors and not any(m.get("dpmsStatus", True) for m in monitors):
+                return "the display is switched off"
+        return None
+
+    def user_active(self):
+        """Whether the person used the computer recently (host sessions)."""
+        now = time.monotonic()
+        theirs = self.person_input()
         if not theirs:
             return False
         latest = theirs[-1]
@@ -1521,11 +1560,25 @@ class Worker:
                 f"{operation} is not available on the host session: the person "
                 "is at this screen. Use a private session for it."
             )
-        if host and operation in (*INPUT_OPERATIONS, "focus") and self.user_active():
-            raise UserActive(
-                "The person is using the computer; nothing was sent. Wait a few "
-                "seconds (desktop_wait with seconds) and try again."
-            )
+        if host and operation in (*INPUT_OPERATIONS, "focus"):
+            unavailable = self.host_unavailable()
+            if unavailable:
+                raise ScreenUnavailable(
+                    f"Nothing was sent: {unavailable}. Input would not reach the "
+                    "person's windows. Stop and tell the person."
+                )
+            if self.user_active():
+                raise UserActive(
+                    "The person is using the computer; nothing was sent. Wait a "
+                    "few seconds (desktop_wait with seconds) and try again."
+                )
+            if request.get("observation") is not None and any(
+                moment > self.screenshot_at for moment in self.person_input()
+            ):
+                raise StaleObservation(
+                    "The person used the computer after that screenshot; nothing "
+                    "was sent. Take a new screenshot."
+                )
         # destroy, take, release and viewer_start stay available to everyone:
         # they are lifecycle and person controls, never agent input.
         self.check_lease(operation, controller)
@@ -1645,6 +1698,7 @@ class Worker:
                 "window": focused,
             }
         if operation == "screenshot":
+            self.screenshot_at = time.monotonic()
             settled = None
             if request.get("settle_ms") is not None:
                 quiet = request["settle_ms"]

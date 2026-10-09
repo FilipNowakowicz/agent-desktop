@@ -46,7 +46,9 @@ Only when the user asks you to act on their own screen (open an app there,
 navigate, click), call desktop_request_host with the reason. They confirm it;
 then use the returned session with the same tools. Their windows are real: act
 carefully, prefer reading before clicking, and never close their windows. If
-input is refused because they are using the computer, wait a few seconds. Their
+input is refused because they are using the computer, wait a few seconds,
+then take a new screenshot. If it is refused because the screen is locked or
+off, stop and tell them. Their
 screen rarely stops changing, so wait for a window title rather than
 stable_ms (element waits need a private session). Call
 desktop_destroy on that session as soon as you are done; it never closes their

@@ -294,14 +294,18 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
 - **You come first.** When you use the mouse or keyboard, agent input is refused
   for about 3 seconds after your last activity ("UserActive", nothing sent).
   Activity is noticed after a 0.3 s pause in the agent's input, so a fast burst of
-  agent steps can finish before it stops.
+  agent steps can finish before it stops. Input that carries the observation
+  token of a screenshot taken before your activity is refused too; the agent
+  must look again.
+- **Locked or dark screen.** While a screen locker runs (hyprlock, swaylock,
+  gtklock, waylock, i3lock) or Hyprland reports every display off, input is
+  refused ("ScreenUnavailable", nothing sent).
 - **Notifications.** You get one when the session starts and ends.
 - **Stays awake.** The session holds a logind idle inhibitor (`systemd-inhibit
   --what=idle`), so idle locking, screen blanking and idle suspend wait until it
   ends or expires; it is released with the session, even if the worker is
   killed. Lid close and manual suspend still work. Set
-  `AGENT_DESKTOP_HOST_KEEP_AWAKE=0` to disable it. Input is not yet refused while
-  the screen is locked, so lock the screen only after `host stop`.
+  `AGENT_DESKTOP_HOST_KEEP_AWAKE=0` to disable it.
 - **Your windows stay open.** Applications the agent starts open through your
   desktop (`hyprctl dispatch exec` on Hyprland, otherwise `systemd-run --user`).
   Ending the session never closes your windows.

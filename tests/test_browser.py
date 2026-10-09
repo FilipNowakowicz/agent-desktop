@@ -112,6 +112,42 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(started["tabs"][0]["url"], self.page.as_uri())
         self.assertEqual(len(core.request(self.session, "status")["applications"]), 1)
 
+    def test_steps_and_targets_within_a_row(self):
+        rows = "".join(
+            f"<tr><td>{n}</td><td><button onclick=\"document.title='{n}'\">Edit"
+            "</button></td></tr>"
+            for n in ("alice", "mallory", "bob")
+        )
+        table = self.root / "table.html"
+        table.write_text(
+            '<!doctype html><meta charset="utf-8"><title>Users</title>'
+            '<p><input id="u"> <button onclick="document.body.dataset.in=u.value;'
+            "document.title='Signed in'\">Sign in</button></p>"
+            f"<table>{rows}</table>"
+        )
+        self.browser("start", url=table.as_uri())
+        result = self.browser(
+            "steps",
+            steps=[
+                {"action": "wait", "selector": "#u", "timeout": 20},
+                {"action": "fill", "selector": "#u", "value": "admin"},
+                {"action": "click", "text": "Sign in"},
+                {"action": "click", "text": "Edit", "within": "mallory"},
+                {"action": "click", "text": "Edit"},
+                {"action": "fill", "selector": "#u", "value": "never"},
+            ],
+        )
+        self.assertEqual(result["completed"], 4, result)
+        self.assertIn("3 elements match", result["stopped"]["reason"])
+        self.assertEqual(self.browser("tabs")["tabs"][0]["title"], "mallory")
+        self.assertEqual(
+            self.browser("find", selector="#u")["items"][0]["value"], "admin"
+        )
+        waited = self.browser(
+            "steps", steps=[{"action": "wait", "text": "nobody", "timeout": 0.3}]
+        )
+        self.assertEqual(waited["stopped"]["reason"], "wait not satisfied")
+
 
 if __name__ == "__main__":
     unittest.main()

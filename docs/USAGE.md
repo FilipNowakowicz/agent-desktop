@@ -136,6 +136,10 @@ session. Then:
 | `wait` | until an element is found, or `gone` (up to 60 s) |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 
+`within` narrows a target to the row, list item, form or dialog containing a
+text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
+one call and stops at the first failure or unmet wait. Any action connects to a
+Firefox already started in the session with `--remote-debugging-port`.
 Clicks and keys are trusted input events from Firefox itself. If several
 elements match, or the match is disabled, nothing happens and the matches are
 listed. Replies carry the page url and title and the element's value afterwards,

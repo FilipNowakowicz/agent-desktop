@@ -132,6 +132,7 @@ def main():
             "click",
             "fill",
             "select",
+            "steps",
         ),
     )
     bridge.add_argument("--url")
@@ -143,6 +144,8 @@ def main():
     bridge.add_argument("--new-tab", action="store_true")
     bridge.add_argument("--gone", action="store_true")
     bridge.add_argument("--timeout", type=float)
+    bridge.add_argument("--within", help="text of the row, item or form holding it")
+    bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
     steps = sub.add_parser(
         "actions", help="run a JSON list of steps, stopping on surprises"
     )

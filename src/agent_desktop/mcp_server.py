@@ -342,6 +342,8 @@ def desktop_browser(
     new_tab: bool = False,
     gone: bool = False,
     timeout: float = 10,
+    within: str | None = None,
+    steps: list[dict] | None = None,
 ) -> dict:
     """Use Firefox in a private session through its DOM, without screenshots.
 
@@ -357,8 +359,14 @@ def desktop_browser(
     and select need exactly one visible, enabled match, otherwise nothing is
     done and the matches are listed. Replies include the page url and title,
     and the element's value afterwards (never a password's). tab picks a tab by
-    index from "tabs"; later calls stay on it. Faster and more exact than
-    pixels for web pages; use screenshots for visual questions.
+    index from "tabs"; later calls stay on it. within narrows a target to the
+    row, list item, form or dialog containing that text, e.g. text="Edit",
+    within="mallory". action "steps" runs a list of these actions in one call
+    (steps=[{"action": "fill", "selector": "#u", "value": "admin"},
+    {"action": "click", "text": "Sign in"}, {"action": "wait", "text":
+    "Dashboard"}]) and stops at the first failure or unmet wait: plan several
+    actions per call. Faster and more exact than pixels for web pages; use
+    screenshots for visual questions.
     """
     arguments = {
         "url": url,
@@ -370,6 +378,8 @@ def desktop_browser(
         "new_tab": new_tab,
         "gone": gone,
         "timeout": timeout,
+        "within": within,
+        "steps": steps,
     }
     return call(
         session,

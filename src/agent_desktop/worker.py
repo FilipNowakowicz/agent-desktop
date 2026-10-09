@@ -853,8 +853,11 @@ class Worker:
             "selector": request.get("selector"),
             "text": request.get("text"),
             "exact": request.get("exact") is True,
+            "within": request.get("within"),
         }
         try:
+            if action == "steps":
+                return self.browser_steps(request.get("steps"))
             if action == "start":
                 bridge = self.start_browser(request.get("url"))
                 return {"tabs": bridge.tabs()[1]}
@@ -954,14 +957,47 @@ class Worker:
                     }
                 return result
             raise ValueError(
-                "action must be start, tabs, open, find, text, wait, click, fill "
-                "or select"
+                "action must be start, tabs, open, find, text, wait, click, fill, "
+                "select or steps"
             )
         except browser.BrowserError as error:
             raise ValueError(str(error)) from None
         except ConnectionClosed:
             self.browser = None
             raise ValueError("Firefox closed the bridge; start it again") from None
+
+    def browser_steps(self, steps):
+        """Several browser actions in one request, stopping at the first error."""
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+            raise ValueError("steps must be a list of 1 to 30 browser actions")
+        results = []
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict) or step.get("action") in (None, "steps"):
+                raise ValueError(f"Step {index} needs an action other than steps")
+            try:
+                result = self.browser_request(step)
+            except (ValueError, TimeoutError) as error:
+                return {
+                    "completed": index,
+                    "total": len(steps),
+                    "results": results,
+                    "stopped": {"step": index, "reason": str(error)},
+                }
+            if step["action"] == "wait" and not result.get("satisfied"):
+                results.append(result)
+                return {
+                    "completed": index + 1,
+                    "total": len(steps),
+                    "results": results,
+                    "stopped": {"step": index, "reason": "wait not satisfied"},
+                }
+            results.append(result)
+        return {
+            "completed": len(steps),
+            "total": len(steps),
+            "results": results,
+            "stopped": None,
+        }
 
     def page_state(self, bridge, context):
         from . import browser

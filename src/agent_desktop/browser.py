@@ -20,7 +20,7 @@ CTRL = ""
 # placeholder or value. With pick, the one match itself (or null); otherwise
 # up to MAX_ITEMS described as JSON, without password values.
 FIND = """
-(selector, text, exact, pick) => {
+(selector, text, exact, pick, within) => {
   const visible = (e) => {
     const s = getComputedStyle(e);
     return e.getClientRects().length > 0 && s.visibility !== "hidden" &&
@@ -52,6 +52,18 @@ FIND = """
     found = found.filter((e) => !found.some((o) => o !== e && e.contains(o)));
   }
   found = found.filter(visible);
+  if (within) {
+    // Containers (row, list item, form, dialog...) of the innermost visible
+    // elements whose text includes `within`; targets must lie inside one.
+    const w = fold(within);
+    let holders = [...document.body.querySelectorAll("*")].filter(
+      (e) => visible(e) && own(e).includes(w));
+    holders = holders.filter((e) => !holders.some((o) => o !== e && e.contains(o)));
+    const scopes = holders.map((e) => e.closest(
+      "tr,li,form,fieldset,section,article,dialog,[role=row],[role=dialog]," +
+      "[role=listitem],[role=group]") || e.parentElement);
+    found = found.filter((e) => scopes.some((c) => c && c.contains(e)));
+  }
   if (pick) return found.length === 1 ? found[0] : null;
   const describe = (e) => {
     const d = {tag: e.tagName.toLowerCase()};
@@ -161,15 +173,15 @@ class Browser:
             raise BrowserError(f"Page script failed: {details.get('text', details)}")
         return result["result"]
 
-    def find(self, context, selector=None, text=None, exact=False):
+    def find(self, context, selector=None, text=None, exact=False, within=None):
         if not (selector or text):
             raise ValueError("Give a CSS selector or a text")
-        value = self.call(FIND, [selector, text, exact, False], context)
+        value = self.call(FIND, [selector, text, exact, False, within], context)
         return json.loads(remote_value(value))
 
-    def element(self, context, selector=None, text=None, exact=False):
+    def element(self, context, selector=None, text=None, exact=False, within=None):
         """A reference to the one visible element that matches."""
-        found = self.find(context, selector, text, exact)
+        found = self.find(context, selector, text, exact, within)
         if found["count"] != 1:
             described = repr(selector or text)
             if not found["count"]:
@@ -177,9 +189,10 @@ class Browser:
             sample = "; ".join(json.dumps(i) for i in found["items"][:4])
             raise BrowserError(
                 f"{found['count']} elements match {described} ({sample}); use a "
-                "more specific selector or exact text"
+                "more specific selector, exact text or within (text of the row, "
+                "item or form that holds it)"
             )
-        node = self.call(FIND, [selector, text, exact, True], context)
+        node = self.call(FIND, [selector, text, exact, True, within], context)
         if node.get("type") != "node":
             raise BrowserError("The element changed while it was looked up")
         return {"sharedId": node["sharedId"]}, found["items"][0]

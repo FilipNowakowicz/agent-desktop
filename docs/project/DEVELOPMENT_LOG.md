@@ -12,9 +12,20 @@ returned. Clicks and keys are BiDi `input.performActions` (trusted events). It
 is mutating for the lease, refused during takeover and on host sessions, and
 recorded by the effect ledger. The person's own Firefox is not touched.
 
+Later in the day: any action attaches to a Firefox started in the session with
+`--remote-debugging-port` (the agent skipped "start" in the first run), `within`
+scopes a target to the row/item/form holding a text, and `steps` batches
+actions. Benchmark `--firefox`/`--bridge`. Small A/B (8 runs, all passed;
+docs/research/2026-10-09-browser-bridge.md): faster and cheaper on a form,
+slower on a 40-row admin table before within/steps; one run after them used
+10 calls instead of 21–25. Speed advantage not established. Agent runs today:
+48 (one failed at start: the venv had lost its entry points after a rebase;
+`uv sync --reinstall-package agent-desktop` fixed it).
+
 Validation: tests/test_browser.py (Firefox 156): form fill with Unicode,
 password redaction, select, check box, ambiguous and disabled refusals, page
-text, new tab; full suite (see PR).
+text, new tab, attach, within and steps; full desktop suite 151 tests OK
+(10 skipped).
 ## 2026-10-09 — S2: guarded steps (kept for reliability, not speed)
 
 `desktop_actions` steps take `expect`; `ui_action` steps can name a target found

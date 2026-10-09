@@ -86,6 +86,43 @@ class ActionTests(unittest.TestCase):
         wait_for((first / "typed.txt").exists)
         self.assertEqual((first / "typed.txt").read_text(), "one café")
 
+    def test_expectations_and_run_timeout(self):
+        first = self.fixture("first")
+        unmet = core.run_actions(
+            self.session,
+            [
+                {
+                    "action": "type",
+                    "text": "x",
+                    "expect": {"title": "Nope", "timeout": 0.5},
+                },
+                {"action": "type", "text": "never"},
+            ],
+        )
+        self.assertEqual(unmet["completed"], 1)
+        self.assertEqual(unmet["stopped"]["step"], 0)
+        self.assertTrue(unmet["stopped"]["expectation"])
+        self.assertIn("no window", unmet["stopped"]["reason"])
+        met = core.run_actions(
+            self.session,
+            [{"action": "key", "key": "Return", "expect": {"title": "first"}}],
+        )
+        self.assertIsNone(met["stopped"], met)
+        wait_for((first / "typed.txt").exists)
+        self.assertEqual((first / "typed.txt").read_text(), "x")
+        late = core.run_actions(
+            self.session,
+            [{"action": "wait", "seconds": 1}, {"action": "type", "text": "late"}],
+            timeout=0.5,
+        )
+        self.assertEqual(late["completed"], 1)
+        self.assertIn("run timeout", late["stopped"]["reason"])
+        for bad in ({"titel": "x"}, {}, "first"):
+            with self.subTest(expect=bad), self.assertRaises(core.DesktopError):
+                core.run_actions(
+                    self.session, [{"action": "key", "key": "a", "expect": bad}]
+                )
+
     def test_expected_window_with_wait_step(self):
         self.fixture("first")
         observation = core.request(self.session, "screenshot")["observation"]

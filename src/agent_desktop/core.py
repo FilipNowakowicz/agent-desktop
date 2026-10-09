@@ -657,6 +657,40 @@ def recover(session, info):
 # A blinking text caret changes a thin box; a loading spinner is larger.
 QUIET_AREA = 400
 
+# wait(state=...): a listed state, or the absence of its opposite.
+STATE_TESTS = {
+    "checked": ("checked", True),
+    "unchecked": ("checked", False),
+    "enabled": ("disabled", False),
+    "disabled": ("disabled", True),
+    "focused": ("focused", True),
+    "selected": ("selected", True),
+    "expanded": ("expanded", True),
+    "collapsed": ("expanded", False),
+    "editable": ("editable", True),
+    "pressed": ("pressed", True),
+    "busy": ("busy", True),
+    "idle": ("busy", False),
+}
+
+
+def node_matches(node, element=None, role=None, text=None, state=None, exact=False):
+    """Whether a UI node has this name (substring, or whole with `exact`),
+    exact role, text or value substring and state."""
+    content = str(node.get("text") or "") + str(node.get("value") or "")
+    if state is not None:
+        listed, present = STATE_TESTS[state]
+        if (listed in node.get("states", ())) != present:
+            return False
+    return (
+        (
+            element is None
+            or (element == node["name"] if exact else element in node["name"])
+        )
+        and (role is None or node["role"] == role)
+        and (text is None or text in content)
+    )
+
 
 def wait(
     session,
@@ -670,12 +704,16 @@ def wait(
     text=None,
     seconds=0,
     controller=None,
+    state=None,
+    exact=False,
 ):
     """Wait until every condition holds at the same time.
 
     Conditions: a window (title substring and/or exact app_id), a UI element
-    (accessible name substring, exact role and/or text or value substring,
-    searched within the matched window when a title is given) and a settled
+    (accessible name substring, or the whole name with `exact`; exact role;
+    text or value substring; a `state` such as checked, unchecked, enabled,
+    disabled, focused, selected, expanded or collapsed; searched within the
+    matched windows when a title or app_id is given) and a settled
     screen. `gone` applies to the window condition, or to the element condition
     when no window condition is given; an incomplete tree never counts as gone.
     `seconds` pauses first; `timeout` counts from the end of the pause.
@@ -689,6 +727,8 @@ def wait(
         raise DesktopError("stable_ms must be an integer from 0 to 30000")
     if not isinstance(seconds, (int, float)) or not 0 <= seconds <= 30:
         raise DesktopError("seconds must be between 0 and 30")
+    if state is not None and state not in STATE_TESTS:
+        raise DesktopError(f"state must be one of {', '.join(STATE_TESTS)}")
     # Every wait addresses an existing, controllable session, even a plain pause.
     # Its requests renew the caller's lease, so a long wait keeps control.
     request(session, "control", controller)
@@ -697,16 +737,11 @@ def wait(
     time.sleep(seconds)
     deadline = time.monotonic() + timeout
     wants_window = title is not None or app_id is not None
-    wants_element = element is not None or role is not None or text is not None
+    wants_element = any(v is not None for v in (element, role, text, state))
     element_gone = gone and not wants_window
 
     def element_matches(node):
-        content = str(node.get("text") or "") + str(node.get("value") or "")
-        return (
-            (element is None or element in node["name"])
-            and (role is None or node["role"] == role)
-            and (text is None or text in content)
-        )
+        return node_matches(node, element, role, text, state, exact)
 
     def check():
         """(satisfied, reason, windows, elements) from one round of checks
@@ -801,6 +836,68 @@ def wait(
         time.sleep(0.2 if wants_element else 0.05)
 
 
+# A ui_action step's own "text" is what set_text writes, so targets have no text.
+TARGET_KEYS = ("element", "role", "state", "exact", "window", "app")
+EXPECT_KEYS = (
+    "title",
+    "app_id",
+    "gone",
+    "element",
+    "role",
+    "text",
+    "state",
+    "exact",
+    "timeout",
+    "stable_ms",
+)
+
+
+def resolve_element(
+    session,
+    controller,
+    element=None,
+    role=None,
+    text=None,
+    state=None,
+    exact=False,
+    window=None,
+    app=None,
+):
+    """The id of the one visible UI node that matches, looked up now.
+
+    A name matches as a substring unless `exact`; when several nodes match but
+    exactly one has the whole name, that one is chosen. No match, several
+    matches or an incomplete listing raise DesktopError (nothing is acted on).
+    """
+    if element is None and role is None and text is None:
+        raise DesktopError("A target needs element, role or text")
+    if state is not None and state not in STATE_TESTS:
+        raise DesktopError(f"state must be one of {', '.join(STATE_TESTS)}")
+    scope = {k: v for k, v in (("window", window), ("app", app)) if v is not None}
+    tree = request(session, "ui", controller, max_nodes=2000, **scope)
+    found = [
+        n for n in tree["nodes"] if node_matches(n, element, role, text, state, exact)
+    ]
+    if len(found) > 1 and element is not None and not exact:
+        whole = [n for n in found if n["name"] == element]
+        if len(whole) == 1:
+            found = whole
+    described = f"{element!r}" if element is not None else "the target"
+    if not found:
+        incomplete = tree["truncated"] or tree.get("unreadable")
+        raise DesktopError(
+            f"No visible element matches {described}"
+            + (" (the UI listing was incomplete)" if incomplete else "")
+        )
+    if len(found) > 1:
+        sample = "; ".join(f"{n['role']} {n['name']!r}" for n in found[:4])
+        raise DesktopError(
+            f"{len(found)} elements match {described} ({sample}); add role, "
+            "window or exact to pick one"
+        )
+    return found[0]["id"]
+
+
 SEQUENCE_ACTIONS = (
     "click",
     "move",
@@ -814,13 +911,20 @@ SEQUENCE_ACTIONS = (
 )
 
 
-def run_actions(session, actions, observation=None, controller=None):
+def run_actions(session, actions, observation=None, controller=None, timeout=None):
     """Run up to 50 actions, stopping at the first surprise.
 
     Each input action is sent only if windows, focus and output are as they were
     right after the previous action (or as in `observation` for the first). A
-    `wait` or `focus` step expects a change and takes a new baseline. Popups and
-    in-window changes are not detected; take a screenshot afterwards.
+    `wait` or `focus` step expects a change and takes a new baseline.
+
+    Any step can carry `expect`, wait conditions (title, app_id, gone, element,
+    role, text, state, exact, timeout default 5 s, stable_ms) that must hold
+    after it; otherwise the run stops there, reporting the step as done and the
+    expectation as unmet. A `ui_action` step can name its target by element,
+    role, state, exact, window or app instead of a node id; it is looked
+    up when the step runs and must match exactly one element. `timeout` bounds
+    the whole run: no step starts after it.
 
     The sequence holds the session's controller lease throughout, so another
     client cannot interleave input: the caller's lease when a controller is
@@ -839,6 +943,15 @@ def run_actions(session, actions, observation=None, controller=None):
             raise DesktopError(
                 f"Step {index} must not set observation, session or controller"
             )
+        expect = step.get("expect")
+        if expect is not None and (
+            not isinstance(expect, dict) or not expect or set(expect) - set(EXPECT_KEYS)
+        ):
+            raise DesktopError(f"Step {index}: expect takes {', '.join(EXPECT_KEYS)}")
+    if timeout is not None and (
+        not isinstance(timeout, (int, float)) or not 0 < timeout <= 600
+    ):
+        raise DesktopError("timeout must be between 0 and 600 seconds")
     controller = controller_id(controller)
     temporary = controller is None
     if temporary:
@@ -849,7 +962,7 @@ def run_actions(session, actions, observation=None, controller=None):
         return stopped(0, len(actions), str(error))
     first = []  # effect_id of the first step, when the ledger is on
     try:
-        result = run_steps(session, actions, observation, controller, first)
+        result = run_steps(session, actions, observation, controller, first, timeout)
         if first:
             # Everything the sequence changed, including writes after its last
             # step's reply (experimental effect ledger).
@@ -868,17 +981,23 @@ def run_actions(session, actions, observation=None, controller=None):
                 pass  # e.g. the session was destroyed; the lease went with it
 
 
-def run_steps(session, actions, observation, controller, first=None):
+def run_steps(session, actions, observation, controller, first=None, timeout=None):
+    started = time.monotonic()
     baseline = observation or request(session, "observe", controller)["observation"]
     # Keep a cropped or scaled screenshot's coordinate mapping for every step.
     mapping = "@" + observation.partition("@")[2] if "@" in (observation or "") else ""
     for index, step in enumerate(actions):
-        arguments = {k: v for k, v in step.items() if k != "action"}
+        if timeout is not None and time.monotonic() - started > timeout:
+            return stopped(index, len(actions), f"run timeout ({timeout} s) reached")
+        arguments = {k: v for k, v in step.items() if k not in ("action", "expect")}
         action = step["action"]
         if action == "ui_action" and "name" in arguments:
             # "action" names the step, so a UI action's own name travels as "name".
             arguments["action"] = arguments.pop("name")
         try:
+            if action == "ui_action" and "node" not in arguments:
+                target = {k: arguments.pop(k) for k in TARGET_KEYS if k in arguments}
+                arguments["node"] = resolve_element(session, controller, **target)
             if action == "wait":
                 waited = wait(session, **arguments, controller=controller)
                 if not waited["satisfied"]:
@@ -908,11 +1027,28 @@ def run_steps(session, actions, observation, controller, first=None):
         except TypeError as error:
             hint = (
                 "; wait accepts title, app_id, gone, stable_ms, timeout, element, "
-                "role, text and seconds"
+                "role, text, state, exact and seconds"
                 if action == "wait"
                 else ""
             )
             return stopped(index, len(actions), f"{error}{hint}")
+        if step.get("expect"):
+            try:
+                expected = wait(
+                    session, **{"timeout": 5, **step["expect"]}, controller=controller
+                )
+            except (DesktopError, TypeError) as error:
+                expected = {"satisfied": False, "reason": str(error)}
+            if not expected["satisfied"]:
+                result = stopped(
+                    index + 1,
+                    len(actions),
+                    f"step {index} ran, but its expectation was not met: "
+                    f"{expected['reason']}",
+                )
+                result["stopped"]["step"] = index
+                result["stopped"]["expectation"] = True
+                return result
         try:
             baseline = request(session, "observe", controller)["observation"] + mapping
         except DesktopError as error:

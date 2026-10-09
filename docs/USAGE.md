@@ -132,6 +132,36 @@ and reports the step and reason. `wait` and `focus` steps expect a change and ta
 a new baseline. Popups and changes inside a window are not detected, so verify the result:
 `screenshot=true` appends the settled screen after the last step that ran.
 
+### Guarded steps
+
+Any step can carry `expect`, conditions in `wait` form (title, app_id, gone,
+element, role, text, state, exact, stable_ms, timeout; default timeout 5 s)
+that must hold after the step:
+
+```json
+[
+  {"action": "ui_action", "role": "text", "state": "editable",
+   "name": "set_text", "text": "https://example.org/hook"},
+  {"action": "ui_action", "element": "Save", "role": "push button", "exact": true,
+   "name": "press", "expect": {"element": "Saved", "timeout": 10}}
+]
+```
+
+If an expectation fails, the run stops with `"expectation": true`; that step
+counts as done, later steps are not sent. A `ui_action` step can name its
+target (element, role, state, exact, window, app) instead of a node id.
+The target is looked up when the step runs and must match exactly one visible
+element (one with the whole name wins over substring matches); otherwise
+nothing is sent and the run stops, listing what matched. `timeout` on
+`desktop_actions` (CLI `--timeout`) bounds the whole run. Element conditions
+need the accessibility tree, so private sessions only.
+
+`wait` (and expectations) accept `state`: checked, unchecked, enabled, disabled,
+focused, selected, expanded, collapsed, editable, pressed, busy or idle, and
+`exact` to match the whole element name. Listings mark controls that cannot be
+used now as `disabled`. `press` also works on check boxes and radio buttons
+that only offer `check` (Chromium).
+
 ## Effect ledger (experimental)
 
 Create sessions with `AGENT_DESKTOP_EFFECTS=1` in the environment of the CLI or

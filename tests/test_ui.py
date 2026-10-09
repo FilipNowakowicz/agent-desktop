@@ -109,6 +109,63 @@ class UITests(UISessionTest):
         lines = Path(app["logs"]).read_text().strip().splitlines()
         self.assertEqual(lines[-1], "Ada Lovelace ✓")
 
+    def test_guarded_plan_with_targets_found_at_run_time(self):
+        app = core.request(
+            self.session,
+            "launch",
+            argv=["zenity", "--entry", "--title=Guard test", "--text=Code"],
+        )
+        field = self.find(lambda n: "editable" in n["states"])
+        usable = core.wait(self.session, element="OK", role="button", state="enabled")
+        self.assertTrue(usable["satisfied"], usable)
+        self.assertFalse(
+            core.wait(self.session, element="OK", state="disabled", timeout=0.3)[
+                "satisfied"
+            ]
+        )
+        # Several buttons match: nothing is sent and the run stops.
+        ambiguous = core.run_actions(
+            self.session, [{"action": "ui_action", "role": "button", "name": "press"}]
+        )
+        self.assertEqual(ambiguous["completed"], 0)
+        self.assertIn("elements match", ambiguous["stopped"]["reason"])
+        missing = core.run_actions(
+            self.session,
+            [{"action": "ui_action", "element": "Nothing here", "name": "press"}],
+        )
+        self.assertIn("No visible element", missing["stopped"]["reason"])
+        self.assertIsNone(
+            next(
+                e["exit_code"]
+                for e in core.request(self.session, "status")["applications"]
+                if e["pid"] == app["pid"]
+            )
+        )
+        result = core.run_actions(
+            self.session,
+            [
+                {
+                    "action": "ui_action",
+                    "role": field["role"],
+                    "state": "editable",
+                    "name": "set_text",
+                    "text": "4711",
+                    "expect": {"role": field["role"], "text": "4711"},
+                },
+                {
+                    "action": "ui_action",
+                    "element": "OK",
+                    "role": "button",
+                    "exact": True,
+                    "name": "press",
+                    "expect": {"title": "Guard test", "gone": True, "timeout": 10},
+                },
+            ],
+        )
+        self.assertIsNone(result["stopped"], result)
+        lines = Path(app["logs"]).read_text().strip().splitlines()
+        self.assertEqual(lines[-1], "4711")
+
     def test_wait_for_elements_after_actions(self):
         core.request(
             self.session,

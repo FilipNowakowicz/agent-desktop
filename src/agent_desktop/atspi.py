@@ -15,15 +15,20 @@ REGISTRY = ("org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root")
 ACCESSIBLE = "org.a11y.atspi.Accessible"
 STATES = {
     1: "active",
+    3: "busy",
     4: "checked",
     7: "editable",
     10: "expanded",
     12: "focused",
+    16: "modal",
     20: "pressed",
     23: "selected",
     36: "invalid",
     43: "read-only",
 }
+# GTK 4 sets only SENSITIVE, Chromium and GTK 3 both: either means usable.
+ENABLED = 8
+SENSITIVE = 24
 SHOWING = 25
 # Unnamed layout containers are skipped (their children are kept) to save tokens.
 CONTAINERS = {
@@ -36,7 +41,17 @@ CONTAINERS = {
     "generic",
 }
 TEXT_ROLES = {"text", "entry", "text box", "paragraph", "terminal", "document text"}
-PRESS_ACTIONS = ("click", "press", "activate", "toggle", "jump", "dodefault")
+# Chromium check boxes and radio buttons offer only "check" or "uncheck".
+PRESS_ACTIONS = (
+    "click",
+    "press",
+    "activate",
+    "toggle",
+    "jump",
+    "dodefault",
+    "check",
+    "uncheck",
+)
 # Offered by every Chromium node; omitted from listings, still callable by name.
 HIDDEN_ACTIONS = {"showContextMenu"}
 MAX_DEPTH = 200
@@ -157,6 +172,9 @@ class Accessibility:
             and "editable" in record["states"]
         ):
             record.setdefault("actions", []).append("set_text")
+        if record.get("actions") and not {ENABLED, SENSITIVE} & bits:
+            # Listed only where it matters: a control that cannot be used now.
+            record["states"].append("disabled")
         return record, SHOWING in bits
 
     def action_names(self, node):

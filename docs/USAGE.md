@@ -106,6 +106,19 @@ are desktop pixels. Do not convert manually and also pass the token, or the
 scaling is applied twice. The token's layout part always describes the whole
 desktop.
 
+## Act and see in one call
+
+Input tools and `desktop_actions` accept `screenshot=true` (CLI: `--screenshot`):
+after the input, the reply also carries a screenshot taken once the screen has
+been still for 0.3 s (blinking carets ignored), at most 3 s later, with its
+observation token. `settled` says which happened (`quiet` or `changing`) and
+`settle_ms` how long it took. A still screen means the application stopped
+repainting, not that it finished: a slow reply can arrive later, and a failed
+input leaves the screen still too, so check the image. On their own,
+`screenshot --settle-ms MS` (worker request `settle_ms`, `settle_timeout_ms`)
+waits the same way before capturing. This saves a model round trip after most
+inputs; `AGENT_DESKTOP_LOOK=0` hides the option (an experiment baseline).
+
 ## Action sequences
 
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)
@@ -116,8 +129,8 @@ A `ui_action` step names its UI action as `name`, because `action` names the ste
 Each input step is sent only while windows, focus and output match the state right
 after the previous step (or the given screenshot token); otherwise the run stops
 and reports the step and reason. `wait` and `focus` steps expect a change and take
-a new baseline. Popups and changes inside a window are not detected, and the
-result carries no observation token, so take a screenshot to verify.
+a new baseline. Popups and changes inside a window are not detected, so verify the result:
+`screenshot=true` appends the settled screen after the last step that ran.
 
 ## Effect ledger (experimental)
 

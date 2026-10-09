@@ -111,6 +111,13 @@ class WaitTests(unittest.TestCase):
         self.assertFalse(busy["satisfied"])
         self.assertEqual(busy["reason"], "screen still changing")
         self.assertLess(time.monotonic() - started, 4)
+        # A settled screenshot says the screen never went still.
+        shot = core.request(
+            self.session, "screenshot", settle_ms=300, settle_timeout_ms=1000
+        )
+        self.assertEqual(shot["settled"], "changing")
+        self.assertGreaterEqual(shot["settle_ms"], 1000)
+        self.assertTrue(Path(shot["path"]).exists())
 
     def test_frames_report_changed_region(self):
         first = core.request(self.session, "frame")
@@ -124,6 +131,14 @@ class WaitTests(unittest.TestCase):
         core.wait(self.session, title="Region", timeout=15)
         changed = core.request(self.session, "frame", since=same["frame"])["changed"]
         self.assertGreater(changed[2] * changed[3], 10000)
+        still = core.request(
+            self.session, "screenshot", settle_ms=200, settle_timeout_ms=3000
+        )
+        self.assertEqual(still["settled"], "quiet")
+        self.assertLess(still["settle_ms"], 3000)
+        for bad in ({"settle_ms": 0}, {"settle_ms": 500, "settle_timeout_ms": 100}):
+            with self.subTest(bad=bad), self.assertRaises(core.DesktopError):
+                core.request(self.session, "screenshot", **bad)
         for bad in ({"timeout": -1}, {"timeout": 121}, {"stable_ms": 1.5}):
             with self.subTest(bad=bad), self.assertRaises(core.DesktopError):
                 core.wait(self.session, **bad)

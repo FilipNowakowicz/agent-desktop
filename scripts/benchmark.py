@@ -165,6 +165,10 @@ def run_agent(
         "tool_calls": len(calls),
         "tool_errors": len(errors),
         "tools": {n: names.count(n) for n in sorted(set(names))},
+        # Input calls that asked for the settled screen in the same reply.
+        "inline_screenshots": sum(
+            1 for c in calls if (c.get("input") or {}).get("screenshot") is True
+        ),
         "reply": (result.get("result") or "")[-500:],
         "cost_usd": result.get("total_cost_usd"),
         "usage": result.get("usage", {}),
@@ -195,6 +199,7 @@ def mcp_config_for(root):
                 **server.get("env", {}),
                 "AGENT_DESKTOP_EFFECTS": os.environ.get("AGENT_DESKTOP_EFFECTS", "0"),
                 "AGENT_DESKTOP_ATLAS": os.environ.get("AGENT_DESKTOP_ATLAS", ""),
+                "AGENT_DESKTOP_LOOK": os.environ.get("AGENT_DESKTOP_LOOK", "1"),
             }
         path.write_text(json.dumps(config, indent=2) + "\n")
     return str(path)
@@ -292,8 +297,14 @@ def main():
         action="store_true",
         help="experimental effect ledger in sessions and MCP replies",
     )
+    parser.add_argument(
+        "--no-look",
+        action="store_true",
+        help="baseline: input tools cannot return a screenshot (screenshot=true)",
+    )
     args = parser.parse_args()
     random.seed(args.seed)
+    os.environ["AGENT_DESKTOP_LOOK"] = "0" if args.no_look else "1"
     # Sessions inherit this from the harness; the MCP server from claude.
     os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
     if args.atlas:
@@ -340,6 +351,7 @@ def main():
         "seed": args.seed,
         "tools": args.tools,
         "effects": args.effects,
+        "look": not args.no_look,
         "atlas": bool(args.atlas),
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),

@@ -968,9 +968,13 @@ class Worker:
 
         A key sent while an application is still working through typed text can
         overtake it: LibreOffice applied Home and Down after the text sent before
-        them (F006). A settled screen shows that the text has been handled.
+        them (F006). A quiet screen makes that less likely; it does not prove the
+        application is done (a slow reply can arrive later). Returns whether the
+        screen went quiet ("quiet") or was still changing at the limit
+        ("changing"), and how long it took.
         """
-        deadline = time.monotonic() + limit
+        started = time.monotonic()
+        deadline = started + limit
         token = self.frame(None)["frame"]
         quiet_since = time.monotonic()
         while time.monotonic() - quiet_since < quiet and time.monotonic() < deadline:
@@ -979,6 +983,12 @@ class Worker:
             token, box = latest["frame"], latest["changed"]
             if box == "unknown" or (box and box[2] * box[3] > SETTLE_AREA):
                 quiet_since = time.monotonic()
+        return {
+            "settled": (
+                "quiet" if time.monotonic() - quiet_since >= quiet else "changing"
+            ),
+            "settle_ms": round((time.monotonic() - started) * 1000),
+        }
 
     def observation(self):
         """Token for the window layout: output, windows, focus and states.
@@ -1405,7 +1415,23 @@ class Worker:
                 "window": focused,
             }
         if operation == "screenshot":
+            settled = None
+            if request.get("settle_ms") is not None:
+                quiet = request["settle_ms"]
+                limit = request.get("settle_timeout_ms", 3000)
+                if (
+                    not all(isinstance(v, int) for v in (quiet, limit))
+                    or not 0 < quiet <= 2000
+                    or not quiet <= limit <= 10000
+                ):
+                    raise ValueError(
+                        "settle_ms must be 1-2000 and settle_timeout_ms from "
+                        "settle_ms to 10000"
+                    )
+                settled = self.settle(quiet / 1000, limit / 1000)
             capture = self.screenshot(request.get("region"), request.get("scale"))
+            if settled:
+                capture.update(settled)
             # Another client's screenshot must not vouch for the controller.
             if not self.active_lease() or self.lease["holder"] == controller:
                 self.needs_screenshot = False

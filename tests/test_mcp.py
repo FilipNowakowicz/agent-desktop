@@ -116,9 +116,19 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     )
                     self.assertFalse(text.isError)
                     key = await client.call_tool(
-                        "desktop_key", {"session": session_id, "key": "Return"}
+                        "desktop_key",
+                        {"session": session_id, "key": "Return", "screenshot": True},
                     )
                     self.assertFalse(key.isError)
+                    # Act and observe: the settled screen comes in the same reply.
+                    looked = json.loads(key.content[0].text)
+                    self.assertTrue(looked["delivered"])
+                    self.assertIn(
+                        looked["screenshot"]["settled"], ("quiet", "changing")
+                    )
+                    self.assertEqual(
+                        [block.type for block in key.content], ["text", "image"]
+                    )
                     # The server acts as one controller and holds the lease.
                     status = await client.call_tool(
                         "desktop_status", {"session": session_id}

@@ -316,6 +316,40 @@ def notify(summary, body, env):
                 continue
 
 
+def keep_awake(session, env):
+    """Hold a logind idle inhibitor for a host session (best effort).
+
+    The screen locker, blanking and idle suspend wait while it is held, so input
+    cannot land on a lock screen. It ends with this worker even if the worker is
+    killed. AGENT_DESKTOP_HOST_KEEP_AWAKE=0 disables it.
+    """
+    if env.get("AGENT_DESKTOP_HOST_KEEP_AWAKE") == "0":
+        return None
+    if not shutil.which("systemd-inhibit", path=env.get("PATH")):
+        return None
+    watch = f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 5; done"
+    try:
+        return subprocess.Popen(
+            [
+                "systemd-inhibit",
+                "--what=idle",
+                "--mode=block",
+                "--who=Agent Desktop",
+                f"--why=Host session {session}",
+                "sh",
+                "-c",
+                watch,
+            ],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return None
+
+
 def lease_seconds_default():
     """Inactivity limit for controller leases (AGENT_DESKTOP_LEASE_SECONDS, 60 s)."""
     try:
@@ -357,6 +391,7 @@ class Worker:
         self.stop = False
         self.profile_lock = None
         self.activity = None  # host sessions: the person's input
+        self.awake = None  # host sessions: the idle inhibitor
         self.agent_input = []  # host sessions: (start, end) of our input
 
     def save(self, status, **values):
@@ -393,6 +428,7 @@ class Worker:
         # Agents pause between steps longer than this, so the person's input after
         # one of those pauses is noticed even while the agent is working.
         self.activity = InputActivity(display, idle_ms=300)
+        self.awake = keep_awake(self.info["id"], self.env)
         until = time.strftime("%H:%M", time.localtime(self.info["expires_at"]))
         notify(
             "An agent is using your screen",
@@ -1707,6 +1743,12 @@ class Worker:
         ):
             if device:
                 device.close()
+        if self.awake and self.awake.poll() is None:
+            self.awake.terminate()
+            try:
+                self.awake.wait(5)
+            except subprocess.TimeoutExpired:
+                self.awake.kill()
         try:
             cleanup_processes(self.info["token"], self.tracked())
         finally:

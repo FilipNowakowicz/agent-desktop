@@ -39,6 +39,19 @@ server when asked; the desktop tools then appear as `mcp__agent-desktop__*`.
 With the Nix runtime linked at `~/.local/share/agent-desktop/runtime`, or the
 Ubuntu packages installed, no further environment setup is needed.
 
+The project file applies only to sessions started in this repository. To give
+every Claude Code session on the machine the desktop tools, register the server
+at user scope with the checkout's absolute path:
+
+```sh
+claude mcp add --scope user agent-desktop -- \
+  uv --directory /path/to/agent-desktop run agent-desktop-mcp
+```
+
+The server's instructions (sessions, host requests, login handoff) reach the
+client with the tools, so no separate skill or prompt is needed. The server runs
+whatever is checked out at that path.
+
 `scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
 non-interactively, with no built-in tools and only this MCP server. The agent must
 create a session, launch Chromium on a local page, read a code that exists only

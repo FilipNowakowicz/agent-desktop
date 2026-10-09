@@ -175,7 +175,9 @@ it is limited to verified entries.
    to measure how much of an atlas survives an update.
 4. **Desired-state use.** A list of wanted settings applied and verified in
    one call, for profiles shared between sessions.
-5. **Upstream.** The Geany key swap could be reported (maintainer's decision).
+5. **Upstream.** The Geany key swap was reported on 2026-10-09 as
+   [geany/geany#4677](https://github.com/geany/geany/issues/4677). It dates
+   from the 2011 commit that split the combined preference (4ffbd8f9).
 
 ## Reproduction
 

@@ -123,6 +123,29 @@ class ActionTests(unittest.TestCase):
                     self.session, [{"action": "key", "key": "a", "expect": bad}]
                 )
 
+    def test_chords_scroll_position_and_tokens(self):
+        first = self.fixture("first")
+        core.request(self.session, "key", key="shift+a")
+        with self.assertRaisesRegex(core.DesktopError, "chord syntax"):
+            core.request(self.session, "key", key="ctrl+nokey")
+        core.request(self.session, "scroll", dy=1, x=10, y=10)
+        with self.assertRaisesRegex(core.DesktopError, "outside|desktop"):
+            core.request(self.session, "scroll", dy=1, x=99999, y=10)
+        core.request(self.session, "key", key="Return")
+        wait_for((first / "typed.txt").exists)
+        self.assertEqual((first / "typed.txt").read_text(), "A")
+        # The manifest holds the session token: only the user can read it.
+        mode = (core.session_path(self.session) / "session.json").stat().st_mode
+        self.assertEqual(mode & 0o777, 0o600)
+        # A token from another session does not validate here.
+        other = core.create()["session"]
+        try:
+            token = core.request(other, "screenshot")["observation"]
+        finally:
+            core.destroy(other)
+        with self.assertRaisesRegex(core.DesktopError, "StaleObservation"):
+            core.request(self.session, "move", x=5, y=5, observation=token)
+
     def test_expected_window_with_wait_step(self):
         self.fixture("first")
         observation = core.request(self.session, "screenshot")["observation"]

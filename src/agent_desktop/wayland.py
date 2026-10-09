@@ -384,7 +384,10 @@ class Keysyms:
     def resolve(self, name):
         keysym = self.library.xkb_keysym_from_name(name.encode(), 0)
         if not keysym:
-            raise ValueError(f"Unknown key name: {name}")
+            raise ValueError(
+                f"Unknown key name: {name}; use an XKB keysym such as Return, "
+                'Tab, Escape or t, and chord syntax such as "ctrl+t" for shortcuts'
+            )
         return keysym
 
 

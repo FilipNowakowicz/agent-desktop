@@ -4,11 +4,11 @@ import os
 
 from .core import (
     DesktopError,
-    active_host_session,
     answer_host,
     create,
     delete_profile,
     destroy,
+    host_status,
     logs,
     profiles,
     prune,
@@ -230,6 +230,8 @@ def main():
         elif command == "scroll":
             operation.add_argument("dy", type=int, help="wheel notches, > 0 down")
             operation.add_argument("--dx", type=int, default=0, help="> 0 right")
+            operation.add_argument("--x", type=int, help="scroll here (move first)")
+            operation.add_argument("--y", type=int)
         elif command == "focus":
             operation.add_argument("window")
         elif command == "release":
@@ -296,7 +298,7 @@ def main():
                 while result.get("status") == "pending":
                     result = request_host(args["reason"] or "", args["minutes"])
             else:
-                result = {"session": active_host_session()}
+                result = host_status()
         elif command == "trace":
             result = trace(args["session"], args["limit"])
         elif command == "destroy":

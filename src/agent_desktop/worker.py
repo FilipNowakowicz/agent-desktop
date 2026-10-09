@@ -229,6 +229,14 @@ MUTATING_OPERATIONS = (
     "set",
     "browser",
 )
+CHORD_MODIFIERS = {
+    "control": "ctrl",
+    "ctl": "ctrl",
+    "super": "logo",
+    "meta": "logo",
+    "win": "logo",
+    "cmd": "logo",
+}
 KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
@@ -256,7 +264,12 @@ def trace_arguments(request):
         kept["text_chars"] = len(request["text"])
     key = request.get("key")
     if isinstance(key, str):
-        kept["key"] = key if len(key) > 1 else "<character>"
+        chord = "+" in key[1:]
+        # A shortcut (with ctrl, alt or logo) spells nothing; plain keys might.
+        shortcut = chord or bool(
+            {"ctrl", "alt", "logo"} & set(kept.get("modifiers") or [])
+        )
+        kept["key"] = key if len(key) > 1 or shortcut else "<character>"
     argv = request.get("argv")
     if isinstance(argv, list) and argv:
         kept["program"] = Path(str(argv[0])).name
@@ -1311,7 +1324,9 @@ class Worker:
             for w in self.toplevels.current()
         )
         # The control epoch makes every token stale after a person had control.
+        # The session id keeps one session's token from validating in another.
         layout = [
+            self.info["id"],
             output["width"],
             output["height"],
             output["scale"],
@@ -1836,6 +1851,11 @@ class Worker:
             return self.frame(request.get("since"))
         if operation in INPUT_OPERATIONS and request.get("observation") is not None:
             self.check_observation(request["observation"])
+        if operation == "scroll" and (
+            request.get("x") is not None or request.get("y") is not None
+        ):
+            # Scroll at a position: move there first (same coordinates as click).
+            self.handle({**request, "operation": "move"})
         if operation in ("click", "move", "drag"):
             button = request.get("button", "left")
             if button not in BUTTONS:
@@ -1885,8 +1905,19 @@ class Worker:
         elif operation == "key":
             key = request.get("key")
             modifiers = request.get("modifiers", [])
+            if isinstance(key, str) and "+" in key[1:] and isinstance(modifiers, list):
+                # Chord syntax: "ctrl+t", "ctrl+shift+Tab".
+                *named, key = key.split("+")
+                modifiers = [
+                    *modifiers,
+                    *(CHORD_MODIFIERS.get(m.lower(), m) for m in named),
+                ]
             if not isinstance(key, str) or not re_key(key):
-                raise ValueError("Invalid key name")
+                raise ValueError(
+                    f"Invalid key name {key!r}: use an XKB keysym such as Return, "
+                    "Tab, Escape or t, with modifiers (ctrl, alt, shift, logo) or "
+                    'chord syntax such as "ctrl+t"'
+                )
             if not isinstance(modifiers, list) or any(
                 m not in ("ctrl", "alt", "shift", "logo") for m in modifiers
             ):
@@ -2163,9 +2194,17 @@ class Worker:
             shutil.rmtree(self.root / name, ignore_errors=True)
 
 
+def write_private(path, text):
+    """Write a file only the user can read (the manifest holds the session token)."""
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        stream.write(text)
+    os.chmod(path, 0o600)
+
+
 def write_manifest(root, info):
     temporary = root / "session.json.tmp"
-    temporary.write_text(json.dumps(info, indent=2) + "\n")
+    write_private(temporary, json.dumps(info, indent=2) + "\n")
     temporary.replace(root / "session.json")
 
 

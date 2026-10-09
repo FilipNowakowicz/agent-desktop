@@ -503,7 +503,8 @@ def desktop_key(
     screenshot: bool = False,
 ) -> dict | list:
     """Send a keysym such as Return or Right, optionally with ctrl/alt/shift/logo
-    modifiers and repeated up to 100 times.
+    modifiers (or as a chord: "ctrl+t", "ctrl+shift+Tab") and repeated up to 100
+    times. delivered means sent to the compositor, not handled by the app.
 
     With screenshot=true the reply also contains the screen once it has been still
     for 0.3 s (at most 3 s; "settled" says which), with its observation token,
@@ -583,12 +584,16 @@ def desktop_scroll(
     dx: int = 0,
     observation: str | None = None,
     screenshot: bool = False,
+    x: int | None = None,
+    y: int | None = None,
 ) -> dict | list:
-    """Scroll at the current pointer location by mouse-wheel notches: dy > 0
-    scrolls down, dx > 0 right (a notch is usually about three lines).
+    """Scroll by mouse-wheel notches at x/y (coordinates as for desktop_click),
+    or at the current pointer location: dy > 0 scrolls down, dx > 0 right (a
+    notch is usually about three lines).
 
     With screenshot=true the reply also contains the settled screen."""
-    result = call(session, "scroll", dy=dy, dx=dx, observation=observation)
+    position = {"x": x, "y": y} if x is not None or y is not None else {}
+    result = call(session, "scroll", dy=dy, dx=dx, observation=observation, **position)
     return looked(session, result, screenshot)
 
 

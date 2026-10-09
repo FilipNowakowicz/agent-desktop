@@ -329,7 +329,9 @@ def create(
         info["parent_wayland"] = None
         info["host_wayland"] = parent
         info["expires_at"] = time.time() + _host_minutes * 60
-    (root / "session.json").write_text(json.dumps(info, indent=2) + "\n")
+    from .worker import write_private
+
+    write_private(root / "session.json", json.dumps(info, indent=2) + "\n")
     if home:
         (home.parent / "last-session.json").write_text(
             json.dumps({"session": session}) + "\n"
@@ -487,6 +489,19 @@ def active_host_session():
         if entry.get("mode") == "host" and entry.get("status") in ("starting", "ready"):
             return entry["session"]
     return None
+
+
+def host_status():
+    """The running host session with its expiry, or {"session": None}."""
+    session = active_host_session()
+    if not session:
+        return {"session": None}
+    expires = manifest(session).get("expires_at")
+    return {
+        "session": session,
+        "expires_at": expires,
+        "seconds_left": max(0, round(expires - time.time())) if expires else None,
+    }
 
 
 def host_minutes(minutes):

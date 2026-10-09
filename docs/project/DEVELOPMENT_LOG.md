@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-09 — Host trial polish
+
+From docs/trials/2026-10-09-host-browser-task.md: observation tokens include the
+session id (finding 3; a token from another session is stale); `key` accepts
+chords such as `ctrl+t` and unknown names explain the syntax; `scroll` takes
+`x`/`y`; `host status` reports `expires_at` and `seconds_left`; `session.json`
+is written with mode 0600; the trace keeps key names of shortcuts (ctrl, alt or
+logo) while still hiding plain characters (finding 7). Documented that the
+token covers window-level changes only and that `delivered` means sent to the
+compositor (findings 2–3). Not done: layer-shell focus detection (Hyprland
+exposes layers but not which one has keyboard focus), window geometry and
+workspaces, stable window ids, notification placement.
+
+Validation: ruff check and format; full desktop suite with zenity, kdialog and
+at-spi2-core from `nix shell`: 154 tests OK (10 skipped).
+
 ## 2026-10-09 — Browser bridge A/B (with within and steps)
 
 Matched A/B, 2 tasks × 3 runs per arm in Firefox, all 12 passed: wall time

@@ -104,7 +104,10 @@ pass: with this screenshot's `observation`, input tools (and every step of an
 action sequence) take x/y in this image and convert them; without a token, x/y
 are desktop pixels. Do not convert manually and also pass the token, or the
 scaling is applied twice. The token's layout part always describes the whole
-desktop.
+desktop: the session, output, windows, focus and window states. It does not
+change with content inside a window, such as a browser's new tab or page, nor
+with popups and layer-shell panels; in browsers it guards window-level changes
+only.
 
 ## Act and see in one call
 
@@ -298,7 +301,7 @@ minutes, at most 240) or is destroyed.
 
 ```sh
 agent-desktop host start --minutes 10   # allow without a request
-agent-desktop host status
+agent-desktop host status               # session, expires_at, seconds_left
 agent-desktop host stop                 # end it now (bind this to a key if you like)
 ```
 
@@ -308,6 +311,8 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
   agent steps can finish before it stops. Input that carries the observation
   token of a screenshot taken before your activity is refused too; the agent
   must look again.
+- **Session files.** `session.json` holds the session's control token and is
+  readable only by you (mode 0600).
 - **Locked or dark screen.** While a screen locker runs (hyprlock, swaylock,
   gtklock, waylock, i3lock) or Hyprland reports every display off, input is
   refused ("ScreenUnavailable", nothing sent).
@@ -421,7 +426,11 @@ on real key codes (Shift for capitals and symbols). Characters a US keyboard lac
 be typed regardless of layout: up to 10000 characters per request, paced at
 about 8 ms per key (`AGENT_DESKTOP_KEY_INTERVAL_MS`). `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
 XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
-modifiers. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
+modifiers, or chords such as `ctrl+t` or `ctrl+shift+Tab`. `scroll` takes optional
+`x`/`y` (CLI `--x/--y`) to move there first. `delivered` means the input was sent
+to the compositor, not that the application handled it: on the host, a
+layer-shell panel (quick settings, a launcher) can hold keyboard focus without
+appearing in `windows` or the focus fields, so check the result. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
 default bindings, which execute host commands such as `brightnessctl`, are not loaded.
 Applications run as your user, with
 host filesystem and network access; graphical separation is not a security sandbox.

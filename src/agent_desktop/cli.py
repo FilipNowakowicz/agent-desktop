@@ -103,6 +103,8 @@ def main():
     waiter.add_argument("--element", help="accessible name substring")
     waiter.add_argument("--role")
     waiter.add_argument("--text", help="substring of the element's text or value")
+    waiter.add_argument("--state", help="e.g. checked, enabled, focused, expanded")
+    waiter.add_argument("--exact", action="store_true", help="whole element name")
     tree = sub.add_parser("ui", help="list visible UI elements (accessibility)")
     tree.add_argument("session")
     tree.add_argument("--app")
@@ -120,6 +122,7 @@ def main():
     steps.add_argument("session")
     steps.add_argument("actions", type=json.loads)
     steps.add_argument("--observation")
+    steps.add_argument("--timeout", type=float, help="bound the whole run (seconds)")
     steps.add_argument(
         "--screenshot",
         action="store_true",

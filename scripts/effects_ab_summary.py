@@ -1,5 +1,6 @@
 """Compare benchmark runs with and without a treatment: the effect ledger,
-the atlas, or input that returns a screenshot (runs without --no-look).
+the atlas, input that returns a screenshot (runs without --no-look), or with
+AB_ARM=guards, guarded steps (runs without --no-guards).
 
     uv run scripts/effects_ab_summary.py artifacts/benchmark/RUN [...]
 
@@ -9,6 +10,7 @@ cost, as medians per task and arm.
 """
 
 import json
+import os
 import statistics
 import sys
 from pathlib import Path
@@ -53,6 +55,9 @@ for run in sys.argv[1:]:
         arm = "atlas"
     elif summary.get("effects"):
         arm = "effects"
+    elif os.environ.get("AB_ARM") == "guards":
+        # Guarded steps compared with both arms able to look.
+        arm = "guards" if summary.get("guards") else "baseline"
     else:
         # Runs before the screenshot option existed have no "look" key.
         arm = "look" if summary.get("look") else "baseline"
@@ -111,7 +116,11 @@ for (task, arm), records in sorted(groups.items()):
 # Pooled comparison: each run's value relative to its task's baseline median,
 # then a two-sided permutation test on the difference of mean ratios.
 treated = next(
-    (t for t in ("atlas", "effects", "look") if any(a == t for _k, a in groups)),
+    (
+        t
+        for t in ("atlas", "effects", "guards", "look")
+        if any(a == t for _k, a in groups)
+    ),
     "effects",
 )
 METRICS = {

@@ -250,6 +250,8 @@ def desktop_wait(
     role: str | None = None,
     text: str | None = None,
     seconds: float = 0,
+    state: str | None = None,
+    exact: bool = False,
 ) -> dict:
     """Wait instead of polling with screenshots.
 
@@ -257,7 +259,10 @@ def desktop_wait(
     for none to remain if gone is true. With element (accessible name substring),
     role (exact, as listed by desktop_ui) and/or text (substring of its text or
     value), wait for a matching UI element, e.g. a "Saved" label, or for it to
-    disappear when gone is true and no window is given. With stable_ms, then wait
+    disappear when gone is true and no window is given. exact=true matches the
+    whole name; state requires checked, unchecked, enabled, disabled, focused,
+    selected, expanded, collapsed, editable, pressed, busy or idle. Elements
+    are searched within the matched windows. With stable_ms, then wait
     until the screen has not changed for that long (a blinking caret is ignored).
     seconds (up to 30) pauses first, for changes no condition describes.
     Returns satisfied=false at the timeout (at most 120 s); when no window
@@ -275,6 +280,8 @@ def desktop_wait(
         text,
         seconds,
         controller=CONTROLLER,
+        state=state,
+        exact=exact,
     )
 
 
@@ -284,26 +291,37 @@ def desktop_actions(
     actions: list[dict],
     observation: str | None = None,
     screenshot: bool = False,
+    timeout: float | None = None,
 ) -> dict | list:
     """Run up to 50 steps in one call, e.g. click a field, type, press Return.
 
     Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
     drag, scroll, type, key, ui_action, focus or wait (e.g. {"action": "wait",
     "seconds": 1}). A ui_action step names its UI action as "name", e.g.
-    {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}. Pass the observation token of the screenshot you planned
-    from; coordinates in every step are then in that screenshot's image. Input is sent only while windows and focus are
-    as they were after the previous step; otherwise the run stops and reports
-    which step and why. Insert a wait step where you expect a window to open or
-    close. Popups and changes inside a window are not detected, so verify the
-    result afterwards. No other client can send input
+    {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}.
+    Pass the observation token of the screenshot you planned from; coordinates
+    in every step are then in that screenshot's image. Input is sent only while
+    windows and focus are as they were after the previous step; otherwise the
+    run stops and reports which step and why. No other client can send input
     while the steps run. Steps are never retried: a step reported with
     "uncertain": true may or may not have happened, so check before repeating it.
+
+    Guarded steps: plan several steps ahead and say what each should cause.
+    Any step can carry "expect": desktop_wait conditions (title, app_id, gone,
+    element, role, text, state, exact, timeout default 5) that must hold after
+    it, e.g. {"action": "key", "key": "Return", "expect": {"title": "Saved"}};
+    if not, the run stops there with "expectation": true and the step counted
+    as done. A ui_action step can name its target instead of a node id
+    (element, role, state, exact, window, app), looked up when the step
+    runs: {"action": "ui_action", "element": "Save", "role": "push button",
+    "name": "press"}; it must match exactly one element, otherwise nothing is
+    sent and the run stops. timeout (seconds) bounds the whole run.
 
     With screenshot=true the reply ends with the screen after the last step run
     (also when the run stopped early), once it has been still for 0.3 s (at most
     3 s; "settled" says which).
     """
-    result = core.run_actions(session, actions, observation, CONTROLLER)
+    result = core.run_actions(session, actions, observation, CONTROLLER, timeout)
     return looked(session, result, screenshot)
 
 
@@ -551,6 +569,18 @@ def desktop_destroy(session: str) -> dict:
     """Stop a session's owned processes and remove its private runtime/configuration."""
     return core.destroy(session)
 
+
+# Experiment baseline (AGENT_DESKTOP_GUARDS=0): sequences without the
+# guarded-step description, for matched comparisons.
+if os.environ.get("AGENT_DESKTOP_GUARDS") == "0":
+    for registered in mcp._tool_manager.list_tools():
+        if registered.name == "desktop_actions":
+            registered.description = re.sub(
+                r"\n\s*\n\s*Guarded steps:.*?(?=\n\s*\n)",
+                "",
+                registered.description,
+                flags=re.S,
+            )
 
 if not LOOK:
     for registered in mcp._tool_manager.list_tools():

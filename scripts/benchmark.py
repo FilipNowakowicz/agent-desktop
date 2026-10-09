@@ -200,6 +200,7 @@ def mcp_config_for(root):
                 "AGENT_DESKTOP_EFFECTS": os.environ.get("AGENT_DESKTOP_EFFECTS", "0"),
                 "AGENT_DESKTOP_ATLAS": os.environ.get("AGENT_DESKTOP_ATLAS", ""),
                 "AGENT_DESKTOP_LOOK": os.environ.get("AGENT_DESKTOP_LOOK", "1"),
+                "AGENT_DESKTOP_GUARDS": os.environ.get("AGENT_DESKTOP_GUARDS", "1"),
             }
         path.write_text(json.dumps(config, indent=2) + "\n")
     return str(path)
@@ -302,8 +303,14 @@ def main():
         action="store_true",
         help="baseline: input tools cannot return a screenshot (screenshot=true)",
     )
+    parser.add_argument(
+        "--no-guards",
+        action="store_true",
+        help="baseline: desktop_actions without the guarded-step description",
+    )
     args = parser.parse_args()
     random.seed(args.seed)
+    os.environ["AGENT_DESKTOP_GUARDS"] = "0" if args.no_guards else "1"
     os.environ["AGENT_DESKTOP_LOOK"] = "0" if args.no_look else "1"
     # Sessions inherit this from the harness; the MCP server from claude.
     os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
@@ -352,6 +359,7 @@ def main():
         "tools": args.tools,
         "effects": args.effects,
         "look": not args.no_look,
+        "guards": not args.no_guards,
         "atlas": bool(args.atlas),
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),

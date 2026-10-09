@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-09 — S1a: input returns the settled screen
+
+Input tools, `desktop_actions` and the CLI (`--screenshot`) accept
+`screenshot=true`: the reply carries a screenshot taken once the screen has been
+still for 0.3 s (at most 3 s) and says whether it went quiet. Worker `settle`
+now returns that outcome; `screenshot` accepts `settle_ms`/`settle_timeout_ms`.
+`AGENT_DESKTOP_LOOK=0` hides the option (experiment baseline); the benchmark has
+`--no-look`, records inline screenshots, and the A/B summary also tests turns
+and seconds.
+
+Agent A/B (docs/research/2026-10-09-act-and-observe.md, 18 runs, all passed):
+turns −31% (p = 0.0002), input tokens −20% (p = 0.04), wall time −14%
+(p = 0.04); median cost unchanged within noise. Kept. Side finding: `press`
+failed on Chromium check boxes that offer only `check` (fixed in S2).
+
+Validation: ruff check and format; full desktop suite with zenity, kdialog and
+at-spi2-core from `nix shell`: 146 tests OK (10 skipped).
+
 ## 2026-10-09 — External review; S0 foundations
 
 An external research review (docs/research/2026-10-09-astra-review.md, written

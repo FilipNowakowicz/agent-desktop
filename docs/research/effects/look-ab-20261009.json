@@ -1,0 +1,136 @@
+{
+ "tasks": [
+  {
+   "task": "chromium-form",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 2,
+   "inline_screenshots": 0,
+   "tool_calls": 11,
+   "effects_calls": 0,
+   "turns": 12,
+   "input_tokens": 141967,
+   "output_tokens": 1216,
+   "cost_usd": 0.11829380000000002,
+   "seconds": 22.3
+  },
+  {
+   "task": "chromium-form",
+   "arm": "look",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 2,
+   "tool_calls": 9,
+   "effects_calls": 0,
+   "turns": 10,
+   "input_tokens": 103665,
+   "output_tokens": 1126,
+   "cost_usd": 0.1264992,
+   "seconds": 19.1
+  },
+  {
+   "task": "chromium-slider",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 3,
+   "inline_screenshots": 0,
+   "tool_calls": 5,
+   "effects_calls": 0,
+   "turns": 6,
+   "input_tokens": 64274,
+   "output_tokens": 645,
+   "cost_usd": 0.0751502,
+   "seconds": 12.4
+  },
+  {
+   "task": "chromium-slider",
+   "arm": "look",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 2,
+   "tool_calls": 3,
+   "effects_calls": 0,
+   "turns": 4,
+   "input_tokens": 56835,
+   "output_tokens": 493,
+   "cost_usd": 0.082847,
+   "seconds": 10.8
+  },
+  {
+   "task": "mousepad-save",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 3,
+   "inline_screenshots": 0,
+   "tool_calls": 5,
+   "effects_calls": 0,
+   "turns": 6,
+   "input_tokens": 78524,
+   "output_tokens": 839,
+   "cost_usd": 0.0833708,
+   "seconds": 19.4
+  },
+  {
+   "task": "mousepad-save",
+   "arm": "look",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 2,
+   "tool_calls": 3,
+   "effects_calls": 0,
+   "turns": 4,
+   "input_tokens": 57293,
+   "output_tokens": 673,
+   "cost_usd": 0.08837,
+   "seconds": 17.4
+  }
+ ],
+ "pooled_input_tokens": {
+  "runs": {
+   "baseline": 9,
+   "look": 9
+  },
+  "mean_ratio": {
+   "baseline": 0.946,
+   "look": 0.759
+  },
+  "p_value": 0.0403
+ },
+ "pooled_turns": {
+  "runs": {
+   "baseline": 9,
+   "look": 9
+  },
+  "mean_ratio": {
+   "baseline": 0.981,
+   "look": 0.676
+  },
+  "p_value": 0.0002
+ },
+ "pooled_seconds": {
+  "runs": {
+   "baseline": 9,
+   "look": 9
+  },
+  "mean_ratio": {
+   "baseline": 0.976,
+   "look": 0.844
+  },
+  "p_value": 0.0441
+ },
+ "runs": [
+  "artifacts/benchmark/20261009-185218-b9be (look) 185332-d0e9 (baseline) 185439-2a2e (look) 185536-f94a (baseline) 185640-9fb9 (look) 185730-ff9f (baseline)"
+ ]
+}

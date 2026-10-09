@@ -71,7 +71,9 @@ foundations (control gates and exact waits, done first), S1a act and observe
 with existing capture, S2 exact checks and guarded plans, S3 private-browser
 adapter and three checked procedures, S4 host hardening; damage capture, host
 OCR and route memory only when a measured task needs them. General crawling and
-speculative mutations are cut.
+speculative mutations are cut. S1a is done: input with `screenshot=true` cut
+model turns 31% and input tokens 20% in a matched A/B
+([act and observe](../research/2026-10-09-act-and-observe.md)).
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

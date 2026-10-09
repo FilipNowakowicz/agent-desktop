@@ -123,6 +123,23 @@ class LookupTests(unittest.TestCase):
         text = (home / ".config/editor/settings.conf").read_text()
         self.assertIn("[prefs/view]\nhighlight-current-line=true", text)
 
+    def test_apply_refuses_a_different_starting_value(self):
+        home = self.directory / "home"
+        path = home / ".config/editor/settings.conf"
+        path.parent.mkdir(parents=True)
+        path.write_text("[prefs/view]\nhighlight-current-line=maybe\n")
+        with self.assertRaisesRegex(ValueError, "nothing was written"):
+            atlas.apply(
+                home, "editor", "Highlight current line", directory=self.directory
+            )
+        self.assertIn("=maybe", path.read_text())
+        path.write_text("[prefs/view]\nhighlight-current-line=true\n")
+        result = atlas.apply(
+            home, "editor", "Highlight current line", directory=self.directory
+        )
+        self.assertEqual(result["written"], [])
+        self.assertEqual(len(result["unchanged"]), 1)
+
     def test_apply_refuses_unverified_and_unknown(self):
         for control in ("Menubar", "Nothing"):
             with self.subTest(control=control), self.assertRaises(ValueError):

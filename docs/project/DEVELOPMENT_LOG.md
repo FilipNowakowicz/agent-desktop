@@ -1,5 +1,39 @@
 # Development log
 
+## 2026-10-09 — External review; S0 foundations
+
+An external research review (docs/research/2026-10-09-astra-review.md, written
+read-only against 4b44101) checked the beyond-human-speed plan against the
+code. Its static findings were verified by reading the source; these were fixed:
+
+- `desktop_set` wrote into the session home from the MCP process, bypassing the
+  worker's lease and takeover checks. It is now a worker operation `set`
+  (mutating, effect-ledger recorded, refused on the host). `atlas.apply` writes
+  nothing unless every key still holds its learned starting value (or already
+  the target), and refuses ambiguous control names. Two Mousepad plugin
+  toggles that write the same list can no longer overwrite each other.
+- Element waits with `app_id` (and no title) searched every application; they
+  now search the matched windows only.
+- `atspi.tree` skipped unreadable nodes silently, so a `gone` element wait could
+  succeed on a partial read. The tree now reports `unreadable`, and gone waits
+  return "element unknown" while it is nonzero.
+- File waits (`wait_for_file`) matched deletions; deleted or missing files no
+  longer match.
+- Docs: host waits cannot use elements (USAGE, MCP instructions); typing is
+  paced at 8 ms per key; README notes the approved-host exception.
+- Plan: corrected three claims (private sessions do not share the person's
+  configuration; damage is not readiness; a disposable session is not a
+  disposable world) and reordered the roadmap: S0 foundations, S1a act and
+  observe, S2 exact checks and guarded plans, S3 private browser and procedures,
+  S4 host hardening, later stages only when measured tasks need them.
+
+Not changed: the review's suggestions about delivery-state vocabulary and plan
+deadlines belong to S2.
+
+Validation: ruff check and format; `PATH=<runtime>/bin:$PATH uv run python -m
+unittest discover -s tests -v` (full suite), and test_ui.py with zenity,
+kdialog and at-spi2-core from `nix shell`.
+
 ## 2026-10-09 — Plan: beyond human speed
 
 docs/research/2026-10-09-beyond-human-speed.md records the plan agreed with the

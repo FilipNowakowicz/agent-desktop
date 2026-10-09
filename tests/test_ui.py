@@ -178,6 +178,15 @@ class UITests(UISessionTest):
             self.session, title="Alpha dialog", element="Secret code", timeout=5
         )
         self.assertTrue(right["satisfied"], right)
+        # app_id scopes the element too: zenity's text is not in a foot window.
+        core.request(self.session, "launch", argv=["foot", "--config=/dev/null"])
+        foot = core.wait(self.session, app_id="foot", timeout=10)
+        self.assertTrue(foot["satisfied"], foot)
+        other = core.wait(self.session, app_id="foot", element="Secret code", timeout=1)
+        self.assertFalse(other["satisfied"])
+        self.assertEqual(other["reason"], "no element")
+        own = core.wait(self.session, app_id="zenity", element="Secret code", timeout=5)
+        self.assertTrue(own["satisfied"], own)
 
     def test_tree_filters_and_limits(self):
         core.request(

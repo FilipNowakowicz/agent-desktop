@@ -130,7 +130,8 @@ Code. See [integrations](docs/INTEGRATIONS.md).
   applications use your installed software. Other tools run a desktop in Docker or a VM, which isolates better but
   costs setup and resources.
 - **Your own desktop stays yours.** Agent input goes to the agent's session
-  only, never to your physical screen, unlike tools that drive your real desktop.
+  only, never to your physical screen, unless you approve a host session for a
+  task; that access is explicit and expires.
 - **Built-in handoff.** An agent can request a person; `take` opens the session
   in a viewer, with your keyboard layout, and closing it hands control back.
 

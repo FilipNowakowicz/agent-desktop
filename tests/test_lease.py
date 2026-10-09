@@ -1,5 +1,6 @@
 """One exclusive controller per session, enforced by a lease (real compositor)."""
 
+import json
 import os
 import shutil
 import sys
@@ -123,6 +124,44 @@ class LeaseTests(unittest.TestCase):
             core.request(self.session, "lease")
         with self.assertRaisesRegex(core.DesktopError, "Controller ids"):
             core.request(self.session, "move", "bad id!", x=1, y=1)
+
+    def test_atlas_set_needs_the_lease(self):
+        atlas = self.root / "atlas"
+        atlas.mkdir()
+        (atlas / "atlas-editor.json").write_text(
+            json.dumps(
+                {
+                    "summary": {"app": "editor"},
+                    "atlas": [
+                        {
+                            "kind": "menu",
+                            "menu": "View",
+                            "label": "Wrap",
+                            "verified": True,
+                            "effect": [
+                                {
+                                    "file": "~/.config/editor/settings.conf",
+                                    "key": "[view] wrap",
+                                    "from": None,
+                                    "to": "true",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+        arguments = {"app": "editor", "control": "Wrap", "atlas": str(atlas)}
+        core.request(self.session, "move", "client-a", x=5, y=5)
+        with self.assertRaisesRegex(core.DesktopError, "LeaseHeld"):
+            core.request(self.session, "set", "client-b", **arguments)
+        home = core.session_path(self.session) / "home"
+        self.assertFalse((home / ".config/editor/settings.conf").exists())
+        result = core.request(self.session, "set", "client-a", **arguments)
+        self.assertEqual(
+            result["written"], ["~/.config/editor/settings.conf [view] wrap = true"]
+        )
+        self.assertIn("wrap=true", (home / ".config/editor/settings.conf").read_text())
 
     def test_action_sequence_cannot_be_interleaved(self):
         fixture = self.fixture("sequence")

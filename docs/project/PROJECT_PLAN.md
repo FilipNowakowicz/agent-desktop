@@ -65,8 +65,13 @@ targets resolved at run time and expectations, measured against matched arms.
 The full plan, [beyond human speed](../research/2026-10-09-beyond-human-speed.md),
 adds delta-coded observation (damage, keyframes, text deltas, surprise only),
 navigation maps from model-free exploration, a browser bridge and verified
-procedures, with stages S1–S6 and stop criteria. S1 (settled deltas) and S2
-(guarded plans) are the next work.
+procedures, with staged stop criteria. An
+[external review](../research/2026-10-09-astra-review.md) reordered it: S0
+foundations (control gates and exact waits, done first), S1a act and observe
+with existing capture, S2 exact checks and guarded plans, S3 private-browser
+adapter and three checked procedures, S4 host hardening; damage capture, host
+OCR and route memory only when a measured task needs them. General crawling and
+speculative mutations are cut.
 
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.

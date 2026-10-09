@@ -194,7 +194,7 @@ class Accessibility:
         """
         nodes, truncated = [], None
         deadline = time.monotonic() + budget
-        visited = 0
+        visited = unreadable = 0
         max_visited = max(2000, max_nodes * 10)
 
         def exhausted():
@@ -211,7 +211,7 @@ class Accessibility:
 
         def walk(window_nodes):
             """Depth-first, in order, with an explicit stack (trees can be deep)."""
-            nonlocal visited, truncated
+            nonlocal visited, truncated, unreadable
             stack = [(node, 1, True) for node in reversed(window_nodes)]
             while stack and not exhausted():
                 node, depth, is_window = stack.pop()
@@ -226,7 +226,9 @@ class Accessibility:
                     record, showing = self.describe(node)
                     children = self.children(node)
                 except (AccessibilityError, TimeoutError):
-                    # Elements disappear while the tree is read (e.g. a closing window).
+                    # Elements disappear while the tree is read (e.g. a closing
+                    # window); counted, so absence is not claimed from a partial read.
+                    unreadable += 1
                     continue
                 if not showing:
                     continue
@@ -249,6 +251,7 @@ class Accessibility:
                 name = self.get(application, ACCESSIBLE, "Name")
                 windows = self.children(application)
             except (AccessibilityError, TimeoutError):
+                unreadable += 1
                 continue
             if app and app.lower() not in name.lower():
                 continue
@@ -268,6 +271,7 @@ class Accessibility:
             "nodes": nodes,
             "truncated": truncated is not None,
             "truncated_by": truncated,
+            "unreadable": unreadable,
         }
 
     def act(self, node_id, action, text=None):

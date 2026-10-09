@@ -138,7 +138,13 @@ def write_ini(path, key, value):
 def apply(home, app, control, directory=None):
     """Write the configuration change learned for `control` ("Menu > Label",
     the label alone, or the control text desktop_atlas returned) into a
-    session home. Only verified entries with keyfile/INI effects are applied."""
+    session home. Only verified entries with keyfile/INI effects are applied.
+
+    Each key must still hold the value it had when the change was learned (or
+    already the new one): the atlas records whole values, so writing one over
+    a different starting state (a list or bitfield another control also
+    changes) would overwrite that state. Nothing is written unless every key
+    passes."""
     matches = [
         entry
         for entry in load(directory)
@@ -151,12 +157,50 @@ def apply(home, app, control, directory=None):
             f"No verified atlas entry for {app}: {control!r}; use desktop_atlas to "
             "find the exact control text"
         )
+    if len({location(entry) for entry in matches}) > 1:
+        raise ValueError(
+            f"{control!r} matches several {app} controls; use the full control "
+            "text desktop_atlas returned"
+        )
     entry = matches[0]
-    written = []
+    planned = []
     for effect in entry["effect"]:
         if not effect["key"].startswith("[") or effect["to"] is None:
             raise ValueError("This entry's effect cannot be applied as a key")
         path = Path(home) / effect["file"].removeprefix("~/")
-        write_ini(path, effect["key"], effect["to"])
-        written.append(f"{effect['file']} {effect['key']} = {effect['to']}")
-    return {"app": app, "control": location(entry), "written": written}
+        current = read_ini(path, effect["key"])
+        if current not in (effect["from"], effect["to"]):
+            raise ValueError(
+                f"{effect['file']} {effect['key']} is {current!r}, not the "
+                f"{effect['from']!r} this change was learned from; nothing was "
+                "written. Use the GUI for this control."
+            )
+        planned.append((path, effect, current == effect["to"]))
+    written, unchanged = [], []
+    for path, effect, done in planned:
+        line = f"{effect['file']} {effect['key']} = {effect['to']}"
+        if done:
+            unchanged.append(line)
+        else:
+            write_ini(path, effect["key"], effect["to"])
+            written.append(line)
+    return {
+        "app": app,
+        "control": location(entry),
+        "written": written,
+        "unchanged": unchanged,
+    }
+
+
+def read_ini(path, key):
+    """The value of "[section] name" in an INI/GLib keyfile, or None."""
+    section, _, name = key.partition("] ")
+    if not path.exists():
+        return None
+    inside = False
+    for line in path.read_text().splitlines():
+        if line.startswith("["):
+            inside = line.strip() == section + "]"
+        elif inside and line.split("=", 1)[0].strip() == name and "=" in line:
+            return line.split("=", 1)[1].strip()
+    return None

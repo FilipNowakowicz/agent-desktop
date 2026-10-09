@@ -7,11 +7,6 @@ CLI or a local MCP server. Agents can launch applications, inspect windows and
 accessible UI elements, take screenshots, and send keyboard and pointer input.
 You can watch a session or take control when a task needs human interaction.
 
-![A headless session: LibreOffice Calc with a small table and a chart](docs/images/calc-session.png)
-
-*A headless session captured with the tool. An agent entered the table and
-inserted the chart through the MCP tools while the host desktop stayed in use.*
-
 **Experimental, Linux-first.** Headless sessions have been tested locally on
 NixOS/Hyprland and in Ubuntu, Fedora and Arch CI environments. Those checks cover
 specific tasks, not every application or desktop installation. See the

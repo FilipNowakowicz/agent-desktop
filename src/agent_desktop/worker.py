@@ -226,11 +226,12 @@ MUTATING_OPERATIONS = (
     "focus",
     "ui_action",
     "request_human",
+    "set",
 )
 KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
-EFFECT_OPERATIONS = (*INPUT_OPERATIONS, "launch", "focus", "ui_action")
+EFFECT_OPERATIONS = (*INPUT_OPERATIONS, "launch", "focus", "ui_action", "set")
 TRACED_OPERATIONS = (*MUTATING_OPERATIONS, "screenshot", "lease", "take", "release")
 TRACE_FIELDS = (
     *("x", "y", "to_x", "to_y", "dx", "dy", "button", "repeat", "modifiers"),
@@ -284,6 +285,7 @@ HOST_UNSUPPORTED = (
     "request_human",
     "ui",
     "ui_action",
+    "set",
 )
 # Pause agent input this long after the person last used the computer.
 HOST_PAUSE_SECONDS = 3.0
@@ -1454,6 +1456,16 @@ class Worker:
                     "delivered": True,
                     "method": "keyboard",
                 }
+        if operation == "set":
+            from . import atlas
+
+            # Through the worker, so the lease and a person's control apply.
+            return atlas.apply(
+                self.env["HOME"],
+                request.get("app"),
+                request.get("control"),
+                request.get("atlas"),
+            )
         if operation == "effects":
             if not self.effects:
                 raise ValueError(

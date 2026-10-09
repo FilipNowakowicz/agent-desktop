@@ -39,8 +39,8 @@ navigate, click), call desktop_request_host with the reason. They confirm it;
 then use the returned session with the same tools. Their windows are real: act
 carefully, prefer reading before clicking, and never close their windows. If
 input is refused because they are using the computer, wait a few seconds. Their
-screen rarely stops changing, so wait for a window title or element rather than
-stable_ms. Call
+screen rarely stops changing, so wait for a window title rather than
+stable_ms (element waits need a private session). Call
 desktop_destroy on that session as soon as you are done; it never closes their
 applications. Use private sessions for everything else."""
 
@@ -171,13 +171,13 @@ def desktop_set(session: str, app: str, control: str) -> dict:
     private session's home. Many applications pick the change up while running;
     others on their next start. Verify the result (e.g. desktop_ui). Not for
     host sessions. Experimental: needs AGENT_DESKTOP_ATLAS."""
-    from . import atlas
-
-    info = core.manifest(session)
-    if info.get("mode") == "host":
-        raise core.DesktopError("desktop_set only writes private session homes")
-    home = info.get("home") or str(core.session_path(session) / "home")
-    return atlas.apply(home, app, control)
+    return call(
+        session,
+        "set",
+        app=app,
+        control=control,
+        atlas=os.environ.get("AGENT_DESKTOP_ATLAS"),
+    )
 
 
 @tool()

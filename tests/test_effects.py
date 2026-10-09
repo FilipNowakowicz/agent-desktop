@@ -180,6 +180,9 @@ class RecorderTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: ledger.matches(action, "~/*.csv")))
         late = ledger.since(action)
         self.assertEqual(late["files"][0]["path"], "~/out.csv")
+        # Deleting the file undoes the match.
+        (self.root / "out.csv").unlink()
+        self.assertTrue(wait_for(lambda: not ledger.matches(action, "~/*.csv")))
         with self.assertRaises(ValueError):
             ledger.matches(action, "*.csv")
         with self.assertRaises(ValueError):

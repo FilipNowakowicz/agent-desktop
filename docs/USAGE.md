@@ -149,7 +149,10 @@ pointing to a directory of atlas files, the MCP server offers
 `desktop_set(session, app, control)`, which writes a verified entry into a
 private session's configuration without the GUI. Some applications apply such
 a change while running, others at their next start; check the result.
-`desktop_set` refuses host sessions. Details:
+`desktop_set` refuses host sessions, needs the session's controller lease like
+any input, is refused while a person has control, and writes nothing when a key
+no longer holds the value the change was learned from (for example a plugin list
+another control already changed). Details:
 [docs/research/2026-10-09-effect-atlas.md](research/2026-10-09-effect-atlas.md).
 
 ## Taking control (logins, 2FA, CAPTCHAs)
@@ -233,7 +236,8 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
 - **Not available:** takeover, viewers, `request_human` and semantic UI (the
   accessibility bus belongs to your desktop). Use a private session for those.
 - **Waiting:** a live desktop rarely stops changing (clocks, terminals, video),
-  so `stable_ms` waits usually time out. Wait for a window title or element.
+  so `stable_ms` waits usually time out. Wait for a window title or app id;
+  element waits use the accessibility tree, which host sessions do not read.
 - **Screenshots** show your whole screen, including notifications and other
   windows, and the agent's model provider receives them.
 - **Requirements:** a wlroots-style Wayland desktop with virtual keyboard and
@@ -327,8 +331,8 @@ than one output at scale 1 is rejected.
 Keyboard input uses one persistent virtual keyboard per session with a US layout
 on real key codes (Shift for capitals and symbols). Characters a US keyboard lacks
 (accents, Greek, CJK) are mapped on demand to spare keys, so any Unicode text can
-be typed regardless of layout: up to 10000 characters per request, without fixed
-delays. `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
+be typed regardless of layout: up to 10000 characters per request, paced at
+about 8 ms per key (`AGENT_DESKTOP_KEY_INTERVAL_MS`). `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
 XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
 modifiers. The private compositor binds only Alt-Tab, Alt-Shift-Tab and Alt-F4; labwc's
 default bindings, which execute host commands such as `brightnessctl`, are not loaded.

@@ -6,12 +6,19 @@ goes), the [effect ledger](2026-10-08-effect-ledger.md) and the
 [effect atlas](2026-10-09-effect-atlas.md). Nothing here is measured yet unless
 it says so; estimates are labelled.
 
+**Revised the same day after an [external review](2026-10-09-astra-review.md):**
+the roadmap (§5) is reordered, three claims are corrected in place (marked
+*Corrected*), and the review's code findings are fixed first.
+
 ## 1. The problem in one paragraph
 
 In the host trial, time inside the tool was 0.4–2.6% of wall time; the rest was
-the agent deciding between calls (median gap 2.1–3.6 s). 53 of 59 screenshots
-came directly after an input, and 33 after exactly one action. Faster capture
-or input cannot help. Speed is
+the agent's side of the loop (median gap 2.1–3.6 s): model inference, but also
+its shell work, transport and the person's pauses, which the trace does not
+separate. 53 of 59 screenshots came directly after an input, and 33 after
+exactly one action. Faster capture or input cannot change much, apart from
+task-specific exceptions such as typing long text (paced at 8 ms per key).
+Speed is
 
 ```text
 task time ≈ understanding + (model decisions × 2–4 s) + execution (≈ 0.01–0.3 s per step)
@@ -61,10 +68,13 @@ know.
   a change and reports the changed rectangles; ext-image-copy-capture-v1
   reports damage as frame metadata. The runtime already speaks Wayland
   directly (`wayland.py`); capture currently uses `grim`, which has no damage.
-  Damage also gives a precise *settled* signal: no damage for N ms.
+  *Corrected:* damage means a repaint, not that the application is ready (a
+  failed input leaves the screen still; a network reply can arrive after a
+  quiet spell). Quiet is a cue to re-check a condition, never a postcondition.
 - **Keyframes and deltas.** Send a full frame at the start, after large changes
   or after k deltas; otherwise send only changed crops with their position.
-  Image cost is roughly width × height / 750 tokens: a full 1920×1080 frame
+  Image cost is roughly width × height / 750 tokens for Claude models (other
+  providers count differently; measure billed usage): a full 1920×1080 frame
   ~1,500–1,800 tokens after downscaling, a 600×400 dialog ~320, a 200×60
   button ~16. With prompt caching, earlier frames are not reprocessed, so an
   appended crop costs about its own tokens.
@@ -161,7 +171,10 @@ list.
 - Speculation while the model thinks (Speculative Actions, arXiv 2510.04371,
   up to 20% lower latency): pre-compute the next observation (OCR, element map)
   so it is ready when asked; pre-executing actions is safe only in disposable
-  sessions.
+  sessions. *Corrected:* a disposable session is not a disposable world;
+  applications still write the person's files and reach the network, so
+  speculation stays read-only unless every effect is known to be local and
+  thrown away.
 
 ### 3.7 Live applications without taking the person's screen
 
@@ -170,9 +183,10 @@ let a client inject input into an unfocused window, so "the agent uses my real
 windows in the background while I use others" cannot work through the screen.
 It can work through the application:
 
-- **Private sessions already share the person's configuration** (same user and
-  home). Exceptions: applications that lock a running profile (Firefox,
-  Thunderbird, Chromium) and single-instance applications.
+- *Corrected:* private sessions do **not** share the person's configuration;
+  each gets its own home (`worker.py`, `HOME`/`XDG_*`). They share the user,
+  files and network. Using the person's configuration means copying selected
+  files into a profile, or the bridge below.
 - **Browser bridge.** Firefox started with `--remote-debugging-port` exposes
   WebDriver BiDi: background tabs, DOM, scripts, `webExtension.install`
   (temporary unless signed and `moz:permanent`). Costs: a restart with the flag,
@@ -216,19 +230,27 @@ speed.
 
 Each stage is a PR with tests; agent comparisons use matched arms with several
 runs per arm (the effect-ledger study showed 14 vs 6 tool calls on identical
-runs), report wall time, model turns, input tokens, success and wrong actions,
-and dry-run before spending the maintainer's allowance.
+runs), report wall time (p50 and p95, failed attempts kept), model turns, input
+tokens, success and wrong actions, and dry-run before spending the maintainer's
+allowance. First-use and repeat runs are reported separately. "Human speed"
+claims wait for a matched human baseline.
+
+Revised order after the review: trustworthy checks before longer plans, the
+existing capture path before a new one, a few hand-written procedures before
+general maps.
 
 | Stage | Build | Measure | Stop / continue |
 | --- | --- | --- | --- |
-| S1 Settled deltas | Damage-based capture in `wayland.py` (screencopy v2 with damage, fallback to grim + image diff); every input can return `settled` with a text or crop delta and a keyframe when large; noise masks | Capture/settle latency; tokens per observation on recorded tasks; agent A/B on the standard suite | Continue if tokens per task drop ≥30% at equal success |
-| S2 Guarded plans | `expect` per step, run-time `target` by name/role/text, branch on anticipated dialogs, commit points, compact report | Model turns and wall time vs. S1, wrong-action rate, trap tasks (a dialog that should stop the run) | Continue if turns drop ≥30% without lower success; otherwise keep S1 |
-| S3 Host targets | Local OCR for host-mode text targets and expectations; layer-shell and lock awareness (trial findings 1–2) | OCR target accuracy on recorded host frames; false-stop rate | Use only where accuracy ≥95% on labelled targets |
-| S4 Browser bridge | Private-session BiDi driver (DOM targets, background tabs); then the maintainer's Firefox with explicit approval; evaluate a companion extension | Browser tasks: turns, time, success vs. pixels | Keep if faster at equal success |
-| S5 Navigation maps | Generalise the atlas crawler to states/transitions; shortest-path planning; edge expectations | Map coverage, edge verification rate, planning success on unseen goals | Keep if planned runs beat S2 on repeated apps |
-| S6 Procedures and parallelism | Procedure store with staleness checks; offer-at-plan-time; parallel sessions for independent subtasks | Repeat-task time vs. first run; parallel speed-up | — |
+| S0 Foundations | `desktop_set` through the worker (lease, takeover) and refusing changed starting values; element waits scoped to the app's windows; partial accessibility reads never count as absence; file waits ignore deletions; doc corrections | Tests | Done before S1 |
+| S1a Act and observe | Inputs and sequences can return a final observation (screenshot or region) after a bounded settle that reports *why* it returned (quiet, condition met, deadline), using the existing capture | Model turns, wall time, success on matched tasks | Continue if turns drop ≥20% at equal success |
+| S2 Exact checks and guarded plans | Exact, scoped selectors (name, role, app/window, enabled/checked); yes/no/unknown results; per-step `expect`; run-time targets; one deadline per plan; per-step outcomes (dispatched, observed, contradicted, unknown) | Turns, wrong-action rate, trap tasks (unexpected dialog, disabled button, duplicate labels) | Continue if turns drop ≥30% without lower success or more wrong actions |
+| S3 Private browser and procedures | BiDi adapter for private Firefox (DOM targets, background tabs); three hand-written procedures with parameters, preconditions and independent output checks | Turns and time vs. pixels; procedure warm runs vs. first runs | Keep each if faster at equal success |
+| S4 Host hardening | Lock and overlay refusal, fresh screenshot after the person's activity, then the maintainer's Firefox via BiDi with explicit approval | Refusal tests in a private stand-in host | Required before long plans on the host |
+| S5 Later, if justified | Damage-based capture; OCR targets on the host (measure precision when accepted and abstention, not one accuracy figure); task-scoped route memory from successful traces instead of general crawling; parallel sessions for independent tasks | As before | Only when a measured task shows it is the bottleneck |
 
-S1 and S2 are the core experiment; S3–S6 follow only if they pay off.
+Cut from the near-term plan: generic breadth-first navigation crawling,
+speculative mutations, racing two sessions on the same external write,
+learned noise masks, and automatic procedure induction.
 
 ## 6. Unattended work and authorisation
 

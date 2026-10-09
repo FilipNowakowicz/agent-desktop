@@ -553,9 +553,15 @@ class EffectLedger:
         start, _windows = self.records[action]
         last = {}
         for recorder in self.recorders:
-            for at, _kind, relative in recorder.since(start):
-                if not NOISE.search(relative):
-                    last[f"{recorder.label}/{relative}"] = at
+            for at, kind, relative in recorder.since(start):
+                if NOISE.search(relative):
+                    continue
+                path = f"{recorder.label}/{relative}"
+                # A deleted file is not a written one.
+                if kind == "deleted" or not (recorder.root / relative).is_file():
+                    last.pop(path, None)
+                else:
+                    last[path] = at
         now = time.monotonic()
         return any(
             fnmatch.fnmatchcase(path, pattern) and now - at >= quiet

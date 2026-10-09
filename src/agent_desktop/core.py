@@ -709,7 +709,8 @@ def wait(
         )
 
     def check():
-        """(satisfied, reason, windows, elements) for one consistent look."""
+        """(satisfied, reason, windows, elements) from one round of checks
+        (separate requests, so not an atomic snapshot)."""
         windows, elements = [], []
         if wants_window:
             windows = [
@@ -726,13 +727,38 @@ def wait(
                     [],
                 )
         if wants_element:
-            scope = {"window": title} if title is not None and not gone else {}
-            tree = request(session, "ui", controller, max_nodes=2000, **scope)
-            elements = [n for n in tree["nodes"] if element_matches(n)]
+            # The element must belong to a matched window, not any application.
+            if gone:
+                scopes = [None]
+            elif title is not None:
+                scopes = [title]
+            elif app_id is not None:
+                scopes = list(dict.fromkeys(w["title"] for w in windows))
+            else:
+                scopes = [None]
+            truncated = unreadable = False
+            for scope in scopes:
+                tree = request(
+                    session,
+                    "ui",
+                    controller,
+                    max_nodes=2000,
+                    **({"window": scope} if scope is not None else {}),
+                )
+                elements += [n for n in tree["nodes"] if element_matches(n)]
+                truncated = truncated or tree["truncated"]
+                unreadable = unreadable or bool(tree.get("unreadable"))
             if element_gone and elements:
                 return False, "element still present", windows, elements
-            if element_gone and tree["truncated"]:
+            if element_gone and truncated:
                 return False, "element unknown: tree truncated", windows, elements
+            if element_gone and unreadable:
+                return (
+                    False,
+                    "element unknown: part of the UI could not be read",
+                    windows,
+                    elements,
+                )
             if not element_gone and not elements:
                 return False, "no element", windows, elements
         return True, "ok", windows, elements

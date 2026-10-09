@@ -49,9 +49,10 @@ credential security boundary. The README and user guide must retain that limit.
       dated records keep their original form.
 - [x] [SECURITY.md](../SECURITY.md) with private reporting.
 - [x] Maintainer authorized the visibility change (2026-10-09).
-- [ ] After the change: enable private vulnerability reporting and Dependabot
-      alerts, protect `main` with the Lint check, and run the full Checks
-      matrix once.
+- [x] Made public on 2026-10-09. Private vulnerability reporting and
+      Dependabot alerts are on, `main` requires the Lint check and refuses force
+      pushes, and Actions runs again: the full Checks matrix passed on all four
+      jobs (run 37870749337).
 
 Original prompt files were retired; their useful ideas are consolidated in the
 project plan and the original text remains in Git history. Dated research and reviews describe the

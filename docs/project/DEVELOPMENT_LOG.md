@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-09 — S4: host input refused on locked or dark screens
+
+Host sessions refuse input and focus (`ScreenUnavailable`, nothing sent) while
+a screen locker process runs (hyprlock, swaylock, gtklock, waylock, i3lock) or
+Hyprland reports every monitor's DPMS off. Input carrying the observation token
+of a screenshot taken before the person's latest activity is refused as stale,
+so the agent looks again after the person used the computer (trial findings 1
+and the review's S4). The idle inhibitor no longer needs the "lock only after
+host stop" caveat. Layer-shell focus and window geometry remain open.
+
+Validation: tests/test_host.py with a private stand-in host and a fake locker
+process (comm renamed to swaylock); full desktop suite 152 tests OK (10 skipped).
+
 ## 2026-10-09 — S3: browser bridge for private Firefox
 
 New worker operation `browser` (MCP `desktop_browser`, CLI `browser`): `start`

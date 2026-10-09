@@ -25,6 +25,14 @@ class TraceArgumentTests(unittest.TestCase):
         self.assertEqual(kept, {"text_chars": 7, "observation": "abc@0,0,1"})
         self.assertEqual(trace_arguments({"key": "a"})["key"], "<character>")
         self.assertEqual(trace_arguments({"key": "Return"})["key"], "Return")
+        # Shortcuts spell nothing, so their key is kept.
+        self.assertEqual(trace_arguments({"key": "ctrl+t"})["key"], "ctrl+t")
+        self.assertEqual(
+            trace_arguments({"key": "t", "modifiers": ["ctrl"]})["key"], "t"
+        )
+        self.assertEqual(
+            trace_arguments({"key": "t", "modifiers": ["shift"]})["key"], "<character>"
+        )
         launch = trace_arguments({"argv": ["/usr/bin/curl", "-u", "user:pass"]})
         self.assertEqual(launch, {"program": "curl", "argc": 3})
 

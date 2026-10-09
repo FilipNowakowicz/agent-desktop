@@ -253,6 +253,9 @@ class HostTests(unittest.TestCase):
 
     def test_expires(self):
         host = self.approved(minutes=0.02)
+        status = core.host_status()
+        self.assertEqual(status["session"], host)
+        self.assertLessEqual(status["seconds_left"], 2)
         wait_for(lambda: core.manifest(host)["status"] == "stopped", timeout=10)
         self.assertIsNone(core.active_host_session())
 

@@ -55,7 +55,7 @@ The foundation is more complete than the October 5 review alone suggests:
 persistent sessions, supervision, explicit input routing, screenshot coordinates,
 AT-SPI, bounded sequences, controller leases, observation, handoff, profiles,
 traces, and supported Nix/Ubuntu installation paths. See
-[plan](../../PROJECT_PLAN.md), [usage](../USAGE.md), and
+[plan](../project/PROJECT_PLAN.md), [usage](../USAGE.md), and
 [compatibility](../COMPATIBILITY.md). These are observed source/documentation;
 compatibility results remain limited to the recorded environments.
 

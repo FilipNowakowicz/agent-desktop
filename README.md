@@ -29,7 +29,8 @@ security sandbox**. The optional host guard reduces accidental host changes.
 - Screenshot observation tokens, waits and bounded action sequences to help
   detect changes before acting; verify outcomes after each action.
 - Optional AT-SPI element inspection and semantic actions.
-- A read-only observer, cooperative human takeover and named login profiles.
+- A read-only observer, cooperative human takeover (with clipboard paste for
+  passwords) and named login profiles that keep logins between sessions.
 - Process supervision, cleanup, bounded screenshot retention and diagnostics.
 
 The runtime uses existing Linux desktop infrastructure and works with existing
@@ -149,21 +150,37 @@ It is not a security boundary: applications run as your user (see above).
 | [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
 | [Validation](docs/VALIDATION.md) | Checks, lifecycle experiments and application smoke tests |
 | [Benchmarks](docs/BENCHMARK.md) | Task definitions, recorded results and comparison limits |
-| [Contributing](CONTRIBUTING.md) | Development workflow and testing boundaries |
-| [Start here](START_HERE.md) | Contributor orientation and continuation workflow |
-| [Project plan](PROJECT_PLAN.md) / [development log](DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |
+| [Contributing](CONTRIBUTING.md) / [security](SECURITY.md) | Development workflow, testing boundaries and reporting vulnerabilities |
+| [Start here](docs/project/START_HERE.md) | Contributor orientation and continuation workflow |
+| [Project plan](docs/project/PROJECT_PLAN.md) / [development log](docs/project/DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |
 
-The [research notes](RESEARCH_FINDINGS.md) and dated reviews are historical context. The project plan records the chosen direction.
+The [research notes](docs/project/RESEARCH_FINDINGS.md) and dated reviews are historical context. The project plan records the chosen direction.
 
 ## Project status
 
-The next goal is a dependable daily-use alpha: reproducible runtime installation,
-longer lifecycle testing and representative workflows. Current benchmarks do not
-establish a general reliability or performance advantage over other runtimes.
+The daily-use alpha gates closed on 2026-10-08: two supported installations, a
+20-task pilot at 20/20 on the fixed build, and a real login handoff that
+persisted across sessions. Current benchmarks do not establish a general
+reliability or performance advantage over other runtimes. A fix for the X11
+mapping failure is proposed upstream as
+[wlroots!5477](https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5477).
 
-The repository remains private while documentation is prepared for a possible
-public release. See the [publication checklist](docs/PUBLICATION.md) for
-outstanding decisions.
+## Research
+
+Two experimental features are off by default:
+
+- **[Effect ledger](docs/research/2026-10-08-effect-ledger.md)**
+  (`AGENT_DESKTOP_EFFECTS=1`): each action reports which files, windows and
+  processes it changed, including document cells. In an A/B test with Claude
+  Code it cut input tokens by 25% with equal success.
+- **[Effect atlas](docs/research/2026-10-09-effect-atlas.md)**
+  (`AGENT_DESKTOP_ATLAS`): the runtime clicks each setting of an application in
+  throwaway sessions and learns, without a model, which configuration key it
+  changes, then verifies each result. Agents can apply a verified setting
+  directly; three of four settings tasks went from 10–13 steps to 3–4. It also
+  found a [Geany bug](https://github.com/geany/geany/issues/4677).
+
+Both are research results on a few applications, not supported features yet.
 
 ## License
 

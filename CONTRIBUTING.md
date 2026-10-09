@@ -2,8 +2,8 @@
 
 Agent Desktop is an experimental Linux runtime for general computer use by
 existing agents. Improvements should follow observed failures and the
-[project plan](PROJECT_PLAN.md), with evidence in the
-[development log](DEVELOPMENT_LOG.md).
+[project plan](docs/project/PROJECT_PLAN.md), with evidence in the
+[development log](docs/project/DEVELOPMENT_LOG.md).
 
 ## Development setup
 
@@ -47,8 +47,9 @@ Graphical separation, the host guard and cooperative takeover are not security
 sandboxes. Report limitations accurately and verify task outcomes independently
 of tool delivery responses.
 
-## Before publication
+## Reporting problems
 
-The project is licensed under the [MIT License](LICENSE). Keep repository
-visibility private until publication is explicitly authorized.
-The [publication checklist](docs/PUBLICATION.md) tracks remaining decisions.
+Use the bug report template for failures and include `agent-desktop doctor`
+output. Report security problems privately as described in
+[SECURITY.md](SECURITY.md). The project is licensed under the
+[MIT License](LICENSE).

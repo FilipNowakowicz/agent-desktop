@@ -1,13 +1,13 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-07. This document records the chosen direction, implemented
+Updated: 2026-10-09. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
 
 ## Development status
 
-Repository: `FilipNowakowicz/agent-desktop` (private). Development stages use
+Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must
 update this status and the development log with completed work and remaining gaps.
 
@@ -21,20 +21,20 @@ update this status and the development log with completed work and remaining gap
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
 
-Next work follows the [review plan](docs/reviews/2026-10-05-project-review/plan.md),
+Next work follows the [review plan](../reviews/2026-10-05-project-review/plan.md),
 with the review's open questions decided in
-[decisions.md](docs/reviews/2026-10-05-project-review/decisions.md). Implemented:
+[decisions.md](../reviews/2026-10-05-project-review/decisions.md). Implemented:
 correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), environment
 hygiene (#49), the two installation paths with automatic runtime selection (#52), the
 controller lease (#55), no keyring prompts (#56), the action trace (#58), and the
-two pilot batches with their fixes (#72–#79, [diary](docs/trials/pilot.md)).
+two pilot batches with their fixes (#72–#79, [diary](../trials/pilot.md)).
 The daily-use alpha gates are closed (2026-10-08). The wlroots fix is
-proposed upstream as wlroots!5477 ([runtime/UPSTREAM.md](runtime/UPSTREAM.md));
+proposed upstream as wlroots!5477 ([runtime/UPSTREAM.md](../../runtime/UPSTREAM.md));
 the local patch stays until a release contains it. Next work is the research direction
 below. Extensions should follow observed needs.
 
 Research for the next direction: the
-[2026-10-07 recommendation](docs/research/2026-10-07-next-direction.md) proposes
+[2026-10-07 recommendation](../research/2026-10-07-next-direction.md) proposes
 precise UI queries and checked actions as a bounded next experiment, followed by
 reusable procedures if they improve verified outcomes. It compares alternatives,
 develops the algebraic research options and specifies evaluation/stop criteria.
@@ -43,7 +43,7 @@ closed. Broad platform fleets and model training remain
 deferred; task-workspace review and scientific workflows are candidate later
 experiments.
 
-First result (2026-10-08, [effect ledger](docs/research/2026-10-08-effect-ledger.md)):
+First result (2026-10-08, [effect ledger](../research/2026-10-08-effect-ledger.md)):
 an experimental per-action report of files, windows and processes changed
 (`AGENT_DESKTOP_EFFECTS=1`) cut Claude Code's input tokens by 25% on five
 file-producing tasks (p = 0.016) without changing success, and showed that a
@@ -51,7 +51,7 @@ GUI setting's effect can be learned once and applied directly (a small,
 verified settings map for Calc). Ranked next steps are in that report; the
 ledger stays experimental until the open items there are done.
 
-Second result (2026-10-09, [effect atlas](docs/research/2026-10-09-effect-atlas.md)):
+Second result (2026-10-09, [effect atlas](../research/2026-10-09-effect-atlas.md)):
 model-free differential exploration mapped and verified 30 of Mousepad's and
 75 of Geany's settings to configuration keys (and found swapped key names in
 Geany). Applying a learned setting directly (`desktop_set`) halved the cost of
@@ -76,9 +76,9 @@ Build a small working foundation, use it, and improve it from observed failures.
 
 ### Files and authority
 
-- `PROJECT_PLAN.md` — current direction, proposed architecture, milestones, extensions and handoff.
-- `START_HERE.md` — portable orientation and continuation workflow.
-- `RESEARCH_FINDINGS.md` — initial research and dated popularity snapshot. Its debugging-first recommendation was subsequently superseded by the broader direction in this plan.
+- `docs/project/PROJECT_PLAN.md` — current direction, proposed architecture, milestones, extensions and handoff.
+- `docs/project/START_HERE.md` — portable orientation and continuation workflow.
+- `docs/project/RESEARCH_FINDINGS.md` — initial research and dated popularity snapshot. Its debugging-first recommendation was subsequently superseded by the broader direction in this plan.
 
 The original brainstorming prompts were retired during documentation cleanup.
 Their useful direction is preserved here, especially in sections 7A–7E; these
@@ -184,7 +184,7 @@ Optional viewer connects to the session; closing it does not end the session.
 
 ### Choose the backend experimentally
 
-The physical host compositor need not match the agent's compositor. The M0 experiment selected a private labwc/wlroots-based session and verified headless screenshots plus keyboard/mouse delivery. It is the implemented runtime backend; general application compatibility and production reliability are not established. See `DEVELOPMENT_LOG.md`.
+The physical host compositor need not match the agent's compositor. The M0 experiment selected a private labwc/wlroots-based session and verified headless screenshots plus keyboard/mouse delivery. It is the implemented runtime backend; general application compatibility and production reliability are not established. See `docs/project/DEVELOPMENT_LOG.md`.
 
 | Candidate | Reason to consider | What must be validated |
 | --- | --- | --- |
@@ -346,8 +346,8 @@ macOS host → managed Linux environment → same runtime
 
 ## 8. Development conventions and boundaries
 
-- The planning conversation created no implementation or running desktop. Development subsequently completed the M0 experiment; temporary runtime packages were fetched without host activation. See `DEVELOPMENT_LOG.md`.
-- Development is underway; `START_HERE.md` provides contributor orientation for the implemented stages and remaining issues.
+- The planning conversation created no implementation or running desktop. Development subsequently completed the M0 experiment; temporary runtime packages were fetched without host activation. See `docs/project/DEVELOPMENT_LOG.md`.
+- Development is underway; `docs/project/START_HERE.md` provides contributor orientation for the implemented stages and remaining issues.
 - The packaged persistent runtime uses uv-managed Python and headless labwc. Subreaper-based process ownership and persistent session-local input devices and supervisor-crash recovery are implemented; keep improvements grounded in experiments.
 - Use `uv`, a uv-managed interpreter, `uv sync` and `uv run`; ignore `.venv`. Keep portable Python metadata. Do not add project Nix files solely to supply Python dependencies.
 - Nix packaging or a NixOS test environment for the actual Linux runtime is a separate legitimate design choice. Follow current user/local instructions.

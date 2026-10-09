@@ -1,10 +1,11 @@
 # Repository instructions
 
 - Build a private Linux desktop for general computer use by existing agents.
-  Read `CONTRIBUTING.md`, `START_HERE.md` and `PROJECT_PLAN.md` for workflow and
-  current direction. Record decisions, exact validation and remaining failures
-  in `DEVELOPMENT_LOG.md`.
-- Keep current product direction and deferred ideas in `PROJECT_PLAN.md`.
+  Read `CONTRIBUTING.md`, `docs/project/START_HERE.md` and
+  `docs/project/PROJECT_PLAN.md` for workflow and current direction. Record
+  decisions, exact validation and remaining failures in
+  `docs/project/DEVELOPMENT_LOG.md`.
+- Keep current product direction and deferred ideas in `docs/project/PROJECT_PLAN.md`.
 - CI minutes are limited: PRs run only the Lint workflow. Run the desktop suite
   locally; trigger the full Checks matrix manually only for runtime, packaging or
   CI changes and milestones (see docs/VALIDATION.md).
@@ -42,6 +43,6 @@
   into public-facing examples.
 - When contributors work in parallel, use a separate worktree. Do not edit, stage
   or commit another contributor's changes. State the PR base and dependencies.
-- Keep the repository private until explicitly authorized to publish. A request
-  to open a PR does not authorize merging it. Do not choose a license without
-  a maintainer decision.
+- The repository is public. Releases, package publishing and visibility or
+  license changes need a maintainer decision. A request to open a PR does not
+  authorize merging it.

@@ -55,7 +55,7 @@ uv run agent-desktop create
 
 Runtime executable paths can be supplied with `--labwc` and `--grim` (the M0
 script also accepts `--foot`, `--wtype` and `--wlrctl`). The tested NixOS invocation is
-in the [development log](../DEVELOPMENT_LOG.md). Headless CI also runs in Fedora
+in the [development log](project/DEVELOPMENT_LOG.md). Headless CI also runs in Fedora
 and Arch containers; desktop installs on those distributions remain untested.
 
 The experiment creates a temporary headless labwc session with software rendering,

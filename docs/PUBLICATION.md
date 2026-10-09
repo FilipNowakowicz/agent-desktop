@@ -1,7 +1,7 @@
 # Publication preparation
 
-This is a preparation checklist, not authorization to publish. The repository
-remains private until the maintainer authorizes publication.
+Checklist used to prepare the repository for public visibility (2026-10-05 to
+2026-10-09).
 
 ## Presentation
 
@@ -28,24 +28,30 @@ credential security boundary. The README and user guide must retain that limit.
       package license metadata.
 - [x] Supported installations: Nix runtime and Ubuntu 24.04
       ([runtime/INSTALL.md](../runtime/INSTALL.md)), both in CI.
-- [ ] Complete representative daily-use and longer lifecycle trials; record
-      failures as well as passes.
+- [x] Daily-use trials: the pilot met its bar (20/20 on the fixed build) and
+      the alpha gates closed on 2026-10-08; the maintainer's own use continues
+      as feedback, not a gate (decisions.md).
 - [x] Threat model decided ([decisions](reviews/2026-10-05-project-review/decisions.md)):
       cooperative same-user operation; takeover is not a confidentiality boundary.
 - [x] Disclosure scan (2026-10-05) of tracked files and all Git history: no
       tokens, keys or passwords. The only personal data is local paths
       (`/home/user/...`) and the author email, which the maintainer accepts. One
       reference to the maintainer's private configuration repository
-      (`nixos-config#417`) remains in the development log. Repeat the scan just
-      before publishing.
+      (`nixos-config#417`) remains in the development log. Repeated on 2026-10-09
+      over all history: still no secrets. History is published as is; it also
+      contains the retired project prompts and the 2026-10-05 review command
+      log (maintainer decision, 2026-10-09).
 - [x] Repository name: `agent-desktop` (clone instructions and integration
       references updated).
 - [x] Commit author email stays as is (maintainer decision, 2026-10-05).
-- [ ] At publication, move the internal planning records (`DEVELOPMENT_LOG.md`,
-      `PROJECT_PLAN.md`, `RESEARCH_FINDINGS.md`, `START_HERE.md`) under
-      `docs/project/`, updating links in AGENTS.md, CONTRIBUTING.md, the PR
-      template and current docs. Dated reviews keep their original references.
-- [ ] Obtain explicit maintainer authorization for the visibility change.
+- [x] Planning records moved under [docs/project/](project) (2026-10-09);
+      Markdown links were updated everywhere, while plain-text file names in
+      dated records keep their original form.
+- [x] [SECURITY.md](../SECURITY.md) with private reporting.
+- [x] Maintainer authorized the visibility change (2026-10-09).
+- [ ] After the change: enable private vulnerability reporting and Dependabot
+      alerts, protect `main` with the Lint check, and run the full Checks
+      matrix once.
 
 Original prompt files were retired; their useful ideas are consolidated in the
 project plan and the original text remains in Git history. Dated research and reviews describe the

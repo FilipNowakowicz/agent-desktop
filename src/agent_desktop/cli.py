@@ -116,6 +116,36 @@ def main():
     act.add_argument("action")
     act.add_argument("--text")
     act.add_argument("--observation")
+    bridge = sub.add_parser(
+        "browser", help="private Firefox through WebDriver BiDi (start, open, ...)"
+    )
+    bridge.add_argument("session")
+    bridge.add_argument(
+        "action",
+        choices=(
+            "start",
+            "tabs",
+            "open",
+            "text",
+            "find",
+            "wait",
+            "click",
+            "fill",
+            "select",
+            "steps",
+        ),
+    )
+    bridge.add_argument("--url")
+    bridge.add_argument("--selector", help="CSS selector")
+    bridge.add_argument("--text", help="visible text, label or placeholder")
+    bridge.add_argument("--exact", action="store_true")
+    bridge.add_argument("--value", help="text to fill or option to select")
+    bridge.add_argument("--tab", type=int)
+    bridge.add_argument("--new-tab", action="store_true")
+    bridge.add_argument("--gone", action="store_true")
+    bridge.add_argument("--timeout", type=float)
+    bridge.add_argument("--within", help="text of the row, item or form holding it")
+    bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
     steps = sub.add_parser(
         "actions", help="run a JSON list of steps, stopping on surprises"
     )
@@ -272,6 +302,10 @@ def main():
             result = destroy(args["session"])
         elif command == "view":
             result = view(**args)
+        elif command == "browser":
+            session = args.pop("session")
+            options = {k: v for k, v in args.items() if v not in (None, False)}
+            result = request(session, "browser", controller, **options)
         elif command in ("ui", "ui-action"):
             session = args.pop("session")
             result = request(session, command.replace("-", "_"), controller, **args)

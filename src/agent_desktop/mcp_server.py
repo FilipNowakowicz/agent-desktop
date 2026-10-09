@@ -38,6 +38,10 @@ refused and nothing is sent; create your own session instead of sharing one.
 A step whose delivery is uncertain is reported, never retried: check the
 desktop before repeating it.
 
+For web pages in a private session, desktop_browser drives Firefox through
+its DOM (start, open, find, click, fill, select, text, wait): use it instead of
+screenshots and coordinates where it applies.
+
 Only when the user asks you to act on their own screen (open an app there,
 navigate, click), call desktop_request_host with the reason. They confirm it;
 then use the returned session with the same tools. Their windows are real: act
@@ -323,6 +327,66 @@ def desktop_actions(
     """
     result = core.run_actions(session, actions, observation, CONTROLLER, timeout)
     return looked(session, result, screenshot)
+
+
+@tool()
+def desktop_browser(
+    session: str,
+    action: str,
+    url: str | None = None,
+    selector: str | None = None,
+    text: str | None = None,
+    exact: bool = False,
+    value: str | None = None,
+    tab: int | None = None,
+    new_tab: bool = False,
+    gone: bool = False,
+    timeout: float = 10,
+    within: str | None = None,
+    steps: list[dict] | None = None,
+) -> dict:
+    """Use Firefox in a private session through its DOM, without screenshots.
+
+    action "start" opens Firefox (url optional) with a local WebDriver BiDi
+    bridge, or connects to one already started in the session with
+    --remote-debugging-port (other actions connect to that one too); a Firefox
+    started without it must be closed first. Then: "open" a url
+    (new_tab for a new tab), "tabs", "text" (visible text of the page or
+    selector), "find" (elements by CSS selector or by visible text, label or
+    placeholder; exact for the whole text), "wait" (until found, or gone; up to
+    60 s), "click", "fill" (replace a field's text with value, typed as real
+    keys) and "select" (an option of a <select> by text or value). click, fill
+    and select need exactly one visible, enabled match, otherwise nothing is
+    done and the matches are listed. Replies include the page url and title,
+    and the element's value afterwards (never a password's). tab picks a tab by
+    index from "tabs"; later calls stay on it. within narrows a target to the
+    row, list item, form or dialog containing that text, e.g. text="Edit",
+    within="mallory". action "steps" runs a list of these actions in one call
+    (steps=[{"action": "fill", "selector": "#u", "value": "admin"},
+    {"action": "click", "text": "Sign in"}, {"action": "wait", "text":
+    "Dashboard"}]) and stops at the first failure or unmet wait: plan several
+    actions per call. Faster and more exact than pixels for web pages; use
+    screenshots for visual questions.
+    """
+    arguments = {
+        "url": url,
+        "selector": selector,
+        "text": text,
+        "exact": exact,
+        "value": value,
+        "tab": tab,
+        "new_tab": new_tab,
+        "gone": gone,
+        "timeout": timeout,
+        "within": within,
+        "steps": steps,
+    }
+    return call(
+        session,
+        "browser",
+        action=action,
+        **{k: v for k, v in arguments.items() if v is not None},
+    )
 
 
 @tool()

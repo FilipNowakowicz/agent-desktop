@@ -98,8 +98,19 @@ class Browser:
             url.rstrip("/") + "/session", open_timeout=timeout, max_size=2**24
         )
         self.next_id = 0
-        self.command("session.new", {"capabilities": {}})
+        try:
+            self.command("session.new", {"capabilities": {}})
+        except Exception:
+            self.socket.close()
+            raise
         self.context = None
+
+    def alive(self):
+        try:
+            self.command("session.status", {}, timeout=2)
+            return True
+        except Exception:
+            return False
 
     def close(self):
         try:
@@ -130,7 +141,10 @@ class Browser:
         tree = self.command("browsingContext.getTree", {"maxDepth": 0})["contexts"]
         tabs = []
         for index, context in enumerate(tree):
-            title = self.evaluate("document.title", context["context"])
+            try:
+                title = self.evaluate("document.title", context["context"])
+            except BrowserError:
+                title = None  # privileged pages (about:, extensions) refuse scripts
             tabs.append({"tab": index, "url": context["url"], "title": title})
         return tree, tabs
 

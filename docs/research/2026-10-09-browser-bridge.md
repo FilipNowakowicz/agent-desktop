@@ -33,9 +33,23 @@ One run with `within` and `steps` (artifact `20261009-215014-0c17`, an
 anecdote): the agent used both, 10 calls instead of 21–25, 42.6 s, $0.23; still
 slower than pixels here, partly a first batch that stopped on an unlinked label.
 
+## Matched A/B with `within` and `steps`
+
+Same setup, three runs per arm and task, arms alternating, all 12 passed.
+Aggregates: [`effects/bridge-ab-20261009.json`](effects/bridge-ab-20261009.json).
+
+| Task | Turns pixels → bridge | Input tokens | Seconds | Cost |
+| --- | --- | --- | --- | --- |
+| chromium-form (in Firefox) | 6 → 4 | 102k → 60k | 18.9 → 10.3 | $0.137 → $0.069 |
+| hard-web-admin | 10 → 10 | 196k → 173k | 29.0 → 22.7 | $0.207 → $0.148 |
+
+Pooled, relative to each task's pixel median: wall time −33% (p = 0.0013),
+input tokens −30% (p = 0.0013), turns −21% (p = 0.06). Unlike S1a, cost falls
+too (no images in replies).
+
 ## Decision
 
-Keep the bridge: exact, image-free web work with refusals instead of wrong
-clicks. Its speed advantage is not shown; a matched comparison with
-`within`/`steps` (three runs per arm, more web tasks) is the next measurement,
-outside today's run allowance (48 of ~50 used).
+Keep the bridge and point agents to it for web pages. Its gain needed `steps`
+and `within`: one DOM action per call was slower than batched pixel steps.
+Limits: two tasks, one model, Firefox only; visual pages (canvas, charts) still
+need screenshots.

@@ -1,0 +1,101 @@
+{
+ "tasks": [
+  {
+   "task": "chromium-form",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 4,
+   "tool_calls": 5,
+   "effects_calls": 0,
+   "turns": 6,
+   "input_tokens": 101569,
+   "output_tokens": 1112,
+   "cost_usd": 0.1368156,
+   "seconds": 18.9
+  },
+  {
+   "task": "chromium-form",
+   "arm": "bridge",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 0,
+   "tool_calls": 3,
+   "effects_calls": 0,
+   "turns": 4,
+   "input_tokens": 60048,
+   "output_tokens": 479,
+   "cost_usd": 0.0687398,
+   "seconds": 10.3
+  },
+  {
+   "task": "hard-web-admin",
+   "arm": "baseline",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 1,
+   "inline_screenshots": 8,
+   "tool_calls": 9,
+   "effects_calls": 0,
+   "turns": 10,
+   "input_tokens": 195865,
+   "output_tokens": 1451,
+   "cost_usd": 0.2069142,
+   "seconds": 29.0
+  },
+  {
+   "task": "hard-web-admin",
+   "arm": "bridge",
+   "runs": 3,
+   "passed": 3,
+   "false_success": 0,
+   "screenshots": 0,
+   "inline_screenshots": 0,
+   "tool_calls": 9,
+   "effects_calls": 0,
+   "turns": 10,
+   "input_tokens": 172889,
+   "output_tokens": 1503,
+   "cost_usd": 0.1480646,
+   "seconds": 22.7
+  }
+ ],
+ "pooled_input_tokens": {
+  "runs": {
+   "baseline": 6,
+   "bridge": 6
+  },
+  "mean_ratio": {
+   "baseline": 1.0,
+   "bridge": 0.703
+  },
+  "p_value": 0.0013
+ },
+ "pooled_turns": {
+  "runs": {
+   "baseline": 6,
+   "bridge": 6
+  },
+  "mean_ratio": {
+   "baseline": 1.0,
+   "bridge": 0.789
+  },
+  "p_value": 0.0612
+ },
+ "pooled_seconds": {
+  "runs": {
+   "baseline": 6,
+   "bridge": 6
+  },
+  "mean_ratio": {
+   "baseline": 0.998,
+   "bridge": 0.673
+  },
+  "p_value": 0.0013
+ }
+}

@@ -294,7 +294,6 @@ HOST_UNSUPPORTED = (
     "ui",
     "ui_action",
     "set",
-    "browser",
 )
 # Processes that mean the person's screen is locked (host sessions).
 SCREEN_LOCKERS = {"hyprlock", "swaylock", "gtklock", "waylock", "i3lock"}
@@ -403,6 +402,7 @@ class Worker:
         self.keysyms = None
         self.browser = None  # (BiDi connection, Firefox pid) once started
         self.screenshot_at = 0.0  # monotonic start of the latest screenshot
+        self.agent_tabs = set()  # host: Firefox tabs the agent opened
         self.stop = False
         self.profile_lock = None
         self.activity = None  # host sessions: the person's input
@@ -829,7 +829,7 @@ class Worker:
         one started in the session with --remote-debugging-port, or a new one."""
         from . import browser
 
-        if self.browser and self.browser[1].poll() is None:
+        if self.browser and self.browser[1]() is None:
             return self.browser[0]
         if self.attach_browser():
             if url:
@@ -859,7 +859,7 @@ class Worker:
             if time.monotonic() > deadline:
                 raise TimeoutError("Firefox did not open its BiDi port in 30 s")
             time.sleep(0.2)
-        self.browser = (browser.Browser(found.group(1)), process)
+        self.browser = (browser.Browser(found.group(1)), process.poll)
         return self.browser[0]
 
     def attach_browser(self):
@@ -867,17 +867,25 @@ class Worker:
         --remote-debugging-port, if one is running. Returns whether connected."""
         from . import browser
 
-        if self.browser and self.browser[1].poll() is None:
+        if self.browser and self.browser[1]() is None:
             return True
         if self.browser:
             self.browser[0].close()
             self.browser = None
+        if self.info["mode"] == "host":
+            url = person_firefox_bridge(self.env)
+            if url:
+                bridge = browser.Browser(url)
+                self.browser = (bridge, lambda: None if bridge.alive() else 1)
+                self.agent_tabs = set()
+                return True
+            return False
         for app, process in self.apps.items():
             log = self.root / f"app-{app}.log"
             if process.poll() is None and log.exists():
                 found = BIDI_LISTENING.search(log.read_text(errors="replace"))
                 if found:
-                    self.browser = (browser.Browser(found.group(1)), process)
+                    self.browser = (browser.Browser(found.group(1)), process.poll)
                     return True
         return False
 
@@ -897,6 +905,15 @@ class Worker:
         try:
             if action == "steps":
                 return self.browser_steps(request.get("steps"))
+            host = self.info["mode"] == "host"
+            if action == "start" and host:
+                if not self.attach_browser():
+                    raise ValueError(
+                        "The person's Firefox has no WebDriver BiDi port. Ask them "
+                        "to restart it with --remote-debugging-port=0; the agent "
+                        "never restarts their browser."
+                    )
+                return {"tabs": self.browser[0].tabs()[1]}
             if action == "start":
                 bridge = self.start_browser(request.get("url"))
                 return {"tabs": bridge.tabs()[1]}
@@ -904,6 +921,18 @@ class Worker:
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
             context = bridge.target(request.get("tab"))
+            if (
+                host
+                and action in ("open", "click", "fill", "select", "close")
+                and not (action == "open" and request.get("new_tab"))
+                and request.get("tab") is None
+                and context not in self.agent_tabs
+            ):
+                raise ValueError(
+                    "On the person's Firefox, act only in tabs you opened (open "
+                    "with new_tab, in the background) or name a tab explicitly "
+                    "with tab; their current tab is left alone."
+                )
             if action == "tabs":
                 return {"tabs": bridge.tabs()[1]}
             if action == "open":
@@ -911,16 +940,27 @@ class Worker:
                 if not isinstance(url, str) or not url:
                     raise ValueError("open needs a url")
                 if request.get("new_tab"):
-                    context = bridge.command("browsingContext.create", {"type": "tab"})[
+                    created = {"type": "tab"}
+                    if host:
+                        # Do not switch the person's view to the agent's tab.
+                        created["background"] = True
+                    context = bridge.command("browsingContext.create", created)[
                         "context"
                     ]
                     bridge.context = context
+                    if host:
+                        self.agent_tabs.add(context)
                 bridge.command(
                     "browsingContext.navigate",
                     {"context": context, "url": url, "wait": "complete"},
                     timeout=60,
                 )
                 return self.page_state(bridge, context)
+            if action == "close":
+                bridge.command("browsingContext.close", {"context": context})
+                self.agent_tabs.discard(context)
+                bridge.context = None
+                return {"closed": True, "tabs": bridge.tabs()[1]}
             if action == "find":
                 return bridge.find(context, **target)
             if action == "text":
@@ -996,8 +1036,8 @@ class Worker:
                     }
                 return result
             raise ValueError(
-                "action must be start, tabs, open, find, text, wait, click, fill, "
-                "select or steps"
+                "action must be start, tabs, open, close, find, text, wait, click, "
+                "fill, select or steps"
             )
         except browser.BrowserError as error:
             raise ValueError(str(error)) from None
@@ -2059,6 +2099,10 @@ class Worker:
 
     def cleanup_host(self):
         """Release the person's desktop: never close their windows."""
+        if self.browser:
+            # Ends the BiDi session; Firefox keeps it after a dropped connection.
+            self.browser[0].close()
+            self.browser = None
         for device in (
             self.virtual_pointer,
             self.virtual_keyboard,
@@ -2243,6 +2287,36 @@ def credential_variable(name):
         or upper.startswith(CREDENTIAL_PREFIXES)
         or any(part in upper for part in CREDENTIAL_PARTS)
     ) and not upper.startswith("AGENT_DESKTOP_")
+
+
+def person_firefox_bridge(env):
+    """The BiDi WebSocket of the person's running Firefox, if it was started
+    with --remote-debugging-port (Firefox writes WebDriverBiDiServer.json into
+    the profile while listening)."""
+    home = Path(env.get("HOME") or Path.home())
+    # MOZ_APP_DATA, when set, is where this person's Firefox keeps profiles.
+    roots = (
+        [env["MOZ_APP_DATA"]]
+        if env.get("MOZ_APP_DATA")
+        else [home / ".config/mozilla/firefox", home / ".mozilla/firefox"]
+    )
+    found = []
+    for root in roots:
+        if root and Path(root).is_dir():
+            found += Path(root).glob("*/WebDriverBiDiServer.json")
+    for path in sorted(found, key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        port = data.get("ws_port") or data.get("port")
+        host = data.get("ws_host") or data.get("host") or "127.0.0.1"
+        if isinstance(port, int) and host in ("127.0.0.1", "localhost", "::1"):
+            with socket.socket() as probe:
+                probe.settimeout(0.5)
+                if probe.connect_ex(("127.0.0.1", port)) == 0:
+                    return f"ws://127.0.0.1:{port}"
+    return None
 
 
 BIDI_LISTENING = re.compile(r"WebDriver BiDi listening on (ws://127\.0\.0\.1:[0-9]+)")

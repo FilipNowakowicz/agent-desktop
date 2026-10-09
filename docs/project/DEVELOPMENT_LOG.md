@@ -1,5 +1,38 @@
 # Development log
 
+## 2026-10-09 — Browser bridge A/B (with within and steps)
+
+Matched A/B, 2 tasks × 3 runs per arm in Firefox, all 12 passed: wall time
+−33% (p = 0.0013), input tokens −30% (p = 0.0013), turns −21% (p = 0.06), cost
+roughly halved on the form. docs/research/2026-10-09-browser-bridge.md. Agent
+runs today: 60 (the maintainer extended the allowance).
+
+## 2026-10-09 — Browser bridge on the person's own Firefox (host sessions)
+
+Host sessions can use `desktop_browser` on the person's running Firefox when it
+was started with `--remote-debugging-port=0`: the worker finds
+`WebDriverBiDiServer.json` under `MOZ_APP_DATA` (or the usual profile roots) and
+connects; it never starts or restarts their browser. Reads work on any tab;
+`open` with `new_tab` opens a background tab (`browsingContext.create`
+`background: true`), and click, fill, select, open and the new `close` act only
+in agent-opened tabs or a tab named with `tab`. Browser actions do not move the
+person's pointer or keyboard, so they are not paused by the person's activity
+or a locked screen. Host cleanup ends the BiDi session: Firefox keeps a session
+after a dropped connection and refuses new ones ("Maximum number of active
+sessions"), which the first live attempt hit; `tabs` also failed on privileged
+pages (about:, extension pages) and now reports their title as null.
+
+Maintainer-authorised live check (2026-10-09 22:24): their Firefox was quit with
+SIGTERM twice (recovery data under 10 s old, `browser.startup.page` = 3) and
+restarted via `hyprctl dispatch exec "firefox --remote-debugging-port=0"`; the
+session restored. A host session listed 7 tabs, opened a local page in a
+background tab, read it and closed it; `session.status` afterwards was ready.
+No existing tab was changed.
+
+Validation: tests/test_host.py with a stand-in host running Firefox on a
+temporary profile (including about:preferences); full desktop suite 153 tests
+OK (10 skipped).
+
 ## 2026-10-09 — S4: host input refused on locked or dark screens
 
 Host sessions refuse input and focus (`ScreenUnavailable`, nothing sent) while

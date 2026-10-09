@@ -178,6 +178,63 @@ class HostTests(unittest.TestCase):
             locker.wait()
         core.request(host, "move", x=40, y=40)
 
+    @unittest.skipUnless(shutil.which("firefox"), "Firefox unavailable")
+    def test_works_in_the_person_firefox_in_background_tabs(self):
+        # The person's Firefox, started with a BiDi port and its own profile.
+        profiles = self.root / "mozilla"
+        (profiles / "person").mkdir(parents=True)
+        page = self.root / "mine.html"
+        page.write_text("<title>Their tab</title><button>Danger</button>")
+        os.environ["MOZ_APP_DATA"] = str(profiles)
+        self.addCleanup(os.environ.pop, "MOZ_APP_DATA", None)
+        core.request(
+            self.person,
+            "launch",
+            argv=[
+                "firefox",
+                "--profile",
+                str(profiles / "person"),
+                "--remote-debugging-port=0",
+                page.as_uri(),
+                # A privileged page: listing tabs must not fail on it.
+                "about:preferences",
+            ],
+        )
+        wait_for((profiles / "person/WebDriverBiDiServer.json").exists, timeout=30)
+        host = self.approved()
+
+        def browser(action, **arguments):
+            return core.request(host, "browser", action=action, **arguments)
+
+        tabs = browser("start")["tabs"]
+        self.assertEqual(tabs[0]["title"], "Their tab")
+        browser("tabs", tab=0)
+        self.assertIn("Danger", browser("text")["text"])
+        # Their current tab is not acted on unless named explicitly.
+        with self.assertRaisesRegex(core.DesktopError, "tabs you opened"):
+            browser("click", text="Danger")
+        work = self.root / "work.html"
+        work.write_text(
+            "<title>Agent tab</title><input id=q>"
+            "<button onclick=\"document.title='done '+q.value\">Go</button>"
+        )
+        browser("open", url=work.as_uri(), new_tab=True)
+        done = browser(
+            "steps",
+            steps=[
+                {"action": "fill", "selector": "#q", "value": "ok"},
+                {"action": "click", "text": "Go"},
+            ],
+        )
+        self.assertIsNone(done["stopped"], done)
+        titles = [t["title"] for t in browser("tabs")["tabs"]]
+        self.assertEqual(titles[0], "Their tab")
+        self.assertEqual(titles[-1], "done ok")
+        closed = browser("close")
+        self.assertEqual(len(closed["tabs"]), len(titles) - 1)
+        with self.assertRaisesRegex(core.DesktopError, "tabs you opened"):
+            browser("close")
+
     @unittest.skipUnless(shutil.which("systemd-inhibit"), "no systemd-inhibit")
     def test_keeps_the_computer_awake_until_it_ends(self):
         def inhibitors():

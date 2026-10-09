@@ -131,6 +131,7 @@ session. Then:
 | --- | --- |
 | `open` | navigate to `url` and wait for the load (`new_tab` for a new tab) |
 | `tabs` | list tabs with url and title; `tab` picks one for later calls |
+| `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
 | `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
 | `wait` | until an element is found, or `gone` (up to 60 s) |
@@ -144,7 +145,17 @@ Clicks and keys are trusted input events from Firefox itself. If several
 elements match, or the match is disabled, nothing happens and the matches are
 listed. Replies carry the page url and title and the element's value afterwards,
 never a password's. The bridge is a worker operation: it needs the controller
-lease, is refused while a person has control and on host sessions. Any local
+lease and is refused while a person has control.
+
+On a host session, `desktop_browser` uses your own Firefox if you started it
+with `--remote-debugging-port=0` (Firefox then writes
+`WebDriverBiDiServer.json` into the profile; `MOZ_APP_DATA` or the usual profile
+roots are searched). The agent never starts or restarts it. It can read any
+tab, but opens its own tabs in the background (`open` with `new_tab`) and acts
+only there or in a tab named with `tab`; your current tab is left alone. This
+uses your logins and does not move your pointer or keyboard, so it works while
+you use the computer. While a bridge session is connected, pages can see
+`navigator.webdriver` and Firefox shows that it is remote-controlled. Any local
 process of the same user could also connect to the port while Firefox runs,
 like any other process of that user can control the session.
 

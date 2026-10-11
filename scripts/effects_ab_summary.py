@@ -113,6 +113,7 @@ for (task, arm), records in sorted(groups.items()):
             "output_tokens": median([tokens(r)[1] for r in records]),
             "cost_usd": median([r.get("cost_usd") or 0 for r in records]),
             "seconds": median([r.get("elapsed_seconds") or 0 for r in records]),
+            "looks": median([r.get("screenshots") or 0 for r in records]),
         }
     )
 # Pooled comparison: each run's value relative to its task's baseline median,
@@ -129,6 +130,8 @@ METRICS = {
     "input_tokens": lambda r: tokens(r)[0],
     "turns": lambda r: r.get("turns") or 0,
     "seconds": lambda r: r.get("elapsed_seconds") or 0,
+    # Screenshot calls plus inputs with screenshot=true (recorded since E0).
+    "looks": lambda r: r.get("screenshots") or 0,
 }
 
 

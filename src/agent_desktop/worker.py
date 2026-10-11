@@ -1810,7 +1810,10 @@ class Worker:
                     ),
                     "node": request["node"],
                 }
-            except Unsupported:
+            except Unsupported as error:
+                if request["action"] != "set_text":
+                    # Nothing was sent; say why instead of guessing other input.
+                    raise ValueError(str(error)) from None
                 # e.g. Chromium: focus the field, verify, then replace by typing.
                 accessibility.focus(node)
                 self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)

@@ -74,6 +74,20 @@ mismatch stops the run there. Applications often write after the reply: call
 desktop_effects with the action's effect_id, and wait_for_file (e.g. "~/*.ods")
 to wait for a save. "Nothing observed" is evidence only for its time window."""
 
+# Experiment (E3, AGENT_DESKTOP_LOOK_DELTA=1): screenshot=true replies show
+# only what changed since the last screenshot shown.
+LOOK_DELTA = os.environ.get("AGENT_DESKTOP_LOOK_DELTA") == "1"
+if LOOK_DELTA:
+    INSTRUCTIONS += """
+
+Screenshots after input show only what changed: with screenshot=true the reply
+contains the changed part of the screen since your last screenshot (its
+"region" is [x, y, width, height] on the desktop; the rest looks as before),
+the whole screen when most of it changed (changed_only "whole frame"), or no
+image with "unchanged": true (keep using your last image and its observation
+token). Pass each image's own observation token, so x/y are in that image. Call desktop_screenshot when you need the whole
+screen again."""
+
 # Experiment baseline (AGENT_DESKTOP_LOOK=0): the server as it was before input
 # could return a screenshot, for matched comparisons.
 LOOK = os.environ.get("AGENT_DESKTOP_LOOK") != "0"
@@ -130,7 +144,11 @@ def looked(session, result, screenshot):
         "screenshot",
         settle_ms=SETTLE_MS,
         settle_timeout_ms=SETTLE_TIMEOUT_MS,
+        **({"changed_only": True} if LOOK_DELTA else {}),
     )
+    if capture.get("unchanged"):
+        # Nothing on screen differs from the last screenshot shown: no image.
+        return {**result, "screenshot": capture}
     return [
         TextContent(type="text", text=json.dumps({**result, "screenshot": capture})),
         Image(path=capture["path"]),
@@ -509,7 +527,13 @@ def desktop_screenshot(
     the image. Input tools given this screenshot's observation interpret x/y as
     coordinates in this image; without an observation they are desktop pixels.
     """
-    capture = call(session, "screenshot", region=region, scale=scale)
+    capture = call(
+        session,
+        "screenshot",
+        region=region,
+        scale=scale,
+        **({"track": True} if LOOK_DELTA and region is None else {}),
+    )
     return [
         TextContent(type="text", text=json.dumps(capture)),
         Image(path=capture["path"]),

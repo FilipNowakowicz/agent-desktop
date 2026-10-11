@@ -406,6 +406,9 @@ class Worker:
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.ui_counter = 0
         self.frames = {}  # recent raw frames for change detection, oldest first
+        # The last whole frame shown to the agent: changed_only screenshots
+        # send only what differs from it (experimental, E3).
+        self.seen = None
         # ("type" or "key", monotonic end) of the last keyboard input.
         self.last_keys = (None, 0.0)
         self.virtual_pointer = None
@@ -1265,6 +1268,28 @@ class Worker:
             "observation": image_token(before, region, scale),
         }
 
+    def changed_screenshot(self, scale=None):
+        """Only the part of the screen that changed since the last whole frame
+        shown: the changed box plus a margin, the whole frame when most of the
+        screen changed or nothing was shown before, or no image at all when
+        nothing changed. The token maps the region's coordinates as usual."""
+        width, height, pixels = self.capture_pixels()
+        previous, self.seen = self.seen, (width, height, pixels)
+        if previous is None or previous[:2] != (width, height):
+            return {**self.screenshot(None, scale), "changed_only": "whole frame"}
+        box = changed_box(previous[2], pixels, width, height)
+        if not box:
+            # No token: the last image's own token still maps its coordinates.
+            return {"unchanged": True}
+        x, y, w, h = box
+        margin = CHANGED_MARGIN
+        left, top = max(0, x - margin), max(0, y - margin)
+        right, bottom = min(width, x + w + margin), min(height, y + h + margin)
+        if (right - left) * (bottom - top) > CHANGED_WHOLE * width * height:
+            return {**self.screenshot(None, scale), "changed_only": "whole frame"}
+        capture = self.screenshot([left, top, right - left, bottom - top], scale)
+        return {**capture, "changed_only": "region"}
+
     def prune_screenshots(self, directory):
         """Keep the newest screenshots only, so long sessions do not fill the disk."""
         keep = int(os.environ.get("AGENT_DESKTOP_KEEP_SCREENSHOTS", 200))
@@ -1608,6 +1633,7 @@ class Worker:
             self.control.pop("since", None)
             self.control["epoch"] += 1
             self.needs_screenshot = True
+            self.seen = None
             self.save_control()
             print(f"Control returned to the agent: {how}", file=sys.stderr, flush=True)
         return self.control_state()
@@ -1814,7 +1840,12 @@ class Worker:
                         "settle_ms to 10000"
                     )
                 settled = self.settle(quiet / 1000, limit / 1000)
-            capture = self.screenshot(request.get("region"), request.get("scale"))
+            if request.get("changed_only") is True:
+                capture = self.changed_screenshot(request.get("scale"))
+            else:
+                capture = self.screenshot(request.get("region"), request.get("scale"))
+                if request.get("region") is None and request.get("track") is True:
+                    self.seen = self.capture_pixels()  # for later changed_only
             if settled:
                 capture.update(settled)
             # Another client's screenshot must not vouch for the controller.
@@ -2299,6 +2330,12 @@ def first_difference(a, b):
 
 # Changes of at most this many square pixels (a blinking caret) count as settled.
 SETTLE_AREA = 400
+
+
+# changed_only screenshots: context around the change, and the share of the
+# screen above which the whole frame is sent instead.
+CHANGED_MARGIN = 48
+CHANGED_WHOLE = 0.4
 
 
 def changed_box(before, after, width, height):

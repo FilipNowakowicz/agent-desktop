@@ -1116,9 +1116,36 @@ class Worker:
         )
         if focused is None or not focused["title"]:
             return None
-        tree = self.accessibility().tree(None, focused["title"], 400, budget=0.5)
+        # Not by title: the frame's name can lag it (a page that retitled itself).
+        accessibility = self.accessibility()
+        frame = accessibility.focused_frame(focused["app_id"], focused["title"])
+        if frame is None:
+            return None
+        # Without action lists: fewer D-Bus calls per element.
+        tree = accessibility.tree(None, frame, 400, budget=0.5, actions=False)
         nodes = [n for n in tree["nodes"] if n["depth"] > 1]
-        return {"window": focused["title"], "lines": ui_lines(nodes)}
+        if not nodes:
+            return None  # not readable now: no delta rather than a false one
+        # In a browser, the page: the toolbar and tabs say nothing new.
+        document = next(
+            (i for i, n in enumerate(nodes) if n["role"].startswith("document")), None
+        )
+        if document is not None:
+            depth = nodes[document]["depth"]
+            end = next(
+                (
+                    i
+                    for i in range(document + 1, len(nodes))
+                    if nodes[i]["depth"] <= depth
+                ),
+                len(nodes),
+            )
+            nodes = nodes[document:end]
+        return {
+            "window": focused["id"],
+            "title": focused["title"],
+            "lines": ui_lines(nodes),
+        }
 
     def accessibility(self):
         if not self.info.get("accessibility"):

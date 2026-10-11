@@ -138,7 +138,7 @@ class UITests(unittest.TestCase):
         after = self.snapshot("Confirm", [{"role": "label", "name": "Sure?"}])
         self.assertEqual(
             ui_delta(before, after),
-            {"window": "'Form' → 'Confirm'", "now": ["label 'Sure?'"]},
+            {"window": "Confirm", "now": ["label 'Sure?'"]},
         )
         self.assertIsNone(ui_delta(None, after))
         self.assertEqual(ui_delta(before, before), {})

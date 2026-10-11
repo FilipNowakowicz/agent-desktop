@@ -132,7 +132,7 @@ class Accessibility:
             node, "org.freedesktop.DBus.Properties", "Get", "ss", (interface, name)
         )[0][1]
 
-    def describe(self, node):
+    def describe(self, node, actions=True):
         role = self.call(node, ACCESSIBLE, "GetRoleName")[0]
         name = self.get(node, ACCESSIBLE, "Name")
         words = self.call(node, ACCESSIBLE, "GetState")[0]
@@ -158,7 +158,7 @@ class Accessibility:
             )[0]
         if "org.a11y.atspi.Value" in interfaces:
             record["value"] = self.get(node, "org.a11y.atspi.Value", "CurrentValue")
-        if "org.a11y.atspi.Action" in interfaces:
+        if actions and "org.a11y.atspi.Action" in interfaces:
             # GTK 4 also exposes widget action groups (clipboard.copy, ...);
             # they stay usable by name but are omitted to keep the list short.
             record["actions"] = [
@@ -204,7 +204,41 @@ class Accessibility:
     def children(self, node):
         return [tuple(c) for c in self.call(node, ACCESSIBLE, "GetChildren")[0]]
 
-    def tree(self, app=None, window=None, max_nodes=300, budget=3.0):
+    def focused_frame(self, app_id, title):
+        """The accessible frame of the compositor's focused window, or None.
+
+        Matched by application, then by AT-SPI's active state, the exact
+        title, the only named frame, or a shared " - Application" suffix:
+        a frame's name can lag the window title, and Chromium on Wayland never
+        marks its frames active."""
+        wanted = (app_id or "").lower()
+        for application in self.children(REGISTRY):
+            try:
+                name = (self.get(application, ACCESSIBLE, "Name") or "").lower()
+                if not name or not (
+                    name in wanted or wanted in name or wanted.split(".")[-1] in name
+                ):
+                    continue
+                frames = []
+                for frame in self.children(application):
+                    record, showing = self.describe(frame)
+                    if showing and record["name"]:
+                        frames.append((frame, record))
+            except (AccessibilityError, TimeoutError):
+                continue
+            ending = " - " + title.rpartition(" - ")[2] if " - " in title else None
+            for test in (
+                lambda r, _: "active" in r["states"],
+                lambda r, _: r["name"] == title,
+                lambda _, count: count == 1,
+                lambda r, _: ending is not None and r["name"].endswith(ending),  # noqa: B023
+            ):
+                found = [f for f, record in frames if test(record, len(frames))]
+                if len(found) == 1:
+                    return found[0]
+        return None
+
+    def tree(self, app=None, window=None, max_nodes=300, budget=3.0, actions=True):
         """Visible UI nodes as a flat list with depth, filtered by app or window.
 
         Bounded by listed nodes, visited nodes and elapsed time, so a slow or
@@ -241,7 +275,7 @@ class Accessibility:
                     truncated = truncated or "depth limit"
                     continue
                 try:
-                    record, showing = self.describe(node)
+                    record, showing = self.describe(node, actions)
                     children = self.children(node)
                 except (AccessibilityError, TimeoutError):
                     # Elements disappear while the tree is read (e.g. a closing
@@ -250,7 +284,11 @@ class Accessibility:
                     continue
                 if not showing:
                     continue
-                if is_window and window and window not in record["name"]:
+                if (
+                    is_window
+                    and isinstance(window, str)
+                    and window not in record["name"]
+                ):
                     continue
                 keep = not (
                     record["role"] in CONTAINERS
@@ -262,6 +300,14 @@ class Accessibility:
                 below = depth + 1 if keep else depth
                 stack.extend((child, below, False) for child in reversed(children))
 
+        if isinstance(window, tuple):
+            walk([window])  # one frame, as found by focused_frame
+            return {
+                "nodes": nodes,
+                "truncated": truncated is not None,
+                "truncated_by": truncated,
+                "unreadable": unreadable,
+            }
         for application in self.children(REGISTRY):
             if exhausted():
                 break

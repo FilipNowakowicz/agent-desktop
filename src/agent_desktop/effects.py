@@ -230,6 +230,9 @@ def key_changes(before, after):
 
 
 UI_LINES = 12
+UI_REUSE_S = 2.0
+UI_SETTLE_S = 0.8
+UI_POLL_S = 0.08
 
 
 def ui_lines(nodes):
@@ -257,7 +260,7 @@ def ui_delta(before, after):
         return None
     if before["window"] != after["window"]:
         shown = after["lines"][:UI_LINES]
-        return {"window": f"{before['window']!r} → {after['window']!r}", "now": shown}
+        return {"window": after.get("title", after["window"]), "now": shown}
     removed = list(before["lines"])
     added = []
     for line in after["lines"]:
@@ -501,11 +504,16 @@ def window_changes(before, after):
     def focused(windows):
         for window in windows:
             if "activated" in window["states"]:
-                return label(window)
+                return window
         return None
 
-    if focused(before) != focused(after):
-        result["focus"] = f"{focused(before)} → {focused(after)}"
+    old_focus, new_focus = focused(before), focused(after)
+    # By id: a retitled window keeps its focus.
+    if (old_focus or {}).get("id") != (new_focus or {}).get("id"):
+        result["focus"] = (
+            f"{label(old_focus) if old_focus else None} → "
+            f"{label(new_focus) if new_focus else None}"
+        )
     return result
 
 
@@ -550,8 +558,9 @@ class EffectLedger:
             FileRecorder(directory) for directory in extra if Path(directory).is_dir()
         ]
         self.windows = windows  # callable -> current window list
-        # callable -> {"window": title, "lines": ui_lines(...)} or None
+        # callable -> {"window": id, "title": ..., "lines": ui_lines(...)} or None
         self.ui = ui
+        self.last_ui = None  # (monotonic time, snapshot)
         self.processes = processes  # callable -> {pid: start time}
         self.names = Names()
         self.quiet = quiet
@@ -565,20 +574,56 @@ class EffectLedger:
         processes = self.processes()
         for pid in processes:
             self.names(pid)
+        windows = self.windows()
         return {
             "start": time.monotonic(),
-            "windows": self.windows(),
+            "windows": windows,
             "processes": processes,
-            "ui": self.snapshot(),
+            "ui": self.recent_snapshot(windows),
         }
+
+    def settled_ui(self, state):
+        """The UI at its first observed change, or as it is after UI_SETTLE_S
+        when nothing changed (applications such as Chromium update their tree
+        some hundred milliseconds after input). Later changes are reported by
+        desktop_effects with the action's effect_id."""
+        before = state["ui"]
+        if before is None:
+            return self.snapshot()
+        deadline = state["start"] + UI_SETTLE_S
+        while True:
+            current = self.snapshot()
+            if current is not None and current != before:
+                return current
+            if time.monotonic() >= deadline:
+                return current
+            time.sleep(UI_POLL_S)
+
+    def recent_snapshot(self, windows):
+        """The last report's UI when it is fresh and still the focused window
+        (back-to-back steps), else a new snapshot: one tree walk, not two."""
+        focused = next(
+            (w["id"] for w in windows if "activated" in w.get("states", [])), None
+        )
+        cached = self.last_ui
+        if (
+            cached
+            and cached[1] is not None
+            and time.monotonic() - cached[0] < UI_REUSE_S
+            and cached[1]["window"] == focused
+        ):
+            return cached[1]
+        return self.snapshot()
 
     def snapshot(self):
         if not self.ui:
             return None
         try:
-            return self.ui()
+            found = self.ui()
         except Exception:  # noqa: BLE001 - UI deltas are best effort
-            return None
+            found = None
+        self.last_ui = (time.monotonic(), found)
+        return found
 
     def finish(self, state):
         """Wait briefly for file activity to go quiet, then report effects."""
@@ -589,6 +634,7 @@ class EffectLedger:
             if time.monotonic() - idle_since >= self.quiet:
                 break
             time.sleep(0.03)
+        after_ui = self.settled_ui(state)
         end = time.monotonic()
         self.sequence += 1
         action = self.sequence
@@ -605,7 +651,7 @@ class EffectLedger:
         changed = process_changes(state["processes"], processes, self.names)
         if changed:
             report["processes"] = changed
-        ui = ui_delta(state["ui"], self.snapshot())
+        ui = ui_delta(state["ui"], after_ui)
         if ui:
             report["ui"] = ui
         report["effect_id"] = action

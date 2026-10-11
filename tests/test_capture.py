@@ -53,10 +53,13 @@ class CaptureTests(unittest.TestCase):
             core.request(self.session, "screenshot", changed_only=True),
             {"unchanged": True},
         )
-        core.request(
+        app = core.request(
             self.session, "launch", argv=["foot", "--config=/dev/null", "--title=T"]
         )
-        self.assertTrue(core.wait(self.session, title="T", timeout=20)["satisfied"])
+        if not core.wait(self.session, title="T", timeout=20)["satisfied"]:
+            # e.g. a CI container without fonts; nothing to type into.
+            log = Path(app["logs"]).read_text(errors="replace")[-300:]
+            self.skipTest(f"foot opened no window: {log}")
         core.request(self.session, "screenshot", track=True)
         time.sleep(1)  # let the caret settle into its blink cycle
         core.request(self.session, "type", text="x")

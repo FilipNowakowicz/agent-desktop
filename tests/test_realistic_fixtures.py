@@ -6,6 +6,7 @@ property shadows) before an agent run is spent on them."""
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import types
@@ -116,7 +117,9 @@ class RealisticFixtureTests(unittest.TestCase):
         return found.group(1) if found else output[-300:]
 
     def render(self, page, directory):
-        return subprocess.run(
+        # Its own process group: on a timeout every Chromium process stops
+        # before the profile directory is removed.
+        process = subprocess.Popen(
             [
                 CHROMIUM,
                 "--headless",
@@ -127,15 +130,24 @@ class RealisticFixtureTests(unittest.TestCase):
                 "--dump-dom",
                 page.as_uri(),
             ],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             text=True,
-            timeout=30,
-        ).stdout
+            start_new_session=True,
+        )
+        try:
+            return process.communicate(timeout=30)[0]
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+            raise
 
     hung = False
 
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="realistic-")
+        self.temporary = tempfile.TemporaryDirectory(
+            prefix="realistic-", ignore_cleanup_errors=True
+        )
 
     def tearDown(self):
         self.temporary.cleanup()

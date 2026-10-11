@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-12 — Partial human baseline
+
+The maintainer did three realistic tasks with `--human`, guided step by step:
+release notes 45.8 s (failed: internal lines published too; first attempt
+81.3 s unfinished), ops ticket 38.8 s (config correct, ticket not resolved),
+expense claim 89.5 s (passed). The agents' medians on the same tasks were
+20–50 s. Details and caveats in docs/BENCHMARK.md. The remaining three tasks
+were not done.
+
+`scripts/benchmark.py` now puts the installed runtime first on PATH, as the
+CLI and MCP server do; before, a run without labwc on PATH failed with
+"Missing executable: labwc".
+
 ## 2026-10-11 — E3 changed-only screenshots: gate not met
 
 docs/research/2026-10-11-observation-discipline.md. With `--look-delta`

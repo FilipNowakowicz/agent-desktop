@@ -189,6 +189,27 @@ are compared with `AB_ARM=effects` or `AB_ARM=look_delta
 scripts/effects_ab_summary.py RUN...`; runs refused by the service (usage
 limits) are recorded as `api_error`, excluded, and stop the suite.
 
+### Human baseline (partial, 2026-10-12)
+
+The maintainer did three tasks with `--human --seed 101 --only TASK`, one at a
+time, after a short step-by-step explanation of each from the operator (which
+an agent does not get). One person, one attempt each; the release-notes figure
+is a second attempt (the first, 81.3 s, ended without publishing).
+
+| Task | Person | Outcome | Agents' median (Opus / Sonnet / Haiku) |
+| --- | --- | --- | --- |
+| `real-release-notes` | 45.8 s | failed: the three internal lines were also published | 33 / 22 / 20 s |
+| `real-ticket-config` | 38.8 s | failed: config exactly right, ticket not resolved (comment missing) | 22 / 25 / 21 s |
+| `real-expense-claim` | 89.5 s | passed | 50 / 47 / 39 s |
+
+Runs: `20261012-001507-f14c`, `20261012-001646-6a43`, `20261012-001756-fdc6`
+(the first attempt is in `20261012-001243-af84`). With `--only`, tasks after
+the first draw different random inputs than the full-suite agent runs of the
+same seed; the tasks are otherwise identical. On these three tasks the agents
+were about twice as fast as a person new to them and more often complete; the
+remaining three tasks have no human time. This is a single, guided,
+first-time attempt, not a matched human baseline.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

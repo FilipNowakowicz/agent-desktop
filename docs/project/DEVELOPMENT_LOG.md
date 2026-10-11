@@ -1,5 +1,24 @@
 # Development log
 
+## 2026-10-11 — Plan: effect-first computer use
+
+docs/research/2026-10-11-effect-first.md is the plan agreed in discussion with
+the maintainer. 153 benchmark runs were re-measured: median 21 s per task, about
+3 s per turn. Across 21 single-task runs, model API time was 78% of wall time,
+tool time 12% and other 10%. The plan states the effect-first thesis and its
+prior art (OSWorld-Human, AOI, TClone/Crab, SkillWeaver, history pruning),
+experiments E0–E6 with gates, the end state, and a Windows/macOS path.
+Constraints: no API credits (runs stay on `claude -p`), and the local GPU
+(4 GB) cannot fine-tune a model. Filed #107: `ui_action` uses the `set_text`
+keyboard fallback for every unsupported action, so `select` fails with
+`KeyError: 'text'` after sending Ctrl+A. No implementation.
+
+Added docs/project/DIRECTIONS.md, a living board of directions D1–D9. Each one
+drops an assumption of the "operate the GUI like a person" picture, and each
+lists risks, prior art, the cheapest test and a status. All are ideas, not
+current work. The leading candidate is D1 + D2: agents write programs against a
+structured desktop.
+
 ## 2026-10-09 — Host trial polish
 
 From docs/trials/2026-10-09-host-browser-task.md: observation tokens include the

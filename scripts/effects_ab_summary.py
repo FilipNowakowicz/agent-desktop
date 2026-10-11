@@ -1,6 +1,7 @@
 """Compare benchmark runs with and without a treatment: the effect ledger,
 the atlas, input that returns a screenshot (runs without --no-look), or with
-AB_ARM=guards, guarded steps (runs without --no-guards).
+AB_ARM=guards, guarded steps (runs without --no-guards). AB_ARM=effects
+compares --effects runs with otherwise equal runs (E2).
 
     uv run scripts/effects_ab_summary.py artifacts/benchmark/RUN [...]
 
@@ -51,7 +52,10 @@ groups = {}
 for run in sys.argv[1:]:
     data = json.loads((Path(run) / "summary.json").read_text())
     summary = data["summary"]
-    if summary.get("atlas"):
+    if os.environ.get("AB_ARM") == "effects":
+        # Effect-first (E2) against runs with every other option equal.
+        arm = "effects" if summary.get("effects") else "baseline"
+    elif summary.get("atlas"):
         arm = "atlas"
     elif summary.get("effects"):
         arm = "effects"

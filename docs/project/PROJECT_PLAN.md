@@ -90,7 +90,11 @@ an API agent loop and model tuning stay deferred.
 Progress: E0's realistic suite is in place (#110) and its repeat runs meet the
 variance gate except one task; E1 found every tier completes it, with Haiku
 taking twice the turns at half the time per turn
-([model tiers](../research/2026-10-11-model-tiers.md)). E2 is next.
+([model tiers](../research/2026-10-11-model-tiers.md)). E2 did not meet its
+gate: with Opus, turns −4.5% and looks −6.5% but wall time +15%; Haiku
+unchanged ([effect-first A/B](../research/2026-10-11-effect-first-ab.md)). The
+effect-first thesis is weak on this suite: E4 and E6 stop, the features stay
+experimental. Tool-side observation (E3) and cloud runs (E5) remain open.
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

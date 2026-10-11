@@ -1,0 +1,541 @@
+{
+ "experiment": "E2 effect-first A/B on --suite realistic",
+ "date": "2026-10-11",
+ "seeds": [
+  101,
+  102,
+  103
+ ],
+ "baseline_runs": {
+  "opus": [
+   "20261011-181907-d5e9",
+   "20261011-183222-538e",
+   "20261011-184742-45d1"
+  ],
+  "haiku": [
+   "20261011-182822-197e",
+   "20261011-184316-5d8a",
+   "20261011-185629-55cb"
+  ]
+ },
+ "effects_runs": {
+  "opus": [
+   "20261011-190217-99e6",
+   "20261011-191157-f411",
+   "20261011-223746-7f2e"
+  ],
+  "haiku": [
+   "20261011-190653-09d5",
+   "20261011-191707-1e08",
+   "20261011-224252-4ea7"
+  ]
+ },
+ "excluded": {
+  "20261011-192049-79e0": "usage limit from its third task",
+  "20261011-192232-8e5b": "usage limit"
+ },
+ "opus": {
+  "tasks": [
+   {
+    "task": "real-attach-invoice",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 5,
+    "tool_calls": 8,
+    "effects_calls": 0,
+    "turns": 9,
+    "input_tokens": 151792,
+    "output_tokens": 1502,
+    "cost_usd": 0.163614,
+    "seconds": 32.1,
+    "looks": 5
+   },
+   {
+    "task": "real-attach-invoice",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 5,
+    "tool_calls": 7,
+    "effects_calls": 0,
+    "turns": 8,
+    "input_tokens": 165408,
+    "output_tokens": 1418,
+    "cost_usd": 0.2009748,
+    "seconds": 39.8,
+    "looks": 5
+   },
+   {
+    "task": "real-editor-indentation",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 7,
+    "tool_calls": 8,
+    "effects_calls": 0,
+    "turns": 9,
+    "input_tokens": 168058,
+    "output_tokens": 1845,
+    "cost_usd": 0.19941620000000004,
+    "seconds": 35.4,
+    "looks": 7
+   },
+   {
+    "task": "real-editor-indentation",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 6,
+    "tool_calls": 8,
+    "effects_calls": 0,
+    "turns": 9,
+    "input_tokens": 184690,
+    "output_tokens": 1839,
+    "cost_usd": 0.20937060000000002,
+    "seconds": 42.0,
+    "looks": 6
+   },
+   {
+    "task": "real-expense-claim",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 10,
+    "tool_calls": 18,
+    "effects_calls": 0,
+    "turns": 19,
+    "input_tokens": 370779,
+    "output_tokens": 2723,
+    "cost_usd": 0.3316154,
+    "seconds": 49.6,
+    "looks": 10
+   },
+   {
+    "task": "real-expense-claim",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 11,
+    "tool_calls": 18,
+    "effects_calls": 0,
+    "turns": 19,
+    "input_tokens": 443277,
+    "output_tokens": 2886,
+    "cost_usd": 0.3936218,
+    "seconds": 61.9,
+    "looks": 11
+   },
+   {
+    "task": "real-inventory-cleanup",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 16,
+    "tool_calls": 18,
+    "effects_calls": 0,
+    "turns": 19,
+    "input_tokens": 533666,
+    "output_tokens": 3657,
+    "cost_usd": 0.44606,
+    "seconds": 68.0,
+    "looks": 16
+   },
+   {
+    "task": "real-inventory-cleanup",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 12,
+    "tool_calls": 14,
+    "effects_calls": 0,
+    "turns": 15,
+    "input_tokens": 434630,
+    "output_tokens": 2906,
+    "cost_usd": 0.45513200000000004,
+    "seconds": 67.1,
+    "looks": 12
+   },
+   {
+    "task": "real-release-notes",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 4,
+    "tool_calls": 11,
+    "effects_calls": 0,
+    "turns": 12,
+    "input_tokens": 181152,
+    "output_tokens": 1412,
+    "cost_usd": 0.185933,
+    "seconds": 33.3,
+    "looks": 4
+   },
+   {
+    "task": "real-release-notes",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 3,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 174106,
+    "output_tokens": 1436,
+    "cost_usd": 0.2678824,
+    "seconds": 31.7,
+    "looks": 3
+   },
+   {
+    "task": "real-ticket-config",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 3,
+    "tool_calls": 7,
+    "effects_calls": 0,
+    "turns": 8,
+    "input_tokens": 96538,
+    "output_tokens": 1069,
+    "cost_usd": 0.1264786,
+    "seconds": 22.3,
+    "looks": 3
+   },
+   {
+    "task": "real-ticket-config",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 3,
+    "tool_calls": 7,
+    "effects_calls": 0,
+    "turns": 8,
+    "input_tokens": 107036,
+    "output_tokens": 1083,
+    "cost_usd": 0.144445,
+    "seconds": 25.2,
+    "looks": 3
+   }
+  ],
+  "pooled_input_tokens": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.055,
+    "effects": 1.075
+   },
+   "p_value": 0.7362
+  },
+  "pooled_turns": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.03,
+    "effects": 0.955
+   },
+   "p_value": 0.0498
+  },
+  "pooled_seconds": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.041,
+    "effects": 1.146
+   },
+   "p_value": 0.0397
+  },
+  "pooled_looks": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.017,
+    "effects": 0.935
+   },
+   "p_value": 0.1278
+  }
+ },
+ "haiku": {
+  "tasks": [
+   {
+    "task": "real-attach-invoice",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 10,
+    "tool_calls": 19,
+    "effects_calls": 0,
+    "turns": 20,
+    "input_tokens": 306285,
+    "output_tokens": 3165,
+    "cost_usd": 0.00943231,
+    "seconds": 29.9,
+    "looks": 10
+   },
+   {
+    "task": "real-attach-invoice",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 7,
+    "tool_calls": 19,
+    "effects_calls": 0,
+    "turns": 20,
+    "input_tokens": 404156,
+    "output_tokens": 3229,
+    "cost_usd": 0.01074069,
+    "seconds": 35.3,
+    "looks": 7
+   },
+   {
+    "task": "real-editor-indentation",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 11,
+    "tool_calls": 26,
+    "effects_calls": 0,
+    "turns": 27,
+    "input_tokens": 459584,
+    "output_tokens": 5497,
+    "cost_usd": 0.013361090000000003,
+    "seconds": 49.1,
+    "looks": 11
+   },
+   {
+    "task": "real-editor-indentation",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 1,
+    "inline_screenshots": 9,
+    "tool_calls": 24,
+    "effects_calls": 0,
+    "turns": 25,
+    "input_tokens": 426216,
+    "output_tokens": 4225,
+    "cost_usd": 0.01173182,
+    "seconds": 35.4,
+    "looks": 9
+   },
+   {
+    "task": "real-expense-claim",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 8,
+    "inline_screenshots": 5,
+    "tool_calls": 41,
+    "effects_calls": 0,
+    "turns": 42,
+    "input_tokens": 532438,
+    "output_tokens": 5983,
+    "cost_usd": 0.014821290000000003,
+    "seconds": 38.9,
+    "looks": 5
+   },
+   {
+    "task": "real-expense-claim",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 9,
+    "tool_calls": 34,
+    "effects_calls": 0,
+    "turns": 35,
+    "input_tokens": 622646,
+    "output_tokens": 5779,
+    "cost_usd": 0.01641848,
+    "seconds": 55.9,
+    "looks": 9
+   },
+   {
+    "task": "real-inventory-cleanup",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 24,
+    "tool_calls": 45,
+    "effects_calls": 0,
+    "turns": 46,
+    "input_tokens": 1206963,
+    "output_tokens": 9465,
+    "cost_usd": 0.02766566,
+    "seconds": 72.8,
+    "looks": 24
+   },
+   {
+    "task": "real-inventory-cleanup",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 2,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 19,
+    "tool_calls": 43,
+    "effects_calls": 0,
+    "turns": 44,
+    "input_tokens": 1681747,
+    "output_tokens": 9930,
+    "cost_usd": 0.03608267,
+    "seconds": 111.0,
+    "looks": 19
+   },
+   {
+    "task": "real-release-notes",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 4,
+    "tool_calls": 16,
+    "effects_calls": 0,
+    "turns": 17,
+    "input_tokens": 224967,
+    "output_tokens": 2276,
+    "cost_usd": 0.0071421900000000005,
+    "seconds": 19.9,
+    "looks": 4
+   },
+   {
+    "task": "real-release-notes",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 4,
+    "inline_screenshots": 4,
+    "tool_calls": 19,
+    "effects_calls": 0,
+    "turns": 20,
+    "input_tokens": 269984,
+    "output_tokens": 2653,
+    "cost_usd": 0.01008266,
+    "seconds": 23.7,
+    "looks": 4
+   },
+   {
+    "task": "real-ticket-config",
+    "arm": "baseline",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 3,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 149541,
+    "output_tokens": 1896,
+    "cost_usd": 0.00507562,
+    "seconds": 21.4,
+    "looks": 3
+   },
+   {
+    "task": "real-ticket-config",
+    "arm": "effects",
+    "runs": 3,
+    "passed": 3,
+    "false_success": 0,
+    "screenshots": 2,
+    "inline_screenshots": 3,
+    "tool_calls": 10,
+    "effects_calls": 0,
+    "turns": 11,
+    "input_tokens": 168593,
+    "output_tokens": 1914,
+    "cost_usd": 0.00581623,
+    "seconds": 21.9,
+    "looks": 3
+   }
+  ],
+  "pooled_input_tokens": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.138,
+    "effects": 1.172
+   },
+   "p_value": 0.8484
+  },
+  "pooled_turns": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.007,
+    "effects": 1.006
+   },
+   "p_value": 0.9895
+  },
+  "pooled_seconds": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.06,
+    "effects": 1.123
+   },
+   "p_value": 0.5545
+  },
+  "pooled_looks": {
+   "runs": {
+    "baseline": 18,
+    "effects": 18
+   },
+   "mean_ratio": {
+    "baseline": 1.072,
+    "effects": 1.019
+   },
+   "p_value": 0.6863
+  }
+ }
+}

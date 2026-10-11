@@ -17,7 +17,10 @@ experimental and off by default.
 Validation: session test `test_changed_only_screenshots` (whole frame first,
 `unchanged` without a token, a small region after typing with a matching
 token); ruff; full desktop suite with the repaired Nix runtime, at-spi2-core,
-zenity, kdialog and foot: 168 tests OK (10 skipped).
+zenity, kdialog and foot: 168 tests OK (10 skipped). Checks matrix (run
+38182328487): Ubuntu, Nix, Fedora and Arch passed after the new test skips
+when foot opens no window and the fixture controls stop Chromium's process
+group on a timeout (its children had raced the profile cleanup on Ubuntu).
 
 ## 2026-10-11 — E2 effect-first A/B: gate not met
 

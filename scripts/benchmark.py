@@ -435,6 +435,8 @@ def main():
         help="let the agent use desktop_browser (needs --firefox)",
     )
     args = parser.parse_args()
+    # As the CLI and MCP server do: the installed runtime first on PATH.
+    core.use_runtime()
     random.seed(args.seed)
     if args.effort:
         os.environ["AGENT_DESKTOP_BENCH_EFFORT"] = args.effort

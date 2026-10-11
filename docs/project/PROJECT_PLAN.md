@@ -98,7 +98,8 @@ experimental. E3 (changed-only screenshots) did not meet its gate either:
 input tokens about −7% for Opus, because a fixed prompt prefix, not images,
 dominates them ([observation discipline](../research/2026-10-11-observation-discipline.md)).
 Neither experiment reduced the number of turns, which is what dominates wall
-time. Cloud runs (E5) and the human baseline need the maintainer; a new lever
+time. A partial human baseline (three tasks, guided, 39–90 s against the
+agents' 20–50 s) is in the benchmark guide. Cloud runs (E5) need the maintainer; a new lever
 for turns is a decision for the maintainer (see the directions board).
 
 Longer-range directions (writing programs instead of clicking, structured access to

@@ -1,6 +1,6 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-09. This document records the chosen direction, implemented
+Updated: 2026-10-11. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
@@ -87,6 +87,10 @@ so agents look less, and to test that with realistic unfamiliar tasks, cheaper
 model tiers and an effect-first A/B gate (E0–E6). It also records the end state
 (engine, MCP, a review app) and a Windows/macOS path. It needs no API credits;
 an API agent loop and model tuning stay deferred.
+Progress: E0's realistic suite is in place (#110) and its repeat runs meet the
+variance gate except one task; E1 found every tier completes it, with Haiku
+taking twice the turns at half the time per turn
+([model tiers](../research/2026-10-11-model-tiers.md)). E2 is next.
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

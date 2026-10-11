@@ -179,6 +179,11 @@ showed no confirmation and it had pressed Submit twice; the check, not the
 reply, caught it. One run per task does not yet meet E0's gate (variance across
 three runs per arm) and there is no human baseline yet.
 
+Three matched runs per task with Opus, Sonnet and Haiku (E1, 54 runs, all
+passed) are in the [model-tier report](research/2026-10-11-model-tiers.md);
+`scripts/tier_summary.py RUN...` produces its per-model table, and `--effort`
+sets the agent's effort level.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

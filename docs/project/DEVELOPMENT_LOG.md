@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-11 — E0 repeats and E1 model tiers
+
+docs/research/2026-10-11-model-tiers.md. The realistic suite ran with Opus,
+Sonnet and Haiku 5.5, three matched seeds each (54 runs, interleaved by seed):
+all 54 passed. Wall time p50: Opus 35.4 s, Sonnet 28.1 s, Haiku 37.0 s; median
+turns 11.5 / 13.5 / 22.5; seconds per turn 3.1 / 2.5 / 1.5; model API time
+66–74% of wall time. E0's variance gate is met (median CV of wall time
+0.10–0.15) except for the inventory task (CV up to 0.45). E1 picks Haiku, the
+cheapest tier at equal success. The harness gained `--effort` (the CLI exposes
+no fast mode) and `scripts/tier_summary.py`; `effects_ab_summary.py` also
+reports looks. Still missing: the human baseline and longer tasks that
+separate tiers by success.
+
 ## 2026-10-11 — E0 realistic suite and the time split
 
 Started E0 of docs/research/2026-10-11-effect-first.md. `--suite realistic`

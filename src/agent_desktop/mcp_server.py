@@ -4,6 +4,7 @@ import functools
 import json
 import os
 import re
+import time
 import uuid
 
 import anyio
@@ -129,6 +130,22 @@ def looked(session, result, screenshot):
     ]
 
 
+def log_call(name, started, ok):
+    """With AGENT_DESKTOP_CALL_LOG set (benchmarks), append the call's timing.
+
+    The log measures time inside the tools, separate from the model's time.
+    """
+    path = os.environ.get("AGENT_DESKTOP_CALL_LOG")
+    if not path:
+        return
+    record = {"tool": name, "start": started, "end": time.time(), "ok": ok}
+    try:
+        with open(path, "a") as stream:
+            stream.write(json.dumps(record) + "\n")
+    except OSError:
+        pass
+
+
 def tool(**options):
     """Register a tool that runs in a worker thread.
 
@@ -139,9 +156,16 @@ def tool(**options):
     def register(function):
         @functools.wraps(function)
         async def threaded(*args, **kwargs):
-            return await anyio.to_thread.run_sync(
-                functools.partial(function, *args, **kwargs)
-            )
+            started = time.time()
+            ok = False
+            try:
+                result = await anyio.to_thread.run_sync(
+                    functools.partial(function, *args, **kwargs)
+                )
+                ok = True
+                return result
+            finally:
+                log_call(function.__name__, started, ok)
 
         return mcp.tool(**options)(threaded)
 

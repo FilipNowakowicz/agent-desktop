@@ -13,6 +13,12 @@ Constraints: no API credits (runs stay on `claude -p`), and the local GPU
 keyboard fallback for every unsupported action, so `select` fails with
 `KeyError: 'text'` after sending Ctrl+A. No implementation.
 
+Added docs/project/DIRECTIONS.md, a living board of directions D1–D9. Each one
+drops an assumption of the "operate the GUI like a person" picture, and each
+lists risks, prior art, the cheapest test and a status. All are ideas, not
+current work. The leading candidate is D1 + D2: agents write programs against a
+structured desktop.
+
 ## 2026-10-09 — Host trial polish
 
 From docs/trials/2026-10-09-host-browser-task.md: observation tokens include the

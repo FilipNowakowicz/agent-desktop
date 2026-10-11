@@ -88,6 +88,11 @@ model tiers and an effect-first A/B gate (E0–E6). It also records the end stat
 (engine, MCP, a review app) and a Windows/macOS path. It needs no API credits;
 an API agent loop and model tuning stay deferred.
 
+Longer-range directions (writing programs instead of clicking, structured access to
+every app, learning from the person, a shared skill registry and others) are
+collected, untested, on the [directions board](DIRECTIONS.md). They are input
+for later decisions, not current work.
+
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from

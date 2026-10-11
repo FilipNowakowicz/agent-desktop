@@ -21,7 +21,8 @@ account's usage limit and were rerun).
 
 Validation: unit tests for key changes and UI deltas; session tests for a
 Chromium UI delta and a step stopped by an unmet file expectation; ruff;
-full desktop suite (see the PR).
+full desktop suite with the repaired Nix runtime, at-spi2-core, zenity, kdialog
+and foot: 167 tests OK (10 skipped).
 
 ## 2026-10-11 — E0 repeats and E1 model tiers
 

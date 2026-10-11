@@ -94,7 +94,12 @@ taking twice the turns at half the time per turn
 gate: with Opus, turns −4.5% and looks −6.5% but wall time +15%; Haiku
 unchanged ([effect-first A/B](../research/2026-10-11-effect-first-ab.md)). The
 effect-first thesis is weak on this suite: E4 and E6 stop, the features stay
-experimental. Tool-side observation (E3) and cloud runs (E5) remain open.
+experimental. E3 (changed-only screenshots) did not meet its gate either:
+input tokens about −7% for Opus, because a fixed prompt prefix, not images,
+dominates them ([observation discipline](../research/2026-10-11-observation-discipline.md)).
+Neither experiment reduced the number of turns, which is what dominates wall
+time. Cloud runs (E5) and the human baseline need the maintainer; a new lever
+for turns is a decision for the maintainer (see the directions board).
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

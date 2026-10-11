@@ -148,7 +148,9 @@ New measures:
 Status (2026-10-11): #107 fixed; E0 suite built and its variance gate met
 except one task; E1 done (all tiers 18/18, Haiku chosen); **E2 did not meet
 its gate** ([report](2026-10-11-effect-first-ab.md)), so E4 and E6 are
-stopped. E3 and E5 remain.
+stopped. **E3 did not meet its gate** either
+([report](2026-10-11-observation-discipline.md)). E5 needs a cloud session
+set up by the maintainer.
 
 Each experiment is a PR. Fix #107 first or alongside them.
 

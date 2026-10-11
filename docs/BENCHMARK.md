@@ -182,7 +182,12 @@ three runs per arm) and there is no human baseline yet.
 Three matched runs per task with Opus, Sonnet and Haiku (E1, 54 runs, all
 passed) are in the [model-tier report](research/2026-10-11-model-tiers.md);
 `scripts/tier_summary.py RUN...` produces its per-model table, and `--effort`
-sets the agent's effort level.
+sets the agent's effort level. `--effects` (E2,
+[report](research/2026-10-11-effect-first-ab.md)) and `--look-delta` (E3,
+changed-only screenshots, [report](research/2026-10-11-observation-discipline.md))
+are compared with `AB_ARM=effects` or `AB_ARM=look_delta
+scripts/effects_ab_summary.py RUN...`; runs refused by the service (usage
+limits) are recorded as `api_error`, excluded, and stop the suite.
 
 ## Hard tasks
 

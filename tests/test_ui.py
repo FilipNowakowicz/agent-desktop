@@ -458,10 +458,14 @@ class EffectFirstTests(UISessionTest):
         ]
         if os.geteuid() == 0:  # CI containers; never used for real profiles
             argv.append("--no-sandbox")
-        core.request(self.session, "launch", argv=[*argv, page.as_uri()])
-        self.assertTrue(
-            core.wait(self.session, element="City", timeout=30)["satisfied"]
-        )
+        app = core.request(self.session, "launch", argv=[*argv, page.as_uri()])
+        found = core.wait(self.session, element="City", timeout=30)
+        if (
+            not found["satisfied"]
+            and "No usable sandbox" in Path(app["logs"]).read_text()
+        ):
+            self.skipTest("Chromium sandbox unavailable in this environment")
+        self.assertTrue(found["satisfied"], found)
         nodes = core.request(self.session, "ui", window="Delta form")["nodes"]
         field = next(n for n in nodes if n["name"] == "City")
         core.request(

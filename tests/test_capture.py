@@ -42,6 +42,37 @@ class CaptureTests(unittest.TestCase):
                 os.environ[key] = value
         self.temporary.cleanup()
 
+    def test_changed_only_screenshots(self):
+        if not shutil.which("foot"):
+            self.skipTest("foot unavailable")
+        # Nothing shown yet: the whole frame.
+        first = core.request(self.session, "screenshot", changed_only=True)
+        self.assertEqual(first["changed_only"], "whole frame")
+        # Nothing changed since: no image and no token.
+        self.assertEqual(
+            core.request(self.session, "screenshot", changed_only=True),
+            {"unchanged": True},
+        )
+        app = core.request(
+            self.session, "launch", argv=["foot", "--config=/dev/null", "--title=T"]
+        )
+        if not core.wait(self.session, title="T", timeout=20)["satisfied"]:
+            # e.g. a CI container without fonts; nothing to type into.
+            log = Path(app["logs"]).read_text(errors="replace")[-300:]
+            self.skipTest(f"foot opened no window: {log}")
+        core.request(self.session, "screenshot", track=True)
+        time.sleep(1)  # let the caret settle into its blink cycle
+        core.request(self.session, "type", text="x")
+        time.sleep(0.3)
+        small = core.request(self.session, "screenshot", changed_only=True)
+        if small.get("unchanged"):
+            self.skipTest("the typed character did not render in time")
+        self.assertEqual(small["changed_only"], "region")
+        x, y, width, height = small["region"]
+        self.assertLess(width * height, 0.4 * first["width"] * first["height"])
+        self.assertEqual((small["width"], small["height"]), (width, height))
+        self.assertTrue(small["observation"].endswith(f"@{x},{y},1"))
+
     def test_region_and_scale(self):
         full = core.request(self.session, "screenshot")
         width, height = full["width"], full["height"]

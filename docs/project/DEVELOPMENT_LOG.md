@@ -1,5 +1,27 @@
 # Development log
 
+## 2026-10-11 — E3 changed-only screenshots: gate not met
+
+docs/research/2026-10-11-observation-discipline.md. With `--look-delta`
+(`AGENT_DESKTOP_LOOK_DELTA=1`), a screenshot returned with input shows only
+the changed box plus a margin, the whole frame above 40% change, or no image
+when nothing changed; coordinates map through the region token. On the
+realistic suite (3 seeds, Opus and Haiku, 36 runs against the E1 baseline)
+input tokens fell about 7% for Opus (p 0.15) and not at all for Haiku; the
+gate was −25%. Opus failed one inventory run: a blind batch clicked "Sign out"
+on the session-expiry dialog. A fixed prompt prefix of about 12.8k tokens
+(about 6k of it this server's instructions and tool definitions) makes up
+34–68% of input tokens; screenshots are a small share. The option stays
+experimental and off by default.
+
+Validation: session test `test_changed_only_screenshots` (whole frame first,
+`unchanged` without a token, a small region after typing with a matching
+token); ruff; full desktop suite with the repaired Nix runtime, at-spi2-core,
+zenity, kdialog and foot: 168 tests OK (10 skipped). Checks matrix (run
+38182328487): Ubuntu, Nix, Fedora and Arch passed after the new test skips
+when foot opens no window and the fixture controls stop Chromium's process
+group on a timeout (its children had raced the profile cleanup on Ubuntu).
+
 ## 2026-10-11 — E2 effect-first A/B: gate not met
 
 docs/research/2026-10-11-effect-first-ab.md. The treatment added UI deltas

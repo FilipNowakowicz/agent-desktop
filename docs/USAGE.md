@@ -128,6 +128,10 @@ input leaves the screen still too, so check the image. On their own,
 `screenshot --settle-ms MS` (worker request `settle_ms`, `settle_timeout_ms`)
 waits the same way before capturing. This saves a model round trip after most
 inputs; `AGENT_DESKTOP_LOOK=0` hides the option (an experiment baseline).
+`AGENT_DESKTOP_LOOK_DELTA=1` (experimental, MCP) returns only the changed part
+of the screen since the last screenshot shown, the whole screen above 40%
+change, or no image with `unchanged: true`; it did not reduce input tokens
+enough to be the default ([report](research/2026-10-11-observation-discipline.md)).
 
 ## Web pages through the DOM (browser bridge)
 

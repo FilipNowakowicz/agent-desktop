@@ -64,7 +64,7 @@ for run in sys.argv[1:]:
         # Runs before the screenshot option existed have no "look" key.
         arm = "look" if summary.get("look") else "baseline"
     for record in data["records"]:
-        if "skipped" in record:
+        if "skipped" in record or record.get("api_error"):
             continue
         detail = record.get("detail")
         if (

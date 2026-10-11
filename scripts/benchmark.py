@@ -182,6 +182,8 @@ def run_agent(
         "usage": result.get("usage", {}),
         "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
+        # The service refused the run (e.g. a usage limit): not a task result.
+        "api_error": result.get("api_error") if result.get("is_error") else None,
         "screenshots": sum(
             1
             for c, n in zip(calls, names, strict=True)
@@ -453,6 +455,11 @@ def main():
         if missing:
             records.append({"task": task.name, "skipped": f"missing {missing}"})
             continue
+        if any(r.get("api_error") for r in records):
+            records.append(
+                {"task": task.name, "skipped": "an earlier run hit an API error"}
+            )
+            continue
         record = run_task(
             task,
             root,
@@ -482,7 +489,9 @@ def main():
             ),
             flush=True,
         )
-    ran = [r for r in records if "skipped" not in r]
+    # Runs the service refused are reported, not scored.
+    invalid = [r["task"] for r in records if r.get("api_error")]
+    ran = [r for r in records if "skipped" not in r and not r.get("api_error")]
     summary = {
         "seed": args.seed,
         "human": args.human,
@@ -498,6 +507,7 @@ def main():
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),
         "skipped": [r["task"] for r in records if "skipped" in r],
+        "invalid_api_error": invalid,
         "cleanup_failures": [
             r["task"]
             for r in ran

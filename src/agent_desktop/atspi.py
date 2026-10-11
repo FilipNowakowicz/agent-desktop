@@ -294,6 +294,7 @@ class Accessibility:
 
     def act(self, node_id, action, text=None):
         node = self.parse(node_id)
+        method = None
         if action == "focus":
             done = self.call(node, "org.a11y.atspi.Component", "GrabFocus")[0]
         elif action == "select":
@@ -305,11 +306,33 @@ class Accessibility:
                     parent, "org.a11y.atspi.Selection", "SelectChild", "i", (index,)
                 )[0]
             except AccessibilityError as error:
-                if "UnknownMethod" in str(error) or "NotSupported" in str(error):
+                if "UnknownMethod" not in str(error) and "NotSupported" not in str(
+                    error
+                ):
+                    raise
+                # Chromium list options offer "select", radio buttons "check".
+                # Not doDefault, which every Chromium node offers, and never
+                # toggle or uncheck, which could deselect.
+                names = self.action_names(node)
+                folded = [n.lower() for n in names]
+                wanted = ("select", "check")
+                choice = next((folded.index(n) for n in wanted if n in folded), None)
+                if choice is None and "uncheck" in folded:
+                    return {
+                        "node": node_id,
+                        "action": action,
+                        "delivered": False,
+                        "already": True,
+                    }
+                if choice is None:
                     raise Unsupported(
-                        "The element's parent offers no selection"
+                        f"The element's parent offers no selection and the element "
+                        f"no select or check action (it has {names})"
                     ) from None
-                raise
+                method = names[choice]
+                done = self.call(
+                    node, "org.a11y.atspi.Action", "DoAction", "i", (choice,)
+                )[0]
         elif action == "set_text":
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("set_text needs text of at most 10000 characters")
@@ -333,4 +356,7 @@ class Accessibility:
             ]
         if not done:
             raise AccessibilityError(f"The application refused {action}")
-        return {"node": node_id, "action": action, "delivered": True}
+        result = {"node": node_id, "action": action, "delivered": True}
+        if method:
+            result["method"] = method
+        return result

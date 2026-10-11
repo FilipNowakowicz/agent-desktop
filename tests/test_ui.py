@@ -358,6 +358,79 @@ class ChromiumUITests(UISessionTest):
         sent = core.wait(self.session, title="Sent ada@example.com", timeout=10)
         self.assertTrue(sent["satisfied"], sent)
 
+    def test_select_without_a_selection_parent(self):
+        # Issue #107: Chromium radio buttons and list options have no
+        # Selection parent. select must use their own action, never type.
+        page = Path(self.temporary.name) / "choice.html"
+        page.write_text(
+            "<!doctype html><title>Choice</title>"
+            "<label><input type=radio name=c value=red checked>Red</label>"
+            "<label><input type=radio name=c value=blue>Blue</label>"
+            "<select size=3><option>Ant</option><option>Bee</option></select>"
+            "<p>Plain text</p>"
+            "<script>setInterval(() => document.title = 'Choice ' +"
+            " document.querySelector(':checked[name=c]').value + ' ' +"
+            " document.querySelector('select').value, 100)</script>"
+        )
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={Path(self.temporary.name) / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--force-renderer-accessibility",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        app = core.request(self.session, "launch", argv=[*argv, page.as_uri()])
+        found = core.wait(self.session, title="Choice red", timeout=30)
+        if (
+            not found["satisfied"]
+            and "No usable sandbox" in Path(app["logs"]).read_text()
+        ):
+            self.skipTest("Chromium sandbox unavailable in this environment")
+
+        def node(role, name):
+            nodes = core.request(self.session, "ui")["nodes"]
+            return next(
+                (n for n in nodes if n["role"] == role and n["name"] == name), None
+            )
+
+        blue = wait_for(lambda: node("radio button", "Blue"), timeout=30)
+        result = core.request(
+            self.session, "ui_action", node=blue["id"], action="select"
+        )
+        self.assertEqual(result["method"], "check")
+        self.assertTrue(
+            core.wait(self.session, title="Choice blue", timeout=10)["satisfied"]
+        )
+        red = node("radio button", "Red")
+        bee = wait_for(lambda: node("list item", "Bee"), timeout=10)
+        core.request(self.session, "ui_action", node=bee["id"], action="select")
+        self.assertTrue(
+            core.wait(self.session, title="Choice blue Bee", timeout=10)["satisfied"]
+        )
+        # Already checked: nothing is sent.
+        result = core.request(
+            self.session, "ui_action", node=blue["id"], action="select"
+        )
+        self.assertEqual(result, {**result, "delivered": False, "already": True})
+        # Every Chromium node offers doDefault; select must not click a
+        # paragraph, nor type into it, but report why.
+        text = node("paragraph", "")
+        with self.assertRaisesRegex(core.DesktopError, "no selection"):
+            core.request(self.session, "ui_action", node=text["id"], action="select")
+        self.assertEqual(
+            core.request(self.session, "ui_action", node=red["id"], action="select")[
+                "method"
+            ],
+            "check",
+        )
+        self.assertTrue(
+            core.wait(self.session, title="Choice red Bee", timeout=10)["satisfied"]
+        )
+
 
 @unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "firefox"))

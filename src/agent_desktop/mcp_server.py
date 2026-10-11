@@ -425,8 +425,8 @@ def desktop_ui_action(
     screenshot: bool = False,
 ) -> dict | list:
     """Act on a desktop_ui node: "press" (click/activate/toggle), "focus",
-    "set_text" (replace an editable field's text), "select" (choose a tab or
-    list item within its parent) or a listed action name.
+    "set_text" (replace an editable field's text), "select" (choose a tab,
+    list item or radio button) or a listed action name.
 
     Works without coordinates. Verify the result with desktop_ui or a screenshot.
 

@@ -84,7 +84,10 @@ actions; unnamed layout containers are omitted. `ui-action SESSION NODE press|fo
 action sequences) acts without coordinates, which Wayland does not provide to
 AT-SPI. Coverage depends on the toolkit: GTK 3/4 expose rich trees; Chromium needs
 `--force-renderer-accessibility` (sessions set `ACCESSIBILITY_ENABLED=1`) and gets
-`set_text` by focusing the field and typing; Firefox needs `GNOME_ACCESSIBILITY=1`,
+`set_text` by focusing the field and typing, and `select` on radio buttons and
+list options through their own `check` or `select` action (an already checked
+one reports `already` and sends nothing; other elements report an error and
+receive no input); Firefox needs `GNOME_ACCESSIBILITY=1`,
 which sessions set; Qt 6 (kdialog) works;
 X11-only and custom-drawn applications may expose little. Like other input, actions are refused while a person has control.
 

@@ -1,5 +1,24 @@
 # Development log
 
+## 2026-10-11 — `select` without a Selection parent (#107)
+
+`ui_action` used the `set_text` keyboard fallback for every unsupported action,
+so `select` on a Chromium radio button sent Ctrl+A and then failed with
+`KeyError: 'text'`. Now only `set_text` falls back to typing. `select`, when the
+parent offers no Selection, uses the element's own `select` (Chromium list
+options) or `check` (radio buttons) action and reports it as `method`; an
+already checked element (only `uncheck` offered) returns `delivered: false,
+already: true` and sends nothing. Every Chromium node offers `doDefault`, so it
+is deliberately not used: `select` on a paragraph returns "parent offers no
+selection and the element no select or check action" with no input. In a step
+list this stops the batch with that reason and `completed` counting the
+delivered steps.
+
+Validation: new Chromium test `test_select_without_a_selection_parent` (radio,
+list option, already checked, paragraph refused; outcomes checked through the
+page title). Ruff check and format; full desktop suite with the repaired Nix
+runtime and at-spi2-core, zenity and kdialog from `nix shell`: 155 tests OK
+(10 skipped).
 ## 2026-10-11 — Plan: effect-first computer use
 
 docs/research/2026-10-11-effect-first.md is the plan agreed in discussion with

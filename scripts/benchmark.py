@@ -95,6 +95,7 @@ def run_agent(
     server="agent-desktop",
     disallowed=None,
     call_log=None,
+    effort=None,
 ):
     if disallowed is None:
         disallowed = [
@@ -121,6 +122,8 @@ def run_agent(
     ]
     if model:
         command += ["--model", model]
+    if effort:
+        command += ["--effort", effort]
     started = time.monotonic()
     wall_started = time.time()
     with (artifact / "transcript.jsonl").open("w") as transcript:
@@ -327,6 +330,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     model,
                     mcp_config=context.mcp_config,
                     call_log=call_log_for(root),
+                    effort=os.environ.get("AGENT_DESKTOP_BENCH_EFFORT"),
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
@@ -370,6 +374,11 @@ def main():
     parser.add_argument("--only", nargs="*", help="task names")
     parser.add_argument("--budget", type=float, default=1.0, help="USD per task")
     parser.add_argument("--model")
+    parser.add_argument(
+        "--effort",
+        choices=["low", "medium", "high", "xhigh", "max"],
+        help="the agent's effort level (claude --effort); default: its own",
+    )
     parser.add_argument("--seed", type=int, help="Reproduce randomized fixture inputs")
     parser.add_argument(
         "--tools",
@@ -417,6 +426,8 @@ def main():
     )
     args = parser.parse_args()
     random.seed(args.seed)
+    if args.effort:
+        os.environ["AGENT_DESKTOP_BENCH_EFFORT"] = args.effort
     os.environ["AGENT_DESKTOP_GUARDS"] = "0" if args.no_guards else "1"
     if args.firefox:
         os.environ["AGENT_DESKTOP_BENCH_BROWSER"] = "firefox"
@@ -475,6 +486,7 @@ def main():
     summary = {
         "seed": args.seed,
         "human": args.human,
+        "effort": args.effort,
         "tools": args.tools,
         "effects": args.effects,
         "look": not args.no_look,

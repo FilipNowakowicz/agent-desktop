@@ -1,0 +1,134 @@
+{
+ "experiment": "E1 model tiers on --suite realistic",
+ "date": "2026-10-11",
+ "seeds": [
+  101,
+  102,
+  103
+ ],
+ "claude_code": "2.1.296",
+ "runs": [
+  "20261011-181907-d5e9",
+  "20261011-182320-8672",
+  "20261011-182822-197e",
+  "20261011-183222-538e",
+  "20261011-183651-ad5c",
+  "20261011-184316-5d8a",
+  "20261011-184742-45d1",
+  "20261011-185230-42ef",
+  "20261011-185629-55cb"
+ ],
+ "models": {
+  "claude-haiku-5-5": {
+   "runs": 18,
+   "passed": 18,
+   "seconds_median": 37.15,
+   "turns_median": 22.5,
+   "seconds_per_turn": 1.49,
+   "looks_median": 7.5,
+   "tool_errors": 8,
+   "cost_median_usd": 0.01,
+   "api_share": 0.725,
+   "tasks": {
+    "real-attach-invoice": {
+     "passed": "3/3",
+     "seconds_median": 29.9
+    },
+    "real-editor-indentation": {
+     "passed": "3/3",
+     "seconds_median": 49.1
+    },
+    "real-expense-claim": {
+     "passed": "3/3",
+     "seconds_median": 38.9
+    },
+    "real-inventory-cleanup": {
+     "passed": "3/3",
+     "seconds_median": 72.8
+    },
+    "real-release-notes": {
+     "passed": "3/3",
+     "seconds_median": 19.9
+    },
+    "real-ticket-config": {
+     "passed": "3/3",
+     "seconds_median": 21.4
+    }
+   }
+  },
+  "claude-opus-5-5": {
+   "runs": 18,
+   "passed": 18,
+   "seconds_median": 38.15,
+   "turns_median": 11.5,
+   "seconds_per_turn": 3.1,
+   "looks_median": 6.5,
+   "tool_errors": 2,
+   "cost_median_usd": 0.2,
+   "api_share": 0.741,
+   "tasks": {
+    "real-attach-invoice": {
+     "passed": "3/3",
+     "seconds_median": 32.1
+    },
+    "real-editor-indentation": {
+     "passed": "3/3",
+     "seconds_median": 35.4
+    },
+    "real-expense-claim": {
+     "passed": "3/3",
+     "seconds_median": 49.6
+    },
+    "real-inventory-cleanup": {
+     "passed": "3/3",
+     "seconds_median": 68.0
+    },
+    "real-release-notes": {
+     "passed": "3/3",
+     "seconds_median": 33.3
+    },
+    "real-ticket-config": {
+     "passed": "3/3",
+     "seconds_median": 22.3
+    }
+   }
+  },
+  "claude-sonnet-5-5": {
+   "runs": 18,
+   "passed": 18,
+   "seconds_median": 31.05,
+   "turns_median": 13.5,
+   "seconds_per_turn": 2.46,
+   "looks_median": 6.0,
+   "tool_errors": 7,
+   "cost_median_usd": 0.11,
+   "api_share": 0.663,
+   "tasks": {
+    "real-attach-invoice": {
+     "passed": "3/3",
+     "seconds_median": 27.7
+    },
+    "real-editor-indentation": {
+     "passed": "3/3",
+     "seconds_median": 38.1
+    },
+    "real-expense-claim": {
+     "passed": "3/3",
+     "seconds_median": 46.9
+    },
+    "real-inventory-cleanup": {
+     "passed": "3/3",
+     "seconds_median": 141.6
+    },
+    "real-release-notes": {
+     "passed": "3/3",
+     "seconds_median": 22.4
+    },
+    "real-ticket-config": {
+     "passed": "3/3",
+     "seconds_median": 24.5
+    }
+   }
+  }
+ }
+}

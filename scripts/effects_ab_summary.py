@@ -1,6 +1,8 @@
 """Compare benchmark runs with and without a treatment: the effect ledger,
 the atlas, input that returns a screenshot (runs without --no-look), or with
-AB_ARM=guards, guarded steps (runs without --no-guards).
+AB_ARM=guards, guarded steps (runs without --no-guards). AB_ARM=effects
+compares --effects runs with otherwise equal runs (E2), AB_ARM=look_delta
+--look-delta runs (E3).
 
     uv run scripts/effects_ab_summary.py artifacts/benchmark/RUN [...]
 
@@ -51,7 +53,13 @@ groups = {}
 for run in sys.argv[1:]:
     data = json.loads((Path(run) / "summary.json").read_text())
     summary = data["summary"]
-    if summary.get("atlas"):
+    if os.environ.get("AB_ARM") == "look_delta":
+        # Changed-only screenshots (E3) against otherwise equal runs.
+        arm = "look_delta" if summary.get("look_delta") else "baseline"
+    elif os.environ.get("AB_ARM") == "effects":
+        # Effect-first (E2) against runs with every other option equal.
+        arm = "effects" if summary.get("effects") else "baseline"
+    elif summary.get("atlas"):
         arm = "atlas"
     elif summary.get("effects"):
         arm = "effects"
@@ -64,7 +72,7 @@ for run in sys.argv[1:]:
         # Runs before the screenshot option existed have no "look" key.
         arm = "look" if summary.get("look") else "baseline"
     for record in data["records"]:
-        if "skipped" in record:
+        if "skipped" in record or record.get("api_error"):
             continue
         detail = record.get("detail")
         if (
@@ -121,7 +129,7 @@ for (task, arm), records in sorted(groups.items()):
 treated = next(
     (
         t
-        for t in ("atlas", "effects", "bridge", "guards", "look")
+        for t in ("look_delta", "atlas", "effects", "bridge", "guards", "look")
         if any(a == t for _k, a in groups)
     ),
     "effects",

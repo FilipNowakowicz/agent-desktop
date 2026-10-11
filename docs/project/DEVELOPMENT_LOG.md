@@ -1,5 +1,34 @@
 # Development log
 
+## 2026-10-11 — E2 effect-first A/B: gate not met
+
+docs/research/2026-10-11-effect-first-ab.md. The treatment added UI deltas
+from the accessibility tree, config-key reports, file/config expectations
+(`wait --file/--contains/--key/--value`, also as step `expect`) and
+instructions that present effects as the normal way to work. On the realistic
+suite (three seeds, 72 runs) Opus took 4.5% fewer turns (p 0.05) and 6.5%
+fewer looks (n.s.) but 15% more wall time (p 0.04): model time fell 9%, tool
+time rose 82%, mostly the UI settle wait. Haiku was unchanged and never used
+expectations. The gate (turns or looks −30%) is not met, so the effect-first
+line (E4, E6) stops; the features stay experimental and off by default.
+
+Fixes found on the way: the focused window's accessible frame is matched by
+application and state rather than title (a frame's name lags a page that
+retitles itself; Chromium on Wayland never marks a frame active); focus
+changes compare window ids. The harness records usage-limit and other API
+errors as `api_error`, excludes them and stops the suite (two runs hit the
+account's usage limit and were rerun).
+
+Validation: unit tests for key changes and UI deltas; session tests for a
+Chromium UI delta and a step stopped by an unmet file expectation; ruff;
+full desktop suite with the repaired Nix runtime, at-spi2-core, zenity, kdialog
+and foot: 167 tests OK (10 skipped). Checks matrix (run 38180331249): Ubuntu,
+Nix, Fedora and Arch passed after three test fixes found by the first two runs:
+headless Chromium hangs on the runners (the #110 fixture controls now skip
+there), the UI-delta test reads later changes through effects and skips
+without a Chromium sandbox, and the file-expectation test skips when foot
+opens no window (Arch container).
+
 ## 2026-10-11 — E0 repeats and E1 model tiers
 
 docs/research/2026-10-11-model-tiers.md. The realistic suite ran with Opus,

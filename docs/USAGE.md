@@ -68,7 +68,11 @@ matched, `open_windows` lists the titles and app ids that do exist.
 With accessibility, `--element NAME`, `--role ROLE` and `--text TEXT` wait for a
 matching UI element (e.g. a "Saved" label or a field containing a value), or for
 its disappearance with `--gone`, so an action's outcome can be verified without a
-screenshot.
+screenshot. `--file ~/out.txt --contains Total` waits for a result file in the
+session home (or an absolute path), and `--file ~/.config/App/app.conf --key
+section/key --value 4` for a setting in an INI-style file (GSettings keyfiles,
+`.conf`, `.ini`; GVariant type prefixes and quotes are ignored). These read the
+files directly and work as step expectations too.
 
 ## Semantic UI (accessibility)
 
@@ -218,7 +222,15 @@ session home (documents under `files` with a short line diff, OpenDocument
 spreadsheet cells as `Sheet!B2: value [formula]`, application state under
 `app_state` or as per-directory counts), windows opened, closed or retitled,
 focus changes, and processes started or exited. Caches, locks and temporary
-files are only counted (`noise_files`).
+files are only counted (`noise_files`). INI-style files report changed keys
+(`keys: ["[server] port: 8080 → 8443"]`) instead of a line diff. With
+accessibility, `ui` lists what changed in the focused window: elements
+`added`, `removed` or `changed` (for example a field's new text or a status
+message), or for a different window its first elements under `now`. In a
+browser only the page is compared. The report waits up to 0.8 s for the first
+UI change, because applications such as Chromium update their tree a few
+hundred milliseconds after input; it adds roughly 0.3 s per action on a page
+of about 200 elements (`AGENT_DESKTOP_UI_DELTA=0` turns it off).
 
 Applications often write after the reply. `desktop_effects(session, effect_id)`
 reports everything since that action, and `wait_for_file="~/*.ods"` (or an

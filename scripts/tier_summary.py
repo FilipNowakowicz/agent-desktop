@@ -25,7 +25,7 @@ for run in sys.argv[1:]:
         continue
     data = json.loads((Path(run) / "summary.json").read_text())
     for record in data["records"]:
-        if "skipped" in record:
+        if "skipped" in record or record.get("api_error"):
             continue
         model = record.get("model") or data["summary"].get("model") or "?"
         models.setdefault(model, []).append(record)

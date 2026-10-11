@@ -20,7 +20,7 @@ class FakeTree(Accessibility):
     def get(self, node, _interface, _name):
         return f"app{node[1]}"
 
-    def describe(self, node):
+    def describe(self, node, actions=True):
         time.sleep(self.delay)
         name = "" if self.unnamed else f"button {node[1]}"
         role = "panel" if self.unnamed else "button"

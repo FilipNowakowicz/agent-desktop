@@ -3,6 +3,7 @@ headless Chromium against each generated page, must complete the task, and a
 wrong one must not. Catches fixture bugs (such as an element id that a window
 property shadows) before an agent run is spent on them."""
 
+import os
 import re
 import shutil
 import subprocess
@@ -75,7 +76,21 @@ SOLVERS = {
 }
 
 
-@unittest.skipUnless(CHROMIUM and shutil.which(CHROMIUM), "Chromium unavailable")
+def snap_wrapper(path):
+    """Ubuntu's chromium-browser is a script that installs a snap; it hangs
+    on runners without snapd (the Lint job)."""
+    real = os.path.realpath(path)
+    try:
+        return real.startswith("/snap/") or b"snap" in Path(real).read_bytes()[:4096]
+    except OSError:
+        return True
+
+
+# With the desktop tests: the Lint job runs no browsers.
+@unittest.skipUnless(
+    shutil.which("labwc") and CHROMIUM and not snap_wrapper(CHROMIUM),
+    "desktop runtime or a non-snap Chromium unavailable",
+)
 class RealisticFixtureTests(unittest.TestCase):
     def title_after(self, task, right):
         directory = Path(self.temporary.name) / f"{task.name}-{right}"
@@ -102,7 +117,7 @@ class RealisticFixtureTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=60,
         ).stdout
         found = re.search(r"<title>(.*?)</title>", output)
         return found.group(1) if found else output[-300:]

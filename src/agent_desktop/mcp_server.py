@@ -57,13 +57,20 @@ applications. Use private sessions for everything else."""
 
 EFFECTS_INSTRUCTIONS = """
 
-Effects (experimental, on for these sessions): replies to input, launch, focus
-and ui_action include `effects`: files written in the session home (documents
-under "files" with a line diff, spreadsheet cells as "Sheet!B2: value",
-application state under "app_state"), windows opened, closed or retitled, focus
-and processes started or exited, observed during the action. Use them to check
-file and dialog outcomes instead of a screenshot; take a screenshot when the
-question is visual. Applications often write after the reply: call
+Effects are on: every input, launch, focus, ui_action and desktop_actions
+reply includes `effects`, what the action actually changed: `ui` (elements of
+the focused window added, removed or changed, e.g. a field's new text, a
+dialog's buttons, a status message; or the new window's first elements),
+`files` written in the session home with a line diff, config changes as
+`keys` ("[section] key: old → new"), application state under "app_state",
+windows opened, closed or retitled, focus, and processes. Work from these
+instead of looking: when the effects show what you needed, continue without a
+screenshot, and take one only when the question is visual or the effects are
+empty or surprising. Plan several steps in desktop_actions and give steps an
+"expect" that names the effect: {"file": "~/out.txt", "contains": "Total"} or
+{"file": "~/.config/App/settings.conf", "key": "section/key", "value": "4"}
+(exact, no screenshot), or UI conditions such as {"element": "Saved"}; a
+mismatch stops the run there. Applications often write after the reply: call
 desktop_effects with the action's effect_id, and wait_for_file (e.g. "~/*.ods")
 to wait for a save. "Nothing observed" is evidence only for its time window."""
 
@@ -282,6 +289,10 @@ def desktop_wait(
     seconds: float = 0,
     state: str | None = None,
     exact: bool = False,
+    file: str | None = None,
+    contains: str | None = None,
+    key: str | None = None,
+    value: str | None = None,
 ) -> dict:
     """Wait instead of polling with screenshots.
 
@@ -295,6 +306,10 @@ def desktop_wait(
     are searched within the matched windows. With stable_ms, then wait
     until the screen has not changed for that long (a blinking caret is ignored).
     seconds (up to 30) pauses first, for changes no condition describes.
+    file ("~/..." in the session home, or absolute) checks a result exactly:
+    it exists, contains `contains`, and/or in an INI-style config has `key`
+    ("section/key", e.g. "org/xfce/mousepad/preferences/view/tab-width") equal
+    to `value`.
     Returns satisfied=false at the timeout (at most 120 s); when no window
     matched, open_windows lists the titles and app_ids that do exist.
     """
@@ -312,6 +327,10 @@ def desktop_wait(
         controller=CONTROLLER,
         state=state,
         exact=exact,
+        file=file,
+        contains=contains,
+        key=key,
+        value=value,
     )
 
 
@@ -338,7 +357,8 @@ def desktop_actions(
 
     Guarded steps: plan several steps ahead and say what each should cause.
     Any step can carry "expect": desktop_wait conditions (title, app_id, gone,
-    element, role, text, state, exact, timeout default 5) that must hold after
+    element, role, text, state, exact, file, contains, key, value, timeout
+    default 5) that must hold after
     it, e.g. {"action": "key", "key": "Return", "expect": {"title": "Saved"}};
     if not, the run stops there with "expectation": true and the step counted
     as done. A ui_action step can name its target instead of a node id

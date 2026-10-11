@@ -20,7 +20,7 @@ import uuid
 from pathlib import Path
 
 from .atspi import Accessibility, Unsupported, wait_for_registry
-from .effects import EffectLedger
+from .effects import EffectLedger, ui_lines
 from .wayland import (
     BUTTONS,
     InputActivity,
@@ -685,6 +685,11 @@ class Worker:
                             ).split(":")
                             if os.path.isabs(d)
                         ],
+                        ui=(
+                            self.ui_snapshot
+                            if os.environ.get("AGENT_DESKTOP_UI_DELTA") != "0"
+                            else None
+                        ),
                     )
                 self.start_xwayland_environment(
                     display_file_deadline=time.monotonic() + 5
@@ -1100,6 +1105,20 @@ class Worker:
             context,
         )
         return json.loads(browser.remote_value(state))
+
+    def ui_snapshot(self):
+        """The focused window's UI as comparable lines, for effect reports."""
+        if not self.info.get("accessibility"):
+            return None
+        focused = next(
+            (w for w in self.toplevels.current() if "activated" in w["states"]),
+            None,
+        )
+        if focused is None or not focused["title"]:
+            return None
+        tree = self.accessibility().tree(None, focused["title"], 400, budget=0.5)
+        nodes = [n for n in tree["nodes"] if n["depth"] > 1]
+        return {"window": focused["title"], "lines": ui_lines(nodes)}
 
     def accessibility(self):
         if not self.info.get("accessibility"):

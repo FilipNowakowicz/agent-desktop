@@ -433,6 +433,85 @@ class ChromiumUITests(UISessionTest):
 
 
 @unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "foot"))
+    and CHROMIUM
+    and find_registryd(),
+    "desktop tools, foot, Chromium or at-spi2-core unavailable",
+)
+class EffectFirstTests(UISessionTest):
+    environment = {"AGENT_DESKTOP_EFFECTS": "1"}
+
+    def test_ui_delta_reports_a_page_change(self):
+        page = Path(self.temporary.name) / "form.html"
+        page.write_text(
+            "<!doctype html><title>Delta form</title><label>City <input></label>"
+            "<button onclick=\"document.querySelector('p').textContent="
+            "'Saved '+document.querySelector('input').value\">Save</button><p></p>"
+        )
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={Path(self.temporary.name) / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--force-renderer-accessibility",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        core.request(self.session, "launch", argv=[*argv, page.as_uri()])
+        self.assertTrue(
+            core.wait(self.session, element="City", timeout=30)["satisfied"]
+        )
+        nodes = core.request(self.session, "ui", window="Delta form")["nodes"]
+        field = next(n for n in nodes if n["name"] == "City")
+        core.request(
+            self.session,
+            "ui_action",
+            node=field["id"],
+            action="set_text",
+            text="Bergen",
+        )
+        button = next(n for n in nodes if n["name"] == "Save")
+        result = core.request(
+            self.session, "ui_action", node=button["id"], action="press"
+        )
+        ui = result["effects"].get("ui", {})
+        lines = ui.get("added", []) + ui.get("changed", [])
+        self.assertTrue(any("Saved Bergen" in line for line in lines), result)
+
+    def test_step_expects_a_file_effect(self):
+        home = core.session_path(self.session) / "home"
+        core.request(
+            self.session, "launch", argv=["foot", "--config=/dev/null", "--title=T"]
+        )
+        self.assertTrue(core.wait(self.session, title="T", timeout=20)["satisfied"])
+        written = core.run_actions(
+            self.session,
+            [
+                {
+                    "action": "type",
+                    "text": "printf '[view]\\ntab-width=uint32 4\\n' > ~/a.conf\n",
+                    "expect": {
+                        "file": "~/a.conf",
+                        "key": "view/tab-width",
+                        "value": "4",
+                    },
+                },
+                {
+                    "action": "type",
+                    "text": "echo done > ~/b.txt\n",
+                    "expect": {"file": "~/b.txt", "contains": "missing", "timeout": 1},
+                },
+            ],
+        )
+        self.assertEqual(written["completed"], 2, written)
+        self.assertEqual(written["stopped"]["step"], 1)
+        self.assertTrue(written["stopped"]["expectation"])
+        self.assertIn("does not contain 'missing'", written["stopped"]["reason"])
+        self.assertEqual((home / "b.txt").read_text(), "done\n")
+
+
+@unittest.skipUnless(
     all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "firefox"))
     and find_registryd()
     and os.geteuid() != 0

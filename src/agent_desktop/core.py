@@ -721,6 +721,10 @@ def wait(
     controller=None,
     state=None,
     exact=False,
+    file=None,
+    contains=None,
+    key=None,
+    value=None,
 ):
     """Wait until every condition holds at the same time.
 
@@ -735,6 +739,11 @@ def wait(
 
     Changes covering at most QUIET_AREA square pixels, such as a blinking caret,
     count as settled.
+
+    Effect conditions read the session's files directly: `file` ("~/..." in
+    the session home, or absolute) exists, contains `contains`, and in an
+    INI-style file (GSettings keyfile, .conf, .ini) `key` ("section/key")
+    equals `value`. They need no screenshot or UI tree.
     """
     if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 120:
         raise DesktopError("Timeout must be between 0 and 120 seconds")
@@ -752,6 +761,19 @@ def wait(
     time.sleep(seconds)
     deadline = time.monotonic() + timeout
     wants_window = title is not None or app_id is not None
+    if (contains is not None or key is not None) and file is None:
+        raise DesktopError("contains and key need a file")
+    if (key is None) != (value is None):
+        raise DesktopError("key and value go together")
+    target = None
+    if file is not None:
+        if not isinstance(file, str) or not file.startswith(("~/", "/")):
+            raise DesktopError('file starts with "~/" (the session home) or "/"')
+        target = (
+            session_path(session) / "home" / file[2:]
+            if file.startswith("~/")
+            else Path(file)
+        )
     wants_element = any(v is not None for v in (element, role, text, state))
     element_gone = gone and not wants_window
 
@@ -762,6 +784,10 @@ def wait(
         """(satisfied, reason, windows, elements) from one round of checks
         (separate requests, so not an atomic snapshot)."""
         windows, elements = [], []
+        if target is not None:
+            reason = file_condition(target, contains, key, value)
+            if reason:
+                return False, reason, windows, elements
         if wants_window:
             windows = [
                 w
@@ -864,6 +890,10 @@ EXPECT_KEYS = (
     "exact",
     "timeout",
     "stable_ms",
+    "file",
+    "contains",
+    "key",
+    "value",
 )
 
 
@@ -934,8 +964,8 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
     `wait` or `focus` step expects a change and takes a new baseline.
 
     Any step can carry `expect`, wait conditions (title, app_id, gone, element,
-    role, text, state, exact, timeout default 5 s, stable_ms) that must hold
-    after it; otherwise the run stops there, reporting the step as done and the
+    role, text, state, exact, timeout default 5 s, stable_ms, file, contains,
+    key, value) that must hold after it; otherwise the run stops there, reporting the step as done and the
     expectation as unmet. A `ui_action` step can name its target by element,
     role, state, exact, window or app instead of a node id; it is looked
     up when the step runs and must match exactly one element. `timeout` bounds
@@ -1042,7 +1072,7 @@ def run_steps(session, actions, observation, controller, first=None, timeout=Non
         except TypeError as error:
             hint = (
                 "; wait accepts title, app_id, gone, stable_ms, timeout, element, "
-                "role, text, state, exact and seconds"
+                "role, text, state, exact, seconds, file, contains, key and value"
                 if action == "wait"
                 else ""
             )
@@ -1106,6 +1136,35 @@ def render_tree(tree):
     if tree["truncated"]:
         lines.append("… truncated: filter by app or window, or raise max_nodes")
     return "\n".join(lines) or "(no accessible elements)"
+
+
+def setting(raw):
+    """A keyfile value without GVariant type prefixes or string quotes."""
+    raw = str(raw).strip()
+    for prefix in ("uint32 ", "int32 ", "uint64 ", "int64 ", "byte ", "double "):
+        raw = raw.removeprefix(prefix)
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
+        raw = raw[1:-1]
+    return raw
+
+
+def file_condition(path, contains, key, value):
+    """None when the file condition holds, else the reason it does not."""
+    from .effects import ini_values
+
+    try:
+        text = path.read_text(errors="replace")
+    except OSError:
+        return f"no file {path.name}"
+    if contains is not None and str(contains) not in text:
+        return f"{path.name} does not contain {str(contains)[:60]!r}"
+    if key is not None:
+        values = ini_values(text) or {}
+        if key not in values:
+            return f"{path.name} has no key {key}"
+        if setting(values[key]) != setting(value):
+            return f"{path.name} {key} is {values[key]}, not {value}"
+    return None
 
 
 def wait_effect(session, effect_id, path, timeout=10, controller=None):

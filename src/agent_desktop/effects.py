@@ -185,6 +185,106 @@ def line_diff(before, after):
     return lines
 
 
+SECTION = re.compile(r"\[([^\]]+)\]")
+KEY_CHANGES = 12
+
+
+def ini_values(text):
+    """{"section/key": value} for INI-style text (GSettings keyfiles, .conf,
+    .ini), else None. Needs a [section] header; most other lines must be
+    key=value or comments."""
+    values, section, other, headers = {}, "", 0, 0
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        header = SECTION.fullmatch(line)
+        if header:
+            section, headers = header.group(1).strip(), headers + 1
+        elif "=" in line:
+            key, value = line.split("=", 1)
+            values[f"{section}/{key.strip()}"] = value.strip()
+        else:
+            other += 1
+    if not headers or other > len(values) // 4:
+        return None
+    return values
+
+
+def key_changes(before, after):
+    """Changed keys between two INI texts as "[section] key: old → new", or
+    None when either is not INI-style."""
+    old, new = ini_values(before or ""), ini_values(after)
+    if new is None or (before and old is None):
+        return None
+    old = old or {}
+    changes = []
+    for name in sorted(set(old) | set(new)):
+        if old.get(name) != new.get(name):
+            section, _, key = name.rpartition("/")
+            label = f"[{section}] {key}" if section else key
+            changes.append(f"{label}: {old.get(name)} → {new.get(name)}")
+    if len(changes) > KEY_CHANGES:
+        changes = [*changes[:KEY_CHANGES], f"… {len(changes) - KEY_CHANGES} more"]
+    return changes
+
+
+UI_LINES = 12
+
+
+def ui_lines(nodes):
+    """One comparable line per UI element: role, name, text or value, states."""
+    lines = []
+    for node in nodes:
+        line = node["role"]
+        if node.get("name"):
+            line += f" {node['name'][:80]!r}"
+        for field in ("text", "value"):
+            if node.get(field) not in (None, ""):
+                line += f" {field}={str(node[field])[:80]!r}"
+        if node.get("states"):
+            line += f" [{','.join(node['states'])}]"
+        lines.append(line)
+    return lines
+
+
+def ui_delta(before, after):
+    """What appeared, disappeared or changed in the focused window's UI.
+
+    Lines are compared as multisets; an element whose role and name stay but
+    whose text, value or states change is reported once as "changed"."""
+    if before is None or after is None:
+        return None
+    if before["window"] != after["window"]:
+        shown = after["lines"][:UI_LINES]
+        return {"window": f"{before['window']!r} → {after['window']!r}", "now": shown}
+    removed = list(before["lines"])
+    added = []
+    for line in after["lines"]:
+        if line in removed:
+            removed.remove(line)
+        else:
+            added.append(line)
+
+    def key(line):
+        return line.split(" text=")[0].split(" value=")[0].split(" [")[0]
+
+    changed = []
+    for line in list(added):
+        match = next((old for old in removed if key(old) == key(line)), None)
+        if match is not None:
+            removed.remove(match)
+            added.remove(line)
+            changed.append(f"{match} → {line[len(key(line)) :].strip() or '(no text)'}")
+    delta = {}
+    for name, lines in (("added", added), ("removed", removed), ("changed", changed)):
+        if lines:
+            if len(lines) > UI_LINES:
+                lines = [*lines[:UI_LINES], f"… {len(lines) - UI_LINES} more"]
+            delta[name] = lines
+    return delta
+
+
 class FileRecorder:
     """Records file events under a directory tree, with timestamps."""
 
@@ -360,9 +460,10 @@ class FileRecorder:
                     if not existed:
                         before = ""
                     if before is not None:
-                        diff = line_diff(before, after)
+                        keys = key_changes(before, after)
+                        diff = keys if keys is not None else line_diff(before, after)
                         if diff:
-                            entry["diff"] = diff
+                            entry["keys" if keys is not None else "diff"] = diff
                         elif existed:
                             entry["change"] = "rewritten unchanged"
             files.append(entry)
@@ -442,11 +543,15 @@ class Names:
 class EffectLedger:
     """Per-action effects: files under the home, windows and processes."""
 
-    def __init__(self, home, windows, processes, quiet=0.15, limit=0.6, extra=()):
+    def __init__(
+        self, home, windows, processes, quiet=0.15, limit=0.6, extra=(), ui=None
+    ):
         self.recorders = [FileRecorder(home, "~")] + [
             FileRecorder(directory) for directory in extra if Path(directory).is_dir()
         ]
         self.windows = windows  # callable -> current window list
+        # callable -> {"window": title, "lines": ui_lines(...)} or None
+        self.ui = ui
         self.processes = processes  # callable -> {pid: start time}
         self.names = Names()
         self.quiet = quiet
@@ -464,7 +569,16 @@ class EffectLedger:
             "start": time.monotonic(),
             "windows": self.windows(),
             "processes": processes,
+            "ui": self.snapshot(),
         }
+
+    def snapshot(self):
+        if not self.ui:
+            return None
+        try:
+            return self.ui()
+        except Exception:  # noqa: BLE001 - UI deltas are best effort
+            return None
 
     def finish(self, state):
         """Wait briefly for file activity to go quiet, then report effects."""
@@ -478,7 +592,7 @@ class EffectLedger:
         end = time.monotonic()
         self.sequence += 1
         action = self.sequence
-        self.records[action] = (state["start"], state["windows"])
+        self.records[action] = (state["start"], state["windows"], state["ui"])
         while len(self.records) > 200:
             self.records.pop(next(iter(self.records)))
         processes = self.processes()
@@ -491,6 +605,9 @@ class EffectLedger:
         changed = process_changes(state["processes"], processes, self.names)
         if changed:
             report["processes"] = changed
+        ui = ui_delta(state["ui"], self.snapshot())
+        if ui:
+            report["ui"] = ui
         report["effect_id"] = action
         return report
 
@@ -535,11 +652,14 @@ class EffectLedger:
         """File effects from an earlier action until now (late writes included)."""
         if action not in self.records:
             raise ValueError("Unknown or expired effect_id")
-        start, windows = self.records[action]
+        start, windows, ui = self.records[action]
         report = {"effect_id": action, **self.report(start)}
         changed = window_changes(windows, self.windows())
         if changed:
             report["windows"] = changed
+        ui = ui_delta(ui, self.snapshot())
+        if ui:
+            report["ui"] = ui
         return report
 
     def matches(self, action, pattern, quiet=0.3):
@@ -550,7 +670,7 @@ class EffectLedger:
             raise ValueError("Unknown or expired effect_id")
         if not isinstance(pattern, str) or not pattern.startswith(("~/", "/")):
             raise ValueError('File patterns start with "~/" or "/", e.g. "~/*.ods"')
-        start, _windows = self.records[action]
+        start = self.records[action][0]
         last = {}
         for recorder in self.recorders:
             for at, kind, relative in recorder.since(start):

@@ -9,8 +9,12 @@ from agent_desktop.effects import (
     EffectLedger,
     FileRecorder,
     column_name,
+    ini_values,
+    key_changes,
     line_diff,
     odf_lines,
+    ui_delta,
+    ui_lines,
     window_changes,
 )
 from scripts import office_smoke
@@ -61,6 +65,83 @@ class DiffTests(unittest.TestCase):
             path = Path(directory) / "fake.ods"
             path.write_text("not a zip")
             self.assertIsNone(odf_lines(path))
+
+
+class KeyTests(unittest.TestCase):
+    CONFIG = (
+        "# Checkout\n[server]\nport = 8080\nlog_level = debug\n[admin]\nport = 8081\n"
+    )
+
+    def test_ini_values(self):
+        self.assertEqual(
+            ini_values(self.CONFIG),
+            {"server/port": "8080", "server/log_level": "debug", "admin/port": "8081"},
+        )
+        self.assertIsNone(ini_values("just\nsome text\n"))
+        self.assertIsNone(ini_values("[a]\nx=1\nprose line\nmore prose\n"))
+
+    def test_changes_name_the_section(self):
+        after = self.CONFIG.replace("port = 8080", "port = 8443")
+        self.assertEqual(
+            key_changes(self.CONFIG, after), ["[server] port: 8080 → 8443"]
+        )
+        self.assertEqual(
+            key_changes("", "[view]\ntab-width=uint32 4\n"),
+            ["[view] tab-width: None → uint32 4"],
+        )
+        self.assertIsNone(key_changes("a\nb\n", "a\nc\n"))
+
+    def test_recorder_reports_keys_instead_of_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "app.conf").write_text(self.CONFIG)
+            recorder = FileRecorder(root, "~")
+            self.addCleanup(recorder.close)
+            start = time.monotonic()
+            (root / "app.conf").write_text(self.CONFIG.replace("debug", "warn"))
+            self.assertTrue(wait_for(lambda: recorder.since(start)))
+            time.sleep(0.2)
+            files, _noise = recorder.summarize(recorder.since(start), start)
+        self.assertEqual(files[0]["keys"], ["[server] log_level: debug → warn"])
+        self.assertNotIn("diff", files[0])
+
+
+class UITests(unittest.TestCase):
+    def snapshot(self, window, nodes):
+        return {"window": window, "lines": ui_lines(nodes)}
+
+    def test_added_removed_and_changed(self):
+        field = {"role": "entry", "name": "Email", "states": ["editable"]}
+        before = self.snapshot(
+            "Form", [field, {"role": "push button", "name": "Send", "states": []}]
+        )
+        after = self.snapshot(
+            "Form",
+            [
+                {**field, "text": "ada@example.com"},
+                {"role": "label", "name": "Sent", "states": []},
+            ],
+        )
+        self.assertEqual(
+            ui_delta(before, after),
+            {
+                "added": ["label 'Sent'"],
+                "removed": ["push button 'Send'"],
+                "changed": [
+                    "entry 'Email' [editable] → text='ada@example.com' [editable]"
+                ],
+            },
+        )
+
+    def test_new_window_and_unknown(self):
+        before = self.snapshot("Form", [])
+        after = self.snapshot("Confirm", [{"role": "label", "name": "Sure?"}])
+        self.assertEqual(
+            ui_delta(before, after),
+            {"window": "'Form' → 'Confirm'", "now": ["label 'Sure?'"]},
+        )
+        self.assertIsNone(ui_delta(None, after))
+        self.assertEqual(ui_delta(before, before), {})
 
 
 class WindowTests(unittest.TestCase):

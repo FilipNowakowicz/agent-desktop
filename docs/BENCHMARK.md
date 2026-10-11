@@ -130,6 +130,55 @@ Mousepad's settings file. `--atlas DIR` enables the experimental
 `desktop_atlas` and `desktop_set` tools with that atlas directory; without it
 both tools are disabled. Results: [effect-atlas report](research/2026-10-09-effect-atlas.md#agent-ab).
 
+## Realistic suite (E0, 2026-10-11)
+
+`--suite realistic` (`benchmarks/realistic.py`) holds six tasks that should take
+a person a few minutes and span applications, from the
+[effect-first plan](research/2026-10-11-effect-first.md#6-experiments-next-session-starts-here).
+Prompts state the goal as a colleague would, with no hints about the interface.
+
+| Task | Applications | What it needs |
+| --- | --- | --- |
+| `real-release-notes` | Mousepad, Chromium | pick the user-facing lines from draft notes; version, date field, channel; confirm a modal |
+| `real-ticket-config` | Chromium, foot | read an ops ticket; change one ini section (the admin section has the same keys); resolve with a comment |
+| `real-expense-claim` | Mousepad, Chromium | a long form with fields revealed by earlier answers, filled from a receipt (non-ASCII place name, date, VAT, card digits) |
+| `real-inventory-cleanup` | Chromium | four rows of one supplier across four pages (a similarly named supplier exists), an edit dialog per row, a session-expiry dialog after the second save |
+| `real-editor-indentation` | Mousepad | persistent indentation and line-number settings, then a file that uses them |
+| `real-attach-invoice` | Chromium (file chooser) | attach the right PDF among similar names |
+
+Each record now has `time_split` (model API time from the transcript's
+`duration_api_ms`; tool time as the union of MCP call intervals, which the
+server logs when `AGENT_DESKTOP_CALL_LOG` is set; the rest as other) and
+`screenshots` (screenshot calls plus inputs with `screenshot=true`). The summary
+adds `seconds_p50_p95`, failures included, and the totals. `--human` is the
+timed human baseline: each task opens in an interactive viewer (`take`), the
+clock stops when the person closes it, and the same check judges the result.
+
+`tests/test_realistic_fixtures.py` is the positive control for the web
+fixtures: a scripted solution in headless Chromium must complete each page and
+a deliberate mistake must not. It found two fixture bugs that had failed the
+first agent run (an input with `id=name`, which `window.name` shadows, and a
+handler that removed the page before reading its fields).
+
+First agent pass (Opus 5.5, one run per task, 2026-10-11, `20261011-164910-a0af`
+with both broken fixtures rerun in `20261011-165349-01fe`): all six passed once
+the fixtures were fixed.
+
+| Task | Wall time | Turns | Screenshots | API / tool / other (s) |
+| --- | --- | --- | --- | --- |
+| `real-release-notes` | 29.9 s | 13 | 5 | 23.7 / 4.2 / 2.1 |
+| `real-ticket-config` | 22.1 s | 8 | 3 | 15.1 / 5.1 / 1.9 |
+| `real-expense-claim` (rerun) | 51.8 s | 20 | 12 | 41.8 / 7.9 / 2.1 |
+| `real-inventory-cleanup` | 48.7 s | 14 | 11 | 36.1 / 10.7 / 1.8 |
+| `real-editor-indentation` | 42.0 s | 15 | 6 | 31.8 / 8.1 / 2.1 |
+| `real-attach-invoice` (rerun) | 33.3 s | 8 | 5 | 19.3 / 12.2 / 1.8 |
+
+In the first pass, model API time was 75% of wall time, tool time 20% and other
+5%. With the broken expense fixture the agent reported DONE although the page
+showed no confirmation and it had pressed Submit twice; the check, not the
+reply, caught it. One run per task does not yet meet E0's gate (variance across
+three runs per arm) and there is no human baseline yet.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

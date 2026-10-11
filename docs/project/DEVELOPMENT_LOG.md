@@ -1,5 +1,32 @@
 # Development log
 
+## 2026-10-11 — E0 realistic suite and the time split
+
+Started E0 of docs/research/2026-10-11-effect-first.md. `--suite realistic`
+(benchmarks/realistic.py) holds six multi-application tasks with plain goals:
+release notes from an editor into a web form with a confirmation; an ops ticket
+that needs one ini section changed in a terminal; a long conditional expense
+form filled from a receipt; four rows of one supplier across a paginated table
+with edit dialogs and a session-expiry dialog; persistent Mousepad indentation
+settings plus a file that uses them; and a PDF upload through the file chooser.
+Benchmark records now carry `time_split` (API from `duration_api_ms`; tool as
+the union of MCP call intervals logged when `AGENT_DESKTOP_CALL_LOG` is set;
+other) and `screenshots`; the summary adds p50/p95 wall time. `--human` times a
+person doing each task in `take`, stopping when the viewer closes, and applies
+the same check. It has not been used yet: it needs the maintainer.
+
+Validation: unit tests for the split and the call log; positive and negative
+controls for the five web fixtures in headless Chromium
+(tests/test_realistic_fixtures.py), which found two fixture bugs (`id=name`
+shadowed by `window.name`; a handler that replaced the page before reading it).
+Dry run: all six checks fail with no agent, cleanup clean. One Opus pass:
+4/6 (`20261011-164910-a0af`), both failures the fixture bugs; after the fixes
+both passed (`20261011-165349-01fe`). Wall time 22–59 s per task; API 75%, tool
+20%, other 5%. Ruff check and format; full desktop suite with the repaired Nix
+runtime, at-spi2-core, zenity and kdialog: 159 tests OK (10 skipped).
+
+Open for E0: three runs per arm, a human baseline per task, and whether these
+tasks are long enough (the agent needed under a minute each).
 ## 2026-10-11 — `select` without a Selection parent (#107)
 
 `ui_action` used the `set_text` keyboard fallback for every unsupported action,

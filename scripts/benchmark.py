@@ -24,6 +24,7 @@ from benchmarks.atlas import ATLAS_TASKS  # noqa: E402
 from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
+from benchmarks.realistic import REALISTIC_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS  # noqa: E402
 
 SUITES = {
@@ -32,6 +33,7 @@ SUITES = {
     "office": OFFICE_TASKS,
     "effects": EFFECT_TASKS,
     "atlas": ATLAS_TASKS,
+    "realistic": REALISTIC_TASKS,
 }
 
 # Tool profiles for comparisons. "basic" is the tool set before waiting, action
@@ -92,6 +94,7 @@ def run_agent(
     mcp_config=".mcp.json",
     server="agent-desktop",
     disallowed=None,
+    call_log=None,
 ):
     if disallowed is None:
         disallowed = [
@@ -119,6 +122,7 @@ def run_agent(
     if model:
         command += ["--model", model]
     started = time.monotonic()
+    wall_started = time.time()
     with (artifact / "transcript.jsonl").open("w") as transcript:
         try:
             process = subprocess.run(
@@ -132,6 +136,7 @@ def run_agent(
         except subprocess.TimeoutExpired:
             exit_code, stderr = None, "agent timed out after 900 s"
     elapsed = round(time.monotonic() - started, 1)
+    wall_ended = time.time()
     events = []
     for line in (artifact / "transcript.jsonl").read_text().splitlines():
         try:
@@ -174,6 +179,49 @@ def run_agent(
         "usage": result.get("usage", {}),
         "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
+        "screenshots": sum(
+            1
+            for c, n in zip(calls, names, strict=True)
+            if n == "screenshot" or (c.get("input") or {}).get("screenshot") is True
+        ),
+        "time_split": time_split(
+            elapsed,
+            result.get("duration_api_ms"),
+            call_log,
+            wall_started,
+            wall_ended,
+        ),
+    }
+
+
+def time_split(elapsed, api_ms, call_log, started, ended):
+    """Where a run's wall time went: the model API, our tools, or elsewhere
+    (CLI start-up, MCP initialisation, gaps). Tool time is the union of the
+    logged call intervals, so parallel calls are not counted twice."""
+    if api_ms is None or not call_log or not Path(call_log).exists():
+        return None
+    intervals = []
+    for line in Path(call_log).read_text().splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if started <= record["start"] <= ended:
+            intervals.append((record["start"], record["end"]))
+    tool = 0.0
+    reach = None
+    for start, end in sorted(intervals):
+        if reach is None or start > reach:
+            tool += end - start
+            reach = end
+        elif end > reach:
+            tool += end - reach
+            reach = end
+    api = api_ms / 1000
+    return {
+        "api_seconds": round(api, 1),
+        "tool_seconds": round(tool, 1),
+        "other_seconds": round(max(elapsed - api - tool, 0), 1),
     }
 
 
@@ -201,12 +249,48 @@ def mcp_config_for(root):
                 "AGENT_DESKTOP_ATLAS": os.environ.get("AGENT_DESKTOP_ATLAS", ""),
                 "AGENT_DESKTOP_LOOK": os.environ.get("AGENT_DESKTOP_LOOK", "1"),
                 "AGENT_DESKTOP_GUARDS": os.environ.get("AGENT_DESKTOP_GUARDS", "1"),
+                "AGENT_DESKTOP_CALL_LOG": str(call_log_for(root)),
             }
         path.write_text(json.dumps(config, indent=2) + "\n")
     return str(path)
 
 
-def run_task(task, root, budget, model, dry_run=False, profile="full"):
+def percentiles(values):
+    """p50 and p95 (nearest rank) of the runs that have a value, failures included."""
+    values = sorted(v for v in values if v is not None)
+    if not values:
+        return None
+    return [values[(len(values) - 1) // 2], values[-(-len(values) * 95 // 100) - 1]]
+
+
+def call_log_for(root):
+    return (root / "calls.jsonl").resolve()
+
+
+def run_human(session, goal):
+    """A timed human baseline: the person does the task in an interactive
+    viewer and closes it when done; the same check then judges the outcome.
+    The time includes opening the viewer (about a second)."""
+    from agent_desktop import viewer
+
+    print(
+        f"\nTask: {goal}\nThe viewer opens now. Close it when you are done.",
+        flush=True,
+    )
+    started = time.monotonic()
+    try:
+        taken = viewer.take(session)
+        error = None
+    except core.DesktopError as failure:
+        taken, error = None, str(failure)
+    return {
+        "human": True,
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "viewer_error": error or (taken or {}).get("release_error"),
+    }
+
+
+def run_task(task, root, budget, model, dry_run=False, profile="full", human=False):
     directory = (root / task.name).resolve()
     directory.mkdir(parents=True)
     record = {"task": task.name, "passed": False}
@@ -232,7 +316,9 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
                 raise RuntimeError("Application window did not appear")
             time.sleep(0.2)
         time.sleep(1)  # let the first frame render before the agent looks
-        if not dry_run:
+        if human:
+            record.update(run_human(session, goal))
+        elif not dry_run:
             record.update(
                 run_agent(
                     PROMPT.format(session=session, task=goal),
@@ -240,6 +326,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full"):
                     budget,
                     model,
                     mcp_config=context.mcp_config,
+                    call_log=call_log_for(root),
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
@@ -294,6 +381,11 @@ def main():
         "--dry-run", action="store_true", help="set up and check without an agent"
     )
     parser.add_argument(
+        "--human",
+        action="store_true",
+        help="timed human baseline: do each task yourself in a viewer",
+    )
+    parser.add_argument(
         "--atlas",
         type=Path,
         help="directory of effect-atlas files for the desktop_atlas tool",
@@ -336,7 +428,7 @@ def main():
         os.environ["AGENT_DESKTOP_ATLAS"] = str(args.atlas.resolve())
     else:
         os.environ.pop("AGENT_DESKTOP_ATLAS", None)
-    if not args.dry_run and not shutil.which("claude"):
+    if not (args.dry_run or args.human) and not shutil.which("claude"):
         raise SystemExit("Requires the claude CLI")
     root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
     root = root.with_name(root.name + "-" + uuid.uuid4().hex[:4])
@@ -350,7 +442,15 @@ def main():
         if missing:
             records.append({"task": task.name, "skipped": f"missing {missing}"})
             continue
-        record = run_task(task, root, args.budget, args.model, args.dry_run, args.tools)
+        record = run_task(
+            task,
+            root,
+            args.budget,
+            args.model,
+            args.dry_run,
+            args.tools,
+            args.human,
+        )
         records.append(record)
         print(
             json.dumps(
@@ -374,6 +474,7 @@ def main():
     ran = [r for r in records if "skipped" not in r]
     summary = {
         "seed": args.seed,
+        "human": args.human,
         "tools": args.tools,
         "effects": args.effects,
         "look": not args.no_look,
@@ -392,6 +493,12 @@ def main():
         ],
         "total_cost_usd": round(sum(r.get("cost_usd") or 0 for r in ran), 3),
         "total_seconds": round(sum(r.get("elapsed_seconds") or 0 for r in ran), 1),
+        "seconds_p50_p95": percentiles([r.get("elapsed_seconds") for r in ran]),
+        "time_split": {
+            part: round(sum((r.get("time_split") or {}).get(part, 0) for r in ran), 1)
+            for part in ("api_seconds", "tool_seconds", "other_seconds")
+        },
+        "screenshots": sum(r.get("screenshots") or 0 for r in ran),
         "model": next((r.get("model") for r in ran if r.get("model")), None),
     }
     (root / "summary.json").write_text(

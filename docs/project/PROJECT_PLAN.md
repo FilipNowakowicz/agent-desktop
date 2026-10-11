@@ -80,6 +80,19 @@ reliability ([guarded steps](../research/2026-10-09-guarded-steps.md)). The priv
 steps and row scoping, cut wall time 33% and input tokens 30% against pixels in
 Firefox; host sessions can use the person's own Firefox in background tabs.
 
+Next direction (proposed 2026-10-11, [effect first](../research/2026-10-11-effect-first.md)):
+per-turn cost is unchanged (about 3 s; model API time is about 78% of wall time),
+so the plan is to report exact effects (files, configuration, DOM and network)
+so agents look less, and to test that with realistic unfamiliar tasks, cheaper
+model tiers and an effect-first A/B gate (E0–E6). It also records the end state
+(engine, MCP, a review app) and a Windows/macOS path. It needs no API credits;
+an API agent loop and model tuning stay deferred.
+
+Longer-range directions (writing programs instead of clicking, structured access to
+every app, learning from the person, a shared skill registry and others) are
+collected, untested, on the [directions board](DIRECTIONS.md). They are input
+for later decisions, not current work.
+
 Visible mode is an explicitly requested testing option: a nested labwc window on
 the host Wayland desktop, with its own application environment and targeted input.
 Opening it can take host focus; closing it ends that session. It is separate from

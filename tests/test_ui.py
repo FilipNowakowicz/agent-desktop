@@ -358,6 +358,64 @@ class ChromiumUITests(UISessionTest):
         sent = core.wait(self.session, title="Sent ada@example.com", timeout=10)
         self.assertTrue(sent["satisfied"], sent)
 
+    def test_a_desktop_run_script_fills_a_web_form(self):
+        # D1: lookups by name, actions and checks inside one script.
+        from agent_desktop import mcp_server
+
+        root = Path(self.temporary.name)
+        page = root / "rows.html"
+        page.write_text(
+            "<!doctype html><title>Rows</title>"
+            + "".join(f"<label>Row {n} <input></label>" for n in range(3))
+            + "<table><tr><th>Name</th><th>Action</th></tr>"
+            + "".join(
+                f"<tr><td>{who}</td><td><button onclick=\"this.textContent='Done'\">"
+                "Edit</button></td></tr>"
+                for who in ("ada", "bob", "cy")
+            )
+            + "</table>"
+            + "<button onclick=\"document.title='Saved '+[...document"
+            ".querySelectorAll('input')].map(i => i.value).join(',')\">Save</button>"
+        )
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={root / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--force-renderer-accessibility",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        app = core.request(self.session, "launch", argv=[*argv, page.as_uri()])
+        found = core.wait(self.session, title="Rows", timeout=30)
+        if (
+            not found["satisfied"]
+            and "No usable sandbox" in Path(app["logs"]).read_text()
+        ):
+            self.skipTest("Chromium sandbox unavailable in this environment")
+        result = mcp_server.desktop_run(
+            self.session,
+            "wait(timeout=30, element='Row 2', role='entry')\n"
+            "for n in range(3):\n"
+            "    set_text(f'Row {n}', f'v{n}', role='entry')\n"
+            "press('Save')\n"
+            "wait(title='Saved v0,v1,v2')\n"
+            "print(sorted(e['name'] for e in find('Row', role='entry')))\n"
+            "press('Edit', within='bob')\n"
+            "wait(element='Done')\n"
+            "print(rows())\n",
+        )
+        self.assertEqual(result["exit_code"], 0, result)
+        output = result["stdout"].splitlines()
+        self.assertEqual(output[0], "['Row 0', 'Row 1', 'Row 2']")
+        # Only bob's button was pressed.
+        self.assertEqual(
+            output[1],
+            "[['Name', 'Action'], ['ada', 'Edit'], ['bob', 'Done'], ['cy', 'Edit']]",
+        )
+
     def test_select_without_a_selection_parent(self):
         # Issue #107: Chromium radio buttons and list options have no
         # Selection parent. select must use their own action, never type.

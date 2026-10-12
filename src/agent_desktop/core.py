@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import threading
@@ -19,6 +20,34 @@ class DesktopError(RuntimeError):
 
 class DeliveryUnknown(DesktopError):
     """The request was sent but no reply arrived: it may or may not have acted."""
+
+
+def host_runtime_dir(shared=Path("/tmp")):
+    """Where session runtimes go: XDG_RUNTIME_DIR, or without a login session
+    (containers, cron, CI) a private /tmp/agent-desktop-<uid>.
+
+    /tmp is shared, so the fallback must be a real directory owned by this
+    user and closed to others; anything else is refused, not repaired.
+    """
+    configured = os.environ.get("XDG_RUNTIME_DIR")
+    if configured:
+        return Path(configured)
+    path = shared / f"agent-desktop-{os.getuid()}"
+    try:
+        path.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    found = path.lstat()
+    if (
+        not stat.S_ISDIR(found.st_mode)
+        or found.st_uid != os.getuid()
+        or found.st_mode & 0o077
+    ):
+        raise DesktopError(
+            f"XDG_RUNTIME_DIR is unset and {path} is not a private directory "
+            "of this user; export XDG_RUNTIME_DIR as a private 0700 directory"
+        )
+    return path
 
 
 def state_root():
@@ -278,11 +307,7 @@ def create(
         if not paths[tool]:
             raise DesktopError(f"Missing executable: {executable}")
     parent = None
-    host_runtime = os.environ.get("XDG_RUNTIME_DIR")
-    if not host_runtime:
-        raise DesktopError(
-            "XDG_RUNTIME_DIR must point to a writable user runtime directory"
-        )
+    host_runtime = host_runtime_dir()
     if mode in ("visible", "host"):
         display = os.environ.get("WAYLAND_DISPLAY")
         if not display:
@@ -649,9 +674,8 @@ def recover(session, info):
 
     root = session_path(session)
     runtime = Path(info["runtime"])
-    host_runtime = os.environ.get("XDG_RUNTIME_DIR")
-    expected = Path(host_runtime or "/nonexistent") / "agent-desktop" / session
-    if not host_runtime or runtime.resolve() != expected.resolve():
+    expected = host_runtime_dir() / "agent-desktop" / session
+    if runtime.resolve() != expected.resolve():
         raise DesktopError("Refusing to remove an unexpected runtime directory")
     try:
         # Token only: this process's own children are not session processes.

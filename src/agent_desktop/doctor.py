@@ -91,12 +91,15 @@ def wlroots(labwc):
 
 
 def runtime_directory():
-    host = os.environ.get("XDG_RUNTIME_DIR")
-    if not host or not Path(host).is_dir() or not os.access(host, os.W_OK):
+    try:
+        host = str(core.host_runtime_dir())
+    except core.DesktopError as error:
+        return {"check": "XDG_RUNTIME_DIR", "status": "fail", "detail": str(error)}
+    if not Path(host).is_dir() or not os.access(host, os.W_OK):
         return {
             "check": "XDG_RUNTIME_DIR",
             "status": "fail",
-            "detail": f"unset or not writable: {host!r}",
+            "detail": f"not writable: {host!r}",
             "hint": "run from a normal login session or export a private 0700 directory",
         }
     # The longest socket a session creates must fit in sockaddr_un (108 bytes).
@@ -107,7 +110,10 @@ def runtime_directory():
             "status": "fail",
             "detail": f"path too long for session sockets: {host}",
         }
-    return {"check": "XDG_RUNTIME_DIR", "status": "ok", "path": host}
+    result = {"check": "XDG_RUNTIME_DIR", "status": "ok", "path": host}
+    if not os.environ.get("XDG_RUNTIME_DIR"):
+        result["detail"] = "unset; using a private directory under /tmp"
+    return result
 
 
 def accessibility():

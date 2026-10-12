@@ -89,6 +89,29 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result["status"], "fail")
         self.assertIn("too long", result["detail"])
 
+    def test_runtime_directory_falls_back_to_a_private_tmp_directory(self):
+        environment = {k: v for k, v in os.environ.items() if k != "XDG_RUNTIME_DIR"}
+        with (
+            tempfile.TemporaryDirectory() as shared,
+            mock.patch.dict(os.environ, environment, clear=True),
+        ):
+            fallback = core.host_runtime_dir(Path(shared))
+            self.assertEqual(fallback.name, f"agent-desktop-{os.getuid()}")
+            self.assertEqual(fallback.stat().st_mode & 0o777, 0o700)
+            # Reused while it stays private; refused once others can enter.
+            self.assertEqual(core.host_runtime_dir(Path(shared)), fallback)
+            fallback.chmod(0o755)
+            with self.assertRaisesRegex(core.DesktopError, "not a private"):
+                core.host_runtime_dir(Path(shared))
+            fallback.rmdir()
+            fallback.symlink_to(shared)
+            with self.assertRaisesRegex(core.DesktopError, "not a private"):
+                core.host_runtime_dir(Path(shared))
+            # doctor reports the fallback it would use.
+            result = doctor.runtime_directory()
+            self.assertEqual(result["status"], "ok", result)
+            self.assertIn("unset", result["detail"])
+
     def test_registryd_found_in_libexec_beside_path_prefix(self):
         with tempfile.TemporaryDirectory() as directory:
             (Path(directory) / "bin").mkdir()

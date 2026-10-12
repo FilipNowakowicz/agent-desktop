@@ -1,5 +1,49 @@
 # Development log
 
+## 2026-10-13 — E5 cloud sessions; trial setting up Claude Code cloud
+
+E5 met: the private desktop runs in a Claude Code cloud session (Ubuntu
+24.04.5, kernel 6.18.44 in a Firecracker VM, root; labwc 0.7.1, wlroots 0.17,
+foot 1.16.2 from the environment's setup script). `doctor` fails until
+`XDG_RUNTIME_DIR` is set: the container has no login session. With
+`XDG_RUNTIME_DIR` set to a private 0700 directory, `doctor --smoke` passed
+(1280x720 capture in 1.01 s), and a session launched foot, received
+`e5 cloud ok` exactly (confirmed from the screenshot) and was destroyed cleanly.
+wayvnc and vncviewer were not installed, so `view`, `take` and
+`request_human` cannot work there yet. One run with a terminal app only;
+Firefox, the bridge and benchmark arms are untested. The environment
+("agent-desktop", Trusted network) installs the packages but does not set
+`XDG_RUNTIME_DIR`.
+
+The setup was itself driven through the MCP, as a trial, and found:
+
+1. `desktop_browser` `start` (directly or as a step) launched Firefox through
+   a nested worker request without the controller id. The browser request
+   had just taken the lease, so the launch was refused with LeaseHeld: every
+   MCP client failed on its first start in a new session. Fixed: the launch
+   runs as the requesting controller. Regression test
+   `test_start_as_a_named_controller` (fails before the fix with that error).
+2. Cloudflare Turnstile on claude.ai looped in the private session, with the
+   bridge and without it. Each attempt logged "WebGL context was lost" in
+   the challenge script; the bridged Firefox is also marked as automated.
+   Sites behind Turnstile cannot be logged into from a private session yet.
+   Not fixed. A later attempt in a fresh Firefox process got through.
+3. After Ctrl+Q, Firefox closed its window but the process kept running
+   (about 25 minutes, busy), so the next launch handed its URL to it and
+   exited with no window. Quitting should be checked by process exit.
+4. Cancelling an MCP tool call (a rejected `desktop_wait`, a stopped
+   `desktop_request_host`) made the server reply to the cancelled request;
+   Claude Code dropped the stdio connection ("Received a response for an
+   unknown message ID ... Request cancelled"). Twice; `/mcp` reconnects.
+   Python `mcp` 1.30.0. Not fixed.
+5. The maintainer's Google login, done once in the `claude-ai` profile,
+   carried over to GitHub's "Continue with Google"; GitHub then required
+   2FA. The GitHub App install was finished faster through a host session on
+   the maintainer's own Firefox (not started with a BiDi port, so pixels
+   and `firefox --new-tab` via launch).
+
+Validation: tests/test_browser.py 4 OK with the runtime on PATH; ruff check
+and format.
 ## 2026-10-13 — Runtime directory without a login session
 
 Without `XDG_RUNTIME_DIR` (the Claude Code cloud container, cron, CI),

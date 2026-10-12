@@ -185,3 +185,86 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     os.environ.pop("AGENT_DESKTOP_STATE_DIR", None)
                 else:
                     os.environ["AGENT_DESKTOP_STATE_DIR"] = previous
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon")),
+    "desktop tools unavailable",
+)
+class MCPCancelTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_cancelled_call_gets_no_reply(self):
+        # Claude Code closes the connection on a reply to a cancelled request.
+        with tempfile.TemporaryDirectory(prefix="desktop-mcp-cancel-") as directory:
+            root = Path(directory)
+            (root / "runtime").mkdir(mode=0o700)
+            environment = os.environ.copy()
+            environment["AGENT_DESKTOP_STATE_DIR"] = str(root / "state")
+            environment["XDG_RUNTIME_DIR"] = str(root / "runtime")
+            server = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-m",
+                "agent_desktop.mcp_server",
+                env=environment,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            seen = []
+
+            async def send(message):
+                server.stdin.write((json.dumps(message) + "\n").encode())
+                await server.stdin.drain()
+
+            async def reply(request_id):
+                while True:
+                    line = await asyncio.wait_for(server.stdout.readline(), 30)
+                    message = json.loads(line)
+                    seen.append(message)
+                    if message.get("id") == request_id:
+                        return message
+
+            def call(request_id, name, arguments):
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                }
+
+            try:
+                await send(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2025-06-18",
+                            "capabilities": {},
+                            "clientInfo": {"name": "test", "version": "0"},
+                        },
+                    }
+                )
+                await reply(1)
+                await send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+                await send(call(2, "desktop_create", {}))
+                created = await reply(2)
+                session = json.loads(created["result"]["content"][0]["text"])
+                session = session["session"]
+                await send(call(3, "desktop_wait", {"session": session, "seconds": 3}))
+                await asyncio.sleep(0.5)
+                await send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/cancelled",
+                        "params": {"requestId": 3, "reason": "test"},
+                    }
+                )
+                # Past the end of the cancelled wait, the server still answers.
+                await asyncio.sleep(4)
+                await send(call(4, "desktop_destroy", {"session": session}))
+                destroyed = await reply(4)
+                self.assertNotIn("error", destroyed)
+                self.assertNotIn(3, [message.get("id") for message in seen])
+            finally:
+                server.stdin.close()
+                await server.wait()

@@ -9,6 +9,7 @@ import uuid
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.shared.session import RequestResponder
 from mcp.types import TextContent
 
 from . import core
@@ -127,6 +128,21 @@ def call(session, operation, **arguments):
     return core.request(session, operation, CONTROLLER, **arguments)
 
 
+async def cancel_without_reply(self):
+    """Cancel a request without answering it.
+
+    MCP: the receiver of a cancellation should not respond to the request.
+    mcp 1.x sends a "Request cancelled" error instead, and Claude Code closes
+    the whole connection on that reply ("unknown message ID"). The handler
+    then sees the cancellation and sends nothing either.
+    """
+    self._cancel_scope.cancel()
+    # Completed, so the session drops it from its in-flight requests.
+    self._completed = True
+
+
+RequestResponder.cancel = cancel_without_reply
+
 mcp = FastMCP("Agent Desktop", instructions=INSTRUCTIONS)
 
 # After input with screenshot=true: capture once the screen has been still for
@@ -175,7 +191,9 @@ def tool(**options):
     """Register a tool that runs in a worker thread.
 
     FastMCP runs synchronous tools on its event loop, so one long wait would
-    block every other request of the server, including other sessions.
+    block every other request of the server, including other sessions. A
+    cancelled call stops waiting for its thread (the request it made to the
+    session still finishes) and is not answered.
     """
 
     def register(function):
@@ -185,7 +203,8 @@ def tool(**options):
             ok = False
             try:
                 result = await anyio.to_thread.run_sync(
-                    functools.partial(function, *args, **kwargs)
+                    functools.partial(function, *args, **kwargs),
+                    abandon_on_cancel=True,
                 )
                 ok = True
                 return result

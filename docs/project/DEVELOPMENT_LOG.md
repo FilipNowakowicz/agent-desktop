@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-13 — Cancelled MCP calls get no reply
+
+mcp 1.30.0 answers a cancelled request with a "Request cancelled" error, and
+Claude Code then closes the connection ("Received a response for an unknown
+message ID"); it happened twice during the cloud trial. Separately, the tool
+threads could not be cancelled, so after a cancel the handler finished and
+called `respond()` again, whose assertion stopped the server. Cancelled
+calls now stop waiting for their thread (the request already sent to the
+session still completes) and send nothing.
+
+Validation: new stdio test `test_a_cancelled_call_gets_no_reply` (raw
+JSON-RPC: a cancelled 3 s wait never gets a reply and the server still
+answers afterwards); it fails on stock behaviour (server exits) and with
+only the thread change (id 3 answered). Ruff; full desktop suite with the
+installed runtime on PATH: 169 tests OK (18 skipped: zenity, kdialog and
+at-spi2-core not on PATH).
+
 ## 2026-10-12 — Partial human baseline
 
 The maintainer did three realistic tasks with `--human`, guided step by step:

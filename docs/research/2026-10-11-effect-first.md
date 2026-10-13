@@ -150,7 +150,7 @@ except one task; E1 done (all tiers 18/18, Haiku chosen); **E2 did not meet
 its gate** ([report](2026-10-11-effect-first-ab.md)), so E4 and E6 are
 stopped. **E3 did not meet its gate** either
 ([report](2026-10-11-observation-discipline.md)). E5 is met (2026-10-13): a
-cloud session runs the private desktop once `XDG_RUNTIME_DIR` is set.
+cloud session runs the private desktop and three benchmark arms in parallel.
 
 Each experiment is a PR. Fix #107 first or alongside them.
 

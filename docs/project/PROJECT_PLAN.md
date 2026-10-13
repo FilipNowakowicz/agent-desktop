@@ -100,8 +100,8 @@ dominates them ([observation discipline](../research/2026-10-11-observation-disc
 Neither experiment reduced the number of turns, which is what dominates wall
 time. A partial human baseline (three tasks, guided, 39–90 s against the
 agents' 20–50 s) is in the benchmark guide. E5 is met: the private desktop runs
-in a Claude Code cloud session once `XDG_RUNTIME_DIR` is set (development log,
-2026-10-13); parallel arms there are untested. A new lever
+in a Claude Code cloud session, and three benchmark arms ran there in parallel
+without slowing each other (development log, 2026-10-13). A new lever
 for turns is a decision for the maintainer (see the directions board).
 
 D1, the leading new direction, had its cheapest test on 2026-10-13

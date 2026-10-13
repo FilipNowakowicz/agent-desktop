@@ -1,0 +1,2867 @@
+{
+  "skills": {
+    "skills/real-expense-claim.py": "# Submit an expense claim in the browser for the receipt open in Mousepad.\n# Values from the request itself (not on screen): set them per task.\nCLAIMANT = \"Lin Okafor\"\nCONTRACTOR_COMPANY = \"Brightwave Ltd\"   # set to None for an employee\nimport re, time\nfrom pathlib import Path\n\nW = \"Chromium\"\n\n# --- read the receipt file named in the Mousepad title\nmp = [w for w in windows() if w[\"title\"].endswith(\" - Mousepad\")][0][\"title\"]\npath = Path(mp[: -len(\" - Mousepad\")].lstrip(\"*\"))\ntxt = path.read_text()\n\ndef grab(pat):\n    m = re.search(pat, txt, re.I | re.M)\n    assert m, pat\n    return m.group(1).strip()\n\ndef num(s):\n    return float(s.replace(\" \", \"\").replace(\",\", \".\"))\n\nd, mo, y = re.search(r\"Date:\\s*(\\d{1,2})[./-](\\d{1,2})[./-](\\d{4})\", txt).groups()\nd, mo = d.zfill(2), mo.zfill(2)\nfrm = grab(r\"^From:\\s*(.+)$\")\nto = grab(r\"^To:\\s*(.+)$\")\nkm = num(grab(r\"Distance:\\s*([\\d.,]+)\"))\ncur, total = re.search(r\"Total\\s+([A-Z]{3})\\s*([\\d .,]+\\d)\", txt).groups()\ntotal = num(total)\nvat = num(re.search(r\"VAT[^:\\n]*:\\s*[A-Z]{3}\\s*([\\d .,]+\\d)\", txt).group(1))\npaid_line = grab(r\"^Paid:\\s*(.+)$\")\ncard = \"card\" in paid_line.lower() and (\"corporate\" in paid_line.lower() or \"company\" in paid_line.lower())\nlast4 = re.search(r\"(\\d{4})\\s*$\", paid_line).group(1) if card else None\nlow = (txt + path.name).lower()\nmode = \"Taxi\" if \"taxi\" in low else \"Train\" if \"train\" in low or \"rail\" in low else \"Flight\"\n\n# --- helpers\ndef fields(role):\n    return [e for e in find(role=role, window=W) if \"Address\" not in e[\"name\"]]\n\ndef pick(cb, label):\n    act(cb, \"focus\", None); time.sleep(0.2); type_text(label); time.sleep(0.4)\n\ndef fmt(x):\n    return (\"%.2f\" % x) if x != int(x) or True else str(x)\n\n# --- top part of the form\nact(fields(\"entry\")[0], \"set_text\", CLAIMANT)\npress(\"a contractor\" if CONTRACTOR_COMPANY else \"an employee\", role=\"radio button\", window=W)\ntime.sleep(0.5)\nif CONTRACTOR_COMPANY:\n    act(fields(\"entry\")[1], \"set_text\", CONTRACTOR_COMPANY)\npick(fields(\"combo box\")[0], \"Travel\")            # category -> reveals Travel fieldset\npick(fields(\"combo box\")[1], mode)                # mode\nen = fields(\"entry\")\nbase = 2 if CONTRACTOR_COMPANY else 1\nact(en[base], \"set_text\", frm)\nact(en[base + 1], \"set_text\", to)\nsp = [e for e in fields(\"spin button\") if not e[\"name\"]]   # km, amount, vat\nact(sp[0], \"set_text\", str(int(km)) if km == int(km) else str(km))\nact(sp[1], \"set_text\", \"%.2f\" % total)\nact(sp[2], \"set_text\", \"%.2f\" % vat)\nact(one(\"Day\", role=\"spin button\", window=W), \"focus\", None); time.sleep(0.2)\ntype_text(d + mo + y); time.sleep(0.3)\npick(fields(\"combo box\")[2], cur)                 # currency\n\n# --- lower part is only exposed once scrolled into view\nclick(640, 400); scroll(10); time.sleep(0.6)\npick(fields(\"combo box\")[-1], \"Corporate\" if card else \"My own\")\ntime.sleep(0.4)\nif card:\n    act(fields(\"entry\")[-1], \"set_text\", last4)\nact(one(\"I confirm\", role=\"check box\", window=W), \"check\", None)\ntime.sleep(0.3)\n\n# --- verify before submitting\nvals = {e[\"name\"]: e.get(\"value\") for e in find(role=\"spin button\", window=W) if e[\"name\"]}\nassert int(vals[\"Day\"]) == int(d) and int(vals[\"Month\"]) == int(mo) and int(vals[\"Year\"]) == int(y), vals\ntexts = [e.get(\"text\") for e in fields(\"entry\")]\nassert frm in texts and to in texts, texts\nif card:\n    assert last4 in texts, texts\n\npress(\"Submit claim\", role=\"button\", window=W)\ntime.sleep(1)\ntitles = [w[\"title\"] for w in windows()]\nprint(titles)\nassert any(t.startswith(\"Task - complete\") for t in titles), titles\n",
+    "skills/real-ticket-config.py": "import re, time\n\n# 1. Read the ticket: config path, target port and log level\nparas = \" \".join((n.get(\"name\") or \"\") + \" \" + (n.get(\"text\") or \"\") for n in find())\npath = None\nfor n in find(element=\".ini\"):\n    if n[\"name\"].strip().startswith(\"/\") and n[\"name\"].strip().endswith(\".ini\"):\n        path = n[\"name\"].strip(); break\nif path is None:\n    m = re.search(r\"(/[^\\s\ufffc]+\\.ini)\", paras)\n    path = m.group(1)\nport = re.search(r\"listen on port (\\d+)\", paras).group(1)\nlvl_word = re.search(r\"log only (\\w+)\", paras).group(1).lower()\nlevel = {\"warnings\": \"warning\", \"warning\": \"warning\", \"errors\": \"error\", \"error\": \"error\",\n         \"info\": \"info\", \"debug\": \"debug\", \"criticals\": \"critical\", \"critical\": \"critical\"}.get(lvl_word, lvl_word.rstrip(\"s\"))\nprint(\"path\", path, \"port\", port, \"level\", level)\n\n# 2. Edit only the [server] section\norig = open(path).read()\ndef section_values(text):\n    d, sec = {}, None\n    for line in text.splitlines():\n        m = re.match(r\"\\s*\\[(.+?)\\]\", line)\n        if m: sec = m.group(1).strip(); continue\n        m = re.match(r\"\\s*([^#;=\\s]+)\\s*=\\s*(.*)$\", line)\n        if m and sec: d[(sec, m.group(1))] = m.group(2).strip()\n    return d\nbefore = section_values(orig)\nout, sec = [], None\nfor line in orig.splitlines(keepends=True):\n    m = re.match(r\"\\s*\\[(.+?)\\]\", line)\n    if m:\n        sec = m.group(1).strip()\n    elif sec == \"server\":\n        nl = \"\\n\" if line.endswith(\"\\n\") else \"\"\n        if re.match(r\"\\s*port\\s*=\", line):\n            line = re.sub(r\"^(\\s*port\\s*=\\s*).*$\", r\"\\g<1>\" + port, line.rstrip(\"\\n\")) + nl\n        elif re.match(r\"\\s*log_level\\s*=\", line):\n            line = re.sub(r\"^(\\s*log_level\\s*=\\s*).*$\", r\"\\g<1>\" + level, line.rstrip(\"\\n\")) + nl\n    out.append(line)\nopen(path, \"w\").write(\"\".join(out))\n\n# 3. Comment and resolve\nentry = [n for n in find(role=\"entry\") if \"Address\" not in (n[\"name\"] or \"\")][0]\nact(entry, \"set_text\", f\"Set [server] port to {port} and log_level to {level} in {path.split('/')[-1]}; other sections unchanged.\")\nbtns = [n for n in find(element=\"Resolve\") if n[\"role\"] in (\"push button\", \"button\")]\nif btns:\n    act(btns[0], \"press\")\nelse:\n    cands = [n for n in find(element=\"Resolve\") if n.get(\"actions\")]\n    act(cands[-1], \"press\" if \"press\" in cands[-1][\"actions\"] else cands[-1][\"actions\"][0])\nwait(timeout=10, element=\"Resolved\")\n\n# 4. Checks\nafter = section_values(open(path).read())\nassert after[(\"server\", \"port\")] == port\nassert after[(\"server\", \"log_level\")] == level\nfor k, v in before.items():\n    if k not in ((\"server\", \"port\"), (\"server\", \"log_level\")):\n        assert after.get(k) == v, k\nassert find(element=\"Resolved\")\nprint(\"ok\")\n",
+    "skills/real-inventory-cleanup.py": "# Mark all products of a defunct supplier as Discontinued with stock 0 in the\n# paginated browser inventory table; leave every other row unchanged.\nimport time, re\n\nSUPPLIER = \"Norvik\"            # exact supplier name (not prefixes like \"Norvika\")\nSTATUS = \"Discontinued\"\n\ndef norm(s): return \" \".join((s or \"\").split()).casefold()\n\ndef dismiss_popups():\n    for name in (\"Stay signed in\",):\n        for n in find(element=name, role=\"button\"):\n            act(n, \"press\"); time.sleep(0.4)\n\ndef page_label():\n    scroll(40); time.sleep(0.4)\n    for n in find(text=\"Page \"):\n        m = re.search(r\"Page (\\d+) of (\\d+)\", n.get(\"text\") or n.get(\"name\") or \"\")\n        if m: return int(m[1]), int(m[2])\n    return 1, 1\n\ndef page_rows():\n    dismiss_popups()\n    seen = {}\n    scroll(-60); time.sleep(0.6)\n    stale = 0\n    for _ in range(60):\n        before = len(seen)\n        for r in rows():\n            if len(r) >= 5 and r[0] != \"SKU\" and r[0].strip():\n                seen[r[0]] = [c.strip() for c in r[:5]]\n        stale = stale + 1 if len(seen) == before else 0\n        if stale >= 3: break\n        scroll(3); time.sleep(0.3)\n    return seen\n\ndef is_target(r): return norm(r[2]) == norm(SUPPLIER)\ndef is_done(r): return r[3] == \"0\" and r[4] == STATUS\n\ndef edit(sku):\n    dismiss_popups()\n    press(element=\"Edit\", role=\"button\", within=sku); time.sleep(0.6)\n    act(one(role=\"spin button\"), \"set_text\", \"0\")\n    act(one(role=\"combo box\"), \"open\"); time.sleep(0.5)\n    items = find(role=\"menu item\")\n    names = [n[\"name\"] for n in items]\n    cur = next((i for i, n in enumerate(items) if \"selected\" in n[\"states\"]), 0)\n    tgt = names.index(STATUS)\n    for _ in range(abs(tgt - cur)): key(\"Down\" if tgt > cur else \"Up\")\n    key(\"Return\"); time.sleep(0.4)\n    press(element=\"Save\", role=\"button\", exact=True); time.sleep(0.6)\n\ndef goto_first_page():\n    for _ in range(50):\n        p, _t = page_label()\n        if p <= 1: return\n        dismiss_popups()\n        press(element=\"Previous\", role=\"button\", exact=True); time.sleep(0.7)\n\ndismiss_popups()\ngoto_first_page()\nbefore, after, edited = {}, {}, []\nwhile True:\n    p, total = page_label()\n    rows_now = page_rows()\n    before.update(rows_now)\n    for sku, r in rows_now.items():\n        if is_target(r) and not is_done(r):\n            edit(sku); edited.append(sku)\n    after.update(page_rows())\n    p, total = page_label()\n    if p >= total: break\n    dismiss_popups()\n    press(element=\"Next\", role=\"button\", exact=True); time.sleep(0.7)\n\n# Second full pass to verify the final state from scratch.\ngoto_first_page()\nfinal = {}\nwhile True:\n    final.update(page_rows())\n    p, total = page_label()\n    if p >= total: break\n    dismiss_popups()\n    press(element=\"Next\", role=\"button\", exact=True); time.sleep(0.7)\n\nprint(\"edited:\", edited)\nassert final, \"no rows read\"\nassert set(final) == set(before), f\"row set changed: {set(final) ^ set(before)}\"\ntargets = [s for s, r in final.items() if is_target(r)]\nassert targets, f\"no {SUPPLIER} products found\"\nfor sku, r in final.items():\n    if is_target(r):\n        assert is_done(r), f\"{sku} not updated: {r}\"\n    else:\n        assert r == before[sku], f\"{sku} changed: {before[sku]} -> {r}\"\nprint(\"OK\", len(targets), \"products marked\", STATUS)\n",
+    "repaired/real-inventory-cleanup.py": "# Mark all products of a defunct supplier as Discontinued with stock 0 in the\n# paginated browser inventory table; leave every other row unchanged.\nimport time, re\n\nSUPPLIER = \"Norvik\"            # exact supplier name (not prefixes like \"Norvika\")\nSTATUS = \"Discontinued\"\n\ndef norm(s): return \" \".join((s or \"\").split()).casefold()\n\ndef dismiss_popups():\n    for name in (\"Stay signed in\",):\n        for n in find(element=name, role=\"button\"):\n            act(n, \"press\"); time.sleep(0.4)\n\ndef focus_page():\n    # Put keyboard focus inside the page so Home/End work as scroll fallbacks.\n    for name in (\"Previous\", \"Next\", \"Edit\"):\n        b = find(element=name, role=\"button\", exact=True)\n        if b:\n            try: act(b[0], \"focus\"); return\n            except Exception: pass\n\ndef label():\n    for n in find(text=\"Page \"):\n        m = re.search(r\"Page (\\d+) of (\\d+)\", n.get(\"text\") or n.get(\"name\") or \"\")\n        if m: return int(m[1]), int(m[2])\n    return None\n\ndef page_label():\n    scroll(40); time.sleep(0.4)\n    l = label()\n    if not l:\n        focus_page(); key(\"End\"); time.sleep(0.5); l = label()\n    if not l:\n        raise LookupError(\"page label 'Page X of Y' not found\")\n    return l\n\ndef to_top():\n    for _ in range(3):\n        scroll(-60); time.sleep(0.5)\n        r = rows()\n        if r and r[0][0] == \"SKU\": return\n    focus_page(); key(\"Home\"); time.sleep(0.5)\n\ndef page_rows():\n    dismiss_popups()\n    seen = {}\n    to_top()\n    stale = 0\n    for _ in range(60):\n        before = len(seen)\n        for r in rows():\n            if len(r) >= 5 and r[0] != \"SKU\" and r[0].strip():\n                seen[r[0]] = [c.strip() for c in r[:5]]\n        stale = stale + 1 if len(seen) == before else 0\n        if stale >= 3: break\n        scroll(3); time.sleep(0.3)\n    return seen\n\ndef is_target(r): return norm(r[2]) == norm(SUPPLIER)\ndef is_done(r): return r[3] == \"0\" and r[4] == STATUS\n\ndef reveal(sku):\n    # Only rows on screen are exposed; scroll until this row's Edit is visible.\n    to_top()\n    for _ in range(40):\n        if find(element=\"Edit\", role=\"button\", within=sku): return\n        scroll(2); time.sleep(0.3)\n    raise LookupError(f\"row {sku} not found\")\n\ndef edit(sku):\n    dismiss_popups()\n    reveal(sku)\n    press(element=\"Edit\", role=\"button\", within=sku); time.sleep(0.6)\n    act(one(role=\"spin button\"), \"set_text\", \"0\")\n    act(one(role=\"combo box\"), \"open\"); time.sleep(0.5)\n    items = find(role=\"menu item\")\n    names = [n[\"name\"] for n in items]\n    cur = next((i for i, n in enumerate(items) if \"selected\" in n[\"states\"]), 0)\n    tgt = names.index(STATUS)\n    for _ in range(abs(tgt - cur)): key(\"Down\" if tgt > cur else \"Up\")\n    key(\"Return\"); time.sleep(0.4)\n    press(element=\"Save\", role=\"button\", exact=True); time.sleep(0.8)\n\ndef goto_first_page():\n    for _ in range(50):\n        p, _t = page_label()\n        if p <= 1: return\n        dismiss_popups()\n        press(element=\"Previous\", role=\"button\", exact=True); time.sleep(0.7)\n\ndismiss_popups()\ngoto_first_page()\nbefore, edited = {}, []\nwhile True:\n    rows_now = page_rows()\n    before.update(rows_now)\n    for sku, r in rows_now.items():\n        if is_target(r) and not is_done(r):\n            edit(sku); edited.append(sku)\n    p, total = page_label()\n    if p >= total: break\n    dismiss_popups()\n    press(element=\"Next\", role=\"button\", exact=True); time.sleep(0.7)\n\n# Second full pass to verify the final state from scratch.\ngoto_first_page()\nfinal = {}\nwhile True:\n    final.update(page_rows())\n    p, total = page_label()\n    if p >= total: break\n    dismiss_popups()\n    press(element=\"Next\", role=\"button\", exact=True); time.sleep(0.7)\n\nprint(\"edited:\", edited, \"rows:\", len(final))\nassert final, \"no rows read\"\nassert set(final) == set(before), f\"row set changed: {set(final) ^ set(before)}\"\ntargets = [s for s, r in final.items() if is_target(r)]\nassert targets, f\"no {SUPPLIER} products found\"\nfor sku, r in final.items():\n    if is_target(r):\n        assert is_done(r), f\"{sku} not updated: {r}\"\n    else:\n        assert r == before[sku], f\"{sku} changed: {before[sku]} -> {r}\"\nprint(\"OK\", len(targets), \"products marked\", STATUS)\n"
+  },
+  "runs": [
+    {
+      "run": "20261013-020924-397e",
+      "arm": "learn",
+      "summary": {
+        "seed": 1,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": true,
+        "skill": false,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.995,
+        "total_seconds": 264.8,
+        "seconds_p50_p95": [
+          76.8,
+          148.7
+        ],
+        "time_split": {
+          "api_seconds": 170.6,
+          "tool_seconds": 87.9,
+          "other_seconds": 6.3
+        },
+        "screenshots": 11,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 39.3,
+          "tool_calls": 7,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_click": 1,
+            "desktop_run": 5,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 2,
+          "reply": "ind(element=\"Resolve\") if n.get(\"actions\")]\n    act(cands[-1], \"press\" if \"press\" in cands[-1][\"actions\"] else cands[-1][\"actions\"][0])\nwait(timeout=10, element=\"Resolved\")\n\n# 4. Checks\nafter = section_values(open(path).read())\nassert after[(\"server\", \"port\")] == port\nassert after[(\"server\", \"log_level\")] == level\nfor k, v in before.items():\n    if k not in ((\"server\", \"port\"), (\"server\", \"log_level\")):\n        assert after.get(k) == v, k\nassert find(element=\"Resolved\")\nprint(\"ok\")\n```\nSKILL-END",
+          "cost_usd": 0.2539368,
+          "usage": {
+            "input_tokens": 16,
+            "cache_creation_input_tokens": 21338,
+            "cache_read_input_tokens": 117244,
+            "output_tokens": 2986,
+            "output_tokens_details": {
+              "thinking_tokens": 241
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 21338,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 1358,
+                "cache_read_input_tokens": 19741,
+                "cache_creation_input_tokens": 1597,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1597
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 16,
+              "outputTokens": 2986,
+              "cacheReadInputTokens": 117244,
+              "cacheCreationInputTokens": 21338,
+              "webSearchRequests": 0,
+              "costUSD": 0.2539368,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 241,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 8,
+          "api_error": null,
+          "screenshots": 2,
+          "time_split": {
+            "api_seconds": 33.7,
+            "tool_seconds": 3.4,
+            "other_seconds": 2.2
+          },
+          "learned": true,
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 8443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-020924-397e/state/62a58a8aca1f/screenshots/d54b6ad2258a45f6a18772671097379d.png",
+          "cleanup": {
+            "session": "62a58a8aca1f",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 76.8,
+          "tool_calls": 13,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 9,
+            "desktop_screenshot": 1,
+            "desktop_ui": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 4,
+          "reply": "e\") for e in find(role=\"spin button\", window=W) if e[\"name\"]}\nassert int(vals[\"Day\"]) == int(d) and int(vals[\"Month\"]) == int(mo) and int(vals[\"Year\"]) == int(y), vals\ntexts = [e.get(\"text\") for e in fields(\"entry\")]\nassert frm in texts and to in texts, texts\nif card:\n    assert last4 in texts, texts\n\npress(\"Submit claim\", role=\"button\", window=W)\ntime.sleep(1)\ntitles = [w[\"title\"] for w in windows()]\nprint(titles)\nassert any(t.startswith(\"Task - complete\") for t in titles), titles\n```\nSKILL-END",
+          "cost_usd": 0.32568420000000003,
+          "usage": {
+            "input_tokens": 24,
+            "cache_creation_input_tokens": 19807,
+            "cache_read_input_tokens": 249461,
+            "output_tokens": 5862,
+            "output_tokens_details": {
+              "thinking_tokens": 826
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 19807,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 2290,
+                "cache_read_input_tokens": 29596,
+                "cache_creation_input_tokens": 321,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 321
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 24,
+              "outputTokens": 5862,
+              "cacheReadInputTokens": 249461,
+              "cacheCreationInputTokens": 19807,
+              "webSearchRequests": 0,
+              "costUSD": 0.32568420000000003,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 826,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 14,
+          "api_error": null,
+          "screenshots": 4,
+          "time_split": {
+            "api_seconds": 58.7,
+            "tool_seconds": 16.1,
+            "other_seconds": 2.0
+          },
+          "learned": true,
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-020924-397e/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-020924-397e/state/bf9129127201/screenshots/1d16bf3097b643e299d61a80ee58c592.png",
+          "cleanup": {
+            "session": "bf9129127201",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 148.7,
+          "tool_calls": 14,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 13,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 5,
+          "reply": "eep(0.7)\n\nprint(\"edited:\", edited)\nassert final, \"no rows read\"\nassert set(final) == set(before), f\"row set changed: {set(final) ^ set(before)}\"\ntargets = [s for s, r in final.items() if is_target(r)]\nassert targets, f\"no {SUPPLIER} products found\"\nfor sku, r in final.items():\n    if is_target(r):\n        assert is_done(r), f\"{sku} not updated: {r}\"\n    else:\n        assert r == before[sku], f\"{sku} changed: {before[sku]} -> {r}\"\nprint(\"OK\", len(targets), \"products marked\", STATUS)\n```\nSKILL-END",
+          "cost_usd": 0.41542599999999996,
+          "usage": {
+            "input_tokens": 30,
+            "cache_creation_input_tokens": 25110,
+            "cache_read_input_tokens": 332030,
+            "output_tokens": 7401,
+            "output_tokens_details": {
+              "thinking_tokens": 1361
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 25110,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 1815,
+                "cache_read_input_tokens": 34646,
+                "cache_creation_input_tokens": 574,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 574
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 30,
+              "outputTokens": 7401,
+              "cacheReadInputTokens": 332030,
+              "cacheCreationInputTokens": 25110,
+              "webSearchRequests": 0,
+              "costUSD": 0.41542599999999996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 1361,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 15,
+          "api_error": null,
+          "screenshots": 5,
+          "time_split": {
+            "api_seconds": 78.2,
+            "tool_seconds": 68.4,
+            "other_seconds": 2.1
+          },
+          "learned": true,
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-020924-397e/state/7985ece98d8e/screenshots/1d0f8cd4b6394fbea29afa0fcb9d9c36.png",
+          "cleanup": {
+            "session": "7985ece98d8e",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-021406-c8ad",
+      "arm": "replay learned",
+      "summary": {
+        "seed": 5,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 2,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 27.9,
+        "seconds_p50_p95": [
+          10.6,
+          15.3
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "elapsed_seconds": 2.0,
+          "replay_exit_code": 0,
+          "replay_output": "path /home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/real-ticket-config/services/checkout.ini port 7443 level warning\nok\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 7443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/state/1535467d8a3e/screenshots/3b80c7f1fa1344b682ce35b4b0aceb3f.png",
+          "cleanup": {
+            "session": "1535467d8a3e",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "elapsed_seconds": 10.6,
+          "replay_exit_code": 0,
+          "replay_output": "['/home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/real-expense-claim/receipt-taxi.txt - Mousepad', 'Task - complete - Chromium']\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/state/cd7c463bfaa3/screenshots/e9133594a22e424395d44bb63b9f79ee.png",
+          "cleanup": {
+            "session": "cd7c463bfaa3",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": false,
+          "elapsed_seconds": 15.3,
+          "replay_exit_code": 1,
+          "replay_output": "edited: []\n",
+          "replay_error": "Traceback (most recent call last):\n  File \"<string>\", line 91, in <module>\nAssertionError: no Norvik products found\n",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "Task - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-021406-c8ad/state/7710f6d05873/screenshots/0bec823e1ac64e558b7658db9636c763.png",
+          "cleanup": {
+            "session": "7710f6d05873",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-021502-ef2e",
+      "arm": "repair (invalid: usage limit)",
+      "summary": {
+        "seed": 5,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": true,
+        "skill": true,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 0,
+        "passed": 0,
+        "skipped": [],
+        "invalid_api_error": [
+          "real-inventory-cleanup"
+        ],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 0,
+        "seconds_p50_p95": null,
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-inventory-cleanup",
+          "passed": false,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 1,
+          "stderr": "",
+          "elapsed_seconds": 68.7,
+          "tool_calls": 4,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 2,
+            "desktop_screenshot": 1,
+            "desktop_scroll": 1
+          },
+          "inline_screenshots": 1,
+          "reply": "You've hit your session limit \u00b7 resets 3:20am (Europe/London)",
+          "cost_usd": 0.1617996,
+          "usage": {
+            "input_tokens": 8,
+            "cache_creation_input_tokens": 9979,
+            "cache_read_input_tokens": 61978,
+            "output_tokens": 3477,
+            "output_tokens_details": {
+              "thinking_tokens": 398
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 9979,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 1749,
+                "cache_read_input_tokens": 18425,
+                "cache_creation_input_tokens": 1664,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1664
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 8,
+              "outputTokens": 3477,
+              "cacheReadInputTokens": 61978,
+              "cacheCreationInputTokens": 9979,
+              "webSearchRequests": 0,
+              "costUSD": 0.1617996,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 398,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 5,
+          "api_error": "usage_limit_reached",
+          "screenshots": 1,
+          "time_split": {
+            "api_seconds": 31.0,
+            "tool_seconds": 35.0,
+            "other_seconds": 2.7
+          },
+          "learned": false,
+          "detail": [
+            "Task - incomplete 3 rows wrong - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-021502-ef2e/state/c5c883991d2d/screenshots/eea5429dba3a49e29a236a9af37a03ed.png",
+          "cleanup": {
+            "session": "c5c883991d2d",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-233049-a9c8",
+      "arm": "replay learned, instrumented (diagnosis)",
+      "summary": {
+        "seed": 5,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 1,
+        "passed": 0,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 15.8,
+        "seconds_p50_p95": [
+          15.8,
+          15.8
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-inventory-cleanup",
+          "passed": false,
+          "elapsed_seconds": 15.8,
+          "replay_exit_code": 1,
+          "replay_output": "NO LABEL []\nNO LABEL []\nPAGE 1 1 13 ['Acme', 'Borealis', 'Kestrel', 'Norvika', 'Tamsin']\nNO LABEL []\nNO LABEL []\nNO LABEL []\nedited: []\n",
+          "replay_error": "Traceback (most recent call last):\n  File \"<string>\", line 93, in <module>\nAssertionError: no Norvik products found\n",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "Task - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-233049-a9c8/state/a0399e4c83f2/screenshots/015b89bdaff548569601d3280101e784.png",
+          "cleanup": {
+            "session": "a0399e4c83f2",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-233135-1ca4",
+      "arm": "repair",
+      "summary": {
+        "seed": 5,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": true,
+        "skill": true,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 1,
+        "passed": 1,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.511,
+        "total_seconds": 282.8,
+        "seconds_p50_p95": [
+          282.8,
+          282.8
+        ],
+        "time_split": {
+          "api_seconds": 108.5,
+          "tool_seconds": 172.5,
+          "other_seconds": 1.9
+        },
+        "screenshots": 2,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 282.8,
+          "tool_calls": 12,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 8,
+            "desktop_screenshot": 2,
+            "desktop_scroll": 1,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 2,
+          "reply": "ed:\", edited, \"rows:\", len(final))\nassert final, \"no rows read\"\nassert set(final) == set(before), f\"row set changed: {set(final) ^ set(before)}\"\ntargets = [s for s, r in final.items() if is_target(r)]\nassert targets, f\"no {SUPPLIER} products found\"\nfor sku, r in final.items():\n    if is_target(r):\n        assert is_done(r), f\"{sku} not updated: {r}\"\n    else:\n        assert r == before[sku], f\"{sku} changed: {before[sku]} -> {r}\"\nprint(\"OK\", len(targets), \"products marked\", STATUS)\n```\nSKILL-END",
+          "cost_usd": 0.5110437999999999,
+          "usage": {
+            "input_tokens": 26,
+            "cache_creation_input_tokens": 30955,
+            "cache_read_input_tokens": 277999,
+            "output_tokens": 10385,
+            "output_tokens_details": {
+              "thinking_tokens": 1699
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 30955,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 2336,
+                "cache_read_input_tokens": 30605,
+                "cache_creation_input_tokens": 350,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 350
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 26,
+              "outputTokens": 10385,
+              "cacheReadInputTokens": 277999,
+              "cacheCreationInputTokens": 30955,
+              "webSearchRequests": 0,
+              "costUSD": 0.5110437999999999,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 1699,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 13,
+          "api_error": null,
+          "screenshots": 2,
+          "time_split": {
+            "api_seconds": 108.5,
+            "tool_seconds": 172.5,
+            "other_seconds": 1.9
+          },
+          "learned": true,
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-233135-1ca4/state/0d387ee99eb6/screenshots/2b05afcec1b842848d404588f7f3b0b7.png",
+          "cleanup": {
+            "session": "0d387ee99eb6",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-233626-2dfd",
+      "arm": "replay repaired",
+      "summary": {
+        "seed": 6,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 1,
+        "passed": 0,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 102.1,
+        "seconds_p50_p95": [
+          102.1,
+          102.1
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-inventory-cleanup",
+          "passed": false,
+          "elapsed_seconds": 102.1,
+          "replay_exit_code": 0,
+          "replay_output": "edited: ['SKU-AW3V', 'SKU-9BCT'] rows: 52\nOK 2 products marked Discontinued\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "Task - incomplete 2 rows wrong - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-233626-2dfd/state/5a38318fdc43/screenshots/18505f29a87c452dbd0f21da5fcfc9d2.png",
+          "cleanup": {
+            "session": "5a38318fdc43",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-233812-6e19",
+      "arm": "replay repaired",
+      "summary": {
+        "seed": 7,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 1,
+        "passed": 0,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 108.7,
+        "seconds_p50_p95": [
+          108.7,
+          108.7
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-inventory-cleanup",
+          "passed": false,
+          "elapsed_seconds": 108.7,
+          "replay_exit_code": 0,
+          "replay_output": "edited: ['SKU-3KE2', 'SKU-EZU8', 'SKU-5P24'] rows: 52\nOK 3 products marked Discontinued\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "Task - incomplete 1 rows wrong - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-233812-6e19/state/adfd092d3fad/screenshots/0631001188bf4a689f1e12cab8d9ddd1.png",
+          "cleanup": {
+            "session": "adfd092d3fad",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234013-77aa",
+      "arm": "replay learned",
+      "summary": {
+        "seed": 6,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 2,
+        "passed": 2,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 12.1,
+        "seconds_p50_p95": [
+          1.9,
+          10.2
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "elapsed_seconds": 1.9,
+          "replay_exit_code": 0,
+          "replay_output": "path /home/user/agent-desktop/artifacts/benchmark/20261013-234013-77aa/real-ticket-config/services/checkout.ini port 7443 level warning\nok\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 7443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234013-77aa/state/465cec925819/screenshots/827fe74c6ff349c092a520d1ee859627.png",
+          "cleanup": {
+            "session": "465cec925819",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "elapsed_seconds": 10.2,
+          "replay_exit_code": 0,
+          "replay_output": "['/home/user/agent-desktop/artifacts/benchmark/20261013-234013-77aa/real-expense-claim/receipt-taxi.txt - Mousepad', 'Task - complete - Chromium']\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234013-77aa/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234013-77aa/state/82597cb4a568/screenshots/0562d4454b27449d9a9febac8be2e8c9.png",
+          "cleanup": {
+            "session": "82597cb4a568",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234034-dcd4",
+      "arm": "replay learned",
+      "summary": {
+        "seed": 7,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": false,
+        "learn": false,
+        "skill": false,
+        "replay": true,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 2,
+        "passed": 2,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0,
+        "total_seconds": 12.2,
+        "seconds_p50_p95": [
+          1.9,
+          10.3
+        ],
+        "time_split": {
+          "api_seconds": 0,
+          "tool_seconds": 0,
+          "other_seconds": 0
+        },
+        "screenshots": 0,
+        "model": null
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "elapsed_seconds": 1.9,
+          "replay_exit_code": 0,
+          "replay_output": "path /home/user/agent-desktop/artifacts/benchmark/20261013-234034-dcd4/real-ticket-config/services/checkout.ini port 9443 level warning\nok\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 9443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234034-dcd4/state/b56599e46f0b/screenshots/a35348f00ece44abbefc2fb150d0ad0a.png",
+          "cleanup": {
+            "session": "b56599e46f0b",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "elapsed_seconds": 10.3,
+          "replay_exit_code": 0,
+          "replay_output": "['/home/user/agent-desktop/artifacts/benchmark/20261013-234034-dcd4/real-expense-claim/receipt-taxi.txt - Mousepad', 'Task - complete - Chromium']\n",
+          "replay_error": "",
+          "turns": 0,
+          "cost_usd": 0,
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234034-dcd4/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234034-dcd4/state/0fd61616b26d/screenshots/9058ad27fcfe40adad83b14d6d87512d.png",
+          "cleanup": {
+            "session": "0fd61616b26d",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234105-b2c2",
+      "arm": "gate base",
+      "summary": {
+        "seed": 6,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": false,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.863,
+        "total_seconds": 138.0,
+        "seconds_p50_p95": [
+          49.1,
+          66.5
+        ],
+        "time_split": {
+          "api_seconds": 104.1,
+          "tool_seconds": 28.4,
+          "other_seconds": 5.4
+        },
+        "screenshots": 27,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 22.4,
+          "tool_calls": 7,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 1,
+            "desktop_focus": 2,
+            "desktop_screenshot": 1,
+            "desktop_type": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 3,
+          "reply": "DONE \u2014 In checkout.ini, I set the server section's port to 7443 and log_level to warning, then resolved OPS-1282 with a comment; the admin section still uses port 8081 with debug logging.",
+          "cost_usd": 0.1290292,
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 11194,
+            "cache_read_input_tokens": 92546,
+            "output_tokens": 1046,
+            "output_tokens_details": {
+              "thinking_tokens": 77
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 11194,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 68,
+                "cache_read_input_tokens": 19370,
+                "cache_creation_input_tokens": 1934,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1934
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 12,
+              "outputTokens": 1046,
+              "cacheReadInputTokens": 92546,
+              "cacheCreationInputTokens": 11194,
+              "webSearchRequests": 0,
+              "costUSD": 0.1290292,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 77,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 8,
+          "api_error": null,
+          "screenshots": 3,
+          "time_split": {
+            "api_seconds": 15.5,
+            "tool_seconds": 4.9,
+            "other_seconds": 1.9
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 7443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234105-b2c2/state/55340caeabe7/screenshots/3e2932ecd6a84cf2ba49f125bfdb21fb.png",
+          "cleanup": {
+            "session": "55340caeabe7",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 49.1,
+          "tool_calls": 15,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 6,
+            "desktop_click": 4,
+            "desktop_run": 1,
+            "desktop_screenshot": 1,
+            "desktop_ui": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 10,
+          "reply": "DONE: Submitted the expense claim and the page shows \"Claim submitted\". It was for Lin Okafor as a Brightwave Ltd contractor: a taxi from Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo (54 km) on 17/09/2026, NOK 1320.00 including NOK 264.00 VAT, paid with the corporate card ending 1603.",
+          "cost_usd": 0.3271514,
+          "usage": {
+            "input_tokens": 32,
+            "cache_creation_input_tokens": 24988,
+            "cache_read_input_tokens": 349597,
+            "output_tokens": 2860,
+            "output_tokens_details": {
+              "thinking_tokens": 158
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 24988,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 133,
+                "cache_read_input_tokens": 33495,
+                "cache_creation_input_tokens": 1603,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1603
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 32,
+              "outputTokens": 2860,
+              "cacheReadInputTokens": 349597,
+              "cacheCreationInputTokens": 24988,
+              "webSearchRequests": 0,
+              "costUSD": 0.3271514,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 158,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 16,
+          "api_error": null,
+          "screenshots": 10,
+          "time_split": {
+            "api_seconds": 40.5,
+            "tool_seconds": 6.6,
+            "other_seconds": 2.0
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234105-b2c2/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234105-b2c2/state/dec649481048/screenshots/48edd2b286ca4f5e8524f7fff9db5d83.png",
+          "cleanup": {
+            "session": "dec649481048",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 66.5,
+          "tool_calls": 18,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 12,
+            "desktop_click": 1,
+            "desktop_run": 3,
+            "desktop_screenshot": 1,
+            "desktop_scroll": 1
+          },
+          "inline_screenshots": 14,
+          "reply": "DONE. All four Norvik products (Items 11, 27, 45 and 49) are now set to Discontinued with 0 stock, and the page title reads \"Task - complete\". I left the similarly named \"Norvika\" products and every other row unchanged.",
+          "cost_usd": 0.4067634,
+          "usage": {
+            "input_tokens": 36,
+            "cache_creation_input_tokens": 30340,
+            "cache_read_input_tokens": 440097,
+            "output_tokens": 3794,
+            "output_tokens_details": {
+              "thinking_tokens": 321
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 30340,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 81,
+                "cache_read_input_tokens": 38740,
+                "cache_creation_input_tokens": 1710,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1710
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 36,
+              "outputTokens": 3794,
+              "cacheReadInputTokens": 440097,
+              "cacheCreationInputTokens": 30340,
+              "webSearchRequests": 0,
+              "costUSD": 0.4067634,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 321,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 19,
+          "api_error": null,
+          "screenshots": 14,
+          "time_split": {
+            "api_seconds": 48.1,
+            "tool_seconds": 16.9,
+            "other_seconds": 1.5
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234105-b2c2/state/43c7f8f47c8e/screenshots/ede11566d69147dca045afa009a92c5c.png",
+          "cleanup": {
+            "session": "43c7f8f47c8e",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234334-ae40",
+      "arm": "gate base",
+      "summary": {
+        "seed": 7,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": false,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.944,
+        "total_seconds": 183.7,
+        "seconds_p50_p95": [
+          47.3,
+          111.9
+        ],
+        "time_split": {
+          "api_seconds": 147.1,
+          "tool_seconds": 30.6,
+          "other_seconds": 5.8
+        },
+        "screenshots": 26,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 24.5,
+          "tool_calls": 7,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 1,
+            "desktop_focus": 2,
+            "desktop_screenshot": 1,
+            "desktop_type": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 3,
+          "reply": "DONE: in checkout.ini I set the [server] port to 9443 and its log_level to warning, left [admin] on port 8081 with debug logging, and resolved OPS-1354 with a short comment.",
+          "cost_usd": 0.1293552,
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 11221,
+            "cache_read_input_tokens": 92496,
+            "output_tokens": 1052,
+            "output_tokens_details": {
+              "thinking_tokens": 98
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 11221,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 68,
+                "cache_read_input_tokens": 19354,
+                "cache_creation_input_tokens": 1977,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1977
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 12,
+              "outputTokens": 1052,
+              "cacheReadInputTokens": 92496,
+              "cacheCreationInputTokens": 11221,
+              "webSearchRequests": 0,
+              "costUSD": 0.1293552,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 98,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 8,
+          "api_error": null,
+          "screenshots": 3,
+          "time_split": {
+            "api_seconds": 17.7,
+            "tool_seconds": 4.8,
+            "other_seconds": 2.0
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 9443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234334-ae40/state/0d8fa832f790/screenshots/702f188dcc6d46b5b4b41a94eb7e16cd.png",
+          "cleanup": {
+            "session": "0d8fa832f790",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 47.3,
+          "tool_calls": 15,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 7,
+            "desktop_click": 3,
+            "desktop_run": 1,
+            "desktop_screenshot": 1,
+            "desktop_ui": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 10,
+          "reply": "DONE \u2014 submitted Lin Okafor's (contractor, Brightwave Ltd) claim: Travel/Taxi from Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo, 50 km, 14/09/2026, NOK 1245.00 including NOK 249.00 VAT, paid by corporate card ending 2186. The page shows \"Claim submitted\".",
+          "cost_usd": 0.3249852000000001,
+          "usage": {
+            "input_tokens": 32,
+            "cache_creation_input_tokens": 24897,
+            "cache_read_input_tokens": 349206,
+            "output_tokens": 2792,
+            "output_tokens_details": {
+              "thinking_tokens": 214
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 24897,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 130,
+                "cache_read_input_tokens": 33421,
+                "cache_creation_input_tokens": 1586,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1586
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 32,
+              "outputTokens": 2792,
+              "cacheReadInputTokens": 349206,
+              "cacheCreationInputTokens": 24897,
+              "webSearchRequests": 0,
+              "costUSD": 0.3249852000000001,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 214,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 16,
+          "api_error": null,
+          "screenshots": 10,
+          "time_split": {
+            "api_seconds": 39.2,
+            "tool_seconds": 6.1,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234334-ae40/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234334-ae40/state/65388b83d220/screenshots/dc761599ccab47a89c0171643e6efa27.png",
+          "cleanup": {
+            "session": "65388b83d220",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 111.9,
+          "tool_calls": 22,
+          "tool_errors": 1,
+          "tools": {
+            "desktop_actions": 11,
+            "desktop_click": 3,
+            "desktop_run": 4,
+            "desktop_screenshot": 2,
+            "desktop_ui": 2
+          },
+          "inline_screenshots": 13,
+          "reply": "DONE: I set Norvik's 4 products (SKU-PBHB, SKU-GSYU, SKU-KX6C, SKU-N8FN) to Discontinued with stock 0, left the separate supplier \"Norvika\" alone, and the page title now reads \"complete\".",
+          "cost_usd": 0.48982819999999994,
+          "usage": {
+            "input_tokens": 46,
+            "cache_creation_input_tokens": 34682,
+            "cache_read_input_tokens": 635041,
+            "output_tokens": 4259,
+            "output_tokens_details": {
+              "thinking_tokens": 526
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 34682,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 128,
+                "cache_read_input_tokens": 43195,
+                "cache_creation_input_tokens": 1597,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1597
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 46,
+              "outputTokens": 4259,
+              "cacheReadInputTokens": 635041,
+              "cacheCreationInputTokens": 34682,
+              "webSearchRequests": 0,
+              "costUSD": 0.48982819999999994,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 526,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 23,
+          "api_error": null,
+          "screenshots": 13,
+          "time_split": {
+            "api_seconds": 90.2,
+            "tool_seconds": 19.7,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234334-ae40/state/469f6cfa7ec8/screenshots/030db3dd9013421eac3146fad8570030.png",
+          "cleanup": {
+            "session": "469f6cfa7ec8",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234649-f0ee",
+      "arm": "gate base",
+      "summary": {
+        "seed": 8,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": false,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.949,
+        "total_seconds": 141.0,
+        "seconds_p50_p95": [
+          46.1,
+          72.7
+        ],
+        "time_split": {
+          "api_seconds": 106.9,
+          "tool_seconds": 28.4,
+          "other_seconds": 5.7
+        },
+        "screenshots": 29,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 22.2,
+          "tool_calls": 7,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 1,
+            "desktop_focus": 2,
+            "desktop_screenshot": 1,
+            "desktop_type": 2,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 3,
+          "reply": "DONE \u2014 In checkout.ini, the [server] section now has port 8443 and log_level warning; [admin] still has port 8081 and debug logging, and ticket OPS-1579 is resolved with a short comment.",
+          "cost_usd": 0.12985000000000002,
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 11231,
+            "cache_read_input_tokens": 92570,
+            "output_tokens": 1072,
+            "output_tokens_details": {
+              "thinking_tokens": 110
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 11231,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 71,
+                "cache_read_input_tokens": 19378,
+                "cache_creation_input_tokens": 1963,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1963
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 12,
+              "outputTokens": 1072,
+              "cacheReadInputTokens": 92570,
+              "cacheCreationInputTokens": 11231,
+              "webSearchRequests": 0,
+              "costUSD": 0.12985000000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 110,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 8,
+          "api_error": null,
+          "screenshots": 3,
+          "time_split": {
+            "api_seconds": 15.3,
+            "tool_seconds": 4.9,
+            "other_seconds": 2.0
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 8443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234649-f0ee/state/ec4e63635d99/screenshots/04736c1d5f9a4c299e23bd6b900b5b34.png",
+          "cleanup": {
+            "session": "ec4e63635d99",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 46.1,
+          "tool_calls": 15,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 8,
+            "desktop_click": 2,
+            "desktop_run": 2,
+            "desktop_screenshot": 1,
+            "desktop_ui": 1,
+            "desktop_windows": 1
+          },
+          "inline_screenshots": 10,
+          "reply": "DONE: The page says \"Claim submitted\". The claim is for Lin Okafor, contractor at Brightwave Ltd: Travel, Taxi, from Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo, 34 km, 14/09/2026, NOK 1180.00 including NOK 236.00 VAT, paid by corporate card ending 1717.",
+          "cost_usd": 0.3141916,
+          "usage": {
+            "input_tokens": 32,
+            "cache_creation_input_tokens": 23662,
+            "cache_read_input_tokens": 335238,
+            "output_tokens": 2886,
+            "output_tokens_details": {
+              "thinking_tokens": 175
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 23662,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 128,
+                "cache_read_input_tokens": 32150,
+                "cache_creation_input_tokens": 1622,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1622
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 32,
+              "outputTokens": 2886,
+              "cacheReadInputTokens": 335238,
+              "cacheCreationInputTokens": 23662,
+              "webSearchRequests": 0,
+              "costUSD": 0.3141916,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 175,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 16,
+          "api_error": null,
+          "screenshots": 10,
+          "time_split": {
+            "api_seconds": 37.9,
+            "tool_seconds": 6.4,
+            "other_seconds": 1.8
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234649-f0ee/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234649-f0ee/state/ae46043b0275/screenshots/596660fbd2764140b5470ff8fd813c0e.png",
+          "cleanup": {
+            "session": "ae46043b0275",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 72.7,
+          "tool_calls": 21,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 10,
+            "desktop_click": 4,
+            "desktop_run": 2,
+            "desktop_screenshot": 1,
+            "desktop_scroll": 2,
+            "desktop_ui": 2
+          },
+          "inline_screenshots": 16,
+          "reply": "DONE: I checked all 4 pages and set the 4 Norvik products to Discontinued with stock 0. They are Item 03 (SKU-PSVG), Item 09 (SKU-V4EW), Item 51 (SKU-2N5Y) and Item 59 (SKU-5GNS); I left the similarly named \"Norvika\" products and all other rows unchanged, and the tab title now reads \"complete\".",
+          "cost_usd": 0.5050228,
+          "usage": {
+            "input_tokens": 44,
+            "cache_creation_input_tokens": 37319,
+            "cache_read_input_tokens": 627974,
+            "output_tokens": 4035,
+            "output_tokens_details": {
+              "thinking_tokens": 418
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 37319,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 162,
+                "cache_read_input_tokens": 45763,
+                "cache_creation_input_tokens": 1666,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1666
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 44,
+              "outputTokens": 4035,
+              "cacheReadInputTokens": 627974,
+              "cacheCreationInputTokens": 37319,
+              "webSearchRequests": 0,
+              "costUSD": 0.5050228,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 418,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 22,
+          "api_error": null,
+          "screenshots": 16,
+          "time_split": {
+            "api_seconds": 53.7,
+            "tool_seconds": 17.1,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234649-f0ee/state/1e683dc04ff8/screenshots/a59e05068ed6439aa285d1bde4eb32b0.png",
+          "cleanup": {
+            "session": "1e683dc04ff8",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-234935-171f",
+      "arm": "gate skill",
+      "summary": {
+        "seed": 6,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": true,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.481,
+        "total_seconds": 210.0,
+        "seconds_p50_p95": [
+          38.2,
+          154.2
+        ],
+        "time_split": {
+          "api_seconds": 68.9,
+          "tool_seconds": 135.5,
+          "other_seconds": 5.6
+        },
+        "screenshots": 3,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 17.6,
+          "tool_calls": 2,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 1,
+            "desktop_ui": 1
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE. In `checkout.ini`, I set the `[server]` port to 7443 and log_level to warning. The `[admin]` section still has port 8081 and debug logging, and `[database]` is unchanged. I also added a short comment to ticket OPS-1282 and resolved it. Rereading the file confirmed the new values, and the page now shows the ticket as \"Resolved\".",
+          "cost_usd": 0.1017078,
+          "usage": {
+            "input_tokens": 6,
+            "cache_creation_input_tokens": 7905,
+            "cache_read_input_tokens": 41819,
+            "output_tokens": 1504,
+            "output_tokens_details": {
+              "thinking_tokens": 83
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 7905,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 126,
+                "cache_read_input_tokens": 16430,
+                "cache_creation_input_tokens": 1585,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1585
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1504,
+              "cacheReadInputTokens": 41819,
+              "cacheCreationInputTokens": 7905,
+              "webSearchRequests": 0,
+              "costUSD": 0.1017078,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 83,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 3,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 13.7,
+            "tool_seconds": 2.0,
+            "other_seconds": 1.9
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 7443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234935-171f/state/2b13c6b855e7/screenshots/232f1b06ec454a358cbbcdb912a63849.png",
+          "cleanup": {
+            "session": "2b13c6b855e7",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 38.2,
+          "tool_calls": 6,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_click": 1,
+            "desktop_run": 2,
+            "desktop_screenshot": 1,
+            "desktop_scroll": 2
+          },
+          "inline_screenshots": 3,
+          "reply": "DONE \u2014 I submitted the expense claim for Lin Okafor (contractor, Brightwave Ltd), and the page now says \"Claim submitted\". The claim is for the Nordlys taxi on 17/09/2026 from Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo: 54 km, NOK 1320.00 including NOK 264.00 VAT, paid with the corporate card ending 1603. I ran the given script without its submit step, checked every field on screen, then clicked Submit myself.",
+          "cost_usd": 0.18706400000000004,
+          "usage": {
+            "input_tokens": 14,
+            "cache_creation_input_tokens": 13837,
+            "cache_read_input_tokens": 121560,
+            "output_tokens": 2600,
+            "output_tokens_details": {
+              "thinking_tokens": 258
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 13837,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 195,
+                "cache_read_input_tokens": 22314,
+                "cache_creation_input_tokens": 1633,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1633
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 14,
+              "outputTokens": 2600,
+              "cacheReadInputTokens": 121560,
+              "cacheCreationInputTokens": 13837,
+              "webSearchRequests": 0,
+              "costUSD": 0.18706400000000004,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 258,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 7,
+          "api_error": null,
+          "screenshots": 3,
+          "time_split": {
+            "api_seconds": 25.1,
+            "tool_seconds": 11.2,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-234935-171f/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234935-171f/state/51f8970d1d82/screenshots/e9416227c4824e708c37abf94d70a294.png",
+          "cleanup": {
+            "session": "51f8970d1d82",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 154.2,
+          "tool_calls": 4,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 3,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE: all 4 Norvik products are now Discontinued with stock 0: SKU-VXZ7, SKU-4NGJ, SKU-54KN and SKU-FWX8. The given script did the first three but skipped the last two rows on every page, including SKU-FWX8 (on page 3), so I edited that one myself. A full read of all 4 pages, 60 rows, found no other changes (the \"Norvika\" products are untouched), and the tab title now says \"Task - complete\".",
+          "cost_usd": 0.19211659999999997,
+          "usage": {
+            "input_tokens": 10,
+            "cache_creation_input_tokens": 13945,
+            "cache_read_input_tokens": 88883,
+            "output_tokens": 3137,
+            "output_tokens_details": {
+              "thinking_tokens": 278
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 13945,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 214,
+                "cache_read_input_tokens": 22984,
+                "cache_creation_input_tokens": 1071,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1071
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 10,
+              "outputTokens": 3137,
+              "cacheReadInputTokens": 88883,
+              "cacheCreationInputTokens": 13945,
+              "webSearchRequests": 0,
+              "costUSD": 0.19211659999999997,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 278,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 5,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 30.1,
+            "tool_seconds": 122.3,
+            "other_seconds": 1.8
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-234935-171f/state/fcaefd693e6f/screenshots/e159cdfa119f434ca7b62bde81c68915.png",
+          "cleanup": {
+            "session": "fcaefd693e6f",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-235316-d371",
+      "arm": "gate skill",
+      "summary": {
+        "seed": 7,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": true,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.392,
+        "total_seconds": 199.6,
+        "seconds_p50_p95": [
+          34.9,
+          149.0
+        ],
+        "time_split": {
+          "api_seconds": 65.0,
+          "tool_seconds": 128.9,
+          "other_seconds": 5.8
+        },
+        "screenshots": 1,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 15.7,
+          "tool_calls": 2,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 2
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE \u2014 in `checkout.ini`, the `[server]` section now has port 9443 and log_level `warning`. The `[admin]` section (port 8081, debug logging) and the rest of the file are unchanged. OPS-1354 is resolved with a short comment, and the page shows \"Resolved\".",
+          "cost_usd": 0.091706,
+          "usage": {
+            "input_tokens": 6,
+            "cache_creation_input_tokens": 7221,
+            "cache_read_input_tokens": 41370,
+            "output_tokens": 1282,
+            "output_tokens_details": {
+              "thinking_tokens": 55
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 7221,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 99,
+                "cache_read_input_tokens": 15983,
+                "cache_creation_input_tokens": 1348,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1348
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1282,
+              "cacheReadInputTokens": 41370,
+              "cacheCreationInputTokens": 7221,
+              "webSearchRequests": 0,
+              "costUSD": 0.091706,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 55,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 3,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 11.7,
+            "tool_seconds": 2.0,
+            "other_seconds": 2.1
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 9443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235316-d371/state/105349f40a2c/screenshots/e04c86a9472949c58b42fe1422fd4762.png",
+          "cleanup": {
+            "session": "105349f40a2c",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 34.9,
+          "tool_calls": 3,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 2,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 1,
+          "reply": " complete\".\n\nThe claim used these receipt details:\n- **Trip:** taxi on 14.09.2026, Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo, 50 km\n- **Cost:** NOK 1245.00, including NOK 249.00 VAT\n- **Payment:** corporate card ending 2186\n\nThe checks just before submitting confirmed the date, amounts, company name, both addresses and card digits. They didn't confirm Lin Okafor's name or the dropdown choices (category, transport mode, currency, payment method), because the browser didn't report those values back.",
+          "cost_usd": 0.1443064,
+          "usage": {
+            "input_tokens": 8,
+            "cache_creation_input_tokens": 10465,
+            "cache_read_input_tokens": 59472,
+            "output_tokens": 2433,
+            "output_tokens_details": {
+              "thinking_tokens": 205
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 10465,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 344,
+                "cache_read_input_tokens": 17074,
+                "cache_creation_input_tokens": 3501,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 3501
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 8,
+              "outputTokens": 2433,
+              "cacheReadInputTokens": 59472,
+              "cacheCreationInputTokens": 10465,
+              "webSearchRequests": 0,
+              "costUSD": 0.1443064,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 205,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 4,
+          "api_error": null,
+          "screenshots": 1,
+          "time_split": {
+            "api_seconds": 22.2,
+            "tool_seconds": 10.9,
+            "other_seconds": 1.8
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-235316-d371/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235316-d371/state/b7dbac9de5da/screenshots/f15f392a6cea413f8051a0402c01c572.png",
+          "cleanup": {
+            "session": "b7dbac9de5da",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 149.0,
+          "tool_calls": 3,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 2,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE \u2014 The four Norvik products (SKU-PBHB, SKU-GSYU, SKU-KX6C, SKU-N8FN) are now Discontinued with stock 0. The script's own check only read 52 of the 60 rows, so I read the 8 it missed separately: none were Norvik, and the other products checked, including the similarly named Norvika, are unchanged.",
+          "cost_usd": 0.1562512,
+          "usage": {
+            "input_tokens": 8,
+            "cache_creation_input_tokens": 11347,
+            "cache_read_input_tokens": 65916,
+            "output_tokens": 2613,
+            "output_tokens_details": {
+              "thinking_tokens": 385
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 11347,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 149,
+                "cache_read_input_tokens": 20419,
+                "cache_creation_input_tokens": 1038,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1038
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 8,
+              "outputTokens": 2613,
+              "cacheReadInputTokens": 65916,
+              "cacheCreationInputTokens": 11347,
+              "webSearchRequests": 0,
+              "costUSD": 0.1562512,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 385,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 4,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 31.1,
+            "tool_seconds": 116.0,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235316-d371/state/ae70ac7a0ce7/screenshots/faac6662f24c401b93425f1cfd2b43f7.png",
+          "cleanup": {
+            "session": "ae70ac7a0ce7",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    },
+    {
+      "run": "20261013-235647-31eb",
+      "arm": "gate skill",
+      "summary": {
+        "seed": 8,
+        "human": false,
+        "effort": null,
+        "tools": "full",
+        "effects": false,
+        "look": true,
+        "look_delta": false,
+        "run": true,
+        "learn": false,
+        "skill": true,
+        "replay": false,
+        "guards": true,
+        "firefox": false,
+        "bridge": false,
+        "atlas": false,
+        "accessibility": true,
+        "tasks": 3,
+        "passed": 3,
+        "skipped": [],
+        "invalid_api_error": [],
+        "cleanup_failures": [],
+        "total_cost_usd": 0.435,
+        "total_seconds": 317.0,
+        "seconds_p50_p95": [
+          27.4,
+          272.8
+        ],
+        "time_split": {
+          "api_seconds": 70.0,
+          "tool_seconds": 241.4,
+          "other_seconds": 5.6
+        },
+        "screenshots": 3,
+        "model": "claude-opus-5-5"
+      },
+      "records": [
+        {
+          "task": "real-ticket-config",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 16.8,
+          "tool_calls": 2,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 1,
+            "desktop_screenshot": 1
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE: checkout.ini now has [server] port = 8443 and log_level = warning, [admin] and [database] are unchanged, and ticket OPS-1579 is resolved with a short comment.",
+          "cost_usd": 0.0968608,
+          "usage": {
+            "input_tokens": 6,
+            "cache_creation_input_tokens": 7431,
+            "cache_read_input_tokens": 41344,
+            "output_tokens": 1456,
+            "output_tokens_details": {
+              "thinking_tokens": 71
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 7431,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 66,
+                "cache_read_input_tokens": 15956,
+                "cache_creation_input_tokens": 1585,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 1585
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 6,
+              "outputTokens": 1456,
+              "cacheReadInputTokens": 41344,
+              "cacheCreationInputTokens": 7431,
+              "webSearchRequests": 0,
+              "costUSD": 0.0968608,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 71,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 3,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 13.0,
+            "tool_seconds": 1.9,
+            "other_seconds": 1.9
+          },
+          "detail": {
+            "resolved": true,
+            "config": "# Checkout service\n[server]\nhost = 0.0.0.0\nport = 8443\nlog_level = warning\nworkers = 4\n\n[admin]\nport = 8081\nlog_level = debug\n\n[database]\nurl = postgres://db.internal/checkout\n"
+          },
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235647-31eb/state/1bb1039480ef/screenshots/0d3df226abbb4d93af19571bae980f26.png",
+          "cleanup": {
+            "session": "1bb1039480ef",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-expense-claim",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 27.4,
+          "tool_calls": 1,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_run": 1
+          },
+          "inline_screenshots": 0,
+          "reply": "DONE: I submitted the claim for Lin Okafor (contractor, Brightwave Ltd): taxi from Oslo Airport (OSL) to Gr\u00fcnerl\u00f8kka, Oslo on 14.09.2026, 34 km, NOK 1180.00 including NOK 236.00 VAT, paid with the corporate card ending 1717. The browser title changed to \"Task - complete\".",
+          "cost_usd": 0.103244,
+          "usage": {
+            "input_tokens": 4,
+            "cache_creation_input_tokens": 7763,
+            "cache_read_input_tokens": 25920,
+            "output_tokens": 1797,
+            "output_tokens_details": {
+              "thinking_tokens": 63
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 7763,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 192,
+                "cache_read_input_tokens": 15810,
+                "cache_creation_input_tokens": 2063,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 2063
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 4,
+              "outputTokens": 1797,
+              "cacheReadInputTokens": 25920,
+              "cacheCreationInputTokens": 7763,
+              "webSearchRequests": 0,
+              "costUSD": 0.103244,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 63,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 2,
+          "api_error": null,
+          "screenshots": 0,
+          "time_split": {
+            "api_seconds": 15.8,
+            "tool_seconds": 9.8,
+            "other_seconds": 1.8
+          },
+          "detail": [
+            "/home/user/agent-desktop/artifacts/benchmark/20261013-235647-31eb/real-expense-claim/receipt-taxi.txt - Mousepad",
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235647-31eb/state/ef5a706e0f31/screenshots/8647290bc81e44ff92bc73028ee0a6be.png",
+          "cleanup": {
+            "session": "ef5a706e0f31",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        },
+        {
+          "task": "real-inventory-cleanup",
+          "passed": true,
+          "skill": true,
+          "model": "claude-opus-5-5",
+          "exit_code": 0,
+          "stderr": "",
+          "elapsed_seconds": 272.8,
+          "tool_calls": 6,
+          "tool_errors": 0,
+          "tools": {
+            "desktop_actions": 2,
+            "desktop_run": 4
+          },
+          "inline_screenshots": 3,
+          "reply": "DONE: All 4 Norvik products (SKU-PSVG, SKU-V4EW, SKU-2N5Y, SKU-5GNS) now show stock 0 and status Discontinued. The provided script only did 3 of them and still reported success. I updated SKU-5GNS by hand and checked all 60 rows on the 4 pages, and no other product changed (including the \"Norvika\" ones).",
+          "cost_usd": 0.23443940000000002,
+          "usage": {
+            "input_tokens": 14,
+            "cache_creation_input_tokens": 15710,
+            "cache_read_input_tokens": 128817,
+            "output_tokens": 4147,
+            "output_tokens_details": {
+              "thinking_tokens": 539
+            },
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 15710,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 183,
+                "cache_read_input_tokens": 23472,
+                "cache_creation_input_tokens": 2348,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 0,
+                  "ephemeral_1h_input_tokens": 2348
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "model_usage": {
+            "claude-opus-5-5": {
+              "inputTokens": 14,
+              "outputTokens": 4147,
+              "cacheReadInputTokens": 128817,
+              "cacheCreationInputTokens": 15710,
+              "webSearchRequests": 0,
+              "costUSD": 0.23443940000000002,
+              "contextWindow": 1000000,
+              "maxOutputTokens": 128000,
+              "thinkingTokens": 539,
+              "canonicalModel": "claude-opus-5-5",
+              "provider": "firstParty",
+              "costBasis": "list"
+            }
+          },
+          "turns": 7,
+          "api_error": null,
+          "screenshots": 3,
+          "time_split": {
+            "api_seconds": 41.2,
+            "tool_seconds": 229.7,
+            "other_seconds": 1.9
+          },
+          "detail": [
+            "Task - complete - Chromium"
+          ],
+          "final_screenshot": "/home/user/agent-desktop/artifacts/benchmark/20261013-235647-31eb/state/351860d67704/screenshots/d1ac874efc344e0da4f6fd1b18eb6c4a.png",
+          "cleanup": {
+            "session": "351860d67704",
+            "status": "stopped",
+            "runtime_removed": true
+          },
+          "leftover_processes": []
+        }
+      ]
+    }
+  ]
+}

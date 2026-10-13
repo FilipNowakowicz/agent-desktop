@@ -1,5 +1,33 @@
 # Development log
 
+## 2026-10-14 — E6: verified skills do not meet the 3× gate
+
+`scripts/benchmark.py` gained `--learn DIR` (the agent ends with a whole-task
+script, read from the transcript's full final reply and saved as
+`DIR/<task>.py`), `--replay DIR` (no agent: run the script through
+`desktop_run`, then the task check) and `--skill DIR` (the agent gets the
+script). New unit test `SkillTests` for the reply parsing. Details and medians:
+[E6 skills](../research/2026-10-14-e6-skills.md); runs and skill source:
+`benchmarks/results/2026-10-14-e6-skills.json`.
+
+- Learn (seed 1): 3/3 passed, 3/3 skills returned.
+- Replay without a model: expense 3/3 (about 10 s against a 47 s agent
+  median), ticket 3/3 (about 2 s against 22 s), inventory 0/1, then the
+  repaired inventory skill 0/2. On seeds 6 and 7 the repaired skill exited 0
+  and printed OK, but it had read 52 of 60 rows, so the task check failed.
+- Gate (seeds 6–8, `--run` in both arms): 18/18 passed; skill arm turns
+  −62% to −77%, wall time 1.36× and 1.33× faster on expense and ticket, 0.47×
+  on inventory (tool time 116–230 s). Not met.
+
+Invalid runs, excluded: the first repair run hit the account usage limit
+(`api_error: usage_limit_reached`), and the first skill batch never started
+(`"--skill DIR"` passed as one zsh word). Arms were not interleaved: the
+skill runs followed the baseline runs by 10–25 minutes.
+
+Validation: `uv run python -m unittest tests.test_benchmark_timing` (6 OK),
+`uv run ruff check src scripts tests`, `uv run ruff format --check src scripts
+tests`. The desktop suite was not rerun: no runtime code changed.
+
 ## 2026-10-13 — E5: benchmark arms run in parallel in the cloud
 
 A cloud session on main (after #117, #120, #121; claude.ai/code session

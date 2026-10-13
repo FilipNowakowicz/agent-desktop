@@ -2,7 +2,7 @@
 
 import random
 
-from .tasks import DialogTask, Task, chromium, code, html
+from .tasks import DialogTask, Task, chromium, code, page
 
 
 class TicketTransfer(Task):
@@ -11,10 +11,10 @@ class TicketTransfer(Task):
 
     def setup(self, context):
         context.secret = code()
-        page = html(
+        page_html = page(
             "<p>Support form</p><p>Ticket number <input id=t autocomplete=off></p>"
             "<button id=go>Open ticket</button>",
-            f"go.onclick=()=>done(t.value.trim()==='{context.secret}',t.value);",
+            "go.onclick=()=>report({ticket:t.value});",
         )
         terminal = [
             "foot",
@@ -29,7 +29,10 @@ class TicketTransfer(Task):
             "Copy the ticket number shown in the terminal into the browser form and "
             "open the ticket."
         )
-        return [terminal, chromium(context, page)], prompt
+        return [terminal, chromium(context, page_html)], prompt
+
+    def judge(self, context, state):
+        return state["ticket"].strip() == context.secret
 
 
 class WebAdmin(Task):
@@ -42,7 +45,7 @@ class WebAdmin(Task):
         rows = "".join(
             f"{{n:'{n}',role:'{random.choice(['viewer', 'editor'])}'}}," for n in people
         )
-        page = html(
+        page_html = page(
             "<div id=app></div>",
             f"const users=[{rows}];let state='login';function render(){{"
             "if(state==='login')app.innerHTML='<h2>Admin sign in</h2><p>User <input id=u>'"
@@ -62,16 +65,18 @@ class WebAdmin(Task):
             "if(state==='users')app.querySelectorAll('button').forEach(b=>b.onclick=()=>{"
             "state=+b.dataset.i;render()});if(typeof state==='number'){save.onclick=()=>"
             "m.style.display='block';no.onclick=()=>m.style.display='none';yes.onclick=()=>{"
-            "users[state].role=r.value;const x=users.find(v=>v.n==='mallory');"
-            "const others=users.filter(v=>v.n!=='mallory'&&v.role==='auditor').length;"
-            "done(x.role==='auditor'&&others===0,x.n+'='+x.role);state='users';render()}}}render();",
+            "users[state].role=r.value;report({auditors:users.filter(v=>v.role==="
+            "'auditor').map(v=>v.n)});state='users';render()}}}render();",
         )
         prompt = (
             "A browser shows an admin site. Sign in as 'admin' with password 'hunter2', "
             "go to user management, change the role of user 'mallory' (and nobody "
             "else) to 'auditor', and apply the change."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def judge(self, context, state):
+        return state["auditors"] == ["mallory"]
 
 
 class InterruptingModal(Task):
@@ -79,7 +84,7 @@ class InterruptingModal(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<form id=f><p>Street <input id=street></p><p>City <input id=city></p>"
             "<p>Postcode <input id=zip></p><button>Save address</button></form>"
             "<div id=m style='display:none;position:fixed;inset:0;background:#0008'>"
@@ -89,17 +94,24 @@ class InterruptingModal(Task):
             "let signedOut=false,shown=false;street.oninput=()=>{if(!shown){shown=true;"
             "setTimeout(()=>{m.style.display='block';document.activeElement.blur()},1500)}};"
             "stay.onclick=()=>m.style.display='none';out.onclick=()=>{signedOut=true;"
-            "m.style.display='none';document.body.innerHTML='<h1>Signed out</h1>';done(false,"
-            "'signed out')};f.onsubmit=e=>{e.preventDefault();const ok=!signedOut&&"
-            "street.value.trim()==='12 Harbour Road'&&city.value.trim()==='Bergen'&&"
-            "zip.value.trim()==='5003';done(ok,JSON.stringify([street.value,city.value,"
-            "zip.value]))};",
+            "m.style.display='none';document.body.innerHTML='<h1>Signed out</h1>';"
+            "report({signedOut:true})};f.onsubmit=e=>{e.preventDefault();report({"
+            "street:street.value,city:city.value,zip:zip.value})};",
         )
         prompt = (
             "Fill the address form in the browser: street '12 Harbour Road', city "
             "'Bergen', postcode '5003', and save it. Do not sign out."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def judge(self, context, state):
+        if any(s.get("signedOut") for s in context.reports.states()):
+            return False
+        return [state.get(k, "").strip() for k in ("street", "city", "zip")] == [
+            "12 Harbour Road",
+            "Bergen",
+            "5003",
+        ]
 
 
 class SlowLoad(Task):
@@ -108,15 +120,20 @@ class SlowLoad(Task):
 
     def setup(self, context):
         context.secret = code()
-        page = html(
+        page_html = page(
             "<p>Press <b>Generate</b> to create a voucher, then enter the voucher code "
             "below and redeem it.</p><button id=gen>Generate</button><p id=out></p>"
             "<p>Voucher <input id=v autocomplete=off> <button id=red>Redeem</button></p>",
             "gen.onclick=()=>{out.textContent='Generating... please wait';"
             f"setTimeout(()=>out.textContent='Your voucher: {context.secret}',7000)}};"
-            f"red.onclick=()=>done(v.value.trim()==='{context.secret}',v.value);",
+            "red.onclick=()=>report({voucher:v.value});",
         )
-        return [chromium(context, page)], "Complete the task shown on the web page."
+        return [
+            chromium(context, page_html)
+        ], "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["voucher"].strip() == context.secret
 
 
 class ChartReading(Task):
@@ -127,19 +144,22 @@ class ChartReading(Task):
         months = ["January", "February", "March", "April", "May", "June"]
         values = random.sample(range(20, 95, 7), len(months))
         context.answer = months[values.index(max(values))]
-        page = html(
+        page_html = page(
             "<p>Monthly sales (bar chart). Which month had the highest sales?</p>"
             "<canvas id=c width=640 height=320></canvas><p>Answer <input id=a> "
             "<button id=go>Submit</button></p>",
             f"const m={months},v={values};const g=c.getContext('2d');g.font='14px sans-serif';"
             "m.forEach((x,i)=>{g.fillStyle='#46a';g.fillRect(20+i*100,300-v[i]*3,60,v[i]*3);"
             "g.fillStyle='#000';g.fillText(x.slice(0,3),30+i*100,316)});"
-            f"go.onclick=()=>done(a.value.trim().toLowerCase()==='{context.answer.lower()}',a.value);",
+            "go.onclick=()=>report({month:a.value});",
         )
         prompt = (
             "Answer the question on the web page (type the full month name) and submit."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def judge(self, context, state):
+        return state["month"].strip().lower() == context.answer.lower()
 
 
 class EditorOpenEdit(Task):
@@ -245,11 +265,10 @@ class FocusSteal(Task):
             "The quarterly review is moved to Thursday at 14:00 in room Fjord. "
             "Please bring the updated figures and the hiring plan."
         )
-        page = html(
+        page_html = page(
             "<p>Message</p><textarea id=t rows=6 cols=70></textarea>"
             "<p><button id=send>Send</button></p>",
-            "send.onclick=()=>{const v=t.value.replace(/\\s+/g,' ').trim();"
-            f"done(v==={context.text!r},v)}};",
+            "send.onclick=()=>report({message:t.value});",
         )
         warning = [
             "sh",
@@ -263,14 +282,17 @@ class FocusSteal(Task):
             "Other windows may appear; close them and make sure the message is exact."
         )
         context.wait_windows = 1
-        return [chromium(context, page), warning], prompt
+        return [chromium(context, page_html), warning], prompt
+
+    def judge(self, context, state):
+        return " ".join(state["message"].split()) == context.text
 
     def check(self, context):
-        ok, titles = super().check(context)
+        ok, state = super().check(context)
         warning_closed = context.applications[1]
         status = context.status_of(warning_closed)
         closed = status is not None and status["exit_code"] is not None
-        return ok and closed, {"titles": titles, "warning_closed": closed}
+        return ok and closed, {"state": state, "warning_closed": closed}
 
 
 class Validation(Task):
@@ -278,18 +300,21 @@ class Validation(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<h2>Order bolts</h2><p>Quantity <input id=q type=number></p>"
             "<button id=o>Place order</button><p id=err style='color:#b00'></p>",
             "o.onclick=()=>{const n=+q.value;if(n%6){err.textContent='Bolts ship in "
-            "boxes of 6: quantity must be a multiple of 6.';done(false,'q='+n);return}"
-            "err.textContent='';done(n===24,'q='+n)};",
+            "boxes of 6: quantity must be a multiple of 6.';report({quantity:n,"
+            "placed:false});return}err.textContent='';report({quantity:n,placed:true})};",
         )
         prompt = (
             "In the browser, order the smallest quantity of bolts that is at least 20 "
             "and that the shop accepts. Make sure the order is placed."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def judge(self, context, state):
+        return state == {"quantity": 24, "placed": True}
 
 
 HARD_TASKS = [

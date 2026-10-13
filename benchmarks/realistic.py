@@ -8,10 +8,11 @@ read the outcome (page state, files, saved settings), never the agent's reply.
 """
 
 import random
+import re
 from pathlib import Path
 
 from .atlas import ini_value
-from .tasks import Task, chromium, code, html, title_complete
+from .tasks import Task, chromium, code, page
 
 
 def editor(path):
@@ -53,8 +54,7 @@ class ReleaseNotes(Task):
             "Channel: stable\n\n" + "\n".join(lines) + "\n\n"
             "Only user-facing items go into the published highlights.\n"
         )
-        expected = sorted(x.lower() for x in user)
-        page = html(
+        page_html = page(
             "<h2>Release desk</h2>"
             "<p>Version <input id=ver placeholder='e.g. 1.2.3'></p>"
             "<p>Release date <input id=date type=date></p>"
@@ -72,20 +72,37 @@ class ReleaseNotes(Task):
             "q.textContent='Publish '+ver.value+' to '+ch.value+'? Subscribers are "
             "notified immediately.';m.style.display='block'};no.onclick=()=>"
             "m.style.display='none';yes.onclick=()=>{m.style.display='none';"
-            "const got=hl.value.split('\\n').map(s=>s.replace(/^[-*\\s]+/,'')"
-            ".replace(/^\\[user-facing\\]\\s*/i,'').trim().toLowerCase())"
-            ".filter(Boolean).sort();"
-            f"const want={expected!r};"
-            f"const ok=ver.value.trim()==={version!r}&&date.value==="
-            f"'2026-11-{day:02d}'&&ch.value==='stable'&&JSON.stringify(got)==="
-            "JSON.stringify(want);done(ok,JSON.stringify([ver.value,date.value,"
-            "ch.value,got]))};",
+            "report({version:ver.value,date:date.value,channel:ch.value,"
+            "highlights:hl.value})};",
         )
         prompt = (
             "Publish the upcoming release on the release desk in the browser. The "
             "draft release notes are open in the text editor."
         )
-        return [editor(notes), chromium(context, page)], prompt
+        return [editor(notes), chromium(context, page_html)], prompt
+
+    def check(self, context):
+        state = context.reports.last()
+        if state is None:
+            return False, "not published"
+        answer = context.answer
+        # As a reader would: bullets and the [user-facing] tag do not count.
+        lines = (
+            re.sub(
+                r"^\[user-facing\]\s*", "", re.sub(r"^[-*\s]+", "", line), flags=re.I
+            )
+            .strip()
+            .lower()
+            for line in state["highlights"].split("\n")
+        )
+        got = sorted(line for line in lines if line)
+        ok = (
+            state["version"].strip() == answer["version"]
+            and state["date"] == f"2026-11-{answer['day']:02d}"
+            and state["channel"] == "stable"
+            and got == sorted(x.lower() for x in answer["highlights"])
+        )
+        return ok, {**state, "highlights": got}
 
 
 class TicketConfig(Task):
@@ -106,7 +123,7 @@ class TicketConfig(Task):
         )
         context.config.write_text(context.original)
         ticket = random.randint(1200, 1999)
-        page = html(
+        page_html = page(
             f"<h2>OPS-{ticket}: checkout service config</h2>"
             "<p><b>Reporter:</b> Priya (on-call)</p><p>The checkout service on this "
             f"machine must listen on port {context.port} and log only warnings. "
@@ -117,16 +134,16 @@ class TicketConfig(Task):
             "</textarea></p><button id=res>Resolve</button><p id=err "
             "style='color:#b00'></p>",
             "res.onclick=()=>{if(c.value.trim().length<3){err.textContent="
-            "'A comment is required to resolve.';return}document.body.innerHTML="
-            "'<h2>Resolved</h2>';done(true)};",
+            "'A comment is required to resolve.';return}const state={comment:c.value};"
+            "document.body.innerHTML='<h2>Resolved</h2>';report(state)};",
         )
         prompt = (
             "Handle the ops ticket that is open in the browser. A terminal is open too."
         )
-        return [terminal(folder), chromium(context, page)], prompt
+        return [terminal(folder), chromium(context, page_html)], prompt
 
     def check(self, context):
-        resolved, titles = title_complete(context)
+        resolved = context.reports.last() is not None
         try:
             text = context.config.read_text()
         except OSError:
@@ -168,7 +185,7 @@ class ExpenseClaim(Task):
             f"Distance: {km} km\n\nTotal NOK {total},00\n"
             f"incl. VAT 25%: NOK {vat},00\nPaid: corporate card ****{card}\n"
         )
-        page = html(
+        page_html = page(
             "<h2>Expense claim</h2><form id=f>"
             "<p>Claimant name <input id=claimant></p>"
             "<p>I am <label><input type=radio name=who value=employee>an employee"
@@ -201,21 +218,38 @@ class ExpenseClaim(Task):
             "const v={name:claimant.value.trim(),who,company:company.value.trim(),"
             "cat:cat.value,mode:mode.value,from:from.value,to:to.value,km:+km.value,"
             "date:date.value,amount:+amount.value,cur:cur.value,vat:+vat.value,"
-            "paid:paid.value,last4:last4.value.trim()};const good=v.name==='Lin Okafor'"
-            "&&v.who==='contractor'&&/brightwave/i.test(v.company)&&v.cat==='Travel'"
-            "&&v.mode==='Taxi'&&/(oslo airport|osl)/i.test(v.from)&&"
-            "/grünerløkka/i.test(v.to)"
-            f"&&v.km==={km}&&v.date==='2026-09-{day:02d}'&&v.amount==={total}"
-            f"&&v.cur==='NOK'&&v.vat==={vat}&&v.paid==='card'&&v.last4==='{card}';"
-            "document.body.innerHTML='<h2>Claim submitted</h2>';"
-            "done(good,JSON.stringify(v))};",
+            "paid:paid.value,last4:last4.value.trim()};"
+            "document.body.innerHTML='<h2>Claim submitted</h2>';report(v)};",
         )
         prompt = (
             "Submit an expense claim in the browser for the taxi receipt that is "
             "open in the text editor. The claim is for Lin Okafor, a contractor "
             "from Brightwave Ltd."
         )
-        return [editor(receipt), chromium(context, page)], prompt
+        return [editor(receipt), chromium(context, page_html)], prompt
+
+    def check(self, context):
+        v = context.reports.last()
+        if v is None:
+            return False, "not submitted"
+        answer = context.answer
+        ok = (
+            v["name"] == "Lin Okafor"
+            and v["who"] == "contractor"
+            and re.search("brightwave", v["company"], re.I) is not None
+            and v["cat"] == "Travel"
+            and v["mode"] == "Taxi"
+            and re.search("oslo airport|osl", v["from"], re.I) is not None
+            and re.search("grünerløkka", v["to"], re.I) is not None
+            and v["km"] == answer["km"]
+            and v["date"] == f"2026-09-{answer['day']:02d}"
+            and v["amount"] == answer["total"]
+            and v["cur"] == "NOK"
+            and v["vat"] == answer["vat"]
+            and v["paid"] == "card"
+            and v["last4"] == answer["card"]
+        )
+        return ok, v
 
 
 class InventoryCleanup(Task):
@@ -239,7 +273,8 @@ class InventoryCleanup(Task):
             )
         for index in random.sample(range(60), 4):
             rows[index]["supplier"] = "Norvik"
-        page = html(
+        context.rows = [dict(row) for row in rows]
+        page_html = page(
             "<h2>Inventory</h2><div id=app></div><div id=dlg style='display:none;"
             "position:fixed;inset:0;background:#0006'><div style='background:#fff;"
             "margin:100px auto;width:380px;padding:20px'><h3 id=dt></h3><p>Stock "
@@ -251,7 +286,7 @@ class InventoryCleanup(Task):
             "width:380px;padding:20px'>Your session expires in 60 seconds."
             "<p><button id=stay>Stay signed in</button> <button id=out>Sign out"
             "</button></p></div></div>",
-            f"const rows={rows!r};const orig=JSON.parse(JSON.stringify(rows));"
+            f"const rows={rows!r};"
             "let page=0,cur=null,saves=0,gone=false;const per=15;function render(){"
             "const part=rows.slice(page*per,page*per+per);app.innerHTML="
             "'<table border=1 cellpadding=5><tr><th>SKU<th>Name<th>Supplier<th>Stock"
@@ -267,19 +302,33 @@ class InventoryCleanup(Task):
             "dlg.style.display='none';sv.onclick=()=>{if(gone)return;rows[cur].stock="
             "+st.value;rows[cur].status=ss.value;dlg.style.display='none';render();"
             "saves++;if(saves===2)setTimeout(()=>exp.style.display='block',800);"
-            "judge()};stay.onclick=()=>exp.style.display='none';out.onclick=()=>{"
-            "gone=true;document.body.innerHTML='<h2>Signed out</h2>';done(false,"
-            "'signed out')};function judge(){const bad=rows.filter((r,i)=>"
-            "r.supplier==='Norvik'?r.stock!==0||r.status!=='Discontinued':"
-            "r.stock!==orig[i].stock||r.status!==orig[i].status);done(!bad.length,"
-            "bad.length+' rows wrong')}render();",
+            "report({rows})};stay.onclick=()=>exp.style.display='none';out.onclick=()=>{"
+            "gone=true;document.body.innerHTML='<h2>Signed out</h2>';"
+            "report({signedOut:true})};render();",
         )
         prompt = (
             "Our supplier Norvik has gone out of business. In the inventory app in "
             "the browser, mark all of their products as discontinued with no stock "
             "left. Other products must not change."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def check(self, context):
+        states = context.reports.states()
+        if any(state.get("signedOut") for state in states):
+            return False, "signed out"
+        if not states:
+            return False, "nothing saved"
+        wrong = [
+            row["sku"]
+            for row, was in zip(states[-1]["rows"], context.rows, strict=True)
+            if (
+                (row["stock"], row["status"]) != (0, "Discontinued")
+                if was["supplier"] == "Norvik"
+                else (row["stock"], row["status"]) != (was["stock"], was["status"])
+            )
+        ]
+        return not wrong, f"{len(wrong)} rows wrong: {wrong}"
 
 
 class EditorIndentation(Task):
@@ -347,7 +396,7 @@ class AttachInvoice(Task):
         for name in names:
             (folder / name).write_bytes(b"%PDF-1.4\n% placeholder invoice\n")
         months = {"03": "March", "04": "April", "05": "May"}
-        page = html(
+        page_html = page(
             "<h2>Supplier payments</h2><p>Supplier <select id=s><option value=''>"
             "Choose</option><option>Contoso</option><option>Northwind</option>"
             "</select></p><p>Invoice (PDF) <input id=file type=file accept=.pdf>"
@@ -355,15 +404,21 @@ class AttachInvoice(Task):
             "style='color:#b00'></p>",
             "send.onclick=()=>{const f=file.files[0];if(!s.value||!f){"
             "err.textContent='Choose a supplier and attach the invoice.';return}"
-            f"const ok=s.value==='Northwind'&&f.name==={context.expected!r},"
-            "detail=s.value+' '+f.name;"
-            "document.body.innerHTML='<h2>Sent for payment</h2>';done(ok,detail)};",
+            "const state={supplier:s.value,file:f.name};"
+            "document.body.innerHTML='<h2>Sent for payment</h2>';report(state)};",
         )
         prompt = (
             f"Send Northwind's final invoice for {months[month]} 2026 for payment "
             f"in the browser. Our invoices are in {folder}."
         )
-        return [chromium(context, page)], prompt
+        return [chromium(context, page_html)], prompt
+
+    def check(self, context):
+        state = context.reports.last()
+        if state is None:
+            return False, "not sent"
+        ok = state == {"supplier": "Northwind", "file": context.expected}
+        return ok, state
 
 
 REALISTIC_TASKS = [

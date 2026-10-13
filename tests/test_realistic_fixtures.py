@@ -1,10 +1,10 @@
 """Positive control for the realistic web fixtures: a scripted solution, run in
-headless Chromium against each generated page, must complete the task, and a
-wrong one must not. Catches fixture bugs (such as an element id that a window
-property shadows) before an agent run is spent on them."""
+headless Chromium against each generated page, must pass the task's check, and
+a wrong one must not. Catches fixture bugs (such as an element id that a window
+property shadows) before an agent run is spent on them. Without a browser:
+pages must not carry their judge or the expected answer."""
 
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -16,6 +16,7 @@ from pathlib import Path
 from test_runtime import CHROMIUM
 
 from benchmarks import realistic
+from benchmarks.tasks import Reports
 
 FILL = (
     "const set=(e,v)=>{e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));"
@@ -68,6 +69,18 @@ def attach_invoice(answer, right):
     )
 
 
+def fixed_config(context, right):
+    """The terminal half of the ticket: the server section edited."""
+    if right:
+        context.config.write_text(
+            context.original.replace(
+                "port = 8080", f"port = {context.port}", 1
+            ).replace("log_level = debug", "log_level = warning", 1)
+        )
+
+
+PREPARE = {"real-ticket-config": fixed_config}
+
 SOLVERS = {
     "real-release-notes": (release_notes, "answer"),
     "real-ticket-config": (ticket_config, "port"),
@@ -93,11 +106,16 @@ def snap_wrapper(path):
     "desktop runtime or a non-snap Chromium unavailable",
 )
 class RealisticFixtureTests(unittest.TestCase):
-    def title_after(self, task, right):
+    def passes(self, task, right):
         directory = Path(self.temporary.name) / f"{task.name}-{right}"
         directory.mkdir()
-        context = types.SimpleNamespace(directory=directory)
+        reports = Reports()
+        self.addCleanup(reports.close)
+        context = types.SimpleNamespace(
+            directory=directory, reports=reports, report_url=reports.url
+        )
         task.setup(context)
+        PREPARE.get(task.name, lambda *args: None)(context, right)
         solve, field = SOLVERS[task.name]
         script = solve(getattr(context, field), right)
         page = directory / "page.html"
@@ -108,13 +126,12 @@ class RealisticFixtureTests(unittest.TestCase):
         if self.hung:
             self.skipTest("headless Chromium did not finish here")
         try:
-            output = self.render(page, directory)
+            self.render(page, directory)
         except subprocess.TimeoutExpired:
             # Seen on CI runners; the positive control needs a working browser.
             self.hung = True
             self.skipTest("headless Chromium did not finish here")
-        found = re.search(r"<title>(.*?)</title>", output)
-        return found.group(1) if found else output[-300:]
+        return task.check(context)
 
     def render(self, page, directory):
         # Its own process group: on a timeout every Chromium process stops
@@ -157,8 +174,39 @@ class RealisticFixtureTests(unittest.TestCase):
             if task.name not in SOLVERS:
                 continue
             with self.subTest(task=task.name):
-                self.assertEqual(self.title_after(task, True), "Task - complete")
-                self.assertNotEqual(self.title_after(task, False), "Task - complete")
+                passed, detail = self.passes(task, True)
+                self.assertTrue(passed, detail)
+                passed, detail = self.passes(task, False)
+                self.assertFalse(passed, detail)
+
+
+class PageLeakTests(unittest.TestCase):
+    """The agent can read a page's source and its window title: neither may
+    say whether the task was done right."""
+
+    def test_pages_carry_no_judge_or_answer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for task in realistic.REALISTIC_TASKS:
+                if task.name not in SOLVERS:
+                    continue
+                with self.subTest(task=task.name):
+                    directory = Path(temporary) / task.name
+                    directory.mkdir()
+                    context = types.SimpleNamespace(
+                        directory=directory, report_url="http://127.0.0.1:9/"
+                    )
+                    task.setup(context)
+                    source = (directory / "page.html").read_text()
+                    self.assertNotIn("done(", source)
+                    self.assertNotIn("document.title", source)
+                    answer = getattr(context, "answer", {})
+                    for secret in (
+                        answer.get("card"),
+                        answer.get("version"),
+                        getattr(context, "expected", None),
+                    ):
+                        if secret:
+                            self.assertNotIn(secret, source)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,35 @@
 # Development log
 
+## 2026-10-14 — Realistic web pages no longer carry their judge
+
+During E6 an agent printed the inventory page's source, which held the row
+data, the expected outcome and the judge; every web task also wrote its verdict
+into the window title (`Task - incomplete 1 rows wrong`), which agents read.
+The five realistic web tasks now call `report(state)`
+(`benchmarks.tasks.page`), which posts the page state to a per-task loopback
+endpoint (`benchmarks.tasks.Reports`, started by `run_task`); each task's
+`check` judges the last state in Python. The title stays `Task`. Probe first:
+a `file://` page in headless Chromium reached `http://127.0.0.1` with a
+`no-cors` POST.
+
+Validation:
+- `uv run ruff check`/`format --check` on src, scripts, tests, benchmarks;
+- runtime on PATH, `uv run python -m unittest discover -s tests`: 179 tests,
+  OK, 18 skipped. `test_realistic_fixtures` now runs each right and wrong
+  scripted solution in headless Chromium and asserts the Python check (the
+  ticket page first failed it: it replaced the page before reading the
+  comment); the new `PageLeakTests` (no browser, runs in Lint) asserts that no
+  realistic page contains `done(`, `document.title` or the expected answer;
+- `--suite realistic --seed 1 --dry-run`: all six checks fail with no errors;
+- agents, seed 1 (`20261014-003057-b8cf`): the five web tasks passed (31, 20,
+  71, 65, 34 s); `real-attach-invoice --firefox` passed (45.7 s), so the
+  report also arrives from Firefox.
+
+Not done: the basic and hard suites (`benchmarks/tasks.py`, `hard.py`) still
+judge in the page and set the title. Earlier realistic-suite results (E0–E6,
+D1) were measured with the title verdict visible; how often agents used it was
+not checked.
+
 ## 2026-10-14 — E6 follow-up: the skill by path reaches 2.8–2.9×
 
 `--skill-path` (with `--skill`) gives the agent the skill's file path and the

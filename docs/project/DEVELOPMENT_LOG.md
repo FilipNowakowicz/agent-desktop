@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-13 — Runtime directory without a login session
+
+Without `XDG_RUNTIME_DIR` (the Claude Code cloud container, cron, CI),
+`create` and `doctor` failed. Headless sessions now fall back to
+`/tmp/agent-desktop-<uid>`, created 0700; an existing path that is not a
+directory of this user closed to others (a symlink, another owner, mode
+bits for group or others) is refused, not repaired. `recover` checks against
+the same directory. Visible and host modes still need the real one, for the
+parent Wayland socket.
+
+Validation: test_doctor fallback test (created 0700, reused, refused after
+chmod 755 and as a symlink; doctor reports it); with `XDG_RUNTIME_DIR` unset,
+`doctor --smoke` passed and a session started under
+`/tmp/agent-desktop-1000/agent-desktop/<id>` and was destroyed with its
+runtime removed. Full desktop suite: 169 OK (18 skipped). Not yet repeated in the
+cloud.
 ## 2026-10-13 — Cancelled MCP calls get no reply
 
 mcp 1.30.0 answers a cancelled request with a "Request cancelled" error, and

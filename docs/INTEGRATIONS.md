@@ -24,8 +24,10 @@ A generic client configuration looks like:
 }
 ```
 
-The client must pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
-visible mode, `WAYLAND_DISPLAY`). The server selects the desktop runtime itself
+The client should pass the user runtime environment (`XDG_RUNTIME_DIR` and, for
+visible mode, `WAYLAND_DISPLAY`). Without `XDG_RUNTIME_DIR` (containers, cron,
+CI) headless sessions use a private `/tmp/agent-desktop-<uid>` directory, which
+must be owned by the user and closed to others. The server selects the desktop runtime itself
 (`AGENT_DESKTOP_RUNTIME`, then `~/.local/share/agent-desktop/runtime`, then PATH;
 see [runtime/INSTALL.md](../runtime/INSTALL.md#selecting-a-runtime)), so the
 client does not need to adjust PATH. The protocol is also tested with the official Python SDK's

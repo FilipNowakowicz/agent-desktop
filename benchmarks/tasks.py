@@ -4,8 +4,11 @@ Each task launches its application in a harness-created session, gives the agent
 a goal, and verifies the result without trusting the agent's reply.
 """
 
+import json
 import os
 import random
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
@@ -18,7 +21,7 @@ def chromium(context, page):
     """The browser command for a page: Chromium, or Firefox with a WebDriver
     BiDi port when the harness runs with --firefox."""
     path = context.directory / "page.html"
-    path.write_text(page)
+    path.write_text(page.replace(REPORT_URL, getattr(context, "report_url", "")))
     if os.environ.get("AGENT_DESKTOP_BENCH_BROWSER") == "firefox":
         return ["firefox", "--remote-debugging-port=0", path.as_uri()]
     return [
@@ -46,6 +49,61 @@ def html(body, script=""):
         f"{body}<script>function done(ok, detail){{document.title='Task - '"
         f"+(ok?'complete':'incomplete '+(detail||''));}}\n{script}</script>"
     )
+
+
+# Pages built with page() post their state here instead of judging it: the
+# task's check judges it in Python, so neither the page source nor the window
+# title tells the agent whether it got the task right.
+REPORT_URL = "__REPORT_URL__"
+
+
+def page(body, script=""):
+    """A task page whose script calls report(state) when the user acts."""
+    return (
+        '<!doctype html><meta charset="utf-8"><title>Task</title>'
+        "<style>body{font:18px sans-serif;margin:24px}</style>"
+        f"{body}<script>let reports=0;function report(state){{fetch("
+        f"'{REPORT_URL}',{{method:'POST',mode:'no-cors',keepalive:true,"
+        "body:JSON.stringify({n:++reports,state})}).catch(()=>{})}"
+        f"\n{script}</script>"
+    )
+
+
+class Reports:
+    """A loopback endpoint that receives the states a page reports."""
+
+    def __init__(self):
+        self.received = []
+        reports = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                try:
+                    reports.received.append(json.loads(body))
+                except ValueError:
+                    pass
+                self.send_response(204)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}/"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def states(self):
+        """Every reported state, in the order the page sent them."""
+        return [r["state"] for r in sorted(self.received, key=lambda r: r["n"])]
+
+    def last(self):
+        states = self.states()
+        return states[-1] if states else None
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
 
 
 def title_complete(context):

@@ -26,7 +26,7 @@ from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.realistic import REALISTIC_TASKS  # noqa: E402
-from benchmarks.tasks import TASKS  # noqa: E402
+from benchmarks.tasks import TASKS, Reports  # noqa: E402
 
 SUITES = {
     "standard": TASKS,
@@ -417,6 +417,8 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
     info = core.manifest(session)
     context = Context(session, directory)
     context.mcp_config = mcp_config_for(root)
+    context.reports = Reports()
+    context.report_url = context.reports.url
     try:
         argv, goal = task.setup(context)
         # A task may launch several applications; the last one holds its answer.
@@ -496,6 +498,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
     except Exception as error:
         record["error"] = f"{type(error).__name__}: {error}"
     finally:
+        context.reports.close()
         try:
             record["cleanup"] = core.destroy(session)
         except core.DesktopError as error:

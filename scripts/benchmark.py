@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -151,6 +152,7 @@ def run_agent(
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=900,
+                env=agent_environment(),
             )
             exit_code, stderr = process.returncode, process.stderr[-2000:]
         except subprocess.TimeoutExpired:
@@ -214,6 +216,19 @@ def run_agent(
             wall_ended,
         ),
     }
+
+
+# Variables that tie a process to the Claude Code session that started the
+# harness (its id, messaging channel, effort). The agent under test must be an
+# independent client, so they are not inherited; authentication is.
+PARENT_SESSION = re.compile(
+    r"^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_ENTRYPOINT"
+    r"|CLAUDE_CODE_\w*SESSION\w*|CLAUDE_CODE_MESSAGING_\w+)$"
+)
+
+
+def agent_environment():
+    return {k: v for k, v in os.environ.items() if not PARENT_SESSION.match(k)}
 
 
 def time_split(elapsed, api_ms, call_log, started, ended):

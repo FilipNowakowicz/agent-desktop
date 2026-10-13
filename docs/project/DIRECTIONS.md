@@ -69,8 +69,10 @@ Prefer directions that:
   ([D1 scripts](../research/2026-10-13-d1-scripts.md)). With scripts as the
   only way to act, turns fell 4% pooled (about 20–25% on the two multi-record
   tasks) and wall time rose 58%: on an unfamiliar UI the agent still looks
-  after each step, and writing code costs model time. Open: reuse of a
-  working script (E6), tasks with tens of records, cheaper lookups.
+  after each step, and writing code costs model time. Open: tasks with tens
+  of records, cheaper lookups. Reuse of a working script (E6) was tested
+  2026-10-14 and did not meet its gate either
+  ([E6 skills](../research/2026-10-14-e6-skills.md)).
 
 ### D2. Make every application readable as structure
 
@@ -140,7 +142,13 @@ Prefer directions that:
   decision on publishing.
 - **Cheapest test:** publish the Mousepad and Geany atlases as versioned files
   and re-check them on a different machine or version.
-- **Status:** idea.
+- **Status:** idea. Evidence from E6 (2026-10-14,
+  [E6 skills](../research/2026-10-14-e6-skills.md)): agent-written skills
+  replayed without a model in 2–10 s on two of three tasks, but one skill
+  depended on state it never saw and passed its own asserts on a wrong result.
+  A skill is only as good as an independent check, and an agent given a skill
+  still spent 13–22 s of model time. Running a stored skill by name, so that
+  the agent does not write it out again, is untested.
 
 ### D6. The person does not wait
 

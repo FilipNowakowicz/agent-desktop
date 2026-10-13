@@ -81,3 +81,17 @@ class AgentEnvironmentTests(unittest.TestCase):
                 "PATH": "/bin",
             },
         )
+
+
+class SkillTests(unittest.TestCase):
+    def test_the_skill_is_taken_from_the_final_reply(self):
+        reply = (
+            "Done.\n\nSKILL-START\n```python\nfor row in rows():\n    print(row)\n"
+            "```\nSKILL-END\n"
+        )
+        self.assertEqual(
+            benchmark.skill_from_reply(reply), "for row in rows():\n    print(row)\n"
+        )
+        bare = "SKILL-START\npress('Save')\nSKILL-END"
+        self.assertEqual(benchmark.skill_from_reply(bare), "press('Save')\n")
+        self.assertIsNone(benchmark.skill_from_reply("no skill here"))

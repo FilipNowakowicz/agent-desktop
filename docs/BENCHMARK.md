@@ -189,6 +189,13 @@ are compared with `AB_ARM=effects` or `AB_ARM=look_delta
 scripts/effects_ab_summary.py RUN...`; runs refused by the service (usage
 limits) are recorded as `api_error`, excluded, and stop the suite.
 
+E6 ([report](research/2026-10-14-e6-skills.md)) adds three options. `--run
+--learn DIR` asks the agent to end with a script for the whole task and
+saves it as `DIR/<task>.py`. `--replay DIR` runs that script with no agent and
+then runs the task's check. `--run --skill DIR` gives the agent the script.
+Pass `DIR` as a separate argument: in zsh an unquoted variable holding
+`--skill DIR` is not split into two words.
+
 ### Human baseline (partial, 2026-10-12)
 
 The maintainer did three tasks with `--human --seed 101 --only TASK`, one at a

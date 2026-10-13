@@ -1,5 +1,33 @@
 # Development log
 
+## 2026-10-14 — Standard and hard web pages no longer carry their judge
+
+The 17 web tasks of the standard and hard suites now report their state like
+the realistic suite (#126); `Task.check` hands the last reported state to each
+task's `judge`. `html()` and `title_complete()` are gone: no page sets its
+title any more. Several pages had put the answer in their judge (the second
+tab's access code, the terminal's ticket number); those answers are now only
+where the task shows them. Answers that are the page's own content (the code
+drawn on a canvas, the chart values, the slow-load voucher) remain in the page
+source.
+
+`tests/test_realistic_fixtures.py` became `tests/test_web_fixtures.py`: a right
+and a wrong scripted solution for each of the 22 web tasks, judged by the
+Python checks in headless Chromium, plus browser-free tests that every web
+page has a solver and that no page carries `done(`, `document.title` or a
+listed answer. A deliberately broken slider judge (`return True`) made it fail.
+
+Validation:
+- `uv run ruff check`/`format --check` on src, scripts, tests, benchmarks;
+- runtime on PATH, `uv run python -m unittest discover -s tests`: 180 tests,
+  OK, 18 skipped;
+- `--seed 1 --dry-run` on the standard and hard suites: every check failed,
+  no errors (the kdialog tasks were skipped: kdialog not installed);
+- agents, seed 1: all 17 converted tasks passed (`20261014-004711-f73a`,
+  `20261014-005016-1d8c`).
+
+Earlier results on these suites were measured with the verdict in the title.
+
 ## 2026-10-14 — Realistic web pages no longer carry their judge
 
 During E6 an agent printed the inventory page's source, which held the row

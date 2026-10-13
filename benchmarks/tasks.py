@@ -42,15 +42,6 @@ def chromium(context, page):
     ]
 
 
-def html(body, script=""):
-    return (
-        '<!doctype html><meta charset="utf-8"><title>Task</title>'
-        "<style>body{font:18px sans-serif;margin:24px}</style>"
-        f"{body}<script>function done(ok, detail){{document.title='Task - '"
-        f"+(ok?'complete':'incomplete '+(detail||''));}}\n{script}</script>"
-    )
-
-
 # Pages built with page() post their state here instead of judging it: the
 # task's check judges it in Python, so neither the page source nor the window
 # title tells the agent whether it got the task right.
@@ -106,11 +97,6 @@ class Reports:
         self.server.server_close()
 
 
-def title_complete(context):
-    titles = [w["title"] for w in context.windows()]
-    return any(t.startswith("Task - complete") for t in titles), titles
-
-
 class Task:
     name = ""
     requires = ()
@@ -120,7 +106,14 @@ class Task:
         raise NotImplementedError
 
     def check(self, context):
-        return title_complete(context)
+        """Web tasks: judge the last state the page reported."""
+        state = context.reports.last()
+        if state is None:
+            return False, "nothing reported"
+        return bool(self.judge(context, state)), state
+
+    def judge(self, context, state):
+        raise NotImplementedError
 
 
 class CanvasCodeDrag(Task):
@@ -129,7 +122,7 @@ class CanvasCodeDrag(Task):
 
     def setup(self, context):
         context.secret = code()
-        page = html(
+        page_html = page(
             "<p>Type the code drawn below, drag the red box into the dashed target, "
             "then press Submit.</p><canvas id=c width=260 height=60></canvas>"
             "<p><input id=answer autocomplete=off> <button id=submit>Submit</button></p>"
@@ -144,11 +137,13 @@ class CanvasCodeDrag(Task):
             "box.style.left=e.clientX-d[0]+'px';box.style.top=e.clientY-d[1]+'px'}};"
             "box.onpointerup=()=>d=null;function inside(){const b=box.getBoundingClientRect(),"
             "z=zone.getBoundingClientRect();return b.left>=z.left&&b.right<=z.right&&"
-            "b.top>=z.top&&b.bottom<=z.bottom}submit.onclick=()=>done("
-            "answer.value.trim()===code&&inside(),'code='+(answer.value.trim()===code)"
-            "+' box='+inside());",
+            "b.top>=z.top&&b.bottom<=z.bottom}submit.onclick=()=>"
+            "report({code:answer.value,inside:inside()});",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["code"].strip() == context.secret and state["inside"]
 
 
 class Form(Task):
@@ -156,7 +151,7 @@ class Form(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<form id=f><p>Name <input id=fullname></p><p>Country <select id=country>"
             "<option>Choose</option><option>Norway</option><option>Peru</option>"
             "<option>Japan</option></select></p><p>Size <label><input type=radio "
@@ -165,15 +160,22 @@ class Form(Task):
             "<input type=checkbox id=terms> I accept the terms</label></p>"
             "<button>Send</button></form>",
             "f.onsubmit=e=>{e.preventDefault();const s=(document.querySelector("
-            "'input[name=size]:checked')||{}).value;const ok=fullname.value==='Grace Hopper'"
-            "&&country.value==='Peru'&&s==='L'&&terms.checked;done(ok,JSON.stringify("
-            "[fullname.value,country.value,s,terms.checked]))};",
+            "'input[name=size]:checked')||{}).value;report({name:fullname.value,"
+            "country:country.value,size:s||null,terms:terms.checked})};",
         )
         prompt = (
             "Fill the web form: name 'Grace Hopper', country Peru, size L, accept "
             "the terms, then send it."
         )
-        return chromium(context, page), prompt
+        return chromium(context, page_html), prompt
+
+    def judge(self, context, state):
+        return state == {
+            "name": "Grace Hopper",
+            "country": "Peru",
+            "size": "L",
+            "terms": True,
+        }
 
 
 class Scroll(Task):
@@ -182,15 +184,18 @@ class Scroll(Task):
 
     def setup(self, context):
         rows = "".join(f"<p>Paragraph {i}</p>" for i in range(120))
-        page = html(
+        page_html = page(
             f"<h1>Long page</h1>{rows}<button id=finish>Finish</button>{rows}",
-            "finish.onclick=()=>done(true);",
+            "finish.onclick=()=>report({finished:true});",
         )
         prompt = (
             "On the web page, find the 'Finish' button (it is not visible "
             "initially) and click it."
         )
-        return chromium(context, page), prompt
+        return chromium(context, page_html), prompt
+
+    def judge(self, context, state):
+        return state["finished"]
 
 
 class Confirm(Task):
@@ -198,13 +203,16 @@ class Confirm(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<p>Press the button and accept the confirmation.</p>"
             "<button id=del>Delete draft</button>",
-            "del.onclick=()=>done(confirm('Really delete the draft?'),'cancelled');",
+            "del.onclick=()=>report({deleted:confirm('Really delete the draft?')});",
         )
         prompt = "On the web page, delete the draft and confirm the deletion."
-        return chromium(context, page), prompt
+        return chromium(context, page_html), prompt
+
+    def judge(self, context, state):
+        return state["deleted"]
 
 
 class SecondTab(Task):
@@ -218,16 +226,19 @@ class SecondTab(Task):
             '<!doctype html><meta charset="utf-8"><title>Secret</title>'
             f"<h1>The access code is {context.secret}</h1>"
         )
-        page = html(
+        page_html = page(
             f'<p><a href="{secret.as_uri()}" target=_blank>Open the code page</a></p>'
             "<p>Access code <input id=answer> <button id=go>Unlock</button></p>",
-            f"go.onclick=()=>done(answer.value.trim()==='{context.secret}');",
+            "go.onclick=()=>report({code:answer.value});",
         )
         prompt = (
             "On the web page, open the code page link (it opens a new tab), read "
             "the access code there, return to the first tab, enter it and unlock."
         )
-        return chromium(context, page), prompt
+        return chromium(context, page_html), prompt
+
+    def judge(self, context, state):
+        return state["code"].strip() == context.secret
 
 
 class Slider(Task):
@@ -236,14 +247,17 @@ class Slider(Task):
 
     def setup(self, context):
         context.target = random.randint(20, 80)
-        page = html(
+        page_html = page(
             f"<p>Set the volume to exactly {context.target}.</p>"
             "<input type=range id=v min=0 max=100 value=50 style='width:600px'>"
             " <b id=out>50</b><p><button id=save>Save</button></p>",
             "v.oninput=()=>out.textContent=v.value;"
-            f"save.onclick=()=>done(+v.value==={context.target},'value='+v.value);",
+            "save.onclick=()=>report({value:+v.value});",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["value"] == context.target
 
 
 class ContextMenu(Task):
@@ -251,7 +265,7 @@ class ContextMenu(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<p>Right-click the message below and choose <b>Archive</b>.</p>"
             "<div id=msg style='padding:20px;border:1px solid #888;width:300px'>"
             "Quarterly report</div><div id=menu style='display:none;position:absolute;"
@@ -260,10 +274,12 @@ class ContextMenu(Task):
             "msg.oncontextmenu=e=>{e.preventDefault();menu.style.left=e.pageX+'px';"
             "menu.style.top=e.pageY+'px';menu.style.display='block'};"
             "document.querySelectorAll('.i').forEach(i=>{i.style.padding='8px 24px';"
-            "i.onclick=()=>{menu.style.display='none';done(i.textContent==='Archive',"
-            "i.textContent)}});",
+            "i.onclick=()=>{menu.style.display='none';report({item:i.textContent})}});",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["item"] == "Archive"
 
 
 class DoubleClickEdit(Task):
@@ -271,17 +287,19 @@ class DoubleClickEdit(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<p>Double-click Bob's age to edit it, change it to 47 and press Enter.</p>"
             "<table border=1 cellpadding=8><tr><th>Name</th><th>Age</th></tr>"
             "<tr><td>Alice</td><td>31</td></tr><tr><td>Bob</td><td id=bob>52</td></tr>"
             "</table>",
             "bob.ondblclick=()=>{bob.contentEditable=true;bob.focus()};"
             "bob.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();"
-            "bob.contentEditable=false;done(bob.textContent.trim()==='47',"
-            "bob.textContent)}};",
+            "bob.contentEditable=false;report({age:bob.textContent})}};",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["age"].strip() == "47"
 
 
 class Shortcut(Task):
@@ -289,15 +307,18 @@ class Shortcut(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<p>This page has a hidden search box. Open it with Ctrl+K, search "
             "for <b>private desktop</b> and press Enter.</p>"
             "<input id=q style='display:none'>",
             "document.onkeydown=e=>{if(e.ctrlKey&&e.key==='k'){e.preventDefault();"
             "q.style.display='inline';q.focus()}};q.onkeydown=e=>{if(e.key==="
-            "'Enter')done(q.value.trim()==='private desktop',q.value)};",
+            "'Enter')report({query:q.value})};",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["query"].strip() == "private desktop"
 
 
 class Reorder(Task):
@@ -305,7 +326,7 @@ class Reorder(Task):
     requires = ("chromium",)
 
     def setup(self, context):
-        page = html(
+        page_html = page(
             "<p>Drag the items so the list reads <b>One, Two, Three, Four</b> from top "
             "to bottom, then press Done.</p><ul id=list style='list-style:none;"
             "padding:0;width:240px'></ul><button id=fin>Done</button>",
@@ -318,9 +339,12 @@ class Reorder(Task):
             "('li');if(target&&target!==held){const items=[...list.children];if("
             "items.indexOf(held)<items.indexOf(target))target.after(held);else "
             "target.before(held)}held=null};fin.onclick=()=>{const v=[...list."
-            "children].map(l=>l.textContent).join(',');done(v==='One,Two,Three,Four',v)};",
+            "children].map(l=>l.textContent);report({order:v})};",
         )
-        return chromium(context, page), "Complete the task shown on the web page."
+        return chromium(context, page_html), "Complete the task shown on the web page."
+
+    def judge(self, context, state):
+        return state["order"] == ["One", "Two", "Three", "Four"]
 
 
 class FootFile(Task):

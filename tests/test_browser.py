@@ -95,6 +95,28 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(opened["url"], "about:blank")
         self.assertEqual(len(self.browser("tabs")["tabs"]), 2)
 
+    def test_start_as_a_named_controller(self):
+        # MCP clients name a controller; the request takes the lease, and the
+        # Firefox launch inside start (and inside steps) must run as its holder.
+        started = core.request(
+            self.session,
+            "browser",
+            "mcp-test",
+            action="steps",
+            steps=[
+                {"action": "start", "url": self.page.as_uri()},
+                {"action": "wait", "selector": "#fullname", "timeout": 20},
+                {"action": "fill", "text": "Full name", "value": "Ada"},
+            ],
+        )
+        self.assertIsNone(started["stopped"], started)
+        self.assertEqual(started["results"][2]["now"]["value"], "Ada")
+        self.assertEqual(
+            core.request(self.session, "control")["lease"]["holder"], "mcp-test"
+        )
+        with self.assertRaisesRegex(core.DesktopError, "LeaseHeld"):
+            self.browser("fill", text="Full name", value="Grace")
+
     def test_attaches_to_a_firefox_started_with_the_port(self):
         launched = core.request(
             self.session,

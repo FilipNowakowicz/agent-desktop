@@ -845,9 +845,11 @@ class Worker:
             self.ui_names[node] = short
         return self.ui_names[node]
 
-    def start_browser(self, url):
+    def start_browser(self, url, controller=None):
         """Firefox with WebDriver BiDi on a free localhost port: the bridged one,
-        one started in the session with --remote-debugging-port, or a new one."""
+        one started in the session with --remote-debugging-port, or a new one.
+        A new one is launched as `controller`, the holder of the lease that the
+        browser request has just taken."""
         from . import browser
 
         if self.browser and self.browser[1]() is None:
@@ -859,12 +861,13 @@ class Worker:
                     {"context": self.browser[0].target(), "url": url},
                 )
             return self.browser[0]
-        started = self.handle(
-            {
-                "operation": "launch",
-                "argv": ["firefox", "--remote-debugging-port=0", url or "about:blank"],
-            }
-        )
+        launch = {
+            "operation": "launch",
+            "argv": ["firefox", "--remote-debugging-port=0", url or "about:blank"],
+        }
+        if controller is not None:
+            launch["controller"] = controller
+        started = self.handle(launch)
         process = self.apps[started["application"]]
         log = Path(started["logs"])
         deadline = time.monotonic() + 30
@@ -925,7 +928,9 @@ class Worker:
         }
         try:
             if action == "steps":
-                return self.browser_steps(request.get("steps"))
+                return self.browser_steps(
+                    request.get("steps"), request.get("controller")
+                )
             host = self.info["mode"] == "host"
             if action == "start" and host:
                 if not self.attach_browser():
@@ -936,7 +941,9 @@ class Worker:
                     )
                 return {"tabs": self.browser[0].tabs()[1]}
             if action == "start":
-                bridge = self.start_browser(request.get("url"))
+                bridge = self.start_browser(
+                    request.get("url"), request.get("controller")
+                )
                 return {"tabs": bridge.tabs()[1]}
             if not self.attach_browser():
                 raise ValueError('No bridged Firefox; use action "start" first')
@@ -1066,7 +1073,7 @@ class Worker:
             self.browser = None
             raise ValueError("Firefox closed the bridge; start it again") from None
 
-    def browser_steps(self, steps):
+    def browser_steps(self, steps, controller=None):
         """Several browser actions in one request, stopping at the first error."""
         if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
             raise ValueError("steps must be a list of 1 to 30 browser actions")
@@ -1075,7 +1082,7 @@ class Worker:
             if not isinstance(step, dict) or step.get("action") in (None, "steps"):
                 raise ValueError(f"Step {index} needs an action other than steps")
             try:
-                result = self.browser_request(step)
+                result = self.browser_request({**step, "controller": controller})
             except (ValueError, TimeoutError) as error:
                 return {
                     "completed": index,

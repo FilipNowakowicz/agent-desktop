@@ -1,5 +1,31 @@
 # Development log
 
+## 2026-10-13 — Exited applications are collected; Firefox and Cloudflare rechecked
+
+The worker never polled launched applications, so one that exited stayed a
+zombie (`<defunct>`) until a later request polled it, and a pid check still
+saw it as alive. The serve loop (every 0.5 s) now collects them. New test
+`test_exited_applications_are_collected` (an app that lives 1 s) fails
+without the change and passes with it.
+
+Rechecked the two open findings from the cloud trial in a fresh private
+session:
+
+- Firefox after Ctrl+Q: two tries (a local page, and claude.ai after a
+  minute) both exited at once after the quit dialog; the 25-minute busy
+  process from the trial did not reproduce. Ctrl+Q in a new profile first
+  asks "Quit Firefox or close current tab?" (two tabs) or "Close window and
+  quit Firefox?", and a "Make Firefox your default browser?" modal can
+  swallow the key.
+- Cloudflare: a plain Firefox in a fresh profile reached the claude.ai
+  sign-in page without any challenge, and WebGL works in private sessions
+  (`WebGL 1.0`, renderer llvmpipe). The trial's loop followed a first visit
+  from the bridged Firefox (marked as automated); WebGL is not missing.
+  A login with a challenge should still be done without the bridge.
+
+Validation: full desktop suite with the installed runtime on PATH: 177
+tests OK (18 skipped); ruff.
+
 ## 2026-10-13 — Benchmark agents independent of the starting session
 
 The benchmark's `claude -p` agents inherited the environment of whatever

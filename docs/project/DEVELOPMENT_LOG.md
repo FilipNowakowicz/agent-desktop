@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-10-14 — E6 follow-up: the skill by path reaches 2.8–2.9×
+
+`--skill-path` (with `--skill`) gives the agent the skill's file path and the
+exact `desktop_run` call `exec(open(PATH).read())` instead of the code. Seeds
+6–8 × 3 tasks, 9/9 passed: expense 16.2 s (2.92× the baseline median),
+ticket 8.0 s (2.80×), both in 2 turns with 170–219 output tokens and
+$0.04; inventory 156.2 s (0.47×). The gate (3×) is narrowly not met. About 6 s
+per run is the agent (2 s CLI start, about 4 s model); the rest is the
+script, and the expense skill has about 4 s of fixed sleeps (not tuned after
+the measurement). Every inventory run first hit `desktop_run`'s 60 s default
+timeout. One inventory run printed the page source, which contains the task's
+judge code and rows: a benchmark leak to fix. Details:
+[E6 skills](../research/2026-10-14-e6-skills.md), follow-up section.
+
+Validation: `uv run ruff check src scripts tests`, `uv run ruff format --check
+src scripts tests`, `uv run python -m unittest tests.test_benchmark_timing`.
+
 ## 2026-10-14 — E6: verified skills do not meet the 3× gate
 
 `scripts/benchmark.py` gained `--learn DIR` (the agent ends with a whole-task

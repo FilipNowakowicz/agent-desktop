@@ -376,6 +376,14 @@ GTK 4 applications render in software in every session (`GSK_RENDERER=cairo`,
 override with `AGENT_DESKTOP_GSK_RENDERER`); without it, layer-shell panels came
 up blank.
 
+The compositor also renders in software (`WLR_RENDERER=pixman`). To composite on
+a GPU, set `AGENT_DESKTOP_RENDERER=gles2` (or `vulkan`) and optionally
+`AGENT_DESKTOP_RENDER_DEVICE=/dev/dri/renderD128` to choose the render node.
+Applications that use the GPU themselves, such as Blender, render there either
+way; this only moves the compositor's final step off the CPU. Tested with
+headless labwc 0.20.2 on NVIDIA and AMD render nodes, and with Blender on the
+NVIDIA node.
+
 ## Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create

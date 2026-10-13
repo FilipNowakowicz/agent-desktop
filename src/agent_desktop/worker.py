@@ -629,7 +629,7 @@ class Worker:
                 "WLR_BACKENDS": "headless"
                 if self.info["mode"] == "headless"
                 else "wayland",
-                "WLR_RENDERER": "pixman",
+                "WLR_RENDERER": os.environ.get("AGENT_DESKTOP_RENDERER", "pixman"),
                 "WLR_HEADLESS_OUTPUTS": "1",
                 "WLR_WL_OUTPUTS": "1",
                 "WLR_LIBINPUT_NO_DEVICES": "1",
@@ -639,6 +639,11 @@ class Worker:
                 "GSK_RENDERER": os.environ.get("AGENT_DESKTOP_GSK_RENDERER", "cairo"),
             }
         )
+        # Optional GPU for the compositor, e.g. /dev/dri/renderD128 with
+        # AGENT_DESKTOP_RENDERER=gles2; wlroots picks a render node otherwise.
+        render_device = os.environ.get("AGENT_DESKTOP_RENDER_DEVICE")
+        if render_device:
+            self.env["WLR_RENDER_DRM_DEVICE"] = render_device
         self.pin_browser_profiles()
         if self.info["mode"] == "visible":
             self.env["WAYLAND_DISPLAY"] = self.info["parent_wayland"]

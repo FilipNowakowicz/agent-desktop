@@ -1,5 +1,31 @@
 # Development log
 
+## 2026-10-13 — Optional GPU renderer for the compositor
+
+The compositor always rendered with pixman. GPU applications such as Blender
+already render on the GPU inside a session, but labwc then composited their
+buffers in software. `AGENT_DESKTOP_RENDERER` (default `pixman`) now sets
+`WLR_RENDERER`, and `AGENT_DESKTOP_RENDER_DEVICE` sets
+`WLR_RENDER_DRM_DEVICE` to choose a render node. Defaults are unchanged.
+
+Tested on Arch (Hyprland 0.56.2 host; labwc 0.20.2, wlroots 0.20.2; NVIDIA
+RTX 5070 Laptop with driver 610.57.04 at `renderD128`, AMD iGPU at
+`renderD129`):
+
+- headless labwc with `gles2` started on both nodes (GBM allocator `nvidia`
+  and `drm`), and `grim` captured the output;
+- a session created with `gles2` on the NVIDIA node: labwc and Blender 5.2.1
+  (native Wayland) both held the NVIDIA device; the screenshot showed the
+  Blender window; a click, a numpad view rotation and a later screenshot all
+  matched;
+- new tests: `test_software_by_default`, and `test_gpu_renderer_and_device`
+  (skipped without an accessible render node), which fails without the change.
+
+Not established: a speed difference from pixman, `vulkan`, visible mode, and
+Blender view rotation with a middle-button `drag`, which changed the view in
+1 of 3 tries with pixman and 0 of 6 with `gles2` (numpad keys rotated it every
+time).
+
 ## 2026-10-13 — E5: benchmark arms run in parallel in the cloud
 
 A cloud session on main (after #117, #120, #121; claude.ai/code session

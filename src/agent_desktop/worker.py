@@ -2051,6 +2051,10 @@ class Worker:
                     break
                 self.trim_logs()
                 reap_orphans(self.tracked())
+                # Collect exited applications, so they do not stay as zombies
+                # that still look alive to a pid check.
+                for process in self.apps.values():
+                    process.poll()
                 if self.compositor.poll() is not None:
                     raise RuntimeError("Private compositor crashed")
                 if (

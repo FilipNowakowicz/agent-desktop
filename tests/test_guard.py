@@ -170,6 +170,20 @@ class GuardTests(unittest.TestCase):
             with self.subTest(cwd=bad), self.assertRaises(core.DesktopError):
                 core.request(session, "launch", argv=["true"], cwd=bad)
 
+    def test_exited_applications_are_collected(self):
+        session = core.create()["session"]
+        self.sessions.append(session)
+        app = core.request(session, "launch", argv=["sh", "-c", "sleep 1; exit 3"])
+
+        def state():
+            try:
+                return Path(f"/proc/{app['pid']}/stat").read_text().split()[2]
+            except FileNotFoundError:
+                return None
+
+        # Gone, not left as a zombie ("Z") until someone asks.
+        wait_for(lambda: state() is None, timeout=5)
+
     def test_zsh_first_run_menu_is_answered(self):
         # zsh-newuser-install would otherwise take the first typed key.
         session = core.create()["session"]

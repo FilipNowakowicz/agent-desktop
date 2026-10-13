@@ -1,5 +1,25 @@
 # Development log
 
+## 2026-10-13 — E5: benchmark arms run in parallel in the cloud
+
+A cloud session on main (after #117, #120, #121; claude.ai/code session
+`session_01LkkGEv3uWtQbBcVXJCU1Mp`, report only) ran hard-web-admin with
+`--model claude-opus-5-5`, Chromium from the image's Playwright build on
+PATH:
+
+- one run (seed 5): passed in 31.4 s (API 20.5, tool 6.0, other 4.9 s;
+  11 turns, $0.32); the same seed locally passed in 27.4 s;
+- three runs at once (seeds 6–8): all passed, 40.6, 33.4 and 31.8 s; batch
+  wall time about 44 s; tool time per run 4.7–5.9 s, no higher than alone;
+  1-minute load average peaked at 1.3 on 4 vCPU;
+- no warning bar in the final screenshot: `--no-sandbox --test-type` as root
+  keep the page layout as locally.
+
+Not established: four or more at once, heavier suites, API rate limits in a
+larger batch, and whether runs still appear as children of the cloud session
+after #120. The cloud environment's setup script does not put Chromium on
+PATH; the session made a symlink by hand.
+
 ## 2026-10-13 — Exited applications are collected; Firefox and Cloudflare rechecked
 
 The worker never polled launched applications, so one that exited stayed a

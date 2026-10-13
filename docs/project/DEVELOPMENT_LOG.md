@@ -13,7 +13,7 @@ wayvnc and vncviewer were not installed, so `view`, `take` and
 `request_human` cannot work there yet. One run with a terminal app only;
 Firefox, the bridge and benchmark arms are untested. The environment
 ("agent-desktop", Trusted network) installs the packages but does not set
-`XDG_RUNTIME_DIR`.
+`XDG_RUNTIME_DIR`; since #117 sessions fall back to a private /tmp directory.
 
 The setup was itself driven through the MCP, as a trial, and found:
 
@@ -35,7 +35,7 @@ The setup was itself driven through the MCP, as a trial, and found:
    `desktop_request_host`) made the server reply to the cancelled request;
    Claude Code dropped the stdio connection ("Received a response for an
    unknown message ID ... Request cancelled"). Twice; `/mcp` reconnects.
-   Python `mcp` 1.30.0. Not fixed.
+   Python `mcp` 1.30.0. Fixed in #116.
 5. The maintainer's Google login, done once in the `claude-ai` profile,
    carried over to GitHub's "Continue with Google"; GitHub then required
    2FA. The GitHub App install was finished faster through a host session on

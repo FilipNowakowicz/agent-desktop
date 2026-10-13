@@ -1,5 +1,30 @@
 # Development log
 
+## 2026-10-13 — E5 follow-up: benchmark arms in the cloud
+
+Asked the cloud session (claude.ai/code, environment "agent-desktop") whether
+it can run benchmark arms; report only, nothing committed. Its findings:
+
+- A nested `claude -p 'reply with OK' --output-format json` works (exit 0),
+  but the child inherits `CLAUDE_CODE_SESSION_ID`,
+  `CLAUDE_CODE_REMOTE_SESSION_ID`, `CLAUDE_CODE_CHILD_SESSION=1` and the
+  session's ingress token, so arms count as children of that cloud session.
+  The default model there was Sonnet 5.5: arms must pass `--model`.
+- Ubuntu's `chromium-browser` is a snap shim and snapd cannot run (PID 1 is
+  not systemd). The image's Playwright Chromium 141 works, but as root only
+  with `--no-sandbox` (the harness does not add it), which adds warning bars
+  that push page content about 100 px down: cloud and local runs are not
+  comparable unless both run that way.
+- 4 vCPU, 15 GiB, no swap. One idle session with Chromium added about
+  227 MB. Rendering is software, so CPU is the limit: about 3 arms in
+  parallel (an estimate from one idle measurement, not a load test).
+- `uv run scripts/benchmark.py --suite realistic --only
+  real-inventory-cleanup --dry-run --seed 2` set up the task, showed the
+  expected table and cleaned up (`runtime_removed: true`).
+
+Not done: a real arm in the cloud, a parallel batch, and the harness changes
+(child environment, `--no-sandbox` as root, the runtime-directory fallback
+from #117 on main).
 ## 2026-10-13 — D1 scripts: gate not met
 
 docs/research/2026-10-13-d1-scripts.md. `desktop_run` (`AGENT_DESKTOP_RUN=1`,

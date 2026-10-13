@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-10-13 — Benchmark agents independent of the starting session
+
+The benchmark's `claude -p` agents inherited the environment of whatever
+started the harness. From a Claude Code session that includes its session id,
+`CLAUDE_CODE_CHILD_SESSION`, its messaging socket and token and
+`CLAUDE_EFFORT` (here `medium`); in the cloud also the remote session id. The
+agent is now started without those (`CLAUDECODE`, `CLAUDE_PID`,
+`CLAUDE_EFFORT`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_*SESSION*`,
+`CLAUDE_CODE_MESSAGING_*`); authentication variables are kept. Earlier runs
+started from a Claude Code session may have used the parent's effort when
+`--effort` was not given; transcripts do not record it, and medium is
+probably the default, so the effect is likely nil but unverified. Chromium
+tasks run as root (cloud containers) now add `--no-sandbox --test-type`
+(the latter hides the no-sandbox warning bar); not verified as root here.
+
+Validation: unit test for the environment filter; one hard-web-admin run
+(seed 5) passed with the filtered environment (27.4 s); ruff.
+
 ## 2026-10-13 — E5 follow-up: benchmark arms in the cloud
 
 Asked the cloud session (claude.ai/code, environment "agent-desktop") whether

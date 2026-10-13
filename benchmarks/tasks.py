@@ -32,6 +32,9 @@ def chromium(context, page):
         "--window-size=1200,680",
         # Web content in the accessibility tree (used by the semantic UI tools).
         "--force-renderer-accessibility",
+        # As root (cloud containers) Chromium runs only without its sandbox;
+        # --test-type hides the warning bar that flag adds.
+        *(["--no-sandbox", "--test-type"] if os.geteuid() == 0 else []),
         path.as_uri(),
     ]
 

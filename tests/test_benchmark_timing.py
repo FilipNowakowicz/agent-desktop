@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from agent_desktop import mcp_server
@@ -55,3 +56,28 @@ class TimeSplitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgentEnvironmentTests(unittest.TestCase):
+    def test_the_agent_is_not_tied_to_the_starting_session(self):
+        parent = {
+            "CLAUDECODE": "1",
+            "CLAUDE_CODE_SESSION_ID": "s",
+            "CLAUDE_CODE_REMOTE_SESSION_ID": "r",
+            "CLAUDE_CODE_CHILD_SESSION": "1",
+            "CLAUDE_CODE_MESSAGING_TOKEN": "t",
+            "CLAUDE_EFFORT": "medium",
+            "CLAUDE_CODE_OAUTH_TOKEN": "kept",
+            "ANTHROPIC_API_KEY": "kept",
+            "PATH": "/bin",
+        }
+        with unittest.mock.patch.dict(os.environ, parent, clear=True):
+            environment = benchmark.agent_environment()
+        self.assertEqual(
+            environment,
+            {
+                "CLAUDE_CODE_OAUTH_TOKEN": "kept",
+                "ANTHROPIC_API_KEY": "kept",
+                "PATH": "/bin",
+            },
+        )

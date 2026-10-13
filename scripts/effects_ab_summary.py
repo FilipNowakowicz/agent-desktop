@@ -2,7 +2,7 @@
 the atlas, input that returns a screenshot (runs without --no-look), or with
 AB_ARM=guards, guarded steps (runs without --no-guards). AB_ARM=effects
 compares --effects runs with otherwise equal runs (E2), AB_ARM=look_delta
---look-delta runs (E3).
+--look-delta runs (E3), AB_ARM=run --run --tools code runs (D1).
 
     uv run scripts/effects_ab_summary.py artifacts/benchmark/RUN [...]
 
@@ -53,7 +53,10 @@ groups = {}
 for run in sys.argv[1:]:
     data = json.loads((Path(run) / "summary.json").read_text())
     summary = data["summary"]
-    if os.environ.get("AB_ARM") == "look_delta":
+    if os.environ.get("AB_ARM") == "run":
+        # D1: scripts as the only way to act (--run --tools code).
+        arm = "run" if summary.get("run") else "baseline"
+    elif os.environ.get("AB_ARM") == "look_delta":
         # Changed-only screenshots (E3) against otherwise equal runs.
         arm = "look_delta" if summary.get("look_delta") else "baseline"
     elif os.environ.get("AB_ARM") == "effects":
@@ -129,7 +132,7 @@ for (task, arm), records in sorted(groups.items()):
 treated = next(
     (
         t
-        for t in ("look_delta", "atlas", "effects", "bridge", "guards", "look")
+        for t in ("run", "look_delta", "atlas", "effects", "bridge", "guards", "look")
         if any(a == t for _k, a in groups)
     ),
     "effects",

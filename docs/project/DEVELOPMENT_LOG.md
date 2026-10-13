@@ -1,5 +1,25 @@
 # Development log
 
+## 2026-10-13 — D1 scripts: gate not met
+
+docs/research/2026-10-13-d1-scripts.md. `desktop_run` (`AGENT_DESKTOP_RUN=1`,
+experimental, off by default) runs a Python script against a private session
+with a small library (accessibility lookups scoped with `within`, `rows()`,
+press/set_text/select, keys, waits that raise, `home()`), as the server's
+controller; refused on host sessions. Offered beside the other tools, the
+agent never used it; with scripts as the only way to act (`--run --tools
+code`), 18 runs on hard-web-admin, real-inventory-cleanup and
+real-expense-claim (seeds 2–4, Opus) all passed: turns −4% pooled (p 0.82),
+wall time +58% (p 0.001), looks −27% (p 0.012), input tokens −17% (p 0.15).
+The board's gate (turns −50%) is not met; D1 in this form stops.
+
+Validation: tests/test_run.py (a script types, waits for a file and reads it
+through `home()`; an unmet wait stops a script with TimeoutError; a long
+script stops at its timeout) and a Chromium test (a script fills three fields,
+presses one row's Edit with `within`, reads `rows()`); ruff. Found on the way:
+zsh does not split an unquoted `$extra`, which silently broke the first
+code-arm loop; Mousepad is not on PATH outside `nix shell`, so the realistic
+editor tasks skip.
 ## 2026-10-13 — E5 cloud sessions; trial setting up Claude Code cloud
 
 E5 met: the private desktop runs in a Claude Code cloud session (Ubuntu

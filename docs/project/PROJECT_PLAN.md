@@ -104,6 +104,11 @@ in a Claude Code cloud session once `XDG_RUNTIME_DIR` is set (development log,
 2026-10-13); parallel arms there are untested. A new lever
 for turns is a decision for the maintainer (see the directions board).
 
+D1, the leading new direction, had its cheapest test on 2026-10-13
+([D1 scripts](../research/2026-10-13-d1-scripts.md)): with Python scripts as
+the only way to act, turns fell 4% and wall time rose 58%, so its gate
+(turns −50%) is not met.
+
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are
 collected, untested, on the [directions board](DIRECTIONS.md). They are input

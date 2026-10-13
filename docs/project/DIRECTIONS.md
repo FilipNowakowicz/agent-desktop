@@ -65,8 +65,12 @@ Prefer directions that:
   compared with the current tools on `hard-web-admin` and the E0 suite. It is
   worth pursuing only if turns fall by 50% or more on the table task at equal
   success.
-- **Status:** idea. Proposed in discussion as the leading candidate together
-  with D2; not yet decided.
+- **Status:** tested 2026-10-13, gate not met
+  ([D1 scripts](../research/2026-10-13-d1-scripts.md)). With scripts as the
+  only way to act, turns fell 4% pooled (about 20–25% on the two multi-record
+  tasks) and wall time rose 58%: on an unfamiliar UI the agent still looks
+  after each step, and writing code costs model time. Open: reuse of a
+  working script (E6), tasks with tens of records, cheaper lookups.
 
 ### D2. Make every application readable as structure
 
@@ -198,3 +202,4 @@ These are not directions on their own, but they constrain the directions.
 
 - 2026-10-11: board created from discussion with the maintainer; D1–D9 recorded
   as ideas.
+- 2026-10-13: D1 cheapest test run (`desktop_run`, 18 runs): gate not met.

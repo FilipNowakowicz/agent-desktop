@@ -4,6 +4,8 @@ import functools
 import json
 import os
 import re
+import subprocess
+import sys
 import time
 import uuid
 
@@ -116,6 +118,18 @@ applies a verified setting directly, without the GUI; check that it took effect.
 
 if os.environ.get("AGENT_DESKTOP_ATLAS"):
     INSTRUCTIONS += ATLAS_INSTRUCTIONS
+
+# D1 (experimental): the agent writes a program instead of single steps.
+RUN = os.environ.get("AGENT_DESKTOP_RUN") == "1"
+RUN_INSTRUCTIONS = """
+
+Scripts (experimental): desktop_run executes Python against a session, so a
+whole task (loops over rows, conditions, checks with assert) can be one call
+instead of many. Look first (desktop_ui, a screenshot) to learn names, then
+write the task as one script that ends with checks of the result."""
+
+if RUN:
+    INSTRUCTIONS += RUN_INSTRUCTIONS
 
 # One controller id for this server's lifetime (AGENT_DESKTOP_CONTROLLER overrides).
 CONTROLLER = os.environ.get("AGENT_DESKTOP_CONTROLLER") or (
@@ -731,6 +745,77 @@ def desktop_logs(session: str) -> dict:
 def desktop_destroy(session: str) -> dict:
     """Stop a session's owned processes and remove its private runtime/configuration."""
     return core.destroy(session)
+
+
+RUN_OUTPUT_LIMIT = 8000
+
+
+def desktop_run(
+    session: str, code: str, timeout: float = 60, screenshot: bool = False
+) -> dict | list:
+    """Run a Python script against a private session: many steps in one call,
+    with loops, conditions and assert checks.
+
+    The script starts with `from agent_desktop.script import *`, giving:
+    find(element, role, text, state, exact, window, app, within) -> nodes
+    (dicts: id, role, name, states, text, value, actions), where
+    within="mallory" keeps the row, list item, dialog or form containing that
+    text; one(...) -> the single match; text(...); rows() -> visible table rows
+    as lists of cell texts; press(...); set_text(element, value, ...); select(...);
+    act(node, action, text); type_text(s); key("ctrl+s"); click(x, y);
+    scroll(dy); focus(window id or title); windows(); wait(timeout=10,
+    title=, app_id=, element=, role=, text=, state=, gone=, stable_ms=,
+    file=, contains=, key=, value=) raising TimeoutError; browser(action,
+    ...) as desktop_browser; home() (the session home as a Path);
+    screenshot() -> path. element matches a name substring; lookups raise
+    LookupError unless exactly one element matches. Any exception stops the
+    script; earlier steps stay done. Use print for what you want back.
+
+    Returns exit_code, stdout and stderr (the last 8000 characters each) and
+    seconds; timeout (at most 300 s) stops the script. With screenshot=true
+    the reply also contains the settled screen.
+    """
+    info = core.manifest(session)
+    if info.get("mode") == "host":
+        raise core.DesktopError(
+            "desktop_run is not available on the host session: the person is "
+            "at this screen. Use single steps there."
+        )
+    timeout = min(max(float(timeout), 1), 300)
+    environment = {
+        **os.environ,
+        "AGENT_DESKTOP_SESSION": session,
+        "AGENT_DESKTOP_CONTROLLER": CONTROLLER,
+    }
+    started = time.monotonic()
+    try:
+        done = subprocess.run(
+            [sys.executable, "-I", "-c", "from agent_desktop.script import *\n" + code],
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        result = {
+            "exit_code": done.returncode,
+            "stdout": done.stdout[-RUN_OUTPUT_LIMIT:],
+            "stderr": done.stderr[-RUN_OUTPUT_LIMIT:],
+        }
+    except subprocess.TimeoutExpired as expired:
+        output = expired.stdout or b""
+        if isinstance(output, bytes):
+            output = output.decode(errors="replace")
+        result = {
+            "exit_code": None,
+            "timed_out": True,
+            "stdout": output[-RUN_OUTPUT_LIMIT:],
+        }
+    result["seconds"] = round(time.monotonic() - started, 2)
+    return looked(session, result, screenshot)
+
+
+if RUN:
+    tool(structured_output=False)(desktop_run)
 
 
 # Experiment baseline (AGENT_DESKTOP_GUARDS=0): sequences without the

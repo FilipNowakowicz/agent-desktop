@@ -49,7 +49,24 @@ NEWER = [
     "control",
     "profiles",
 ]
-TOOL_PROFILES = {"basic": LIFECYCLE + NEWER, "full": LIFECYCLE}
+# D1 "code": the agent looks with screenshots, ui, windows and wait, and acts
+# only through desktop_run scripts (needs --run).
+STEPS = [
+    "click",
+    "type",
+    "key",
+    "scroll",
+    "drag",
+    "move",
+    "actions",
+    "ui_action",
+    "focus",
+]
+TOOL_PROFILES = {
+    "basic": LIFECYCLE + NEWER,
+    "full": LIFECYCLE,
+    "code": LIFECYCLE + STEPS,
+}
 
 PROMPT = """You control a private Linux desktop through the agent-desktop tools.
 Use session {session}; it already exists and the application is already open.
@@ -257,6 +274,7 @@ def mcp_config_for(root):
                 "AGENT_DESKTOP_LOOK_DELTA": os.environ.get(
                     "AGENT_DESKTOP_LOOK_DELTA", "0"
                 ),
+                "AGENT_DESKTOP_RUN": os.environ.get("AGENT_DESKTOP_RUN", "0"),
                 "AGENT_DESKTOP_CALL_LOG": str(call_log_for(root)),
             }
         path.write_text(json.dumps(config, indent=2) + "\n")
@@ -420,6 +438,11 @@ def main():
         help="E3: screenshots after input show only what changed",
     )
     parser.add_argument(
+        "--run",
+        action="store_true",
+        help="D1: the agent can write Python scripts (desktop_run)",
+    )
+    parser.add_argument(
         "--no-guards",
         action="store_true",
         help="baseline: desktop_actions without the guarded-step description",
@@ -435,6 +458,8 @@ def main():
         help="let the agent use desktop_browser (needs --firefox)",
     )
     args = parser.parse_args()
+    if args.tools == "code" and not args.run:
+        parser.error("--tools code needs --run")
     # As the CLI and MCP server do: the installed runtime first on PATH.
     core.use_runtime()
     random.seed(args.seed)
@@ -446,6 +471,7 @@ def main():
     os.environ["AGENT_DESKTOP_BENCH_BRIDGE"] = "1" if args.bridge else "0"
     os.environ["AGENT_DESKTOP_LOOK"] = "0" if args.no_look else "1"
     os.environ["AGENT_DESKTOP_LOOK_DELTA"] = "1" if args.look_delta else "0"
+    os.environ["AGENT_DESKTOP_RUN"] = "1" if args.run else "0"
     # Sessions inherit this from the harness; the MCP server from claude.
     os.environ["AGENT_DESKTOP_EFFECTS"] = "1" if args.effects else "0"
     if args.atlas:
@@ -511,6 +537,7 @@ def main():
         "effects": args.effects,
         "look": not args.no_look,
         "look_delta": args.look_delta,
+        "run": args.run,
         "guards": not args.no_guards,
         "firefox": args.firefox,
         "bridge": args.bridge,

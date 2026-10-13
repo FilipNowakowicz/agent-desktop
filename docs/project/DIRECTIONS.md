@@ -147,8 +147,9 @@ Prefer directions that:
   replayed without a model in 2–10 s on two of three tasks, but one skill
   depended on state it never saw and passed its own asserts on a wrong result.
   A skill is only as good as an independent check, and an agent given a skill
-  still spent 13–22 s of model time. Running a stored skill by name, so that
-  the agent does not write it out again, is untested.
+  still spent 13–22 s of model time. Given the skill's file path instead,
+  the agent needed about 4 s of model time and two turns, and the repeat ran
+  2.8–2.9× faster than a fresh agent; the rest is the script's own speed.
 
 ### D6. The person does not wait
 

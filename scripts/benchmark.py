@@ -355,6 +355,18 @@ result. If it fails, finish the task yourself.
 {code}
 ```"""
 
+# The agent runs the skill from its file instead of writing it out again.
+SKILL_PATH_PROMPT = """
+
+A script that completed this task on an earlier run, with different data, is
+saved at {path}; it was checked by replaying it on fresh data and ends with
+assert checks. Run it with desktop_run and this exact code:
+
+exec(open({path!r}).read())
+
+If it exits 0, the task is done: reply without further checks. If it fails,
+finish the task yourself."""
+
 SKILL_BLOCK = re.compile(
     r"SKILL-START\s*(?:```(?:python)?\n)?(.*?)(?:```\s*)?SKILL-END", re.S
 )
@@ -429,7 +441,10 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
             prompt += LEARN_PROMPT
         skill = Path(skills or replaying or "/nonexistent") / f"{task.name}.py"
         if skills and skill.exists():
-            prompt += SKILL_PROMPT.format(code=skill.read_text().strip())
+            if os.environ.get("AGENT_DESKTOP_BENCH_SKILL_PATH"):
+                prompt += SKILL_PATH_PROMPT.format(path=str(skill))
+            else:
+                prompt += SKILL_PROMPT.format(code=skill.read_text().strip())
             record["skill"] = True
         if human:
             record.update(run_human(session, goal))
@@ -552,6 +567,11 @@ def main():
         help="E6: give the agent the skill DIR/<task>.py (needs --run)",
     )
     parser.add_argument(
+        "--skill-path",
+        action="store_true",
+        help="E6: give the skill's file path to run, not its code (with --skill)",
+    )
+    parser.add_argument(
         "--replay",
         type=Path,
         help="E6: run DIR/<task>.py without an agent, then check the task",
@@ -574,6 +594,12 @@ def main():
     args = parser.parse_args()
     if args.tools == "code" and not args.run:
         parser.error("--tools code needs --run")
+    if args.skill_path and not args.skill:
+        parser.error("--skill-path needs --skill")
+    if args.skill_path:
+        os.environ["AGENT_DESKTOP_BENCH_SKILL_PATH"] = "1"
+    else:
+        os.environ.pop("AGENT_DESKTOP_BENCH_SKILL_PATH", None)
     if (args.learn or args.skill) and not args.run:
         parser.error("--learn and --skill need --run")
     for option, name in (
@@ -665,6 +691,7 @@ def main():
         "run": args.run,
         "learn": bool(args.learn),
         "skill": bool(args.skill),
+        "skill_path": args.skill_path,
         "replay": bool(args.replay),
         "guards": not args.no_guards,
         "firefox": args.firefox,

@@ -111,7 +111,8 @@ the only way to act, turns fell 4% and wall time rose 58%, so its gate
 either ([E6 skills](../research/2026-10-14-e6-skills.md)): an agent given a
 verified skill took 62–77% fewer turns but was only 1.3× faster on two tasks
 and 2× slower on the paged table, where the skill itself was slow and, run
-alone, wrong.
+alone, wrong. Given the skill's path instead of its code, the agent reached
+2.8–2.9× in two turns: the remaining time is the script's own.
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

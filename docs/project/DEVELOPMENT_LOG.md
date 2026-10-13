@@ -23,8 +23,8 @@ it can run benchmark arms; report only, nothing committed. Its findings:
   expected table and cleaned up (`runtime_removed: true`).
 
 Not done: a real arm in the cloud, a parallel batch, and the harness changes
-(child environment, `--no-sandbox` as root, the runtime-directory fallback
-from #117 on main).
+(child environment, `--no-sandbox` as root). The runtime-directory fallback
+(#117) is on main, so the export is no longer needed.
 ## 2026-10-13 — D1 scripts: gate not met
 
 docs/research/2026-10-13-d1-scripts.md. `desktop_run` (`AGENT_DESKTOP_RUN=1`,

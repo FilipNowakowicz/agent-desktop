@@ -1,5 +1,51 @@
 # Development log
 
+## 2026-10-14 — Old vs new web judge on the realistic suite; reloads
+
+Do earlier realistic-suite results still hold now that agents no longer see a
+verdict in the title? A/B, Opus 5.5, seeds 101–103, arms alternated per seed:
+old judge (commit 2bbae63, before #126, in a separate worktree) and new judge
+(main at e0c8221). All rows are in
+[`benchmarks/results/2026-10-14-judge-ab.json`](../../benchmarks/results/2026-10-14-judge-ab.json).
+The account usage limit hit during seed 103: one old run
+(`real-attach-invoice`, which passed but was flagged) and the new seed-103 runs
+were redone after the reset. The three Mousepad tasks of that rerun were first
+skipped (no Mousepad on PATH) and run again under `nix shell`, still with the
+pre-fix judge.
+
+| Task | Old: passed, median wall | New: passed, median wall |
+| --- | --- | --- |
+| real-attach-invoice | 3/3, 38.8 s | 3/3, 31.6 s |
+| real-editor-indentation (no web page) | 3/3, 50.4 s | 3/3, 49.7 s |
+| real-expense-claim | 3/3, 49.5 s | 3/3, 47.7 s |
+| real-inventory-cleanup | 2/3, 59.2 s | 2/3, 103.5 s |
+| real-release-notes | 3/3, 30.6 s | 3/3, 30.7 s |
+| real-ticket-config | 3/3, 25.3 s | 3/3, 22.4 s |
+| all | 17/18, p50 45.7 s, $4.92 | 17/18, p50 39.3 s, $5.12 |
+
+Pass rates are the same and five tasks are within run-to-run noise. Inventory
+took longer with the new judge (26 vs 16 median turns), but three runs per arm
+overlap (old 47–151 s, new 77–117 s), so this is not shown to be the judge.
+Both failures were sign-outs: old/103 clicked "Sign out" and stopped, and said
+so; new/101 hit "Sign out" with a blind click, reloaded, redid the four edits
+and replied DONE. Earlier results are kept as measured. Inventory times from
+before #126 may be somewhat optimistic.
+
+The new/101 run exposed a judge difference. A reload cleared the old verdict
+title, so the old check judged only the last page load. The new check saw
+every state, and after a reload the report counter restarted, so `last()`
+could return a state from before the reload. Pages now send
+`performance.timeOrigin` with each report, and `Reports.states()` keeps only
+the latest load's states, ordered by their counter. Whether new/101 would pass
+under this rule is unknown: its reports were not saved.
+
+Validation:
+- `uv run ruff check`/`format --check` on src, scripts, tests, benchmarks;
+- runtime on PATH, `test_web_fixtures`: 4 tests OK, including the new
+  `ReportsTests` (three posted reports over two loads; only the later load
+  counts) and every right and wrong web solution in headless Chromium;
+- a headless Chromium page posted `{"load": 1792017926625.8, "n": 1, ...}`.
+
 ## 2026-10-14 — Standard and hard web pages no longer carry their judge
 
 The 17 web tasks of the standard and hard suites now report their state like

@@ -55,7 +55,7 @@ def page(body, script=""):
         "<style>body{font:18px sans-serif;margin:24px}</style>"
         f"{body}<script>let reports=0;function report(state){{fetch("
         f"'{REPORT_URL}',{{method:'POST',mode:'no-cors',keepalive:true,"
-        "body:JSON.stringify({n:++reports,state})}).catch(()=>{})}"
+        "body:JSON.stringify({load:performance.timeOrigin,n:++reports,state})}).catch(()=>{})}"
         f"\n{script}</script>"
     )
 
@@ -85,8 +85,18 @@ class Reports:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     def states(self):
-        """Every reported state, in the order the page sent them."""
-        return [r["state"] for r in sorted(self.received, key=lambda r: r["n"])]
+        """The states reported since the page was last loaded, in the order
+        it sent them. A reload starts the page over, as it cleared the
+        verdict title the pages used to set."""
+        received = list(self.received)
+        if not received:
+            return []
+        load = max(r.get("load", 0) for r in received)
+        return [
+            r["state"]
+            for r in sorted(received, key=lambda r: r["n"])
+            if r.get("load", 0) == load
+        ]
 
     def last(self):
         states = self.states()

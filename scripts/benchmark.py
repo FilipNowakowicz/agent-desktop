@@ -26,7 +26,7 @@ from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.realistic import REALISTIC_TASKS  # noqa: E402
-from benchmarks.tasks import TASKS  # noqa: E402
+from benchmarks.tasks import TASKS, Reports  # noqa: E402
 
 SUITES = {
     "standard": TASKS,
@@ -331,6 +331,82 @@ def run_human(session, goal):
     }
 
 
+# E6 (verified skills): a learning run ends with a script for the whole task;
+# a replay runs that script without a model on new data; a skill run gives
+# the agent the verified script.
+LEARN_PROMPT = """
+
+When the task is done, write a skill for it: one Python script for
+desktop_run that does this whole task from the start, in a fresh session where
+the applications have just opened. Next time the data will differ (rows,
+numbers, names, paths), so the script must find what it needs on the screen or
+in files and must not use values you saw this time. End it with assert checks
+of the result. Do not run it now. Put it last in your final reply, between a
+line SKILL-START and a line SKILL-END."""
+
+SKILL_PROMPT = """
+
+A script that completed this task on an earlier run, with different data, is
+below; it was checked by replaying it on fresh data. Run it with desktop_run
+(as it is, or with small changes if this goal needs them) and confirm the
+result. If it fails, finish the task yourself.
+
+```python
+{code}
+```"""
+
+# The agent runs the skill from its file instead of writing it out again.
+SKILL_PATH_PROMPT = """
+
+A script that completed this task on an earlier run, with different data, is
+saved at {path}; it was checked by replaying it on fresh data and ends with
+assert checks. Run it with desktop_run and this exact code:
+
+exec(open({path!r}).read())
+
+If it exits 0, the task is done: reply without further checks. If it fails,
+finish the task yourself."""
+
+SKILL_BLOCK = re.compile(
+    r"SKILL-START\s*(?:```(?:python)?\n)?(.*?)(?:```\s*)?SKILL-END", re.S
+)
+
+
+def skill_from_reply(text):
+    """The script between SKILL-START and SKILL-END, without code fences."""
+    found = SKILL_BLOCK.search(text or "")
+    return found.group(1).strip() + "\n" if found else None
+
+
+def full_reply(directory):
+    """The agent's whole final reply (records keep only its last 500 chars)."""
+    transcript = directory / "transcript.jsonl"
+    for line in reversed(transcript.read_text().splitlines()):
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("type") == "result":
+            return event.get("result") or ""
+    return ""
+
+
+def replay(session, code):
+    """Run a skill against the session without a model, as desktop_run would."""
+    from agent_desktop import mcp_server
+
+    started = time.monotonic()
+    result = mcp_server.desktop_run(session, code, timeout=300)
+    return {
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "replay_exit_code": result.get("exit_code"),
+        "replay_output": (result.get("stdout") or "")[-1000:],
+        "replay_error": (result.get("stderr") or "")[-2000:],
+        "turns": 0,
+        "cost_usd": 0,
+    }
+
+
 def run_task(task, root, budget, model, dry_run=False, profile="full", human=False):
     directory = (root / task.name).resolve()
     directory.mkdir(parents=True)
@@ -341,6 +417,8 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
     info = core.manifest(session)
     context = Context(session, directory)
     context.mcp_config = mcp_config_for(root)
+    context.reports = Reports()
+    context.report_url = context.reports.url
     try:
         argv, goal = task.setup(context)
         # A task may launch several applications; the last one holds its answer.
@@ -357,12 +435,29 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                 raise RuntimeError("Application window did not appear")
             time.sleep(0.2)
         time.sleep(1)  # let the first frame render before the agent looks
+        learn = os.environ.get("AGENT_DESKTOP_BENCH_LEARN")
+        skills = os.environ.get("AGENT_DESKTOP_BENCH_SKILL")
+        replaying = os.environ.get("AGENT_DESKTOP_BENCH_REPLAY")
+        prompt = PROMPT.format(session=session, task=goal)
+        if learn:
+            prompt += LEARN_PROMPT
+        skill = Path(skills or replaying or "/nonexistent") / f"{task.name}.py"
+        if skills and skill.exists():
+            if os.environ.get("AGENT_DESKTOP_BENCH_SKILL_PATH"):
+                prompt += SKILL_PATH_PROMPT.format(path=str(skill))
+            else:
+                prompt += SKILL_PROMPT.format(code=skill.read_text().strip())
+            record["skill"] = True
         if human:
             record.update(run_human(session, goal))
+        elif replaying:
+            if not skill.exists():
+                raise RuntimeError(f"No skill to replay: {skill}")
+            record.update(replay(session, skill.read_text()))
         elif not dry_run:
             record.update(
                 run_agent(
-                    PROMPT.format(session=session, task=goal),
+                    prompt,
                     agent_directory(root, task),
                     budget,
                     model,
@@ -386,6 +481,12 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     ],
                 )
             )
+        if learn and not (human or dry_run or replaying):
+            code = skill_from_reply(full_reply(agent_directory(root, task)))
+            record["learned"] = code is not None
+            if code:
+                Path(learn).mkdir(parents=True, exist_ok=True)
+                (Path(learn) / f"{task.name}.py").write_text(code)
         time.sleep(0.5)
         # Some checks judge an honest FAILED reply (an impossible task).
         context.reply = record.get("reply")
@@ -397,6 +498,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
     except Exception as error:
         record["error"] = f"{type(error).__name__}: {error}"
     finally:
+        context.reports.close()
         try:
             record["cleanup"] = core.destroy(session)
         except core.DesktopError as error:
@@ -458,6 +560,26 @@ def main():
         help="D1: the agent can write Python scripts (desktop_run)",
     )
     parser.add_argument(
+        "--learn",
+        type=Path,
+        help="E6: the agent ends with a skill script, saved to DIR/<task>.py",
+    )
+    parser.add_argument(
+        "--skill",
+        type=Path,
+        help="E6: give the agent the skill DIR/<task>.py (needs --run)",
+    )
+    parser.add_argument(
+        "--skill-path",
+        action="store_true",
+        help="E6: give the skill's file path to run, not its code (with --skill)",
+    )
+    parser.add_argument(
+        "--replay",
+        type=Path,
+        help="E6: run DIR/<task>.py without an agent, then check the task",
+    )
+    parser.add_argument(
         "--no-guards",
         action="store_true",
         help="baseline: desktop_actions without the guarded-step description",
@@ -475,6 +597,23 @@ def main():
     args = parser.parse_args()
     if args.tools == "code" and not args.run:
         parser.error("--tools code needs --run")
+    if args.skill_path and not args.skill:
+        parser.error("--skill-path needs --skill")
+    if args.skill_path:
+        os.environ["AGENT_DESKTOP_BENCH_SKILL_PATH"] = "1"
+    else:
+        os.environ.pop("AGENT_DESKTOP_BENCH_SKILL_PATH", None)
+    if (args.learn or args.skill) and not args.run:
+        parser.error("--learn and --skill need --run")
+    for option, name in (
+        (args.learn, "LEARN"),
+        (args.skill, "SKILL"),
+        (args.replay, "REPLAY"),
+    ):
+        if option:
+            os.environ[f"AGENT_DESKTOP_BENCH_{name}"] = str(option.resolve())
+        else:
+            os.environ.pop(f"AGENT_DESKTOP_BENCH_{name}", None)
     # As the CLI and MCP server do: the installed runtime first on PATH.
     core.use_runtime()
     random.seed(args.seed)
@@ -493,7 +632,7 @@ def main():
         os.environ["AGENT_DESKTOP_ATLAS"] = str(args.atlas.resolve())
     else:
         os.environ.pop("AGENT_DESKTOP_ATLAS", None)
-    if not (args.dry_run or args.human) and not shutil.which("claude"):
+    if not (args.dry_run or args.human or args.replay) and not shutil.which("claude"):
         raise SystemExit("Requires the claude CLI")
     root = Path("artifacts/benchmark") / time.strftime("%Y%m%d-%H%M%S")
     root = root.with_name(root.name + "-" + uuid.uuid4().hex[:4])
@@ -553,6 +692,10 @@ def main():
         "look": not args.no_look,
         "look_delta": args.look_delta,
         "run": args.run,
+        "learn": bool(args.learn),
+        "skill": bool(args.skill),
+        "skill_path": args.skill_path,
+        "replay": bool(args.replay),
         "guards": not args.no_guards,
         "firefox": args.firefox,
         "bridge": args.bridge,

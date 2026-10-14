@@ -25,6 +25,108 @@ Not established: a speed difference from pixman, `vulkan`, visible mode, and
 Blender view rotation with a middle-button `drag`, which changed the view in
 1 of 3 tries with pixman and 0 of 6 with `gles2` (numpad keys rotated it every
 time).
+## 2026-10-14 — Standard and hard web pages no longer carry their judge
+
+The 17 web tasks of the standard and hard suites now report their state like
+the realistic suite (#126); `Task.check` hands the last reported state to each
+task's `judge`. `html()` and `title_complete()` are gone: no page sets its
+title any more. Several pages had put the answer in their judge (the second
+tab's access code, the terminal's ticket number); those answers are now only
+where the task shows them. Answers that are the page's own content (the code
+drawn on a canvas, the chart values, the slow-load voucher) remain in the page
+source.
+
+`tests/test_realistic_fixtures.py` became `tests/test_web_fixtures.py`: a right
+and a wrong scripted solution for each of the 22 web tasks, judged by the
+Python checks in headless Chromium, plus browser-free tests that every web
+page has a solver and that no page carries `done(`, `document.title` or a
+listed answer. A deliberately broken slider judge (`return True`) made it fail.
+
+Validation:
+- `uv run ruff check`/`format --check` on src, scripts, tests, benchmarks;
+- runtime on PATH, `uv run python -m unittest discover -s tests`: 180 tests,
+  OK, 18 skipped;
+- `--seed 1 --dry-run` on the standard and hard suites: every check failed,
+  no errors (the kdialog tasks were skipped: kdialog not installed);
+- agents, seed 1: all 17 converted tasks passed (`20261014-004711-f73a`,
+  `20261014-005016-1d8c`).
+
+Earlier results on these suites were measured with the verdict in the title.
+
+## 2026-10-14 — Realistic web pages no longer carry their judge
+
+During E6 an agent printed the inventory page's source, which held the row
+data, the expected outcome and the judge; every web task also wrote its verdict
+into the window title (`Task - incomplete 1 rows wrong`), which agents read.
+The five realistic web tasks now call `report(state)`
+(`benchmarks.tasks.page`), which posts the page state to a per-task loopback
+endpoint (`benchmarks.tasks.Reports`, started by `run_task`); each task's
+`check` judges the last state in Python. The title stays `Task`. Probe first:
+a `file://` page in headless Chromium reached `http://127.0.0.1` with a
+`no-cors` POST.
+
+Validation:
+- `uv run ruff check`/`format --check` on src, scripts, tests, benchmarks;
+- runtime on PATH, `uv run python -m unittest discover -s tests`: 179 tests,
+  OK, 18 skipped. `test_realistic_fixtures` now runs each right and wrong
+  scripted solution in headless Chromium and asserts the Python check (the
+  ticket page first failed it: it replaced the page before reading the
+  comment); the new `PageLeakTests` (no browser, runs in Lint) asserts that no
+  realistic page contains `done(`, `document.title` or the expected answer;
+- `--suite realistic --seed 1 --dry-run`: all six checks fail with no errors;
+- agents, seed 1 (`20261014-003057-b8cf`): the five web tasks passed (31, 20,
+  71, 65, 34 s); `real-attach-invoice --firefox` passed (45.7 s), so the
+  report also arrives from Firefox.
+
+Not done: the basic and hard suites (`benchmarks/tasks.py`, `hard.py`) still
+judge in the page and set the title. Earlier realistic-suite results (E0–E6,
+D1) were measured with the title verdict visible; how often agents used it was
+not checked.
+
+## 2026-10-14 — E6 follow-up: the skill by path reaches 2.8–2.9×
+
+`--skill-path` (with `--skill`) gives the agent the skill's file path and the
+exact `desktop_run` call `exec(open(PATH).read())` instead of the code. Seeds
+6–8 × 3 tasks, 9/9 passed: expense 16.2 s (2.92× the baseline median),
+ticket 8.0 s (2.80×), both in 2 turns with 170–219 output tokens and
+$0.04; inventory 156.2 s (0.47×). The gate (3×) is narrowly not met. About 6 s
+per run is the agent (2 s CLI start, about 4 s model); the rest is the
+script, and the expense skill has about 4 s of fixed sleeps (not tuned after
+the measurement). Every inventory run first hit `desktop_run`'s 60 s default
+timeout. One inventory run printed the page source, which contains the task's
+judge code and rows: a benchmark leak to fix. Details:
+[E6 skills](../research/2026-10-14-e6-skills.md), follow-up section.
+
+Validation: `uv run ruff check src scripts tests`, `uv run ruff format --check
+src scripts tests`, `uv run python -m unittest tests.test_benchmark_timing`.
+
+## 2026-10-14 — E6: verified skills do not meet the 3× gate
+
+`scripts/benchmark.py` gained `--learn DIR` (the agent ends with a whole-task
+script, read from the transcript's full final reply and saved as
+`DIR/<task>.py`), `--replay DIR` (no agent: run the script through
+`desktop_run`, then the task check) and `--skill DIR` (the agent gets the
+script). New unit test `SkillTests` for the reply parsing. Details and medians:
+[E6 skills](../research/2026-10-14-e6-skills.md); runs and skill source:
+`benchmarks/results/2026-10-14-e6-skills.json`.
+
+- Learn (seed 1): 3/3 passed, 3/3 skills returned.
+- Replay without a model: expense 3/3 (about 10 s against a 47 s agent
+  median), ticket 3/3 (about 2 s against 22 s), inventory 0/1, then the
+  repaired inventory skill 0/2. On seeds 6 and 7 the repaired skill exited 0
+  and printed OK, but it had read 52 of 60 rows, so the task check failed.
+- Gate (seeds 6–8, `--run` in both arms): 18/18 passed; skill arm turns
+  −62% to −77%, wall time 1.36× and 1.33× faster on expense and ticket, 0.47×
+  on inventory (tool time 116–230 s). Not met.
+
+Invalid runs, excluded: the first repair run hit the account usage limit
+(`api_error: usage_limit_reached`), and the first skill batch never started
+(`"--skill DIR"` passed as one zsh word). Arms were not interleaved: the
+skill runs followed the baseline runs by 10–25 minutes.
+
+Validation: `uv run python -m unittest tests.test_benchmark_timing` (6 OK),
+`uv run ruff check src scripts tests`, `uv run ruff format --check src scripts
+tests`. The desktop suite was not rerun: no runtime code changed.
 
 ## 2026-10-13 — E5: benchmark arms run in parallel in the cloud
 

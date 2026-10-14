@@ -15,10 +15,15 @@ configured account; obtain an agreed scope and budget before running them.
 Claude Code as the agent. For each task the harness creates a fresh headless
 session, launches the application and waits for its window. It then runs
 `claude -p` with **only** the agent-desktop MCP tools (`--tools ""`, strict MCP
-config, $1 cap per task). The outcome is verified independently: window titles set by
-the page, files on disk, or a dialog's stdout and exit code. The agent's reply is
-not trusted. After each task the session is destroyed and checked for leftover
-processes.
+config, $1 cap per task). The outcome is verified independently: the state a
+web page reports, files on disk, or a dialog's stdout and exit code. The
+agent's reply is not trusted. Web pages do not judge themselves: they post
+their state (form values, table rows) to a loopback endpoint of the harness,
+and the task's check judges it in Python, so neither the page source nor the
+window title shows the expected answer or a verdict. Where the answer is the
+page's own content (a code drawn on a canvas, chart values, a voucher shown
+after a delay) it is still in the page source, as in any web app. After each
+task the session is destroyed and checked for leftover processes.
 
 ```sh
 # Runtime tools and the apps must be on PATH; on NixOS, for example:
@@ -154,9 +159,11 @@ adds `seconds_p50_p95`, failures included, and the totals. `--human` is the
 timed human baseline: each task opens in an interactive viewer (`take`), the
 clock stops when the person closes it, and the same check judges the result.
 
-`tests/test_realistic_fixtures.py` is the positive control for the web
-fixtures: a scripted solution in headless Chromium must complete each page and
-a deliberate mistake must not. It found two fixture bugs that had failed the
+`tests/test_web_fixtures.py` (before 2026-10-14 `test_realistic_fixtures.py`,
+realistic suite only) is the positive control for every web fixture: a
+scripted solution in headless Chromium must pass each task's check and a
+deliberate mistake must not; without a browser, it also checks that no page
+carries a judge or an answer it should not. It found two fixture bugs that had failed the
 first agent run (an input with `id=name`, which `window.name` shadows, and a
 handler that removed the page before reading its fields).
 
@@ -188,6 +195,14 @@ changed-only screenshots, [report](research/2026-10-11-observation-discipline.md
 are compared with `AB_ARM=effects` or `AB_ARM=look_delta
 scripts/effects_ab_summary.py RUN...`; runs refused by the service (usage
 limits) are recorded as `api_error`, excluded, and stop the suite.
+
+E6 ([report](research/2026-10-14-e6-skills.md)) adds three options. `--run
+--learn DIR` asks the agent to end with a script for the whole task and
+saves it as `DIR/<task>.py`. `--replay DIR` runs that script with no agent and
+then runs the task's check. `--run --skill DIR` gives the agent the script;
+add `--skill-path` to give its file path instead of its code.
+Pass `DIR` as a separate argument: in zsh an unquoted variable holding
+`--skill DIR` is not split into two words.
 
 ### Human baseline (partial, 2026-10-12)
 

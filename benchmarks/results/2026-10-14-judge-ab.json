@@ -1,0 +1,419 @@
+{
+ "experiment": "old (verdict in the page title) vs new (state reported to the harness) judge, realistic suite",
+ "date": "2026-10-14",
+ "model": "claude-opus-5-5",
+ "seeds": [
+  101,
+  102,
+  103
+ ],
+ "arms": {
+  "old": "commit 2bbae63 (before #126), worktree",
+  "new": "main at e0c8221 (#127)"
+ },
+ "order": "arms alternated per seed; seed 103 partly rerun after the account usage limit",
+ "runs": [
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 29.8,
+   "turns": 7,
+   "cost": 0.14857579999999998,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 79.3,
+   "turns": 15,
+   "cost": 0.28963420000000006,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 47.7,
+   "turns": 19,
+   "cost": 0.3514622000000001,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-inventory-cleanup",
+   "passed": false,
+   "secs": 103.5,
+   "turns": 26,
+   "cost": 0.6657211999999999,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 30.7,
+   "turns": 14,
+   "cost": 0.2056462,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "new",
+   "seed": 101,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 22.4,
+   "turns": 8,
+   "cost": 0.1282904,
+   "run": "20261014-010317-0756"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 32.7,
+   "turns": 9,
+   "cost": 0.1825462,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 50.4,
+   "turns": 19,
+   "cost": 0.2645868,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 45.6,
+   "turns": 18,
+   "cost": 0.3388264,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-inventory-cleanup",
+   "passed": true,
+   "secs": 151.1,
+   "turns": 25,
+   "cost": 0.6397516000000003,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 44.6,
+   "turns": 13,
+   "cost": 0.2065938,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "old",
+   "seed": 101,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 28.0,
+   "turns": 8,
+   "cost": 0.15195039999999999,
+   "run": "20261014-005703-a611"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 31.6,
+   "turns": 8,
+   "cost": 0.16027019999999997,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 49.7,
+   "turns": 12,
+   "cost": 0.24724759999999996,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 47.3,
+   "turns": 18,
+   "cost": 0.3399604,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-inventory-cleanup",
+   "passed": true,
+   "secs": 76.9,
+   "turns": 20,
+   "cost": 0.49207639999999997,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 26.7,
+   "turns": 11,
+   "cost": 0.1706304,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "new",
+   "seed": 102,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 21.3,
+   "turns": 8,
+   "cost": 0.1274454,
+   "run": "20261014-010853-9338"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 38.8,
+   "turns": 7,
+   "cost": 0.15321220000000002,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 47.1,
+   "turns": 11,
+   "cost": 0.2255012,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 53.0,
+   "turns": 20,
+   "cost": 0.3863798,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-inventory-cleanup",
+   "passed": true,
+   "secs": 59.2,
+   "turns": 16,
+   "cost": 0.3918382000000001,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 26.5,
+   "turns": 11,
+   "cost": 0.1741992,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "old",
+   "seed": 102,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 22.7,
+   "turns": 8,
+   "cost": 0.130435,
+   "run": "20261014-011329-b320"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 34.1,
+   "turns": 7,
+   "cost": 0.15024420000000002,
+   "run": "20261014-234437-9ada"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 43.0,
+   "turns": 11,
+   "cost": 0.23353139999999997,
+   "run": "20261014-234806-7a23"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 53.9,
+   "turns": 19,
+   "cost": 0.3532368,
+   "run": "20261014-234806-7a23"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-inventory-cleanup",
+   "passed": true,
+   "secs": 116.9,
+   "turns": 28,
+   "cost": 0.7288434000000001,
+   "run": "20261014-234437-9ada"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 35.5,
+   "turns": 13,
+   "cost": 0.1952296,
+   "run": "20261014-234806-7a23"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 23.7,
+   "turns": 8,
+   "cost": 0.1296646,
+   "run": "20261014-234437-9ada"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-attach-invoice",
+   "passed": true,
+   "secs": 45.8,
+   "turns": 11,
+   "cost": 0.30828160000000004,
+   "run": "20261014-234347-1e8b"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-editor-indentation",
+   "passed": true,
+   "secs": 69.1,
+   "turns": 16,
+   "cost": 0.3041830000000001,
+   "run": "20261014-011758-6073"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-expense-claim",
+   "passed": true,
+   "secs": 49.5,
+   "turns": 20,
+   "cost": 0.381019,
+   "run": "20261014-011758-6073"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-inventory-cleanup",
+   "passed": false,
+   "secs": 46.8,
+   "turns": 14,
+   "cost": 0.3377418000000001,
+   "run": "20261014-011758-6073"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-release-notes",
+   "passed": true,
+   "secs": 30.6,
+   "turns": 12,
+   "cost": 0.1950792,
+   "run": "20261014-011758-6073"
+  },
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-ticket-config",
+   "passed": true,
+   "secs": 25.3,
+   "turns": 9,
+   "cost": 0.1499748,
+   "run": "20261014-011758-6073"
+  }
+ ],
+ "excluded": [
+  {
+   "arm": "old",
+   "seed": 103,
+   "task": "real-attach-invoice",
+   "run": "20261014-011758-6073",
+   "api_error": "usage_limit_reached",
+   "reason": "usage_limit_reached"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-release-notes",
+   "run": "20261014-012237-3b99",
+   "api_error": "usage_limit_reached",
+   "reason": "usage_limit_reached"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-release-notes",
+   "run": "20261014-234437-9ada",
+   "api_error": null,
+   "reason": "skipped: mousepad not on PATH"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-expense-claim",
+   "run": "20261014-234437-9ada",
+   "api_error": null,
+   "reason": "skipped: mousepad not on PATH"
+  },
+  {
+   "arm": "new",
+   "seed": 103,
+   "task": "real-editor-indentation",
+   "run": "20261014-234437-9ada",
+   "api_error": null,
+   "reason": "skipped: mousepad not on PATH"
+  }
+ ]
+}

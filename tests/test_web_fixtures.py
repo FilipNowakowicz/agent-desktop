@@ -4,6 +4,7 @@ a wrong one must not. Catches fixture bugs (such as an element id that a window
 property shadows) before an agent run is spent on them. Without a browser:
 pages must not carry their judge or the expected answer."""
 
+import json
 import os
 import shutil
 import signal
@@ -11,6 +12,7 @@ import subprocess
 import tempfile
 import types
 import unittest
+import urllib.request
 from pathlib import Path
 
 from test_runtime import CHROMIUM
@@ -275,6 +277,24 @@ class WebFixtureTests(unittest.TestCase):
                 self.assertTrue(passed, detail)
                 passed, detail = self.passes(task, False)
                 self.assertFalse(passed, detail)
+
+
+class ReportsTests(unittest.TestCase):
+    def test_a_reload_starts_the_page_over(self):
+        reports = Reports()
+        self.addCleanup(reports.close)
+        sent = [
+            {"load": 1.5, "n": 2, "state": {"signedOut": True}},
+            {"load": 1.5, "n": 1, "state": {"rows": 1}},
+            {"load": 9.0, "n": 1, "state": {"rows": 2}},
+        ]
+        for body in sent:
+            request = urllib.request.Request(
+                reports.url, data=json.dumps(body).encode(), method="POST"
+            )
+            urllib.request.urlopen(request, timeout=5).close()
+        self.assertEqual(reports.states(), [{"rows": 2}])
+        self.assertEqual(reports.last(), {"rows": 2})
 
 
 class PageLeakTests(unittest.TestCase):

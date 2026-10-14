@@ -20,8 +20,9 @@ web page reports, files on disk, or a dialog's stdout and exit code. The
 agent's reply is not trusted. Web pages do not judge themselves: they post
 their state (form values, table rows) to a loopback endpoint of the harness,
 and the task's check judges it in Python, so neither the page source nor the
-window title shows the expected answer or a verdict. Where the answer is the
-page's own content (a code drawn on a canvas, chart values, a voucher shown
+window title shows the expected answer or a verdict. Only the states since the
+page was last loaded count: a reload starts the page over. Where the answer is
+the page's own content (a code drawn on a canvas, chart values, a voucher shown
 after a delay) it is still in the page source, as in any web app. After each
 task the session is destroyed and checked for leftover processes.
 

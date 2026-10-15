@@ -110,7 +110,6 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                             b"\x89PNG\r\n\x1a\n"
                         )
                     )
-                    capture = json.loads(screenshot.content[0].text)
                     text = await client.call_tool(
                         "desktop_type", {"session": session_id, "text": "MCP café λ"}
                     )
@@ -140,15 +139,25 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                             break
                         await asyncio.sleep(0.05)
                     self.assertEqual((fixture / "typed.txt").read_text(), "MCP café λ")
+                    half = await client.call_tool(
+                        "desktop_screenshot", {"session": session_id, "scale": 0.5}
+                    )
+                    half = json.loads(half.content[0].text)
                     click = await client.call_tool(
                         "desktop_click",
                         {
                             "session": session_id,
-                            "x": capture["width"] // 2,
-                            "y": capture["height"] // 2,
+                            "x": half["width"] // 2,
+                            "y": half["height"] // 2,
+                            "observation": half["observation"],
+                            "screenshot": True,
                         },
                     )
                     self.assertFalse(click.isError)
+                    # The settled screen comes at the scale it was planned from.
+                    clicked = json.loads(click.content[0].text)["screenshot"]
+                    self.assertEqual(clicked["scale"], 0.5)
+                    self.assertEqual(clicked["width"], half["width"])
                     for _ in range(100):
                         if (fixture / "mouse.json").exists():
                             break

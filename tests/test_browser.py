@@ -3,6 +3,7 @@
 import os
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -169,6 +170,20 @@ class BrowserTests(unittest.TestCase):
             "steps", steps=[{"action": "wait", "text": "nobody", "timeout": 0.3}]
         )
         self.assertEqual(waited["stopped"]["reason"], "wait not satisfied")
+        # seconds pauses as in desktop_actions, alone or before a condition.
+        started = time.monotonic()
+        paused = self.browser(
+            "steps",
+            steps=[
+                {"action": "wait", "seconds": 0.5},
+                {"action": "wait", "seconds": 0.2, "selector": "#u"},
+            ],
+        )
+        self.assertIsNone(paused["stopped"], paused)
+        self.assertGreaterEqual(time.monotonic() - started, 0.7)
+        self.assertEqual(paused["results"][0], {"satisfied": True, "waited": 0.5})
+        with self.assertRaisesRegex(core.DesktopError, "or seconds"):
+            self.browser("wait")
 
 
 if __name__ == "__main__":

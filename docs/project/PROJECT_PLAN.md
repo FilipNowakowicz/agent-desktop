@@ -1,6 +1,6 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-11. This document records the chosen direction, implemented
+Updated: 2026-10-15. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
@@ -113,6 +113,26 @@ verified skill took 62–77% fewer turns but was only 1.3× faster on two tasks
 and 2× slower on the paged table, where the skill itself was slow and, run
 alone, wrong. Given the skill's path instead of its code, the agent reached
 2.8–2.9× in two turns: the remaining time is the script's own.
+
+Daily-use feedback (2026-10-15, a login-gated download moved to the host
+session): the maintainer wants login-gated work to default to their own desktop
+and existing Firefox logins, in the background and without restarting Firefox.
+Done: browser `wait` takes `seconds`, a human request can be withdrawn, host
+requests report up front whether the person's Firefox has a BiDi port, settled
+screenshots keep the observation's scale, and the instructions offer the host
+first for sites the user is signed into. Open, in rough order of value:
+- the person's logins in the background. The BiDi port is ruled out for daily
+  use (striped URL bar and robot icon; Cloudflare sometimes blocks it).
+  Candidates: importing chosen sites' cookies from their Firefox into a named
+  private profile (small; copies go stale), or a WebExtension with native
+  messaging in their own Firefox (larger; untrusted synthetic events, signing);
+- workspace awareness on the host: windows on other Hyprland workspaces, and
+  focusing one;
+- host screenshots that wait for compositor animations (one caught a workspace
+  switch halfway);
+- richer `find` items for buttons (class, a usable selector);
+- a non-blocking wait for control to return, and adding a profile to a running
+  session.
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

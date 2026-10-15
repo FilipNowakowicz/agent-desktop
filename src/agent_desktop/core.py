@@ -573,6 +573,20 @@ def host_minutes(minutes):
     return minutes
 
 
+def person_browser():
+    """Whether desktop_browser can use the person's Firefox, known before approval."""
+    from .worker import person_firefox_bridge
+
+    if person_firefox_bridge(os.environ):
+        return {"dom": True}
+    return {
+        "dom": False,
+        "detail": "The person's Firefox has no WebDriver BiDi port, so "
+        "desktop_browser cannot use it; screenshots and input still work. Only "
+        "they can restart it with --remote-debugging-port=0.",
+    }
+
+
 def request_host(reason, minutes=15, wait=50):
     """Ask the person to let the agent use their own screen.
 
@@ -589,7 +603,12 @@ def request_host(reason, minutes=15, wait=50):
         raise DesktopError("Wait must be between 0 and 60 seconds")
     running = active_host_session()
     if running:
-        return {"session": running, "status": "ready", "approved": "already running"}
+        return {
+            "session": running,
+            "status": "ready",
+            "approved": "already running",
+            "browser": person_browser(),
+        }
     base = state_root()
     base.mkdir(parents=True, exist_ok=True, mode=0o700)
     path = base / HOST_REQUEST
@@ -639,13 +658,18 @@ def request_host(reason, minutes=15, wait=50):
             "status": "pending",
             "detail": "No answer yet; call desktop_request_host again with the same "
             "reason to keep waiting.",
+            "browser": person_browser(),
         }
     path.unlink(missing_ok=True)
     if answer == "expired":
         raise DesktopError("No answer from the person; the screen was not shared")
     if answer != "approved":
         raise DesktopError("The person declined; do not use their screen")
-    return {**create("host", _host_minutes=pending["minutes"]), "approved": True}
+    return {
+        **create("host", _host_minutes=pending["minutes"]),
+        "approved": True,
+        "browser": person_browser(),
+    }
 
 
 def answer_host(approve, minutes=None):

@@ -1,5 +1,53 @@
 # Development log
 
+## 2026-10-15 — Fixes from a login-gated task on the host
+
+The maintainer used the MCP from another repository to download an installer
+from a Cloudflare-protected site that needs a login. The private session's
+Firefox passed Cloudflare where curl got a challenge; then the task moved to a
+host session with the maintainer's own Firefox logins. Their notes reported
+friction, checked here against the source:
+
+- browser `wait` refused `{"action": "wait", "seconds": 3}` ("Give a CSS
+  selector or a text"), while `desktop_actions` documents that form. It now
+  pauses `seconds` (0–30) first; alone it is a plain pause.
+- a pending `desktop_request_human` could not be withdrawn when the maintainer
+  chose their own screen instead; the session had to be destroyed.
+  `request_human` with `withdraw` (MCP `withdraw=true`, CLI `--withdraw`)
+  clears it and ends a `desktop_control` wait; a takeover under way continues.
+- the agent learned only after approval that the maintainer's Firefox had no
+  BiDi port. Every `request_host` reply, including `pending`, now carries
+  `browser` (`dom` true or false, with the reason).
+- `screenshot=true` replies ignored the scale of the screenshot the input was
+  planned from (a 0.5 plan returned 1920×1080). They now reuse the token's
+  scale.
+- after "The person used the computer after that screenshot", the next
+  screenshot had the same token string. That is by design (host staleness is
+  judged by time, the token by layout); the refusal and the guide now say so.
+- the instructions now offer the host first when a site the user is likely
+  signed into needs a login, and `desktop_create` says a profile cannot be
+  added later.
+
+Not changed: `title: "undefined"` on a 404 page is the page's own title (the
+reply copies `document.title`). The open items (reusing a running Firefox
+without the port, host workspaces, host animations, sparser `find` items for
+buttons, a non-blocking control wait, adding a profile later) are in the
+project plan.
+
+Validation (NixOS, repaired runtime on PATH, headless private sessions; the
+host tests use a private session as the stand-in host):
+- `uv run ruff check` and `ruff format --check` on src, tests, scripts and
+  benchmarks: clean;
+- `test_browser`, `test_takeover`, `test_host`, `test_mcp`: 24 tests OK,
+  including the new checks (browser `seconds` pauses alone and before a
+  condition; a withdrawn request ends a control wait at once; `browser.dom`
+  false with no port and true with the stand-in person's Firefox; a click
+  planned on a 0.5 screenshot returns a 0.5 screenshot);
+- full suite (`unittest discover -s tests`): 186 tests OK, 18 skipped.
+
+The maintainer ruled out the BiDi port for daily use: Firefox shows a striped
+URL bar and robot icon, and Cloudflare sometimes blocks it.
+
 ## 2026-10-15 — Optional GPU renderer for the compositor
 
 labwc always rendered with pixman. `AGENT_DESKTOP_RENDERER` (`pixman`, the

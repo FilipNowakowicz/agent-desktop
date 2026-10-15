@@ -121,8 +121,9 @@ only.
 Input tools and `desktop_actions` accept `screenshot=true` (CLI: `--screenshot`):
 after the input, the reply also carries a screenshot taken once the screen has
 been still for 0.3 s (blinking carets ignored), at most 3 s later, with its
-observation token. `settled` says which happened (`quiet` or `changing`) and
-`settle_ms` how long it took. A still screen means the application stopped
+observation token. When the input carried an `observation` from a scaled
+screenshot, this one is taken at the same scale. `settled` says which happened
+(`quiet` or `changing`) and `settle_ms` how long it took. A still screen means the application stopped
 repainting, not that it finished: a slow reply can arrive later, and a failed
 input leaves the screen still too, so check the image. On their own,
 `screenshot --settle-ms MS` (worker request `settle_ms`, `settle_timeout_ms`)
@@ -148,7 +149,7 @@ session. Then:
 | `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
 | `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
-| `wait` | until an element is found, or `gone` (up to 60 s) |
+| `wait` | until an element is found, or `gone` (up to 60 s); `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 
 `within` narrows a target to the row, list item, form or dialog containing a
@@ -280,6 +281,10 @@ takeover as protection from the agent's tools, not from a hostile process. Closi
 SESSION`) hands control back; the agent must then take a new screenshot before any
 input, and all earlier observation tokens are stale. The agent can wait for this
 with `desktop_control(session, wait_seconds=...)`; release is a cooperative user handoff, not an authentication check.
+If you choose another way (e.g. your own screen), the agent withdraws the request
+with `desktop_request_human(session, withdraw=true)` (CLI: `request-human SESSION
+--withdraw`) and keeps the session; a takeover already under way continues until
+you release it.
 The session's clipboard is never copied to your host. `take --paste` sends your
 host clipboard into the session (e.g. a password from your password manager);
 without it nothing is transferred. `desktop_request_human` and `desktop_control`
@@ -316,7 +321,9 @@ the settings page"), it can request a host session. A notification shows its
 reason: click it to allow, dismiss it to decline. From a terminal, use
 `agent-desktop host approve` or `agent-desktop host deny`. The agent then uses
 the normal tools on your real desktop until the session expires (default 15
-minutes, at most 240) or is destroyed.
+minutes, at most 240) or is destroyed. Every reply to the request, including
+`pending`, has `browser.dom`: whether your Firefox runs with a BiDi port, so the
+agent knows before approval whether it can use your browser through the DOM.
 
 ```sh
 agent-desktop host start --minutes 10   # allow without a request
@@ -329,7 +336,8 @@ agent-desktop host stop                 # end it now (bind this to a key if you 
   Activity is noticed after a 0.3 s pause in the agent's input, so a fast burst of
   agent steps can finish before it stops. Input that carries the observation
   token of a screenshot taken before your activity is refused too; the agent
-  must look again.
+  must look again. The new screenshot's token can be the same string when the
+  windows did not change; it is still the one to use.
 - **Session files.** `session.json` holds the session's control token and is
   readable only by you (mode 0600).
 - **Locked or dark screen.** While a screen locker runs (hyprlock, swaylock,

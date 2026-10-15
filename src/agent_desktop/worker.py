@@ -1014,6 +1014,21 @@ class Worker:
                 timeout = request.get("timeout", 10)
                 if not isinstance(timeout, (int, float)) or not 0 <= timeout <= 60:
                     raise ValueError("timeout must be between 0 and 60 seconds")
+                # A plain pause, as in desktop_actions; then the condition, if any.
+                seconds = request.get("seconds", 0)
+                if (
+                    not isinstance(seconds, (int, float))
+                    or isinstance(seconds, bool)
+                    or not 0 <= seconds <= 30
+                ):
+                    raise ValueError("seconds must be between 0 and 30")
+                time.sleep(seconds)
+                if not (target["selector"] or target["text"]):
+                    if not seconds:
+                        raise ValueError(
+                            "wait needs a CSS selector or a text, or seconds"
+                        )
+                    return {"satisfied": True, "waited": seconds}
                 gone = request.get("gone") is True
                 deadline = time.monotonic() + timeout
                 while True:
@@ -1715,7 +1730,8 @@ class Worker:
             ):
                 raise StaleObservation(
                     "The person used the computer after that screenshot; nothing "
-                    "was sent. Take a new screenshot."
+                    "was sent. Take a new screenshot (its token can look the same "
+                    "when the windows did not change; it is still the one to use)."
                 )
         # destroy, take, release and viewer_start stay available to everyone:
         # they are lifecycle and person controls, never agent input.
@@ -1752,6 +1768,12 @@ class Worker:
                 )
             return {"socket": str(endpoint), "read_only": True}
         if operation == "control":
+            return self.control_state()
+        if operation == "request_human" and request.get("withdraw") is True:
+            # The agent no longer needs the person; a takeover already under
+            # way continues until they release it.
+            self.control["request"] = None
+            self.save_control()
             return self.control_state()
         if operation == "request_human":
             reason = request.get("reason")

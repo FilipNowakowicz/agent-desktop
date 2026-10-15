@@ -25,7 +25,9 @@ reply: prefer that to a separate screenshot call, and batch predictable steps in
 desktop_actions.
 
 Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
-passwords or codes in chat and never type guessed credentials. Call
+passwords or codes in chat and never type guessed credentials. When a task needs
+a site the user is likely signed into already, first offer to use their own
+screen and browser (desktop_request_host) instead of a new login. Otherwise call
 desktop_request_human with a short reason, tell the user that reason and the
 returned take_command, then wait with desktop_control. For a login, also give
 paste_command, which lets them paste a password from their own clipboard, and
@@ -47,7 +49,7 @@ its DOM (start, open, find, click, fill, select, text, wait): use it instead of
 screenshots and coordinates where it applies.
 
 Only when the user asks you to act on their own screen (open an app there,
-navigate, click), call desktop_request_host with the reason. They confirm it;
+navigate, click) or accepts it for a login, call desktop_request_host with the reason. They confirm it;
 then use the returned session with the same tools. Their windows are real: act
 carefully, prefer reading before clicking, and never close their windows. If
 input is refused because they are using the computer, wait a few seconds,
@@ -165,13 +167,16 @@ SETTLE_MS = 300
 SETTLE_TIMEOUT_MS = 3000
 
 
-def looked(session, result, screenshot):
-    """`result`, plus the settled screen when `screenshot` is true."""
+def looked(session, result, screenshot, observation=None):
+    """`result`, plus the settled screen when `screenshot` is true, at the scale
+    of the screenshot the input was planned from."""
     if not screenshot:
         return result
+    scale = observation_scale(observation)
     capture = call(
         session,
         "screenshot",
+        **({"scale": scale} if scale != 1 else {}),
         settle_ms=SETTLE_MS,
         settle_timeout_ms=SETTLE_TIMEOUT_MS,
         **({"changed_only": True} if LOOK_DELTA else {}),
@@ -183,6 +188,15 @@ def looked(session, result, screenshot):
         TextContent(type="text", text=json.dumps({**result, "screenshot": capture})),
         Image(path=capture["path"]),
     ]
+
+
+def observation_scale(observation):
+    """The scale of the screenshot an observation token came from (1 if none)."""
+    try:
+        scale = float(observation.partition("@")[2].split(",")[2])
+    except (AttributeError, IndexError, ValueError):
+        return 1
+    return scale if 0.1 <= scale <= 1 else 1
 
 
 def log_call(name, started, ok):
@@ -238,7 +252,8 @@ def desktop_create(
 
     A named profile keeps the session's home directory (browser logins, app
     settings) for later sessions; one session can use a profile at a time.
-    Without a profile, everything is deleted at destroy. guard_host blocks the
+    Without a profile, everything is deleted at destroy, and a profile cannot be
+    added later: name one from the start when a site may need a login. guard_host blocks the
     system bus and common host-affecting commands (power, network, Bluetooth,
     brightness, pkill) for applications in the session; use it when testing
     panels, widgets or scripts that could change the real machine.
@@ -423,7 +438,7 @@ def desktop_actions(
     3 s; "settled" says which).
     """
     result = core.run_actions(session, actions, observation, CONTROLLER, timeout)
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool()
@@ -441,6 +456,7 @@ def desktop_browser(
     timeout: float = 10,
     within: str | None = None,
     steps: list[dict] | None = None,
+    seconds: float | None = None,
 ) -> dict:
     """Use Firefox in a private session through its DOM, without screenshots.
 
@@ -451,7 +467,7 @@ def desktop_browser(
     (new_tab for a new tab), "close" (the current tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
     placeholder; exact for the whole text), "wait" (until found, or gone; up to
-    60 s), "click", "fill" (replace a field's text with value, typed as real
+    60 s; seconds pauses first, up to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
     keys) and "select" (an option of a <select> by text or value). click, fill
     and select need exactly one visible, enabled match, otherwise nothing is
     done and the matches are listed. Replies include the page url and title,
@@ -482,6 +498,7 @@ def desktop_browser(
         "timeout": timeout,
         "within": within,
         "steps": steps,
+        "seconds": seconds,
     }
     return call(
         session,
@@ -535,7 +552,7 @@ def desktop_ui_action(
         text=text,
         observation=observation,
     )
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool()
@@ -590,7 +607,10 @@ def desktop_type(
     necessarily finished: check that the result is what you expected.
     """
     return looked(
-        session, call(session, "type", text=text, observation=observation), screenshot
+        session,
+        call(session, "type", text=text, observation=observation),
+        screenshot,
+        observation,
     )
 
 
@@ -620,7 +640,7 @@ def desktop_key(
         repeat=repeat,
         observation=observation,
     )
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool(structured_output=False)
@@ -641,7 +661,7 @@ def desktop_click(
     necessarily finished: check that the result is what you expected.
     """
     result = call(session, "click", x=x, y=y, button=button, observation=observation)
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool()
@@ -675,7 +695,7 @@ def desktop_drag(
         button=button,
         observation=observation,
     )
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool(structured_output=False)
@@ -695,17 +715,23 @@ def desktop_scroll(
     With screenshot=true the reply also contains the settled screen."""
     position = {"x": x, "y": y} if x is not None or y is not None else {}
     result = call(session, "scroll", dy=dy, dx=dx, observation=observation, **position)
-    return looked(session, result, screenshot)
+    return looked(session, result, screenshot, observation)
 
 
 @tool()
-def desktop_request_human(session: str, reason: str) -> dict:
+def desktop_request_human(
+    session: str, reason: str | None = None, withdraw: bool = False
+) -> dict:
     """Ask the user to take control, e.g. to log in, enter a 2FA code or pass a CAPTCHA.
 
     Do not ask the user for passwords or codes. Tell them the reason and the
     returned take_command (paste_command for a login), then wait with desktop_control. While they have
     control, input and screenshots are refused; afterwards take a new screenshot.
+    withdraw=true cancels a pending request (e.g. the user chose another way),
+    keeping the session; a takeover already under way lasts until they release it.
     """
+    if withdraw:
+        return call(session, "request_human", withdraw=True)
     return call(session, "request_human", reason=reason)
 
 
@@ -719,7 +745,8 @@ def desktop_request_host(reason: str, minutes: float = 15) -> dict:
     same reason. On approval this returns a host session to use with the other
     tools until it expires (minutes, at most 240) or you destroy it.
     Applications you launch there stay open afterwards. Your input pauses while
-    the user is typing or moving the mouse.
+    the user is typing or moving the mouse. "browser" says whether
+    desktop_browser can use their own Firefox (it needs a WebDriver BiDi port).
     """
     return core.request_host(reason, minutes)
 

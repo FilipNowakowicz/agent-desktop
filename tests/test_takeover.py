@@ -241,6 +241,12 @@ class TakeoverTests(unittest.TestCase):
         state = core.wait_for_agent_control(self.session, 1)
         self.assertGreaterEqual(time.monotonic() - started, 0.9)
         self.assertEqual(state["request"]["reason"], "Enter a code")
+        # The agent withdraws it (the user chose another way); waiting ends.
+        state = core.request(self.session, "request_human", withdraw=True)
+        self.assertIsNone(state["request"])
+        started = time.monotonic()
+        core.wait_for_agent_control(self.session, 5)
+        self.assertLess(time.monotonic() - started, 2)
 
     def test_pasted_text_reaches_the_session(self):
         fixture = self.fixture()

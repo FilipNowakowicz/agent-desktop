@@ -149,6 +149,7 @@ def main():
     bridge.add_argument("--new-tab", action="store_true")
     bridge.add_argument("--gone", action="store_true")
     bridge.add_argument("--timeout", type=float)
+    bridge.add_argument("--seconds", type=float, help="wait: pause first (up to 30)")
     bridge.add_argument("--within", help="text of the row, item or form holding it")
     bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
     steps = sub.add_parser(
@@ -191,7 +192,10 @@ def main():
     tracing.add_argument("--limit", type=int, default=50)
     waiting = sub.add_parser("request-human", help="ask a person to take control")
     waiting.add_argument("session")
-    waiting.add_argument("reason")
+    waiting.add_argument("reason", nargs="?")
+    waiting.add_argument(
+        "--withdraw", action="store_true", help="withdraw the pending request"
+    )
     for command in (
         "status",
         "windows",
@@ -333,9 +337,11 @@ def main():
         elif command == "take":
             result = take(**args)
         elif command == "request-human":
-            result = request(
-                args["session"], "request_human", controller, reason=args["reason"]
-            )
+            if args["withdraw"]:
+                options = {"withdraw": True}
+            else:
+                options = {"reason": args["reason"]}
+            result = request(args["session"], "request_human", controller, **options)
         else:
             session = args.pop("session")
             look = args.pop("screenshot", False)

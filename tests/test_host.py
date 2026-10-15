@@ -93,18 +93,22 @@ class HostTests(unittest.TestCase):
         return result["session"]
 
     def test_only_with_approval(self):
+        # No Firefox with a BiDi port: the replies say so before approval.
+        os.environ["MOZ_APP_DATA"] = str(self.root / "no-firefox")
+        self.addCleanup(os.environ.pop, "MOZ_APP_DATA", None)
         with self.assertRaisesRegex(core.DesktopError, "approval"):
             core.create("host")
         threading.Timer(0.5, core.answer_host, (False,)).start()
         with self.assertRaisesRegex(core.DesktopError, "declined"):
             core.request_host("Open the report", 1, wait=20)
         # Without an answer the call returns, and the request stays open.
-        self.assertEqual(
-            core.request_host("Open the report", 1, wait=0.2)["status"], "pending"
-        )
+        pending = core.request_host("Open the report", 1, wait=0.2)
+        self.assertEqual(pending["status"], "pending")
+        self.assertFalse(pending["browser"]["dom"])
         threading.Timer(0.3, core.answer_host, (True,)).start()
         approved = core.request_host("Open the report", 1, wait=20)
         self.sessions.append(approved["session"])
+        self.assertIn("BiDi", approved["browser"]["detail"])
         core.stop_host()
         with mock.patch.object(core, "HOST_REQUEST_SECONDS", 0.3):
             core.request_host("Expire", 1, wait=0)
@@ -201,6 +205,7 @@ class HostTests(unittest.TestCase):
             ],
         )
         wait_for((profiles / "person/WebDriverBiDiServer.json").exists, timeout=30)
+        self.assertEqual(core.person_browser(), {"dom": True})
         host = self.approved()
 
         def browser(action, **arguments):

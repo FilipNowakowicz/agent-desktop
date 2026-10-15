@@ -376,6 +376,16 @@ GTK 4 applications render in software in every session (`GSK_RENDERER=cairo`,
 override with `AGENT_DESKTOP_GSK_RENDERER`); without it, layer-shell panels came
 up blank.
 
+The compositor also renders in software by default (`pixman`). It then offers
+applications no GPU buffers, so OpenGL applications fall back to software
+rendering (llvmpipe) as well. To use a GPU, set `AGENT_DESKTOP_RENDERER=gles2`
+(or `vulkan`) and choose the render node with `AGENT_DESKTOP_RENDER_DEVICE`, for
+example `/dev/dri/renderD128`. `agent-desktop doctor` lists the accessible nodes
+with their drivers; on a machine with two GPUs, name one, since the node wlroots
+picks by itself may be one it cannot use. Invalid values are refused at
+`create`, a render node set for your own desktop (`WLR_RENDER_DRM_DEVICE`) is
+not inherited, and `status` reports the session's renderer.
+
 ## Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create

@@ -629,7 +629,7 @@ class Worker:
                 "WLR_BACKENDS": "headless"
                 if self.info["mode"] == "headless"
                 else "wayland",
-                "WLR_RENDERER": "pixman",
+                "WLR_RENDERER": self.info["renderer"]["name"],
                 "WLR_HEADLESS_OUTPUTS": "1",
                 "WLR_WL_OUTPUTS": "1",
                 "WLR_LIBINPUT_NO_DEVICES": "1",
@@ -639,6 +639,10 @@ class Worker:
                 "GSK_RENDERER": os.environ.get("AGENT_DESKTOP_GSK_RENDERER", "cairo"),
             }
         )
+        # Only the session's own choice, never a render node set for the host.
+        self.env.pop("WLR_RENDER_DRM_DEVICE", None)
+        if self.info["renderer"]["device"]:
+            self.env["WLR_RENDER_DRM_DEVICE"] = self.info["renderer"]["device"]
         self.pin_browser_profiles()
         if self.info["mode"] == "visible":
             self.env["WAYLAND_DISPLAY"] = self.info["parent_wayland"]
@@ -1724,6 +1728,7 @@ class Worker:
                 "accessibility": self.info.get("accessibility", False),
                 "secret_service": self.info.get("secret_service", True),
                 "guard_host": bool(self.info.get("guard_host")),
+                "renderer": self.info.get("renderer"),
                 "guard_removed_variables": self.info.get("guard_removed_variables", []),
                 "home_removed_variables": self.info.get("home_removed_variables", []),
                 "pinned_browsers": self.info.get("pinned_browsers", []),

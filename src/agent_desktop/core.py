@@ -22,6 +22,38 @@ class DeliveryUnknown(DesktopError):
     """The request was sent but no reply arrived: it may or may not have acted."""
 
 
+RENDERERS = ("pixman", "gles2", "vulkan")
+
+
+def render_nodes():
+    """Accessible GPU render nodes and their kernel drivers, e.g. i915 or nvidia."""
+    nodes = {}
+    for node in sorted(Path("/dev/dri").glob("renderD*")):
+        if os.access(node, os.R_OK | os.W_OK):
+            driver = Path("/sys/class/drm", node.name, "device/driver")
+            nodes[str(node)] = driver.resolve().name if driver.exists() else None
+    return nodes
+
+
+def compositor_renderer():
+    """The compositor's renderer and render node: software unless configured.
+
+    A GPU renderer without a device lets wlroots choose the node, which on a
+    machine with two GPUs can be one it cannot initialize.
+    """
+    renderer = os.environ.get("AGENT_DESKTOP_RENDERER") or "pixman"
+    device = os.environ.get("AGENT_DESKTOP_RENDER_DEVICE") or None
+    if renderer not in RENDERERS:
+        raise DesktopError(
+            f"AGENT_DESKTOP_RENDERER must be one of {', '.join(RENDERERS)}"
+        )
+    if device and renderer == "pixman":
+        raise DesktopError("AGENT_DESKTOP_RENDER_DEVICE needs a GPU renderer")
+    if device and device not in render_nodes():
+        raise DesktopError(f"Not an accessible render node: {device}")
+    return {"name": renderer, "device": device}
+
+
 def host_runtime_dir(shared=Path("/tmp")):
     """Where session runtimes go: XDG_RUNTIME_DIR, or without a login session
     (containers, cron, CI) a private /tmp/agent-desktop-<uid>.
@@ -283,6 +315,7 @@ def create(
             raise DesktopError("Host sessions take no profile or host guard")
     elif mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
+    renderer = compositor_renderer() if mode != "host" else None
     home = None
     if profile is not None:
         home = profile_path(profile) / "home"
@@ -344,6 +377,7 @@ def create(
         "parent_wayland": parent,
         "profile": profile,
         "guard_host": bool(guard_host),
+        "renderer": renderer,
         "home": str(home) if home else None,
         "profile_lock": str(profile_lock(home.parent)) if home else None,
         "token": uuid.uuid4().hex,

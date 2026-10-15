@@ -164,6 +164,37 @@ def runtime_selection():
     return {"check": "runtime", "status": "ok", "path": str(prefix)}
 
 
+def renderer():
+    """The configured compositor renderer, and the render nodes to choose from."""
+    nodes = core.render_nodes()
+    listed = ", ".join(f"{n} ({d or 'unknown driver'})" for n, d in nodes.items())
+    try:
+        chosen = core.compositor_renderer()
+    except core.DesktopError as error:
+        return {
+            "check": "renderer",
+            "status": "fail",
+            "detail": str(error),
+            "render_nodes": nodes,
+        }
+    result = {
+        "check": "renderer",
+        "status": "ok",
+        "detail": chosen["name"],
+        "render_nodes": nodes,
+    }
+    if chosen["device"]:
+        result["detail"] += f" on {chosen['device']}"
+    elif chosen["name"] != "pixman" and len(nodes) != 1:
+        result["status"] = "warn"
+        result["hint"] = (
+            "set AGENT_DESKTOP_RENDER_DEVICE to one of: " + listed
+            if nodes
+            else "no accessible render node; use pixman"
+        )
+    return result
+
+
 def doctor(with_smoke=False):
     core.use_runtime()
     checks = [
@@ -176,6 +207,7 @@ def doctor(with_smoke=False):
         tool("vncviewer", False, "install TigerVNC's vncviewer for `view` and `take`"),
         runtime_directory(),
         accessibility(),
+        renderer(),
     ]
     labwc = checks[1].get("path")
     if labwc:

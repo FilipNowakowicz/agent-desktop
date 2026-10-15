@@ -1,5 +1,40 @@
 # Development log
 
+## 2026-10-15 — Optional GPU renderer for the compositor
+
+labwc always rendered with pixman. `AGENT_DESKTOP_RENDERER` (`pixman`, the
+default, `gles2` or `vulkan`) now sets `WLR_RENDERER`, and
+`AGENT_DESKTOP_RENDER_DEVICE` sets `WLR_RENDER_DRM_DEVICE`. Both are validated
+at `create` and stored in the session record; `status` reports them and
+`doctor` lists the accessible render nodes with their drivers. An inherited
+`WLR_RENDER_DRM_DEVICE` is removed from the compositor's environment. The idea
+and a first trial (NVIDIA and AMD render nodes, Blender) came from Teng Lin in
+PR #123; this is a separate implementation.
+
+Measured on NixOS (Hyprland 0.56.2 host; labwc 0.20.2 and wlroots 0.20.2 from
+nixpkgs; Intel UHD (CML GT2) on i915 at `renderD128`, NVIDIA GTX 1650 Mobile on
+the proprietary driver at `renderD129`), headless sessions:
+
+- with pixman the compositor advertises neither `zwp_linux_dmabuf_v1` nor
+  `wl_drm` (`wayland-info`), and `eglinfo -p wayland` in the session reports
+  `llvmpipe`; with `gles2` on `renderD128` both are advertised and it reports
+  `Mesa Intel(R) UHD Graphics (CML GT2)`. GPU compositing therefore also gives
+  OpenGL applications the GPU, not just the compositor's final step;
+- `es2gears_wayland` (`vblank_mode=0`, default window), steady 5 s samples:
+  pixman about 2,500 FPS, `gles2` about 9,600, `vulkan` about 11,300;
+- `gles2` without a device failed to start: wlroots chose the NVIDIA node,
+  whose GL driver the nixpkgs Mesa cannot load (`DRI2: failed to create
+  screen`), and `create` reported the EGL log. The same happens with
+  `AGENT_DESKTOP_RENDER_DEVICE=/dev/dri/renderD129` in this environment;
+- `tests/test_renderer.py`: configuration and `doctor` checks, a pixman session
+  that ignores a host `WLR_RENDER_DRM_DEVICE` (fails without the change), and
+  `gles2` on every accessible node, where a node that cannot start a GLES2
+  renderer is passed over and none usable skips the test.
+
+Not established: visible mode, the NVIDIA node with a matching GL driver,
+real applications beyond the gears demo, and whether any task gets more
+reliable rather than only faster.
+
 ## 2026-10-14 — Old vs new web judge on the realistic suite; reloads
 
 Do earlier realistic-suite results still hold now that agents no longer see a

@@ -196,6 +196,22 @@ Prefer directions that:
   out of reach and not the project's strength.
 - **Status:** idea. Haiku subagents through `claude -p` could approximate it.
 
+### D10. Act in the person's own browser in the background
+
+- **Assumption dropped:** logged-in web work happens either in a private browser
+  (log in again, or copy cookies) or on the person's screen (not in the
+  background).
+- **Idea:** a Firefox WebExtension with a native messaging host lets the agent
+  open and act in background tabs of the person's running Firefox, with their
+  live logins, and no debugging port, remote-control marks or
+  `navigator.webdriver`.
+- **Risks:** extension signing (or an unsigned install), a per-site permission
+  model the person controls, and synthetic page events (`isTrusted` false),
+  which a few sites reject. The agent shares the person's real browser.
+- **Status:** idea (2026-10-15). The BiDi port was rejected for daily use
+  (striped URL bar, robot icon, sometimes blocked by Cloudflare); cookie import
+  into a profile is the interim path.
+
 ## Product and platform notes
 
 These are not directions on their own, but they constrain the directions.
@@ -212,3 +228,5 @@ These are not directions on their own, but they constrain the directions.
 - 2026-10-11: board created from discussion with the maintainer; D1–D9 recorded
   as ideas.
 - 2026-10-13: D1 cheapest test run (`desktop_run`, 18 runs): gate not met.
+- 2026-10-15: D10 added after a login-gated task; cookie import adopted as the
+  interim path.

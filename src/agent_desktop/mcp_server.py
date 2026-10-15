@@ -26,9 +26,11 @@ desktop_actions.
 
 Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
 passwords or codes in chat and never type guessed credentials. When a task needs
-a site the user is likely signed into already, first offer to use their own
-screen and browser (desktop_request_host) instead of a new login. Otherwise call
-desktop_request_human with a short reason, tell the user that reason and the
+a site the user is likely signed into in their own Firefox, first suggest they
+copy that login into a profile (they run `agent-desktop import-cookies PROFILE
+--site SITE`; then create the session with that profile), which keeps the work
+in the background; or offer their own screen (desktop_request_host). Otherwise
+call desktop_request_human with a short reason, tell the user that reason and the
 returned take_command, then wait with desktop_control. For a login, also give
 paste_command, which lets them paste a password from their own clipboard, and
 suggest ticking "Remember me" (on some sites a separate one for "sign in with"

@@ -122,10 +122,13 @@ requests report up front whether the person's Firefox has a BiDi port, settled
 screenshots keep the observation's scale, and the instructions offer the host
 first for sites the user is signed into. Open, in rough order of value:
 - the person's logins in the background. The BiDi port is ruled out for daily
-  use (striped URL bar and robot icon; Cloudflare sometimes blocks it).
-  Candidates: importing chosen sites' cookies from their Firefox into a named
-  private profile (small; copies go stale), or a WebExtension with native
-  messaging in their own Firefox (larger; untrusted synthetic events, signing);
+  use (striped URL bar and robot icon; Cloudflare sometimes blocks it). Done:
+  `import-cookies` copies chosen sites' cookies from their Firefox files into a
+  named profile (copies go stale; session-only cookies and `localStorage` are
+  not copied). Future option: a WebExtension with native messaging in their
+  own Firefox, acting in background tabs with their live logins and no
+  remote-control marks; it needs signing, a per-site permission model, and its
+  synthetic events are untrusted (a few sites reject them);
 - workspace awareness on the host: windows on other Hyprland workspaces, and
   focusing one;
 - host screenshots that wait for compositor animations (one caught a workspace

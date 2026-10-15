@@ -414,6 +414,31 @@ hold login cookies and tokens on disk, readable by any process running as your
 user and by any agent given that profile; they are never your personal browser
 profile. Deleting a profile is CLI-only.
 
+### Bring a login from your own Firefox
+
+If you are already signed in to a site in your own Firefox, copy that site's
+cookies into a profile instead of logging in again:
+
+```sh
+uv run agent-desktop import-cookies shop --site shop.example --site login.example
+uv run agent-desktop create --profile shop
+```
+
+It reads your default Firefox profile's `cookies.sqlite` (from `profiles.ini`,
+or `--from DIR`) as files on disk: your screen, input and running Firefox are
+not touched and Firefox need not close. Only cookies whose host is a named site
+or one of its subdomains are copied, into the profile's Firefox
+(`~/.mozilla/agent-desktop`, mode 0600); existing ones are replaced. The reply
+lists the count and hosts, never values. The profile must not be in use. It is
+CLI-only on purpose: you choose what leaves your browser, not the agent.
+
+Limits: session-only cookies (sites without "Remember me") are kept in
+Firefox's session store and are not copied; logins held in page storage
+(`localStorage`) are not copied; the copy does not follow later logins or
+logouts in your Firefox (run it again), and a site that binds a login to its
+device may still ask again. Cookies of a site are its credentials: anyone with
+the profile can act as you there.
+
 `profiles` and a `create` with a profile report the profile's previous session
 (`last_session` / `previous_session`): its id and whether it ended `stopped`,
 `failed` (with the error) or `recovered`. After a failed or recovered end,

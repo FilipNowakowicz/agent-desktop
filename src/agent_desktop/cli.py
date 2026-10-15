@@ -74,6 +74,22 @@ def main():
     pruning.add_argument("--dry-run", action="store_true")
     removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
     removal.add_argument("profile")
+    cookies = sub.add_parser(
+        "import-cookies",
+        help="copy chosen sites' cookies from your Firefox into a profile",
+    )
+    cookies.add_argument("profile")
+    cookies.add_argument(
+        "--site",
+        action="append",
+        required=True,
+        help="a site such as example.com (its subdomains too); repeatable",
+    )
+    cookies.add_argument(
+        "--from",
+        dest="source",
+        help="Firefox profile directory (default: your default profile)",
+    )
     for name, text in (
         ("view", "watch a session read-only"),
         ("take", "control a session yourself; closing the viewer hands it back"),
@@ -291,6 +307,12 @@ def main():
             result = prune(args["older_than"], args["dry_run"])
         elif command == "delete-profile":
             result = delete_profile(args["profile"])
+        elif command == "import-cookies":
+            from .cookies import import_firefox_cookies
+
+            result = import_firefox_cookies(
+                args["profile"], args["site"], args["source"]
+            )
         elif command == "logs":
             result = logs(args["session"])
         elif command == "host":

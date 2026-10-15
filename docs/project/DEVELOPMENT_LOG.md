@@ -1,5 +1,37 @@
 # Development log
 
+## 2026-10-15 — Import a site's login from the person's Firefox
+
+The maintainer wants login-gated work to use their existing logins without
+leaving the background, and ruled out the BiDi port for their own Firefox
+(striped URL bar, robot icon, sometimes blocked by Cloudflare). New CLI
+command: `agent-desktop import-cookies PROFILE --site SITE [--from DIR]`
+copies the cookies of the named sites (and their subdomains) from their
+Firefox profile's `cookies.sqlite` into the profile's pinned Firefox
+(`~/.mozilla/agent-desktop/cookies.sqlite`, mode 0600). It reads a private
+copy of the database and its write-ahead log, so the running Firefox is not
+touched, and never prints values. A new database takes the source's table
+schema and `user_version`; an existing one gets matching rows replaced. The
+profile must not be in use. It is CLI-only so the person chooses what leaves
+their browser. The server instructions now suggest it first for sites the
+user is signed into, then the host session, then a login handoff. A browser
+extension in the person's Firefox is recorded as D10 on the directions board.
+
+Validation (NixOS, repaired runtime on PATH; Firefox from the system profile):
+- `uv run ruff check` and `ruff format --check`: clean;
+- `test_profiles`: 10 tests OK. New: site filtering (exact host, leading dot,
+  subdomains; `notshop.example` excluded), replacement on a second import,
+  refusals (no site, single-label or malformed names, no database, profile in
+  use), the default profile from `profiles.ini`, and end to end: a stand-in
+  "person" Firefox sets a persistent cookie on a local server, the import runs
+  while it keeps running, and a new session with the profile sends the cookie;
+- full suite (`unittest discover -s tests`): 190 tests OK, 18 skipped.
+
+Not established: real sites over HTTPS (partitioned and `SameSite` cookies are
+copied as stored, untested), session-only cookies (in `sessionstore-backups`,
+mozlz4-compressed, not read), `localStorage` logins, and sites that bind a
+session to its device.
+
 ## 2026-10-15 — Fixes from a login-gated task on the host
 
 The maintainer used the MCP from another repository to download an installer

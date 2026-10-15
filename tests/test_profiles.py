@@ -4,6 +4,7 @@ import http.server
 import os
 import shutil
 import signal
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from test_runtime import CHROMIUM, wait_for
 
-from agent_desktop import core
+from agent_desktop import cookies, core
 from agent_desktop.worker import owned_processes, process_state
 
 
@@ -20,6 +21,111 @@ class ProfileNameTests(unittest.TestCase):
         for name in ("", "../x", "UPPER", "a/b", ".hidden", "x" * 33, 5):
             with self.subTest(name=name), self.assertRaises(core.DesktopError):
                 core.profile_path(name)
+
+
+# The moz_cookies table as Firefox 14x creates it (schema version 16).
+FIREFOX_COOKIES = """CREATE TABLE moz_cookies (id INTEGER PRIMARY KEY,
+originAttributes TEXT NOT NULL DEFAULT '', name TEXT, value TEXT, host TEXT,
+path TEXT, expiry INTEGER, lastAccessed INTEGER, creationTime INTEGER,
+isSecure INTEGER, isHttpOnly INTEGER, inBrowserElement INTEGER DEFAULT 0,
+sameSite INTEGER DEFAULT 0, schemeMap INTEGER DEFAULT 0,
+isPartitionedAttributeSet INTEGER DEFAULT 0,
+CONSTRAINT moz_uniqueid UNIQUE (name, host, path, originAttributes))"""
+
+
+class CookieImportTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="desktop-cookies-")
+        self.root = Path(self.temporary.name)
+        self.previous = os.environ.get("AGENT_DESKTOP_STATE_DIR")
+        os.environ["AGENT_DESKTOP_STATE_DIR"] = str(self.root / "state")
+        self.addCleanup(self.temporary.cleanup)
+
+    def tearDown(self):
+        if self.previous is None:
+            os.environ.pop("AGENT_DESKTOP_STATE_DIR", None)
+        else:
+            os.environ["AGENT_DESKTOP_STATE_DIR"] = self.previous
+
+    def person(self, rows):
+        profile = self.root / "person"
+        profile.mkdir(exist_ok=True)
+        with sqlite3.connect(profile / "cookies.sqlite") as connection:
+            connection.execute("DROP TABLE IF EXISTS moz_cookies")
+            connection.execute(FIREFOX_COOKIES)
+            connection.execute("PRAGMA user_version = 16")
+            connection.executemany(
+                "INSERT INTO moz_cookies (name, value, host, path, expiry) "
+                "VALUES (?, ?, ?, '/', 4102444800)",
+                rows,
+            )
+        connection.close()
+        return profile
+
+    def imported(self, profile):
+        database = (
+            core.profile_path(profile) / "home/.mozilla/agent-desktop/cookies.sqlite"
+        )
+        connection = sqlite3.connect(database)
+        try:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            rows = connection.execute(
+                "SELECT host, name, value FROM moz_cookies ORDER BY host, name"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(database.stat().st_mode & 0o777, 0o600)
+        return version, rows
+
+    def test_only_the_named_sites_are_copied(self):
+        source = self.person(
+            [
+                ("sid", "1", ".shop.example"),
+                ("sso", "2", "login.shop.example"),
+                ("x", "3", "notshop.example"),
+                ("y", "4", "other.example"),
+            ]
+        )
+        result = cookies.import_firefox_cookies("shop", ["Shop.Example"], source)
+        self.assertEqual(result["cookies"], 2)
+        self.assertNotIn("1", str(result))  # values are never reported
+        self.assertEqual(
+            self.imported("shop"),
+            (16, [(".shop.example", "sid", "1"), ("login.shop.example", "sso", "2")]),
+        )
+        # Importing again replaces cookies instead of duplicating them.
+        self.person([("sid", "new", ".shop.example")])
+        cookies.import_firefox_cookies("shop", ["shop.example"], source)
+        self.assertEqual(
+            self.imported("shop")[1],
+            [(".shop.example", "sid", "new"), ("login.shop.example", "sso", "2")],
+        )
+
+    def test_refusals(self):
+        source = self.person([("sid", "1", "shop.example")])
+        for sites in ([], ["localhost"], ["a b.example"], ["../x.example"]):
+            with self.subTest(sites=sites), self.assertRaises(core.DesktopError):
+                cookies.import_firefox_cookies("shop", sites, source)
+        with self.assertRaisesRegex(core.DesktopError, "No cookies.sqlite"):
+            cookies.import_firefox_cookies("shop", ["shop.example"], self.root)
+        import fcntl
+
+        path = core.profile_path("shop")
+        with core.profile_lock(path).open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with self.assertRaisesRegex(core.DesktopError, "in use"):
+                cookies.import_firefox_cookies("shop", ["shop.example"], source)
+
+    def test_default_profile_from_profiles_ini(self):
+        source = self.person([("sid", "1", "shop.example")])
+        (self.root / "profiles.ini").write_text(
+            "[Profile0]\nName=default\nIsRelative=1\nPath=person\nDefault=1\n"
+        )
+        environment = {"MOZ_APP_DATA": str(self.root)}
+        self.assertEqual(cookies.default_firefox_profile(environment), source)
+        (self.root / "profiles.ini").write_text("[General]\n")
+        with self.assertRaisesRegex(core.DesktopError, "--from"):
+            cookies.default_firefox_profile(environment)
 
 
 class CookieServer(http.server.BaseHTTPRequestHandler):
@@ -217,3 +323,41 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(
             (core.profile_path("browser") / "home").stat().st_mode & 0o777, 0o700
         )
+
+    @unittest.skipUnless(shutil.which("firefox"), "Firefox unavailable")
+    def test_imported_firefox_cookie_is_sent(self):
+        CookieServer.seen = []
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CookieServer)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        # A stand-in for the person's Firefox logs in with its own profile.
+        person = self.root / "person-firefox"
+        person.mkdir()
+        try:
+            session = self.create()
+            core.request(
+                session,
+                "launch",
+                argv=["firefox", "--profile", str(person), base + "/login"],
+            )
+
+            def logged_in():
+                try:
+                    return cookies.read_cookies(person, ["127.0.0.1"])[1]
+                except core.DesktopError:
+                    return False  # Firefox has not created the table yet
+
+            wait_for(logged_in, timeout=30)
+            result = cookies.import_firefox_cookies("imported", ["127.0.0.1"], person)
+            self.assertEqual(result["cookies"], 1, result)
+            # The person's Firefox keeps running; a new session uses the copy.
+            agent = self.create("imported")
+            core.request(agent, "browser", action="start", url=base + "/check")
+            wait_for(
+                lambda: any(path == "/check" for path, _ in CookieServer.seen),
+                timeout=30,
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(dict(CookieServer.seen)["/check"], "login=yes")

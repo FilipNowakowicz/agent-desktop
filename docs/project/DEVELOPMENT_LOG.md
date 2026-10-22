@@ -1,5 +1,59 @@
 # Development log
 
+## 2026-10-22 — Integration validation and cookie-fixture correction
+
+R1 full matrix [39720166244](https://github.com/FilipNowakowicz/agent-desktop/actions/runs/39720166244)
+passed Ubuntu, Nix, Fedora and Arch; PR #132 merged as `f80f511`.
+The first cumulative R2–R5a local desktop run executed 253 tests in 318.881 s:
+233 passed, 19 skipped, one unrelated fixture assertion failed. The cookie
+privacy test searched for the digit `1` in the full response, which legitimately
+contained it in a random temporary path. Replaced the cookie values with distinct
+synthetic sentinels and assert neither sentinel appears in the report, while
+retaining exact database-value checks. All four cookie-import unit tests passed
+afterward. No production cookie behavior changed. The final cumulative suite
+and matrix will validate the completed operation/report integration.
+
+## 2026-10-22 — R5a: scoped state predicates
+
+Added experimental `checks.evaluate` with CLI `check`, MCP `desktop_check` and
+script `check(predicate)`. Supported scopes: bounded persisted file content or
+INI configuration, visible accessibility existence/absence/uniqueness/value/all
+state, and currently enumerated browser context with optional exact URL.
+Results separate `satisfied`, `violated` and `unknown` and retain the requested
+predicate, source scope, observation interval and bounded witnesses. No action
+is dispatched or automatically retried. Missing/ill-typed UI coverage and
+unavailable element states cannot establish completeness; the shared
+`core.ui_complete` guard also hardens unique-target helpers.
+
+Regular-file reads are nonblocking and capped at 2 MiB, detect mutation/path
+replacement during a content read, reject invalid UTF-8 for text comparisons,
+and do not include contents in evidence. INI parsing is strict (duplicate keys
+and unsupported syntax are unknown). Session home resolution honors profiles;
+file checks refuse host sessions and all checks refuse observation during human
+control. Browser IDs still identify tabs, not document revisions. Universal UI
+claims cover only a nonempty requested visible domain, not all application data.
+
+Validation in `/home/user/agent-desktop-r5`, based on R1 `19f5e88`:
+
+- `uv sync --managed-python --locked`; Ruff check/format over src, scripts,
+  tests and benchmarks; compileall; diff whitespace checks: clean.
+- Local full suite with the existing repaired runtime on PATH: 208 run,
+  189 passed, 19 skipped, no failures (277.798 s). The final metadata guard
+  refinements were subsequently covered by 9 focused check tests, all passing
+  with a real disposable private session, and the 8 R1 target tests.
+- `uv run python scripts/checks_probe.py`: 9 seeded correct, wrong, missing and
+  unavailable-evidence cases; 0 mismatches, 0 false successes, 0 false refusals.
+  100 checks of one small persisted file: median 0.404 ms, p95 0.570 ms. This
+  includes private worker control IPC; it is one local microbenchmark, not a
+  model-task or general reliability result. JSON retained in
+  `artifacts/r5/checks-probe.json`; it records the checked source digest.
+- Adversarial review found missing coverage could look complete in the initial
+  draft; strict metadata checks and a regression now preserve unknowns.
+
+No paid model trials or real-account checks were run. Operation recovery and
+the review report are separate implementation stages; no claim that the new
+predicates establish causality or eliminate observation-to-action races.
+
 ## 2026-10-22 — R4 follow-up: verify strict text comparison
 
 Review checked whether invalid UTF-8 could silently become replacement characters

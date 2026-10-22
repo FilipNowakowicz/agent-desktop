@@ -80,25 +80,37 @@ class CookieImportTests(unittest.TestCase):
     def test_only_the_named_sites_are_copied(self):
         source = self.person(
             [
-                ("sid", "1", ".shop.example"),
-                ("sso", "2", "login.shop.example"),
+                ("sid", "private-cookie-sid-fixture", ".shop.example"),
+                ("sso", "private-cookie-sso-fixture", "login.shop.example"),
                 ("x", "3", "notshop.example"),
                 ("y", "4", "other.example"),
             ]
         )
         result = cookies.import_firefox_cookies("shop", ["Shop.Example"], source)
         self.assertEqual(result["cookies"], 2)
-        self.assertNotIn("1", str(result))  # values are never reported
+        # Distinct sentinels cannot accidentally match a random temporary path
+        # (a one-digit cookie value can).
+        self.assertNotIn("private-cookie-sid-fixture", str(result))
+        self.assertNotIn("private-cookie-sso-fixture", str(result))
         self.assertEqual(
             self.imported("shop"),
-            (16, [(".shop.example", "sid", "1"), ("login.shop.example", "sso", "2")]),
+            (
+                16,
+                [
+                    (".shop.example", "sid", "private-cookie-sid-fixture"),
+                    ("login.shop.example", "sso", "private-cookie-sso-fixture"),
+                ],
+            ),
         )
         # Importing again replaces cookies instead of duplicating them.
         self.person([("sid", "new", ".shop.example")])
         cookies.import_firefox_cookies("shop", ["shop.example"], source)
         self.assertEqual(
             self.imported("shop")[1],
-            [(".shop.example", "sid", "new"), ("login.shop.example", "sso", "2")],
+            [
+                (".shop.example", "sid", "new"),
+                ("login.shop.example", "sso", "private-cookie-sso-fixture"),
+            ],
         )
 
     def test_refusals(self):

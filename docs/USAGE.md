@@ -112,6 +112,48 @@ keyboard; Chromium accepted `press` on a settings radio button without changing
 it; Chromium exposes only the part of a page it has rendered, so scroll before
 waiting for an element further down.
 
+## Scoped state checks (experimental)
+
+`agent-desktop check SESSION 'JSON'`, MCP `desktop_check`, and script
+`check(predicate)` read one condition and return a structured result. Compare
+`status` explicitly: `satisfied`, `violated`, or `unknown`. An unknown result is
+not a passing check. Each result retains the predicate, session, observation
+interval, scope and bounded evidence. These checks do not send input or prove
+which action caused an observed state.
+
+```json
+{"kind":"file","path":"~/result.txt","text":"done\n"}
+{"kind":"config","path":"~/app.ini","key":"view/wrap","value":"true"}
+{"kind":"ui","query":{"element":"Name","exact":true},"claim":"value","field":"text","equals":"Ada"}
+{"kind":"ui","query":{"role":"check box","window":"Settings"},"claim":"all","state":"checked"}
+{"kind":"browser_context","context":"ID from browser tabs","url":"https://example.com/"}
+```
+
+File checks support exact `text`, substring `contains`, `sha256` or boolean
+`exists` (default true), combined as a conjunction. They read regular files up
+to 2 MiB and detect replacement or changes during a content read. `~/` means the
+session's home, including named profiles; absolute paths are explicit. Config
+checks support strict INI section/key values, with duplicate/unsupported syntax
+reported as unknown. File evidence contains size, timestamp and digest, not the
+actual contents. File/config checks require a private session.
+
+UI `query` accepts element, role, text, state, exact, app and window. Claims are
+`exists`, `absent`, `unique`, `value` and `all`. `value` needs `equals` and a field
+(`value`, `text` or `name`). `all` needs a separate expected `state`, and its
+query must not already filter by state. It requires a nonempty domain. Visible
+witnesses can establish presence; visible counterexamples can refute absence,
+uniqueness or all-state checks even when coverage is partial. Missing, malformed,
+truncated or unreadable coverage cannot establish absence, uniqueness or
+universal success. Node IDs in evidence are witnesses, not a guarantee against
+subsequent UI changes. Complete UI scope still excludes offscreen/virtualized
+records and persisted application data.
+
+Browser checks enumerate current contexts without selecting another one. A
+context ID identifies a tab, not a document revision. Optional URL equality is
+exact. Observation failures, missing element fields, unsupported encodings and
+human control return unknown. Invalid predicates raise an input error. Reads
+are not atomic across the session; inspect current state before acting.
+
 ## Partial and scaled screenshots
 
 `screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,

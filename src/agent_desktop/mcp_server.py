@@ -530,6 +530,27 @@ def desktop_browser(
 
 
 @tool()
+def desktop_check(session: str, predicate: dict) -> dict:
+    """Read a scoped state predicate, returning satisfied, violated or unknown.
+
+    Examples: {"kind":"file","path":"~/result.txt","contains":"Total"};
+    {"kind":"config","path":"~/app.ini","key":"view/wrap","value":"true"};
+    {"kind":"ui","query":{"role":"check box"},"claim":"all","state":"checked"};
+    {"kind":"ui","query":{"element":"Name","exact":true},"claim":"value",
+    "field":"text","equals":"Ada"}; {"kind":"browser_context","context":"ID",
+    "url":"https://example.com/"}. UI claims: exists, absent, unique, value, all.
+    UI scope is visible accessibility content, not all records. Incomplete reads
+    cannot establish absence, uniqueness or universal success. A witness or
+    counterexample may still decide a claim. File reads are bounded to 2 MiB,
+    regular files only, private sessions only. Checks never prove which action
+    caused a state, and never retry or dispatch input. Compare status explicitly.
+    """
+    from .checks import evaluate
+
+    return evaluate(session, predicate, CONTROLLER)
+
+
+@tool()
 def desktop_ui(
     session: str,
     app: str | None = None,

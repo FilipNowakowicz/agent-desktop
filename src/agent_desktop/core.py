@@ -1026,6 +1026,15 @@ EXPECT_KEYS = (
 )
 
 
+def ui_complete(tree):
+    """Only explicit, well-formed coverage establishes a complete visible read."""
+    return (
+        tree.get("truncated") is False
+        and type(tree.get("unreadable")) is int
+        and tree["unreadable"] == 0
+    )
+
+
 def resolve_element(
     session,
     controller,
@@ -1049,7 +1058,7 @@ def resolve_element(
         raise DesktopError(f"state must be one of {', '.join(STATE_TESTS)}")
     scope = {k: v for k, v in (("window", window), ("app", app)) if v is not None}
     tree = request(session, "ui", controller, max_nodes=2000, **scope)
-    if tree["truncated"] or tree.get("unreadable"):
+    if not ui_complete(tree):
         raise DesktopError(
             "The UI listing was incomplete; uniqueness is unknown. "
             "Filter by app or window and read again before acting."

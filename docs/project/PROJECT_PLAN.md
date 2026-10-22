@@ -7,33 +7,20 @@ implemented features are not a claim of universal compatibility.
 
 ## Development status
 
-Current implementation stages: **R1, UI evidence and browser target identity**,
-and **R2, request deadlines and delivery evidence**.
-Unique-target actions refuse truncated/unreadable accessibility listings;
-script queries retain source coverage, and rendered listings expose read failures.
-Browser tabs expose stable context IDs; losing or closing a selected context
-requires explicit reselection instead of silently choosing another tab.
-This is a bounded correctness stage, not a general completion guarantee.
-R2 adds browser request budgets shared with command deadlines, completed prefixes
-and uncertain current steps, and preserves acknowledged delivery when optional
-screenshots, browser reads or effect collection fail. Already-submitted work
-may still finish after disconnect. Scoped predicates and reconnectable operations follow as separate stages. See the log
-for validation and remaining limits.
+The current correctness stack implements these bounded stages:
 
-Script job supervision (R3) is also implemented: ordinary script process groups
-are stopped and reaped on timeout/cancellation and after the main script exits.
-Session-worker launches survive cancellation. Replies expose cleanup scope and
-helper-call delivery uncertainty; detached descendants remain outside the
-contract. This is lifecycle correctness, not a sandbox or operation rollback.
-Scoped postconditions and reconnectable operation status remain later work.
+| Stage | Implemented behavior | Remaining limits |
+| --- | --- | --- |
+| R1 | Incomplete UI reads refuse unique-target actions; stable browser context IDs and explicit recovery after target loss | Visible accessibility scope; tab identity is not document identity |
+| R2 | Shared request/command budgets; completed prefixes and known delivery survive optional observation/effect failures | Already-issued application work may finish after disconnect; uncertain replies require reconciliation |
+| R3 | Ordinary script groups stopped/reaped; bounded output and helper journals; deliberate session launches survive | Detached descendants are outside the cleanup contract; no sandbox or rollback |
+| R4 | Observational effect reports; unknown baselines; bounded retention; watcher/document coverage and FODS support | Temporal evidence is not causal attribution or complete filesystem coverage |
+| R5a | Experimental scoped file/config/UI/browser state predicates with satisfied, violated and unknown results | Checks describe current state, not task completion or action causality |
 
-R4 effect-ledger hardening is also implemented: reports no longer mutate file
-history, unavailable baselines remain unknown, collection and extraction limits
-are visible, flat OpenDocument XML is supported, and file evidence has bounded
-retention with explicit expiry. This does not provide complete filesystem
-coverage or causal attribution. See `docs/USAGE.md` and the development log for
-limits and validation. Scoped predicates and resumable operations remain later
-work.
+Each stage has a separate PR and exact validation in the development log.
+Durable operation handles (R5b) and one bounded evidence-review experiment (R6)
+follow as separate stages. The full matrix validates the combined stack before
+integration; individual stages retain their focused and local desktop evidence.
 
 Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must

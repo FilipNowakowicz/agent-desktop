@@ -2240,8 +2240,10 @@ class Worker:
                             json.dumps(
                                 {
                                     "ok": False,
-                                    "error": "ValueError: response exceeds the "
-                                    "protocol limit; narrow the request",
+                                    "uncertain": True,
+                                    "error": "Response exceeds the protocol limit "
+                                    "after execution; delivery may have occurred. "
+                                    "Reconcile before retrying, then narrow reads.",
                                 }
                             )
                             + "\n"

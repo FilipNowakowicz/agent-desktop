@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-10-22 — R2 protocol-boundary follow-up
+
+Review found that an oversized reply could bypass delivery-uncertainty handling.
+Oversized/malformed client replies now raise `DeliveryUnknown`; the worker's
+bounded overflow response explicitly marks uncertainty after execution.
+`uv run python -m unittest discover -s tests -p test_delivery.py -v`: 13 passed,
+including oversized, null, array, incomplete and explicitly uncertain replies;
+one send per case, no automatic retry. Ruff and whitespace checks passed.
+
 ## 2026-10-22 — R2: request deadlines and preserved delivery evidence
 
 Implemented on `fix/delivery-deadlines`, based on R1 at `19f5e88`; this stage

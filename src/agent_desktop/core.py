@@ -324,8 +324,15 @@ def request(session, operation, controller=None, **arguments):
             with connection.makefile("rb") as stream:
                 line = stream.readline(262145)
             if len(line) > 262144:
-                raise DesktopError("Response exceeds the protocol limit")
+                raise ValueError("Response exceeds the protocol limit")
             reply = json.loads(line)
+            if (
+                not isinstance(reply, dict)
+                or type(reply.get("ok")) is not bool
+                or (reply["ok"] and "result" not in reply)
+                or (not reply["ok"] and not isinstance(reply.get("error"), str))
+            ):
+                raise ValueError("Malformed session reply")
     except (OSError, ValueError) as error:
         if sent:
             raise DeliveryUnknown(
@@ -336,6 +343,8 @@ def request(session, operation, controller=None, **arguments):
             f"Session unavailable: {session}; see {session_path(session) / 'session.log'}"
         ) from error
     if not reply.get("ok"):
+        if reply.get("uncertain"):
+            raise DeliveryUnknown(reply["error"])
         raise DesktopError(reply.get("error", "Unknown session failure"))
     return reply["result"]
 

@@ -72,6 +72,30 @@ class DeliveryTests(unittest.TestCase):
                 core.request("s", "click", x=1, y=2)
         connection.sendall.assert_called_once()
 
+    def test_oversized_and_malformed_replies_preserve_uncertainty(self):
+        replies = [
+            b"x" * 262145,
+            b"null\n",
+            b"[]\n",
+            b'{"ok":true}\n',
+            b'{"ok":false}\n',
+            b'{"ok":false,"uncertain":true,"error":"reply overflow"}\n',
+        ]
+        for reply in replies:
+            connection = mock.MagicMock()
+            connection.makefile.return_value.__enter__.return_value.readline.return_value = reply
+            with (
+                self.subTest(reply=reply[:80]),
+                mock.patch.object(
+                    core, "manifest", return_value={"control_socket": "socket"}
+                ),
+                mock.patch.object(core.socket, "socket") as factory,
+            ):
+                factory.return_value.__enter__.return_value = connection
+                with self.assertRaises(core.DeliveryUnknown):
+                    core.request("s", "click", x=1, y=2)
+                connection.sendall.assert_called_once()
+
     def test_expired_command_does_not_send(self):
         bridge = Browser.__new__(Browser)
         bridge.deadline = time.monotonic() - 1

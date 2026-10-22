@@ -1342,6 +1342,8 @@ def file_condition(path, contains, key, value):
             before = os.fstat(stream.fileno())
             if not stat.S_ISREG(before.st_mode):
                 return f"{path.name} is not a regular file"
+            if contains is None and key is None:
+                return None
             data = stream.read(FILE_READ_LIMIT + 1)
             after = os.fstat(stream.fileno())
         if len(data) > FILE_READ_LIMIT:

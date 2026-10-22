@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-10-22 — Preserve metadata-only file existence waits
+
+Final integration review found that strict content reads also rejected binary
+or oversized regular files for an existence-only wait. Kept the strict bounded
+read for text/configuration assertions, but return the observed regular-file
+presence without decoding when no content condition was requested. A regression
+covers binary and >2 MiB files, alongside the existing content-refusal cases.
+`test_dispatch_evidence.py`: final 19 tests passed. Ruff/format/diff clean.
+The initial cumulative local suite had 284 passed/19 skipped before this final
+regression; the final runtime matrix is refreshed for the updated source.
+
 ## 2026-10-22 — R6: an offline evidence-review experiment
 
 Implemented `feat/evidence-review` in a separate worktree, based on R1

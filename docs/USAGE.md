@@ -804,3 +804,7 @@ Set `AGENT_DESKTOP_TRACE=0` before creating a session to turn it off.
 
 See the [compatibility matrix](COMPATIBILITY.md) for the scope of validation.
 
+
+Existence-only file waits inspect regular-file metadata and accept binary or
+large files without reading their contents. Strict UTF-8 decoding and the 2 MiB
+read limit apply when a text or configuration content condition is requested.

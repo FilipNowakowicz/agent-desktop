@@ -467,6 +467,7 @@ def desktop_operation(
     kind: str = "actions",
     observation: str | None = None,
     timeout: float = 600,
+    predicates: list[dict] | None = None,
 ) -> dict:
     """Submit, inspect or cooperatively cancel a durable PRIVATE-session job.
 
@@ -477,11 +478,23 @@ def desktop_operation(
     Cancellation stops future dispatch after in-flight work returns; it cannot
     undo input or interrupt Firefox/worker commands already running. An uncertain
     step requires reconciliation, never resubmission. No host sessions or resume.
+    Optional predicates (at most 20 desktop_check predicates) run after dispatch
+    and record separate satisfied/violated/unknown verification. completed means
+    execution completed, not that a task was verified. Retained status evidence
+    includes typed action data; keep exported records private.
     """
     from .operations import operate
 
     return operate(
-        session, action, operation_id, actions, kind, observation, CONTROLLER, timeout
+        session,
+        action,
+        operation_id,
+        actions,
+        kind,
+        observation,
+        CONTROLLER,
+        timeout,
+        predicates,
     )
 
 

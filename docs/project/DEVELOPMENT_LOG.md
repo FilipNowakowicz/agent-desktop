@@ -1,5 +1,53 @@
 # Development log
 
+## 2026-10-22 — R5b: durable private operation handles
+
+Implemented on `feat/operation-handles`, based on the R5a stack `e3d1324`.
+CLI `operation` and MCP `desktop_operation` submit private GUI/browser sequences,
+return an operation ID immediately and expose file-backed reconnectable status
+and cooperative cancellation while the synchronous worker is busy. Each step
+persists pending/dispatching/acknowledged/observed/uncertain evidence; submission
+does not imply delivery. The controller lease spans the job, and GUI steps retain
+the existing observation guards. Helpers carry the session ownership token so
+session destruction cleans them up.
+
+Optional predicates (at most 20, validated before submission) are evaluated with
+the same controller after execution. Verification is stored separately from
+execution state, including unknown evidence and violated outcomes after completed
+input. Loaded records validate action names, schema types, completed prefixes,
+positive mutating-step delivery, terminal consistency and check provenance/scope;
+missing or contradictory evidence refuses status with explicit delivery unknown.
+Listings expose bounded summaries, not typed action data. Retention caps are 32
+records, 512 KiB per record, 64 KiB of requests, 16 KiB of predicates and 4 KiB per
+step/check result. Oversized check evidence is unknown.
+
+Validation in `/home/user/agent-desktop-operations`, uv-managed Python and the
+existing private-desktop runtime on PATH:
+
+- `uv run python -m unittest discover -s tests -v`: 270 tests, 251 passed,
+  19 skipped, no failures (319.485 s). This broad run began before the final
+  record-loader hardening; the final source was subsequently verified by
+  `uv run python -m unittest discover -s tests -p test_operations.py -v`:
+  18 passed, no skips (25.234 s).
+- The focused suite includes five real private Firefox/desktop cases: input
+  received once, submitting-client exit/reconnection with a scoped check,
+  responsive cancellation during a wait, helper death preserving uncertainty,
+  session cleanup and refusal before dispatch under another controller's lease.
+- Malformed/oversized records, missing check provenance, forged verification,
+  absent positive delivery and FIFO records refuse status with unknown delivery.
+  Unit fault injection also covers lost acknowledgement and unavailable checks.
+- Ruff check and format over src/scripts/tests/benchmarks, compileall and
+  `git diff --check`: clean. No full matrix, paid calls or personal profiles
+  were used in this worktree; combined-stack matrix validation is separate.
+
+No replay, retry, resume, rollback or host operations were added. Cancellation
+stops future dispatch after an in-flight request returns; the run budget likewise
+does not interrupt already-issued worker/Firefox requests. A crashed helper can
+leave an extended controller lease until expiry or explicit reconciliation.
+Records are private session artifacts and contain typed action data; exports
+must remain private. Checks establish scoped state at their recorded time, not
+causality or complete task success.
+
 ## 2026-10-22 — Preserve mutation uncertainty and harden legacy file waits
 
 The worker now marks the boundary before desktop input, application launch,

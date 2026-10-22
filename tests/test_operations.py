@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 import shutil
 import signal
 import subprocess
@@ -29,6 +30,10 @@ class OperationTests(unittest.TestCase):
             core, "session_path", return_value=self.root
         )
         self.path_patch.start()
+        self.manifest_patch = mock.patch.object(
+            core, "manifest", return_value={"status": "ready"}
+        )
+        self.manifest_patch.start()
         self.record = {
             "schema_version": 1,
             "session": self.session,
@@ -52,6 +57,8 @@ class OperationTests(unittest.TestCase):
                 },
             ],
             "checks": [],
+            "predicates": [],
+            "verification": "not_requested",
             "observation": None,
             "controller": "test",
             "release_lease": False,
@@ -60,6 +67,7 @@ class OperationTests(unittest.TestCase):
         self.path = operations.record_path(self.session, self.ident)
 
     def tearDown(self):
+        self.manifest_patch.stop()
         self.path_patch.stop()
         self.temp.cleanup()
 
@@ -132,6 +140,9 @@ class OperationTests(unittest.TestCase):
     def test_missing_illtyped_and_oversized_evidence_is_unknown(self):
         for mutation in (
             lambda r: r.pop("steps"),
+            lambda r: r.pop("predicates"),
+            lambda r: r.pop("verification"),
+            lambda r: r.update(schema_version=True),
             lambda r: r.update(completed="2"),
             lambda r: r["steps"][0].update(
                 dispatch_state="acknowledged", result={"delivered": "yes"}
@@ -144,6 +155,10 @@ class OperationTests(unittest.TestCase):
             with self.assertRaisesRegex(core.DesktopError, "unknown"):
                 operations.status(self.session, self.ident)
         self.path.write_bytes(b"x" * (operations.MAX_BYTES + 1))
+        with self.assertRaisesRegex(core.DesktopError, "unknown"):
+            operations.status(self.session, self.ident)
+        self.path.unlink()
+        os.mkfifo(self.path)
         with self.assertRaisesRegex(core.DesktopError, "unknown"):
             operations.status(self.session, self.ident)
 
@@ -163,6 +178,144 @@ class OperationTests(unittest.TestCase):
         self.assertTrue(reduced["delivered"])
         self.assertTrue(reduced["evidence_truncated"])
         self.assertEqual(reduced["observation_error"], "bad read")
+
+    def test_contradictory_terminal_records_are_unknown(self):
+        self.record["state"] = "completed"
+        self.record["result"] = {"completed": 2, "total": 2, "stopped": None}
+        for mutation in (
+            lambda r: None,
+            lambda r: r.update(completed=2),
+            lambda r: r.update(
+                state="cancelled",
+                steps=[{**s, "dispatch_state": "uncertain"} for s in r["steps"]],
+            ),
+            lambda r: r.update(steps=["invalid", "invalid"]),
+        ):
+            record = copy.deepcopy(self.record)
+            mutation(record)
+            operations.save(self.path, record)
+            with self.assertRaisesRegex(core.DesktopError, "unknown"):
+                operations.status(self.session, self.ident)
+
+    def test_checks_are_independent_of_execution_and_same_controller(self):
+        self.record["predicates"] = [{"kind": "file", "path": "~/result.txt"}]
+        self.record["verification"] = "unknown"
+        self.prepare()
+        checked = {
+            "status": "violated",
+            "scope": {"kind": "persisted_file", "path": "~/result.txt"},
+            "reason": "missing",
+            "evidence": {"exists": False},
+            "predicate": self.record["predicates"][0],
+            "observed_at": time.time(),
+        }
+        with (
+            mock.patch.object(core, "request", return_value={"delivered": True}),
+            mock.patch.object(
+                operations.checks, "evaluate", return_value=checked
+            ) as check,
+        ):
+            operations.run_job(self.session, self.ident)
+        result = operations.status(self.session, self.ident)
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["verification"], "violated")
+        self.assertEqual(result["checks"], [checked])
+        check.assert_called_once_with(
+            self.session, self.record["predicates"][0], "test"
+        )
+
+    def test_completed_input_needs_positive_delivery_evidence(self):
+        self.record.update(
+            state="completed",
+            completed=2,
+            result={"completed": 2, "total": 2, "stopped": None},
+        )
+        for step in self.record["steps"]:
+            step.update(dispatch_state="acknowledged", result={})
+        operations.save(self.path, self.record)
+        with self.assertRaisesRegex(core.DesktopError, "unknown"):
+            operations.status(self.session, self.ident)
+        for step in self.record["steps"]:
+            step["result"]["delivered"] = True
+        operations.save(self.path, self.record)
+        self.assertEqual(
+            operations.status(self.session, self.ident)["state"], "completed"
+        )
+
+    def test_predicates_preflight_and_unavailable_evidence(self):
+        with self.assertRaisesRegex(core.DesktopError, "predicate"):
+            operations.start(
+                self.session,
+                [{"action": "key", "key": "Return"}],
+                predicates=[{"kind": "unknown"}],
+            )
+        self.record["predicates"] = [{"kind": "file", "path": "~/result.txt"}]
+        self.record["verification"] = "unknown"
+        self.prepare()
+        with (
+            mock.patch.object(core, "request", return_value={"delivered": True}),
+            mock.patch.object(
+                operations.checks,
+                "evaluate",
+                side_effect=core.DesktopError("unavailable"),
+            ),
+        ):
+            operations.run_job(self.session, self.ident)
+        result = operations.status(self.session, self.ident)
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["verification"], "unknown")
+        self.assertEqual(result["checks"][0]["status"], "unknown")
+
+    def test_forged_verification_and_loaded_actions_are_refused(self):
+        for mutation in (
+            lambda r: r.update(verification="satisfied"),
+            lambda r: r.update(predicates=[{"kind": "unknown"}]),
+            lambda r: r["steps"][0]["request"].update(action="not_an_action"),
+            lambda r: r.update(
+                predicates=[{"kind": "file", "path": "~/proof"}],
+                verification="satisfied",
+                checks=[
+                    {
+                        "status": "unknown",
+                        "scope": {},
+                        "reason": "missing",
+                        "evidence": {},
+                        "predicate_index": 0,
+                    }
+                ],
+            ),
+            lambda r: r.update(
+                predicates=[{"kind": "file", "path": "~/proof"}],
+                verification="satisfied",
+                checks=[
+                    {
+                        "status": "satisfied",
+                        "scope": {},
+                        "reason": "different",
+                        "evidence": {},
+                        "predicate": {"kind": "file", "path": "~/different"},
+                    }
+                ],
+            ),
+        ):
+            record = copy.deepcopy(self.record)
+            mutation(record)
+            operations.save(self.path, record)
+            with self.assertRaisesRegex(core.DesktopError, "unknown"):
+                operations.status(self.session, self.ident)
+        with mock.patch.object(core, "request") as request:
+            self.path.with_suffix(".ready").touch()
+            with self.assertRaisesRegex(core.DesktopError, "unknown"):
+                operations.run_job(self.session, self.ident)
+            request.assert_not_called()
+
+    def test_listing_returns_only_bounded_summaries(self):
+        self.record["steps"][0]["request"]["text"] = "private typed data" * 1000
+        operations.save(self.path, self.record)
+        summary = operations.list_operations(self.session)[0]
+        self.assertNotIn("steps", summary)
+        self.assertNotIn("private typed data", json.dumps(summary))
+        self.assertLess(len(json.dumps(summary)), 2048)
 
     def test_gui_progress_reports_delivery_before_failed_observation(self):
         events = []
@@ -214,6 +367,10 @@ class OperationDesktopTests(unittest.TestCase):
 
     def test_job_survives_submitting_client_exit_and_reconnect(self):
         self.prepare_page()
+        context = self.browser("tabs")["tabs"][0]["context"]
+        predicates = [
+            {"kind": "browser_context", "context": context, "url": self.page.as_uri()}
+        ]
         actions = [
             {"action": "wait", "seconds": 0.5},
             {"action": "click", "selector": "#add"},
@@ -230,6 +387,8 @@ class OperationDesktopTests(unittest.TestCase):
                 "browser",
                 "--actions",
                 json.dumps(actions),
+                "--predicates",
+                json.dumps(predicates),
             ],
             capture_output=True,
             text=True,
@@ -242,6 +401,8 @@ class OperationDesktopTests(unittest.TestCase):
         result = self.finished(submitted["operation_id"])
         self.assertEqual(result["state"], "completed")
         self.assertEqual(result["completed"], 2)
+        self.assertEqual(result["verification"], "satisfied")
+        self.assertEqual(result["checks"][0]["predicate"], predicates[0])
         self.assertEqual(self.browser("text", selector="#count")["text"], "1")
         self.assertEqual(
             operations.list_operations(self.session)[0]["operation_id"],

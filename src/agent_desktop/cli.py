@@ -189,6 +189,9 @@ def main():
     jobs.add_argument("--kind", choices=("actions", "browser"), default="actions")
     jobs.add_argument("--observation")
     jobs.add_argument("--timeout", type=float, default=600)
+    jobs.add_argument(
+        "--predicates", type=json.loads, help="JSON list of at most 20 scoped checks"
+    )
     steps.add_argument(
         "--screenshot",
         action="store_true",

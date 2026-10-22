@@ -10,13 +10,14 @@ import json
 import math
 import os
 import re
+import stat
 import subprocess
 import sys
 import time
 import uuid
 from pathlib import Path
 
-from . import core
+from . import checks, core
 from .worker import start_time
 
 MAX_RECORDS = 32
@@ -59,16 +60,18 @@ def save(path, record):
 
 def load(path, session, operation_id):
     try:
-        if path.is_symlink():
-            raise ValueError("symlink")
-        with path.open("rb") as stream:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ValueError("not a regular record")
             data = stream.read(MAX_BYTES + 1)
         if len(data) > MAX_BYTES:
             raise ValueError("oversized record")
         record = json.loads(data)
         steps = record["steps"]
         valid = (
-            record["schema_version"] == 1
+            type(record["schema_version"]) is int
+            and record["schema_version"] == 1
             and record["session"] == session
             and record["operation_id"] == operation_id
             and record["state"] in STATES
@@ -101,6 +104,7 @@ def load(path, session, operation_id):
         for index, step in enumerate(steps):
             valid = valid and (
                 isinstance(step, dict)
+                and type(step["index"]) is int
                 and step["index"] == index
                 and isinstance(step["request"], dict)
                 and step["dispatch_state"] in DISPATCH
@@ -128,11 +132,16 @@ def load(path, session, operation_id):
                     s["dispatch_state"] in ("acknowledged", "observed")
                     and isinstance(s.get("result"), dict)
                     and not s["result"].get("uncertain")
+                    and not s["result"].get("error")
                     and (
                         "delivered" not in s["result"]
                         or s["result"]["delivered"] is True
                     )
                     and not s["result"].get("observation_error")
+                    and (
+                        s["request"].get("action") in ("wait", "tabs", "find", "text")
+                        or s["result"].get("delivered") is True
+                    )
                     and (
                         s["request"].get("action") != "wait"
                         or s["result"].get("satisfied") is True
@@ -143,14 +152,94 @@ def load(path, session, operation_id):
             valid = (
                 valid
                 and isinstance(record.get("result"), dict)
+                and {"completed", "total", "stopped"} <= record["result"].keys()
+                and type(record["result"]["completed"]) is int
+                and type(record["result"]["total"]) is int
                 and record["result"].get("stopped") is None
+                and record["result"].get("completed") == record["total"]
+                and record["result"].get("total") == record["total"]
             )
         if record["state"] == "cancelled":
             valid = valid and all(
                 s["dispatch_state"] not in ("dispatching", "uncertain") for s in steps
             )
+        valid = valid and all(
+            s["dispatch_state"] in ("acknowledged", "observed")
+            for s in steps[: record["completed"]]
+        )
+        if record["state"] in ("stopped", "cancelled"):
+            valid = valid and all(
+                s["dispatch_state"] not in ("dispatching", "uncertain") for s in steps
+            )
+        if "predicates" not in record or "verification" not in record:
+            raise ValueError("Missing check provenance")
+        if "predicates" in record:
+            predicates = record["predicates"]
+            valid = valid and isinstance(predicates, list) and len(predicates) <= 20
+            for predicate in predicates:
+                checks.validate(predicate)
+            valid = valid and len(record["checks"]) <= len(predicates)
+            valid = valid and record.get("verification") in (
+                "not_requested",
+                "satisfied",
+                "violated",
+                "unknown",
+            )
+            for index, check in enumerate(record["checks"]):
+                valid = valid and (
+                    isinstance(check, dict)
+                    and check.get("status") in ("satisfied", "violated", "unknown")
+                    and isinstance(check.get("scope"), dict)
+                    and isinstance(check.get("reason"), str)
+                    and isinstance(check.get("evidence"), dict)
+                    and (
+                        check.get("predicate") == predicates[index]
+                        or check.get("status") == "unknown"
+                        and check.get("predicate_index") == index
+                    )
+                )
+                if check.get("status") in ("satisfied", "violated"):
+                    expected_scope = {
+                        "file": "persisted_file",
+                        "config": "persisted_config",
+                        "ui": "visible_accessibility",
+                        "browser_context": "browser_context",
+                    }[predicates[index]["kind"]]
+                    valid = valid and check["scope"].get("kind") == expected_scope
+                    valid = (
+                        valid
+                        and type(check.get("observed_at")) in (int, float)
+                        and math.isfinite(check["observed_at"])
+                    )
+                    for key in ("path", "context"):
+                        if key in predicates[index]:
+                            valid = (
+                                valid
+                                and check["scope"].get(key) == predicates[index][key]
+                            )
+                    if predicates[index]["kind"] == "ui":
+                        query = predicates[index].get("query", {})
+                        valid = valid and all(
+                            check["scope"].get(key) == query[key]
+                            for key in ("window", "app")
+                            if key in query
+                        )
+            if record.get("verification") == "satisfied":
+                valid = (
+                    valid
+                    and bool(predicates)
+                    and len(record["checks"]) == len(predicates)
+                    and all(c["status"] == "satisfied" for c in record["checks"])
+                )
+            elif record.get("verification") == "violated":
+                valid = valid and any(
+                    c["status"] == "violated" for c in record["checks"]
+                )
+            elif record.get("verification") == "not_requested":
+                valid = valid and not predicates and not record["checks"]
         if not valid:
             raise ValueError("invalid evidence")
+        validate_actions([s["request"] for s in steps], record["kind"])
         return record
     except (
         OSError,
@@ -159,6 +248,7 @@ def load(path, session, operation_id):
         TypeError,
         AttributeError,
         IndexError,
+        core.DesktopError,
     ) as error:
         raise core.DesktopError(
             "Operation evidence unavailable or invalid; delivery is unknown. Do not resubmit blindly."
@@ -274,9 +364,25 @@ def validate_actions(actions, kind):
 
 
 def start(
-    session, actions, kind="actions", observation=None, controller=None, timeout=600
+    session,
+    actions,
+    kind="actions",
+    observation=None,
+    controller=None,
+    timeout=600,
+    predicates=None,
 ):
     validate_actions(actions, kind)
+    predicates = [] if predicates is None else predicates
+    if not isinstance(predicates, list) or len(predicates) > 20:
+        raise core.DesktopError("predicates must be a list of at most 20 checks")
+    for predicate in predicates:
+        checks.validate(predicate)
+    try:
+        if len(json.dumps(predicates, allow_nan=False).encode()) > 16384:
+            raise core.DesktopError("Predicates exceed 16 KiB")
+    except (ValueError, TypeError) as error:
+        raise core.DesktopError("Predicates must be finite JSON data") from error
     if (
         type(timeout) not in (int, float)
         or not math.isfinite(timeout)
@@ -328,6 +434,8 @@ def start(
                 for i, step in enumerate(actions)
             ],
             "checks": [],
+            "predicates": predicates,
+            "verification": "unknown" if predicates else "not_requested",
             "observation": observation,
             "timeout": timeout,
             "controller": controller or f"op-{operation_id}",
@@ -356,7 +464,12 @@ def start(
             save(path, record)
             path.with_suffix(".ready").touch(mode=0o600)
         except (OSError, core.DesktopError) as error:
-            record.update(state="stopped", reason=f"Could not start operation: {error}")
+            record.update(
+                state="delivery_unknown"
+                if path.with_suffix(".ready").exists()
+                else "stopped",
+                reason=f"Could not finish operation startup: {error}",
+            )
             save(path, record)
         return record
 
@@ -378,9 +491,12 @@ def operate(
     observation=None,
     controller=None,
     timeout=600,
+    predicates=None,
 ):
     if action == "start":
-        return start(session, actions, kind, observation, controller, timeout)
+        return start(
+            session, actions, kind, observation, controller, timeout, predicates
+        )
     if action == "status":
         return (
             status(session, operation_id)
@@ -415,6 +531,39 @@ def bounded_result(result):
     }
 
 
+def evaluate_checks(session, record, controller, path):
+    for index, predicate in enumerate(record.get("predicates", [])):
+        try:
+            result = checks.evaluate(session, predicate, controller)
+            if not isinstance(result, dict) or result.get("status") not in (
+                "satisfied",
+                "violated",
+                "unknown",
+            ):
+                raise ValueError("Invalid check evidence")
+            if len(json.dumps(result, allow_nan=False).encode()) > 4096:
+                raise ValueError("Check evidence exceeds 4096 bytes")
+        except Exception as error:
+            result = {
+                "status": "unknown",
+                "predicate_index": index,
+                "reason": f"Check evidence unavailable ({type(error).__name__})",
+                "evidence": {},
+                "scope": {"kind": predicate["kind"]},
+            }
+        record["checks"].append(result)
+        save(path, record)
+    if record.get("predicates"):
+        statuses = [c["status"] for c in record["checks"]]
+        record["verification"] = (
+            "violated"
+            if "violated" in statuses
+            else "unknown"
+            if "unknown" in statuses or len(statuses) != len(record["predicates"])
+            else "satisfied"
+        )
+
+
 def run_job(session, operation_id):
     path = record_path(session, operation_id)
     deadline = time.monotonic() + 2
@@ -424,6 +573,12 @@ def run_job(session, operation_id):
         time.sleep(0.02)
     record = load(path, session, operation_id)
     if record["state"] in TERMINAL:
+        return
+    if core.manifest(session).get("status") != "ready":
+        record.update(
+            state="stopped", reason="Session stopped before operation startup"
+        )
+        save(path, record)
         return
     record["state"] = "running"
     save(path, record)
@@ -513,7 +668,10 @@ def run_job(session, operation_id):
             for step in record["steps"]:
                 if step["dispatch_state"] == "dispatching":
                     step["dispatch_state"] = "uncertain"
+        terminal_state = record["state"]
         if acquired:
+            record["state"] = "running"
+            evaluate_checks(session, record, controller, path)
             try:
                 if record["release_lease"]:
                     core.request(session, "lease", controller, action="release")
@@ -523,6 +681,7 @@ def run_job(session, operation_id):
             except core.DesktopError as error:
                 record["lease_cleanup"] = "unknown"
                 record["lease_error"] = str(error)[:1000]
+        record["state"] = terminal_state
         save(path, record)
 
 

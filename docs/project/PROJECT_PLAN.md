@@ -17,8 +17,7 @@ This is a bounded correctness stage, not a general completion guarantee.
 R2 adds browser request budgets shared with command deadlines, completed prefixes
 and uncertain current steps, and preserves acknowledged delivery when optional
 screenshots, browser reads or effect collection fail. Already-submitted work
-may still finish after disconnect. Effect-ledger coverage/retention, scoped
-predicates and reconnectable operations follow as separate stages. See the log
+may still finish after disconnect. Scoped predicates and reconnectable operations follow as separate stages. See the log
 for validation and remaining limits.
 
 Script job supervision (R3) is also implemented: ordinary script process groups
@@ -27,6 +26,14 @@ Session-worker launches survive cancellation. Replies expose cleanup scope and
 helper-call delivery uncertainty; detached descendants remain outside the
 contract. This is lifecycle correctness, not a sandbox or operation rollback.
 Scoped postconditions and reconnectable operation status remain later work.
+
+R4 effect-ledger hardening is also implemented: reports no longer mutate file
+history, unavailable baselines remain unknown, collection and extraction limits
+are visible, flat OpenDocument XML is supported, and file evidence has bounded
+retention with explicit expiry. This does not provide complete filesystem
+coverage or causal attribution. See `docs/USAGE.md` and the development log for
+limits and validation. Scoped predicates and resumable operations remain later
+work.
 
 Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must

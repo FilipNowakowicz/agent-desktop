@@ -1,5 +1,50 @@
 # Development log
 
+## 2026-10-22 — R4 follow-up: verify strict text comparison
+
+Review checked whether invalid UTF-8 could silently become replacement characters
+and fabricate an unchanged-file result. Both the R1 baseline and R4 implementation
+already decode strictly and return unavailable text on `UnicodeDecodeError`;
+no lossy decoding path was present. Added regressions for distinct invalid-byte
+writes (both extractions unavailable, change remains `modified`) and an INI
+comment-only change with equal keys (also remains `modified`). The existing ODF
+style-change regression verifies the narrower `canonical text unchanged` label.
+Validation: `uv run python -m unittest discover -s tests -p test_effects.py -v`:
+33 passed. Ruff check/format and `git diff --check` clean. No runtime change.
+
+## 2026-10-22 — R4: observational effect reports and bounded file evidence
+
+Implemented on `fix/effect-evidence-retention` in its own worktree, based on
+R1 `19f5e88`. The stage depends on R1; no dependency on the parallel R2/R3
+changes. The original research checkout remains unchanged.
+
+Reading a file effect report no longer appends versions. Repeated reads preserve
+the retained pre-action observation, including after further writes. Missing or
+evicted history produces `baseline_unknown`, never an invented creation.
+Retention records a monotonic expiry watermark; action IDs still expire after
+200 records. Loss of path history also prevents later missing-history absence
+inference. A failed current stat reports `current_unknown`.
+
+Each recorder now bounds events (8,192), versioned and pending paths (2,048 each),
+versions per path (six), watched directories (4,096), retained UTF-8 payload
+(32 MiB), and recent failure details (32, plus a total count). Reports expose
+`file_coverage`, queue overflow, traversal/registration/read errors and explicit
+expiry. Watcher shutdown stops and joins the reader before closing its fd.
+
+Document extraction reports unavailable/partial coverage for current and retained
+baseline text. FODS uses flat XML rather than the ZIP reader. ZIP content XML
+is checked before and during decompression; XML input is limited to 16 MiB,
+100,000 elements and depth 128, with DTD/entity declarations rejected. Repeated
+populated rows/columns cap at 1,000, counts above one billion are unsupported,
+and extraction output caps at 20,000 lines/256 KiB characters. Ordinary text
+reads are bounded even if a file grows after stat. Equal partial extracts do
+not imply unchanged content; equal full ODF extracts say only
+`canonical text unchanged`, leaving formatting/embedded state outside scope.
+
+Validation (uv-managed CPython 3.12.13, NixOS, existing desktop runtime):
+
+- `uv sync --managed-python --locked`: 34 packages resolved, 33 installed.
+
 ## 2026-10-22 — R3: supervise script jobs and preserve delivery uncertainty
 
 Implemented on `fix/script-job-supervision` in a separate worktree, based on
@@ -32,6 +77,34 @@ Validation (NixOS, existing repaired labwc/wlroots runtime; uv-managed CPython
   `uv run ruff format --check src scripts tests benchmarks`,
   `uv run python -m compileall -q src scripts tests benchmarks`, and
   `git diff --check`: clean.
+- Full local desktop suite during implementation:
+  `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -v`: **209 run, 189 passed, 20 skipped**, 275.772 s.
+  Private Firefox/Chromium, effect-first input/file waits, actual input,
+  screenshots and cleanup ran. Skips: absent LibreOffice, Mousepad, Xterm/Xev,
+  wlr-randr, GTK/Qt dialog tools, unusable GLES2, opt-in visible mode and
+  unavailable logind inhibition. No host desktop input was used.
+- Final focused checks after subsequent extraction/retention refinements:
+  `uv run python -m unittest discover -s tests -p test_effects.py -v`:
+  **31 passed**, 4.321 s. Regression coverage includes 20 repeated reads, later
+  writes, history/action expiry, missing baseline, post-eviction absence,
+  watcher registration and injected read failure, flat XML, repeated rows,
+  decompression/depth/element/entity limits and equal partial/full extracts.
+- Bounded synthetic stress at default retention: 100,000 injected events and
+  10,000 distinct absent-path observations retained exactly 8,192 events and
+  2,048 paths. Python `tracemalloc` current 2,187,256 bytes; peak 2,291,433 bytes;
+  1.305 s. Empty-file histories use no retained text payload. This measures
+  Python allocations in this run, not process RSS, document-parser peak memory
+  or a long-session soak. Local evidence: `artifacts/r4/retention-stress.json`,
+  `effects-tests.log` and `desktop-suite.log` in the implementation worktree.
+
+Limits: no exhaustive filesystem coverage, causation or arbitrary document
+semantic verification is claimed. Inotify timestamps are receipt times; initial
+indexing/new-directory watch installation can race with applications. Old
+intervals conservatively lose comparisons after any retention gap. The
+cross-distribution Checks matrix remains an integration gate; no publishing,
+host activation or personal-account access was performed.
+
 - `uv run python -m unittest discover -s tests -p test_script_jobs.py -v`:
   12 passed. Covers redirected children, inherited output handles, SIGTERM
   resistance, timeout, cancellation, successful-parent cleanup, detached-child

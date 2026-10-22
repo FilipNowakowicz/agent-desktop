@@ -924,6 +924,8 @@ class Worker:
         from . import browser
 
         action = request.get("action")
+        mutation_started = False
+        context = None
         target = {
             "selector": request.get("selector"),
             "text": request.get("text"),
@@ -933,7 +935,9 @@ class Worker:
         try:
             if action == "steps":
                 return self.browser_steps(
-                    request.get("steps"), request.get("controller")
+                    request.get("steps"),
+                    request.get("controller"),
+                    request.get("deadline"),
                 )
             host = self.info["mode"] == "host"
             if action == "start" and host:
@@ -943,15 +947,22 @@ class Worker:
                         "to restart it with --remote-debugging-port=0; the agent "
                         "never restarts their browser."
                     )
+                self.browser[0].deadline = request.get("deadline")
                 return {"tabs": self.browser[0].tabs()[1]}
             if action == "start":
+                mutation_started = True
                 bridge = self.start_browser(
                     request.get("url"), request.get("controller")
                 )
-                return {"tabs": bridge.tabs()[1]}
+                bridge.deadline = request.get("deadline")
+                return self.browser_observed(
+                    {"started": True, "delivered": True},
+                    lambda: {"tabs": bridge.tabs()[1]},
+                )
             if not self.attach_browser():
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
+            bridge.deadline = request.get("deadline")
             if action == "tabs":
                 if request.get("tab") is not None or request.get("context") is not None:
                     bridge.target(request.get("tab"), request.get("context"))
@@ -984,6 +995,7 @@ class Worker:
                 url = request.get("url")
                 if not isinstance(url, str) or not url:
                     raise ValueError("open needs a url")
+                mutation_started = True
                 if request.get("new_tab"):
                     created = {"type": "tab"}
                     if host:
@@ -1000,13 +1012,20 @@ class Worker:
                     {"context": context, "url": url, "wait": "complete"},
                     timeout=60,
                 )
-                return self.page_state(bridge, context)
+                return self.browser_observed(
+                    {"delivered": True, "context": context},
+                    lambda: self.page_state(bridge, context),
+                )
             if action == "close":
+                mutation_started = True
                 bridge.command("browsingContext.close", {"context": context})
                 self.agent_tabs.discard(context)
                 # Keep the closed identity: later actions require an explicit
                 # selection rather than silently inheriting another tab.
-                return {"closed": True, "tabs": bridge.tabs()[1]}
+                return self.browser_observed(
+                    {"closed": True, "delivered": True},
+                    lambda: {"tabs": bridge.tabs()[1]},
+                )
             if action == "find":
                 return bridge.find(context, **target)
             if action == "text":
@@ -1057,6 +1076,7 @@ class Worker:
                 if described.get("disabled"):
                     raise ValueError(f"The element is disabled: {described}")
                 if action == "click":
+                    mutation_started = True
                     bridge.click(context, element)
                 elif action == "fill":
                     value = request.get("value")
@@ -1064,10 +1084,12 @@ class Worker:
                         raise ValueError(
                             "fill needs a value of at most 2000 characters"
                         )
+                    mutation_started = True
                     bridge.click(context, element)
                     bridge.keys(context, value, select_all=True)
                 else:
                     option = request.get("value")
+                    mutation_started = True
                     chosen = bridge.call(
                         "(e, o) => { const m = [...e.options].find((x) => "
                         "x.text.trim() === o || x.value === o); if (!m) return null; "
@@ -1079,49 +1101,89 @@ class Worker:
                     )
                     if browser.remote_value(chosen) is None:
                         raise ValueError(f"No option {option!r}: {described}")
-                after = bridge.call(
-                    "(e) => e.isConnected ? JSON.stringify({value: e.type === "
-                    "'password' ? undefined : e.value, checked: e.checked}) : null",
-                    [element],
-                    context,
-                )
-                result = {
-                    "element": described,
-                    "delivered": True,
-                    **self.page_state(bridge, context),
-                }
-                after = browser.remote_value(after)
-                if isinstance(after, str):
-                    result["now"] = {
-                        k: v for k, v in json.loads(after).items() if v is not None
-                    }
-                return result
+                result = {"element": described, "delivered": True, "context": context}
+
+                def observe():
+                    after = bridge.call(
+                        "(e) => e.isConnected ? JSON.stringify({value: e.type === "
+                        "'password' ? undefined : e.value, checked: e.checked}) : null",
+                        [element],
+                        context,
+                    )
+                    state = self.page_state(bridge, context)
+                    after = browser.remote_value(after)
+                    if isinstance(after, str):
+                        state["now"] = {
+                            k: v for k, v in json.loads(after).items() if v is not None
+                        }
+                    return state
+
+                return self.browser_observed(result, observe)
             raise ValueError(
                 "action must be start, tabs, open, close, find, text, wait, click, "
                 "fill, select or steps"
             )
-        except browser.BrowserError as error:
+        except (browser.BrowserError, ConnectionClosed, TimeoutError, OSError) as error:
+            if isinstance(error, ConnectionClosed):
+                self.browser = None
+            if mutation_started:
+                return {
+                    "delivered": None,
+                    "uncertain": True,
+                    "context": context,
+                    "error": str(error),
+                    "recovery": "Observe/reconcile before retrying; browser input may have run.",
+                }
             raise ValueError(str(error)) from None
-        except ConnectionClosed:
-            self.browser = None
-            raise ValueError("Firefox closed the bridge; start it again") from None
+        finally:
+            if self.browser:
+                self.browser[0].deadline = None
 
-    def browser_steps(self, steps, controller=None):
+    @staticmethod
+    def browser_observed(result, observe):
+        """A follow-up read must never erase an acknowledged mutation."""
+        try:
+            return {**result, **observe()}
+        except Exception as error:
+            return {
+                **result,
+                "observation_error": str(error),
+                "recovery": "Observe/reconcile before repeating the delivered action.",
+            }
+
+    def browser_steps(self, steps, controller=None, deadline=None):
         """Several browser actions in one request, stopping at the first error."""
         if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
             raise ValueError("steps must be a list of 1 to 30 browser actions")
-        results = []
         for index, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("action") in (None, "steps"):
                 raise ValueError(f"Step {index} needs an action other than steps")
+        results = []
+        for index, step in enumerate(steps):
             try:
-                result = self.browser_request({**step, "controller": controller})
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError("Browser batch deadline reached before step")
+                result = self.browser_request(
+                    {**step, "controller": controller, "deadline": deadline}
+                )
             except (ValueError, TimeoutError) as error:
                 return {
                     "completed": index,
                     "total": len(steps),
                     "results": results,
                     "stopped": {"step": index, "reason": str(error)},
+                }
+            if result.get("uncertain") or result.get("observation_error"):
+                results.append(result)
+                return {
+                    "completed": index + (1 if result.get("delivered") else 0),
+                    "total": len(steps),
+                    "results": results,
+                    "stopped": {
+                        "step": index,
+                        "reason": result.get("error") or result["observation_error"],
+                        "uncertain": bool(result.get("uncertain")),
+                    },
                 }
             if step["action"] == "wait" and not result.get("satisfied"):
                 results.append(result)
@@ -1705,7 +1767,37 @@ class Worker:
         time.sleep(0.05)
         pointer.button(button, False)
 
+    def handle_with_effects(self, request):
+        """Optional instrumentation cannot erase known execution results."""
+        record = None
+        effect_error = None
+        if (
+            self.effects
+            and request.get("operation") in EFFECT_OPERATIONS
+            and self.control["owner"] == "agent"
+        ):
+            try:
+                record = self.effects.begin()
+            except Exception as error:
+                effect_error = str(error)
+        result = self.handle(request)
+        if record and isinstance(result, dict):
+            try:
+                result["effects"] = self.effects.finish(record)
+            except Exception as error:
+                effect_error = str(error)
+        if effect_error is not None and isinstance(result, dict):
+            result["effects_error"] = effect_error
+        return result
+
     def handle(self, request):
+        if (
+            request.get("deadline") is not None
+            and time.monotonic() >= request["deadline"]
+        ):
+            raise ValueError(
+                "Request deadline expired before execution; nothing delivered"
+            )
         operation = request["operation"]
         if operation == "destroy":
             self.stop = True
@@ -2123,16 +2215,7 @@ class Worker:
                         request = json.loads(line)
                         trace = self.trace_start(request)
                         started = time.monotonic()
-                        effects = (
-                            self.effects.begin()
-                            if self.effects
-                            and request.get("operation") in EFFECT_OPERATIONS
-                            and self.control["owner"] == "agent"
-                            else None
-                        )
-                        result = self.handle(request)
-                        if effects and isinstance(result, dict):
-                            result["effects"] = self.effects.finish(effects)
+                        result = self.handle_with_effects(request)
                         if self.activity and request.get("operation") in (
                             *INPUT_OPERATIONS,
                             "focus",
@@ -2157,8 +2240,10 @@ class Worker:
                             json.dumps(
                                 {
                                     "ok": False,
-                                    "error": "ValueError: response exceeds the "
-                                    "protocol limit; narrow the request",
+                                    "uncertain": True,
+                                    "error": "Response exceeds the protocol limit "
+                                    "after execution; delivery may have occurred. "
+                                    "Reconcile before retrying, then narrow reads.",
                                 }
                             )
                             + "\n"

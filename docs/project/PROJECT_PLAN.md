@@ -7,13 +7,18 @@ implemented features are not a claim of universal compatibility.
 
 ## Development status
 
-Current implementation stage: **R1, UI evidence and browser target identity**.
+Current implementation stages: **R1, UI evidence and browser target identity**,
+and **R2, request deadlines and delivery evidence**.
 Unique-target actions refuse truncated/unreadable accessibility listings;
 script queries retain source coverage, and rendered listings expose read failures.
 Browser tabs expose stable context IDs; losing or closing a selected context
 requires explicit reselection instead of silently choosing another tab.
 This is a bounded correctness stage, not a general completion guarantee.
-Next candidates are deadline/partial-delivery contracts, script child cleanup,
+R2 adds browser request budgets shared with command deadlines, batch completed
+prefixes with uncertain current steps, and preserves acknowledged delivery when
+optional screenshot, browser page reads or effect collection fail. Transport
+disconnects remain uncertain; browser work already submitted may still finish.
+Next candidates are script child cleanup,
 and effect-ledger coverage/retention; then scoped predicates and resumable
 operations. These later stages remain unimplemented. See the development log
 for validation and remaining limits.

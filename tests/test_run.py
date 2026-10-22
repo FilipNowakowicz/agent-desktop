@@ -1,14 +1,16 @@
 """desktop_run (D1, experimental): a Python script acts on a private session."""
 
+import functools
 import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
+import anyio
 from test_runtime import wait_for
 
-from agent_desktop import core, mcp_server
+from agent_desktop import core, mcp_server, script_jobs
 from agent_desktop.worker import owned_processes
 
 
@@ -82,3 +84,51 @@ class RunTests(unittest.TestCase):
         self.assertTrue(result["timed_out"])
         self.assertIn("started", result["stdout"])
         self.assertLess(result["seconds"], 5)
+
+    def test_session_launched_application_survives_script_cancellation(self):
+        pid_file = Path(self.temporary.name) / "app-pid"
+        code = (
+            "app = launch(['foot', '--config=/dev/null', '--title=Surviving app', 'sh'])\n"
+            f"from pathlib import Path\nPath({str(pid_file)!r}).write_text(str(app['pid']))\n"
+            "wait(timeout=30, title='Never opens')\n"
+        )
+
+        async def trial():
+            async with anyio.create_task_group() as group:
+                group.start_soon(
+                    script_jobs.cancellable_call,
+                    functools.partial(mcp_server.desktop_run, self.session, code),
+                )
+                with anyio.fail_after(10):
+                    while not pid_file.exists():
+                        await anyio.sleep(0.02)
+                group.cancel_scope.cancel()
+
+        anyio.run(trial)
+        self.assertTrue(Path(f"/proc/{pid_file.read_text()}").exists())
+        self.assertTrue(
+            core.wait(
+                self.session,
+                title="Surviving app",
+                timeout=5,
+                controller=mcp_server.CONTROLLER,
+            )["satisfied"]
+        )
+        self.assertTrue(
+            core.request(self.session, "screenshot", mcp_server.CONTROLLER)["path"]
+        )
+
+    def test_timeout_reports_pending_worker_operation(self):
+        result = mcp_server.desktop_run(
+            self.session,
+            "from agent_desktop.script import request\n"
+            "request('screenshot', settle_ms=2000, settle_timeout_ms=3000)\n",
+            timeout=1,
+        )
+        self.assertTrue(result["timed_out"], result)
+        self.assertEqual(result["operations"]["in_flight"], ["screenshot"], result)
+        self.assertEqual(result["operations"]["delivery"], "unknown", result)
+        self.assertEqual(result["cleanup"]["state"], "complete", result)
+        # Stopping the caller does not retract a worker operation. It still
+        # finishes; later requests can use the desktop normally.
+        self.assertTrue(core.request(self.session, "windows", mcp_server.CONTROLLER))

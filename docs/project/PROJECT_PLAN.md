@@ -14,14 +14,19 @@ script queries retain source coverage, and rendered listings expose read failure
 Browser tabs expose stable context IDs; losing or closing a selected context
 requires explicit reselection instead of silently choosing another tab.
 This is a bounded correctness stage, not a general completion guarantee.
-R2 adds browser request budgets shared with command deadlines, batch completed
-prefixes with uncertain current steps, and preserves acknowledged delivery when
-optional screenshot, browser page reads or effect collection fail. Transport
-disconnects remain uncertain; browser work already submitted may still finish.
-Next candidates are script child cleanup,
-and effect-ledger coverage/retention; then scoped predicates and resumable
-operations. These later stages remain unimplemented. See the development log
+R2 adds browser request budgets shared with command deadlines, completed prefixes
+and uncertain current steps, and preserves acknowledged delivery when optional
+screenshots, browser reads or effect collection fail. Already-submitted work
+may still finish after disconnect. Effect-ledger coverage/retention, scoped
+predicates and reconnectable operations follow as separate stages. See the log
 for validation and remaining limits.
+
+Script job supervision (R3) is also implemented: ordinary script process groups
+are stopped and reaped on timeout/cancellation and after the main script exits.
+Session-worker launches survive cancellation. Replies expose cleanup scope and
+helper-call delivery uncertainty; detached descendants remain outside the
+contract. This is lifecycle correctness, not a sandbox or operation rollback.
+Scoped postconditions and reconnectable operation status remain later work.
 
 Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must

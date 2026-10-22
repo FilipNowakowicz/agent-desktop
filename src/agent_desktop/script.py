@@ -9,11 +9,12 @@ wait that is not met, raises and stops the script.
 import os
 from pathlib import Path
 
-from . import core
+from . import core, script_jobs
 
 __all__ = [
     "SESSION",
     "home",
+    "launch",
     "windows",
     "focus",
     "find",
@@ -38,11 +39,14 @@ CONTROLLER = core.controller_id()
 
 
 def request(operation, **arguments):
-    return core.request(
-        SESSION,
+    return script_jobs.operation(
         operation,
-        CONTROLLER,
-        **{k: v for k, v in arguments.items() if v is not None},
+        lambda: core.request(
+            SESSION,
+            operation,
+            CONTROLLER,
+            **{k: v for k, v in arguments.items() if v is not None},
+        ),
     )
 
 
@@ -50,6 +54,11 @@ def home():
     """The session's home directory, for reading the files a task produces."""
     info = core.manifest(SESSION)
     return Path(info.get("home") or core.session_path(SESSION) / "home")
+
+
+def launch(argv, cwd=None):
+    """Start an app through the session worker so it outlives this script job."""
+    return request("launch", argv=argv, cwd=cwd)
 
 
 def windows():
@@ -261,7 +270,12 @@ def wait(timeout=10, **conditions):
     """Wait like desktop_wait (title, app_id, gone, element, role, text, state,
     exact, stable_ms, seconds, file, contains, key, value); raise
     TimeoutError if the conditions do not hold by the timeout."""
-    result = core.wait(SESSION, timeout=timeout, controller=CONTROLLER, **conditions)
+    result = script_jobs.operation(
+        "wait",
+        lambda: core.wait(
+            SESSION, timeout=timeout, controller=CONTROLLER, **conditions
+        ),
+    )
     if not result.get("satisfied"):
         raise TimeoutError(f"wait {conditions} not met: {result.get('reason')}")
     return result

@@ -3,8 +3,11 @@
 import tempfile
 import time
 import unittest
+import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
+from agent_desktop import effects
 from agent_desktop.effects import (
     EffectLedger,
     FileRecorder,
@@ -291,6 +294,220 @@ class RecorderTests(unittest.TestCase):
         self.assertTrue(
             wait_for(lambda: any(e[2] == "a/b/deep.txt" for e in recorder.since(start)))
         )
+
+
+class EvidenceRetentionTests(unittest.TestCase):
+    def recorder(self, root):
+        recorder = FileRecorder(root, "~")
+        self.addCleanup(recorder.close)
+        return recorder
+
+    def test_many_reports_do_not_consume_baseline_and_later_writes_remain_relative(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "notes"
+            path.write_text("old\n")
+            recorder = self.recorder(root)
+            start = time.monotonic()
+            path.write_text("new\n")
+            self.assertTrue(wait_for(lambda: recorder.since(start)))
+            for _ in range(20):
+                files, _ = recorder.summarize(recorder.since(start), start)
+                self.assertEqual(files[0]["change"], "modified")
+                self.assertEqual(files[0]["diff"], ["-old", "+new"])
+            path.write_text("later\n")
+            files, _ = recorder.summarize(recorder.since(start), start)
+            self.assertEqual(files[0]["diff"], ["-old", "+later"])
+            self.assertLessEqual(len(recorder.versions["notes"]), 2)
+
+    def test_history_eviction_is_unknown_never_created(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "notes"
+            path.write_text("old")
+            recorder = self.recorder(root)
+            start = time.monotonic()
+            for _ in range(effects.VERSIONS + 1):
+                path.write_text("new")
+                recorder.record("notes", time.monotonic())
+            files, _ = recorder.summarize([(start, "modified", "notes")], start)
+            self.assertEqual(files[0]["change"], "baseline_unknown")
+            self.assertNotIn("diff", files[0])
+            self.assertGreaterEqual(recorder.expired_before, start)
+            watermark = recorder.expired_before
+            recorder.expire(0)
+            self.assertEqual(recorder.expired_before, watermark)
+
+    def test_unavailable_history_does_not_mean_known_absence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = self.recorder(Path(directory))
+            self.assertEqual(
+                recorder.before("unobserved", time.monotonic()), (None, None)
+            )
+
+    def test_watch_failure_and_event_expiry_are_visible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = EffectLedger(Path(directory), lambda: [], lambda: {})
+            self.addCleanup(ledger.close)
+            recorder = ledger.recorders[0]
+            recorder.add_watch(Path(directory) / "missing")
+            report = ledger.finish(ledger.begin())
+            self.assertIn("incomplete", report)
+            self.assertIn(
+                "watch registration failed", report["file_coverage"][0]["failures"][0]
+            )
+            start = time.monotonic()
+            with patch.object(effects, "MAX_EVENTS", 2):
+                for i in range(3):
+                    recorder.event(start + i, "modified", "notes")
+            self.assertIn(
+                "file evidence expired",
+                ledger.report(start)["file_coverage"][0]["reasons"],
+            )
+
+    def test_read_failure_is_visible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = self.recorder(Path(directory))
+            recorder.stopped = True
+            recorder.thread.join(2)
+            recorder.stopped = False
+            with (
+                patch.object(
+                    effects.select, "select", return_value=([recorder.fd], [], [])
+                ),
+                patch.object(
+                    effects.os, "read", side_effect=OSError("injected read failure")
+                ),
+            ):
+                recorder.run()
+            self.assertIn("injected read failure", recorder.failures[-1])
+
+    def test_bounded_stress_retains_explicit_expiry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = self.recorder(Path(directory))
+            start = time.monotonic()
+            for i in range(effects.MAX_EVENTS * 3):
+                recorder.event(start + i / 100000, "modified", f"path-{i}")
+            for i in range(effects.MAX_PATHS * 2):
+                recorder.record(f"absent-{i}", time.monotonic())
+            self.assertEqual(len(recorder.events), effects.MAX_EVENTS)
+            self.assertEqual(len(recorder.versions), effects.MAX_PATHS)
+            self.assertGreater(recorder.expired_before, start)
+            self.assertEqual(recorder.before("absent-0", start), (None, None))
+
+    def test_document_limits_flat_xml_and_decompression(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            flat = root / "sheet.fods"
+            xml = (
+                '<office:document xmlns:office="'
+                + effects.ODF["office"]
+                + '" xmlns:table="'
+                + effects.ODF["table"]
+                + '" xmlns:text="'
+                + effects.ODF["text"]
+                + '"><office:body><table:table table:name="S"><table:table-row table:number-rows-repeated="1001"><table:table-cell><text:p>x</text:p></table:table-cell></table:table-row></table:table></office:body></office:document>'
+            )
+            flat.write_text(xml)
+            coverage = {}
+            result = effects.read_document(flat, coverage)
+            self.assertEqual(len(result.splitlines()), 1000)
+            self.assertFalse(coverage["complete"])
+            self.assertIn("1000", coverage["reasons"][0])
+            zipped = root / "large.ods"
+            with zipfile.ZipFile(zipped, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("content.xml", b"x" * 2048)
+            with patch.object(effects, "DOCUMENT_LIMIT", 1024):
+                self.assertIsNone(effects.read_document(zipped, coverage))
+                self.assertIn("decompressed XML", coverage["reasons"][0])
+
+    def test_truncated_equal_documents_are_not_reported_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "sheet.fods"
+            path.write_text(
+                '<office:document xmlns:office="'
+                + effects.ODF["office"]
+                + '" xmlns:text="'
+                + effects.ODF["text"]
+                + '"><office:body><text:p>first</text:p><text:p>second</text:p></office:body></office:document>'
+            )
+            with patch.object(effects, "MAX_CELLS", 1):
+                recorder = self.recorder(root)
+                start = time.monotonic()
+                files, _ = recorder.summarize([(start, "modified", path.name)], start)
+                self.assertEqual(files[0]["change"], "modified")
+                self.assertFalse(files[0]["document_coverage"]["complete"])
+                self.assertFalse(files[0]["baseline_document_coverage"]["complete"])
+
+    def test_expired_action_id_is_explicit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ledger = EffectLedger(
+                Path(directory), lambda: [], lambda: {}, quiet=0, limit=0
+            )
+            self.addCleanup(ledger.close)
+            first = ledger.finish(ledger.begin())["effect_id"]
+            for _ in range(201):
+                ledger.finish(ledger.begin())
+            self.assertEqual(len(ledger.records), 200)
+            with self.assertRaisesRegex(ValueError, "expired effect_id"):
+                ledger.since(first)
+
+    def test_evicted_path_is_not_assumed_absent_for_a_new_action(self):
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = self.recorder(Path(directory))
+            with patch.object(effects, "MAX_PATHS", 1):
+                recorder.record("one", time.monotonic())
+                recorder.record("two", time.monotonic())
+            start = time.monotonic()
+            recorder.event(start + 0.001, "created", "one")
+            self.assertEqual(recorder.before("one", start), (None, None))
+
+    def test_unchanged_document_text_does_not_claim_unchanged_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "text.fods"
+            path.write_text(
+                '<office:document xmlns:office="'
+                + effects.ODF["office"]
+                + '" xmlns:text="'
+                + effects.ODF["text"]
+                + '"><office:body><text:p>same</text:p></office:body></office:document>'
+            )
+            recorder = self.recorder(root)
+            start = time.monotonic()
+            path.write_text(
+                path.read_text().replace("<text:p>", '<text:p text:style-name="bold">')
+            )
+            files, _ = recorder.summarize([(start, "modified", path.name)], start)
+            self.assertEqual(files[0]["change"], "canonical text unchanged")
+
+    def test_xml_depth_and_element_limits_are_explicit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested.fods"
+            for xml, limit_name in (
+                ("<a>" * 130 + "</a>" * 130, "depth"),
+                ("<a><b/><c/></a>", "elements"),
+            ):
+                path.write_text(xml)
+                coverage = {}
+                with patch.object(
+                    effects,
+                    "MAX_XML_ELEMENTS",
+                    2 if limit_name == "elements" else 100000,
+                ):
+                    self.assertIsNone(effects.read_document(path, coverage))
+                self.assertIn("depth/element limit", coverage["reasons"][0])
+
+    def test_entity_declaration_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "entity.fods"
+            path.write_text('<!DOCTYPE x [<!ENTITY a "expanded">]><x>&a;</x>')
+            coverage = {}
+            self.assertIsNone(effects.read_document(path, coverage))
+            self.assertIn("declarations unsupported", coverage["reasons"][0])
 
 
 if __name__ == "__main__":

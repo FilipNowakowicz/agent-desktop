@@ -283,6 +283,41 @@ outside the watched directories, in memory, in binary stores such as dconf, or
 over the network are not seen. Research notes and measurements:
 [docs/research/2026-10-08-effect-ledger.md](research/2026-10-08-effect-ledger.md).
 
+File reports are observational: repeatedly reading an action does not consume
+its baseline. Files with unavailable history report `change="baseline_unknown"`
+instead of being called newly created. A current existence read that fails reports
+`current_unknown`. Reports may change as later writes arrive; they compare the
+currently readable file with the retained pre-action observation.
+
+`file_coverage` describes each watched root, including queue overflow,
+registration/traversal/read failures (a total count and at most 32 recent details),
+and the monotonic `expired_before` watermark. `complete` means that these known
+event-collection gaps were not encountered in the requested interval. It does
+not establish exhaustive filesystem coverage: event timestamps are receipt times,
+watch installation has races, and files outside the roots remain outside scope.
+Any retention loss conservatively expires comparisons for older intervals;
+`incomplete` flags affected reports. Expired/unknown action IDs raise an error.
+
+Per root, the recorder retains at most 8,192 events, 2,048 versioned paths,
+2,048 pending paths, six versions per path and 4,096 directory watches, with a
+32 MiB retained UTF-8 payload budget (plus bounded object overhead). After path eviction, missing history stays unknown
+even for newer actions; it cannot safely establish absence. Action IDs retain
+at most 200 records. These are bounded defaults, not a long-session reliability
+claim.
+
+Document entries expose `document_coverage` and `baseline_document_coverage`
+when either extraction is unavailable or limited. OpenDocument extraction reads
+ZIP `content.xml`, or flat XML for `.fods`, with a 16 MiB file/decompressed XML
+limit, at most 100,000 XML elements and nesting depth 128. DTD/entity
+declarations and UTF-16 XML are rejected. Repeat counts above one billion are
+unsupported. Canonical extraction
+limits repeated populated rows/columns to 1,000, output to 20,000 lines and
+256 KiB characters; ordinary UTF-8 text reads are limited to 256 KiB bytes.
+Partial equal extracts are never labelled unchanged. Full equal OpenDocument
+extracts report `canonical text unchanged`, which covers only extracted text. Canonical
+paragraph/cell text does not cover all document formatting, embedded objects or
+application state. Diffs themselves remain shortened summaries.
+
 ## Effect atlas (experimental)
 
 `scripts/effect_atlas.py APP` learns which configuration key each menu toggle

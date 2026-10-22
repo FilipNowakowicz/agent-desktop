@@ -15,6 +15,7 @@ import ctypes
 import ctypes.util
 import difflib
 import fnmatch
+import io
 import os
 import re
 import select
@@ -22,6 +23,8 @@ import struct
 import threading
 import time
 import zipfile
+import zlib
+from collections import deque
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -64,6 +67,15 @@ DIFF_LINES = 20
 STATE_LIST = 8
 VERSIONS = 6
 LINE_CHARS = 160
+MAX_EVENTS = 8192
+MAX_PATHS = 2048
+MAX_WATCHES = 4096
+MAX_FAILURES = 32
+
+
+def text_size(text):
+    """Retained UTF-8 payload bytes (Python/container overhead is separate)."""
+    return len(text.encode("utf-8")) if text is not None else 0
 
 
 def _libc():
@@ -80,6 +92,9 @@ ODF = {
 }
 DOCUMENT_LIMIT = 16 * 1024 * 1024
 MAX_CELLS = 20000
+MAX_XML_ELEMENTS = 100000
+MAX_XML_DEPTH = 128
+MAX_REPEAT = 10**9
 
 
 def column_name(index):
@@ -91,64 +106,139 @@ def column_name(index):
     return name
 
 
-def odf_lines(path):
-    """An OpenDocument file as canonical lines: spreadsheet cells as
-    "Sheet!B3: value" (with "formula" when present), text documents as
-    paragraphs. None if it is not readable ODF."""
+class DocumentText(str):
+    """Canonical text with extraction limits, retained with version history."""
+
+    def __new__(cls, value, reasons=()):
+        result = super().__new__(cls, value)
+        result.coverage = {"complete": not reasons, "reasons": list(reasons)}
+        return result
+
+
+def odf_lines(path, coverage=None):
+    """Bounded canonical ODF extraction; coverage describes omitted content."""
+    coverage = coverage if coverage is not None else {}
+    reasons = []
     try:
         if path.stat().st_size > DOCUMENT_LIMIT:
-            return None
-        with zipfile.ZipFile(path) as archive:
-            root = ElementTree.fromstring(archive.read("content.xml"))
-    except (OSError, KeyError, zipfile.BadZipFile, ElementTree.ParseError):
-        return None
-    table, text = f"{{{ODF['table']}}}", f"{{{ODF['text']}}}"
-    lines = []
-    tables = root.iter(table + "table")
-    for sheet in tables:
-        name = sheet.get(table + "name", "?")
-        row_index = 0
-        for row in sheet.iter(table + "table-row"):
-            rows = int(row.get(table + "number-rows-repeated", "1"))
-            column = 0
-            for cell in row:
-                if cell.tag not in (table + "table-cell", table + "covered-table-cell"):
-                    continue
-                columns = int(cell.get(table + "number-columns-repeated", "1"))
-                value = "\n".join("".join(p.itertext()) for p in cell.iter(text + "p"))
-                formula = cell.get(table + "formula")
-                if value or formula:
-                    for r in range(min(rows, 1000)):
-                        for c in range(min(columns, 1000)):
-                            line = f"{name}!{column_name(column + c)}{row_index + r + 1}: {value}"
-                            if formula:
-                                line += f"  [{formula}]"
-                            lines.append(line)
-                            if len(lines) > MAX_CELLS:
-                                return "\n".join(lines)
-                column += columns
-            row_index += rows
-    if not lines:
-        body = root.find(f"{{{ODF['office']}}}body")
-        if body is not None:
-            for paragraph in body.iter():
-                if paragraph.tag in (text + "p", text + "h"):
-                    content = "".join(paragraph.itertext()).strip()
-                    if content:
-                        lines.append(content)
-    return "\n".join(lines)
+            raise ValueError("document size limit")
+        if path.suffix.lower() == ".fods":
+            with path.open("rb") as stream:
+                data = stream.read(DOCUMENT_LIMIT + 1)
+        else:
+            with zipfile.ZipFile(path) as archive:
+                if archive.getinfo("content.xml").file_size > DOCUMENT_LIMIT:
+                    raise ValueError("decompressed XML size limit")
+                with archive.open("content.xml") as stream:
+                    data = stream.read(DOCUMENT_LIMIT + 1)
+        if len(data) > DOCUMENT_LIMIT:
+            raise ValueError("decompressed XML size limit")
+        # ODF needs no DTD/entities. Reject them before parsing to bound expansion.
+        if b"<!DOCTYPE" in data.upper() or b"<!ENTITY" in data.upper():
+            raise ValueError("XML declarations unsupported")
+        # Reject alternate encodings that could bypass the declaration check.
+        if b"\0" in data:
+            raise ValueError("non UTF-8 XML unsupported")
+        parser = ElementTree.iterparse(io.BytesIO(data), events=("start", "end"))
+        depth, elements = 0, 0
+        for event, _element in parser:
+            if event == "start":
+                depth += 1
+                elements += 1
+                if depth > MAX_XML_DEPTH or elements > MAX_XML_ELEMENTS:
+                    raise ValueError("XML depth/element limit")
+            else:
+                depth -= 1
+        root = parser.root
+        table, text = f"{{{ODF['table']}}}", f"{{{ODF['text']}}}"
+        lines, chars = [], 0
 
+        def append(line):
+            nonlocal chars
+            cost = len(line) + bool(lines)
+            if len(lines) >= MAX_CELLS or chars + cost > TEXT_LIMIT:
+                raise OverflowError("extracted text limit")
+            lines.append(line)
+            chars += cost
 
-def read_document(path):
-    """Text, or canonical lines for a supported document format, else None."""
-    if path.suffix.lower() in (".ods", ".odt", ".fods", ".odp"):
         try:
-            if path.is_symlink() or not path.is_file():
-                return None
-        except OSError:
+            for sheet in root.iter(table + "table"):
+                name = sheet.get(table + "name", "?")
+                row_index = 0
+                for row in sheet.iter(table + "table-row"):
+                    rows = int(row.get(table + "number-rows-repeated", "1"))
+                    column = 0
+                    for cell in row:
+                        if cell.tag not in (
+                            table + "table-cell",
+                            table + "covered-table-cell",
+                        ):
+                            continue
+                        columns = int(cell.get(table + "number-columns-repeated", "1"))
+                        if not (1 <= rows <= MAX_REPEAT and 1 <= columns <= MAX_REPEAT):
+                            raise ValueError(
+                                "repeated cell count outside supported limits"
+                            )
+                        value = "\n".join(
+                            "".join(p.itertext()) for p in cell.iter(text + "p")
+                        )
+                        formula = cell.get(table + "formula")
+                        if value or formula:
+                            if rows > 1000 or columns > 1000:
+                                reasons.append("repeated rows/columns limited to 1000")
+                            for r in range(min(rows, 1000)):
+                                for c in range(min(columns, 1000)):
+                                    line = f"{name}!{column_name(column + c)}{row_index + r + 1}: {value}"
+                                    if formula:
+                                        line += f"  [{formula}]"
+                                    append(line)
+                        column += columns
+                    row_index += rows
+            if not lines:
+                body = root.find(f"{{{ODF['office']}}}body")
+                if body is not None:
+                    for paragraph in body.iter():
+                        if paragraph.tag in (text + "p", text + "h"):
+                            content = "".join(paragraph.itertext()).strip()
+                            if content:
+                                append(content)
+        except OverflowError as error:
+            reasons.append(str(error))
+        result = DocumentText("\n".join(lines), sorted(set(reasons)))
+        coverage.update(result.coverage)
+        return result
+    except (
+        OSError,
+        KeyError,
+        ValueError,
+        zipfile.BadZipFile,
+        ElementTree.ParseError,
+        RuntimeError,
+        EOFError,
+        zlib.error,
+    ) as error:
+        coverage.update(
+            complete=False, reasons=[f"document extraction unavailable: {error}"]
+        )
+        return None
+
+
+def read_document(path, coverage=None):
+    """Text or canonical document lines, with explicit extraction coverage."""
+    coverage = coverage if coverage is not None else {}
+    if path.suffix.lower() in (".ods", ".odt", ".fods", ".odp"):
+        if path.is_symlink() or not path.is_file():
+            coverage.update(complete=False, reasons=["not a regular document"])
             return None
-        return odf_lines(path)
-    return read_text(path)
+        return odf_lines(path, coverage)
+    result = read_text(path)
+    coverage.update(
+        complete=result is not None,
+        reasons=[]
+        if result is not None
+        else ["text unavailable: unreadable, binary or size limit"],
+    )
+    return result
 
 
 def read_text(path):
@@ -158,7 +248,10 @@ def read_text(path):
             return None
         if path.stat().st_size > TEXT_LIMIT:
             return None
-        data = path.read_bytes()
+        with path.open("rb") as stream:
+            data = stream.read(TEXT_LIMIT + 1)
+        if len(data) > TEXT_LIMIT:
+            return None
     except OSError:
         return None
     if b"\0" in data[:4096]:
@@ -300,8 +393,13 @@ class FileRecorder:
         if self.fd < 0:
             raise OSError(ctypes.get_errno(), "inotify_init1 failed")
         self.watches = {}  # watch descriptor -> directory
-        self.events = []  # (monotonic time, kind, path relative to root)
+        self.events = deque()  # (monotonic time, kind, path relative to root)
         self.overflowed = False
+        self.failures = deque(maxlen=MAX_FAILURES)
+        self.failure_count = 0
+        self.expired_before = 0.0
+        self.expiry_lock = threading.Lock()
+        self.baseline_gaps = False
         # relative path -> [(time observed, exists, text or None)], oldest first,
         # so a report can diff against the state before any given action.
         self.versions = {}
@@ -320,7 +418,7 @@ class FileRecorder:
         """Watch a tree. `index` remembers existing files (start); `found` is the
         time a new directory appeared: files already inside it were written
         before its watch existed, so they are recorded as created then."""
-        for current, _directories, files in os.walk(directory):
+        for current, _directories, files in os.walk(directory, onerror=self.failure):
             self.add_watch(Path(current))
             for name in files:
                 path = Path(current) / name
@@ -328,14 +426,35 @@ class FileRecorder:
                     self.record(self.relative(path), 0.0)
                 elif found is not None:
                     with self.lock:
-                        self.events.append((found, "created", self.relative(path)))
+                        self.event(found, "created", self.relative(path))
+
+    def failure(self, error):
+        with self.state_lock:
+            self.failure_count += 1
+            self.failures.append(str(error))
+
+    def expire(self, at):
+        with self.expiry_lock:
+            self.expired_before = max(self.expired_before, at)
+
+    def event(self, at, kind, relative):
+        if len(self.events) >= MAX_EVENTS:
+            self.expire(self.events.popleft()[0])
+        self.events.append((at, kind, relative))
 
     def add_watch(self, directory):
+        if len(self.watches) >= MAX_WATCHES:
+            self.failure(f"watch limit: {directory}")
+            return
         descriptor = self.libc.inotify_add_watch(
             self.fd, os.fsencode(directory), WATCH_MASK
         )
         if descriptor >= 0:
             self.watches[descriptor] = directory
+        else:
+            self.failure(
+                f"watch registration failed: {directory} (errno {ctypes.get_errno()})"
+            )
 
     def relative(self, path):
         return str(path.relative_to(self.root))
@@ -347,24 +466,50 @@ class FileRecorder:
 
     def _record(self, relative, at):
         path = self.root / relative
-        exists = path.is_file() and not path.is_symlink()
-        text = read_document(path) if exists and not NOISE.search(relative) else None
-        if text is not None and self.text_bytes + len(text) > TEXT_BUDGET:
+        try:
+            exists = path.is_file() and not path.is_symlink()
+            text = (
+                read_document(path) if exists and not NOISE.search(relative) else None
+            )
+        except OSError as error:
+            self.failure(f"file read failed: {relative}: {error}")
+            exists, text = None, None
+        if text is not None and self.text_bytes + text_size(text) > TEXT_BUDGET:
             text = None
+        if relative not in self.versions and len(self.versions) >= MAX_PATHS:
+            removed = self.versions.pop(next(iter(self.versions)))
+            self.text_bytes -= sum(text_size(v[2]) for v in removed)
+            self.expire(time.monotonic())
+            self.baseline_gaps = True
         history = self.versions.setdefault(relative, [])
         history.append((at, exists, text))
-        self.text_bytes += len(text or "")
+        self.text_bytes += text_size(text)
         while len(history) > VERSIONS:
-            self.text_bytes -= len(history.pop(0)[2] or "")
+            removed = history.pop(0)
+            self.text_bytes -= text_size(removed[2])
+            self.expire(history[0][0])
         return exists, text
 
     def before(self, relative, start):
         """(existed, text) as last observed before `start`."""
         with self.state_lock:
+            if start <= self.expired_before and self.expired_before:
+                return None, None
             for at, exists, text in reversed(self.versions.get(relative, [])):
                 if at < start:
                     return exists, text
-        return False, None
+            # Initial indexing establishes absence only without gaps, and a
+            # first creation event is the only safe missing-history baseline.
+            events = [e for e in self.since(0) if e[2] == relative]
+            if (
+                not self.failure_count
+                and not self.overflowed
+                and not self.baseline_gaps
+                and events
+            ):
+                if events[0][1] == "created" and events[0][0] >= start:
+                    return False, None
+        return None, None
 
     def observe_quiet(self, quiet=0.1):
         """Version files whose events stopped `quiet` seconds ago, stamped with
@@ -379,9 +524,16 @@ class FileRecorder:
 
     def run(self):
         while not self.stopped:
-            ready, _, _ = select.select(
-                [self.fd], [], [], 0.05 if self.pending else 0.5
-            )
+            try:
+                ready, _, _ = select.select(
+                    [self.fd], [], [], 0.05 if self.pending else 0.5
+                )
+            except (OSError, ValueError) as error:
+                if not self.stopped:
+                    self.failure(f"watch read failed: {error}")
+                return
+            if self.stopped:
+                return
             self.observe_quiet()
             if not ready:
                 continue
@@ -389,7 +541,9 @@ class FileRecorder:
                 data = os.read(self.fd, 65536)
             except BlockingIOError:
                 continue
-            except OSError:
+            except OSError as error:
+                if not self.stopped:
+                    self.failure(f"watch read failed: {error}")
                 return
             now = time.monotonic()
             offset = 0
@@ -421,7 +575,10 @@ class FileRecorder:
             kind = "modified"
         relative = self.relative(path)
         with self.lock:
-            self.events.append((now, kind, relative))
+            self.event(now, kind, relative)
+            if relative not in self.pending and len(self.pending) >= MAX_PATHS:
+                self.expire(self.pending.pop(next(iter(self.pending))))
+                self.baseline_gaps = True
             self.pending[relative] = now
 
     def since(self, start, end=None):
@@ -441,40 +598,81 @@ class FileRecorder:
         start give the same answer (versions, not a single moving baseline)."""
         paths = dict.fromkeys(relative for _at, _kind, relative in events)
         files, noise = [], 0
-        now = time.monotonic()
         for relative in paths:
+            if NOISE.search(relative):
+                noise += 1
+                continue
             existed, before = self.before(relative, start)
-            exists, after = self.record(relative, now)
-            if NOISE.search(relative) or not (existed or exists):
+            path = self.root / relative
+            coverage = {}
+            try:
+                exists = path.is_file() and not path.is_symlink()
+            except OSError as error:
+                exists = None
+                coverage.update(complete=False, reasons=[str(error)])
+            try:
+                after = read_document(path, coverage) if exists else None
+            except OSError as error:
+                after = None
+                coverage.update(
+                    complete=False, reasons=[f"document read failed: {error}"]
+                )
+            if existed is False and exists is False:
                 noise += 1
                 continue
             change = (
-                "modified"
+                "baseline_unknown"
+                if existed is None
+                else "current_unknown"
+                if exists is None
+                else "modified"
                 if existed and exists
                 else ("created" if exists else "deleted")
             )
             entry = {"path": f"{self.label}/{relative}", "change": change}
+            if coverage and not coverage.get("complete"):
+                entry["document_coverage"] = coverage
+            prior_coverage = getattr(before, "coverage", None)
+            if prior_coverage and not prior_coverage["complete"]:
+                entry["baseline_document_coverage"] = prior_coverage
+            elif existed and before is None:
+                entry["baseline_document_coverage"] = {
+                    "complete": False,
+                    "reasons": ["baseline text unavailable or retention text budget"],
+                }
             if exists:
                 try:
                     entry["bytes"] = (self.root / relative).stat().st_size
                 except OSError:
                     pass
                 if after is not None:
-                    if not existed:
+                    if existed is False:
                         before = ""
                     if before is not None:
                         keys = key_changes(before, after)
                         diff = keys if keys is not None else line_diff(before, after)
                         if diff:
                             entry["keys" if keys is not None else "diff"] = diff
-                        elif existed:
-                            entry["change"] = "rewritten unchanged"
+                        elif (
+                            existed
+                            and before == after
+                            and coverage.get("complete")
+                            and (not prior_coverage or prior_coverage["complete"])
+                        ):
+                            entry["change"] = (
+                                "canonical text unchanged"
+                                if isinstance(after, DocumentText)
+                                else "rewritten unchanged"
+                            )
             files.append(entry)
         files.sort(key=lambda e: e["path"])
         return files, noise
 
     def close(self):
+        if self.stopped:
+            return
         self.stopped = True
+        self.thread.join(timeout=1)
         try:
             os.close(self.fd)
         except OSError:
@@ -690,8 +888,31 @@ class EffectLedger:
             report["app_state"] = state
         if noise:
             report["noise_files"] = noise
-        if any(r.overflowed for r in self.recorders):
-            report["incomplete"] = "file event queue overflowed"
+        coverage = []
+        for recorder in self.recorders:
+            reasons = []
+            if recorder.overflowed:
+                reasons.append("file event queue overflowed")
+            with recorder.state_lock:
+                failure_count = recorder.failure_count
+                failures = list(recorder.failures)
+            if failure_count:
+                reasons.append("watch registration, traversal or read failures")
+            if recorder.expired_before and start <= recorder.expired_before:
+                reasons.append("file evidence expired")
+            coverage.append(
+                {
+                    "root": recorder.label,
+                    "complete": not reasons,
+                    "reasons": reasons,
+                    "failure_count": failure_count,
+                    "failures": failures,
+                    "expired_before": recorder.expired_before,
+                }
+            )
+        report["file_coverage"] = coverage
+        if any(not item["complete"] for item in coverage):
+            report["incomplete"] = "file evidence has gaps; see file_coverage"
         return report
 
     def since(self, action):

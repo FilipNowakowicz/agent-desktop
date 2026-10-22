@@ -484,6 +484,32 @@ class EvidenceRetentionTests(unittest.TestCase):
             files, _ = recorder.summarize([(start, "modified", path.name)], start)
             self.assertEqual(files[0]["change"], "canonical text unchanged")
 
+    def test_invalid_utf8_transitions_never_report_unchanged_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "bytes.txt"
+            path.write_bytes(b"old: \xff\n")
+            recorder = self.recorder(root)
+            start = time.monotonic()
+            path.write_bytes(b"old: \xfe\n")
+            files, _ = recorder.summarize([(start, "modified", path.name)], start)
+            self.assertEqual(files[0]["change"], "modified")
+            self.assertFalse(files[0]["document_coverage"]["complete"])
+            self.assertFalse(files[0]["baseline_document_coverage"]["complete"])
+            self.assertNotIn("diff", files[0])
+
+    def test_equal_ini_keys_do_not_imply_unchanged_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "app.ini"
+            path.write_text("[section]\nkey=value\n# old comment\n")
+            recorder = self.recorder(root)
+            start = time.monotonic()
+            path.write_text("[section]\nkey=value\n# different comment\n")
+            files, _ = recorder.summarize([(start, "modified", path.name)], start)
+            self.assertEqual(files[0]["change"], "modified")
+            self.assertNotIn("keys", files[0])
+
     def test_xml_depth_and_element_limits_are_explicit(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "nested.fods"

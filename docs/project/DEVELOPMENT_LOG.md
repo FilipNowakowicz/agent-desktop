@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-22 — R4 follow-up: verify strict text comparison
+
+Review checked whether invalid UTF-8 could silently become replacement characters
+and fabricate an unchanged-file result. Both the R1 baseline and R4 implementation
+already decode strictly and return unavailable text on `UnicodeDecodeError`;
+no lossy decoding path was present. Added regressions for distinct invalid-byte
+writes (both extractions unavailable, change remains `modified`) and an INI
+comment-only change with equal keys (also remains `modified`). The existing ODF
+style-change regression verifies the narrower `canonical text unchanged` label.
+Validation: `uv run python -m unittest discover -s tests -p test_effects.py -v`:
+33 passed. Ruff check/format and `git diff --check` clean. No runtime change.
+
 ## 2026-10-22 — R4: observational effect reports and bounded file evidence
 
 Implemented on `fix/effect-evidence-retention` in its own worktree, based on

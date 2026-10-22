@@ -582,10 +582,12 @@ class Toplevels:
             {**w, "parent": by_handle.get(w["parent"])} for w in self.windows.values()
         ]
 
-    def activate(self, window_id):
+    def activate(self, window_id, before_mutation=None):
         self.connection.roundtrip()
         for handle, window in self.windows.items():
             if window["id"] == window_id:
+                if before_mutation:
+                    before_mutation()
                 self.connection.send(handle, 4, struct.pack("=I", self.seat))
                 break
         else:

@@ -19,7 +19,10 @@ class DesktopError(RuntimeError):
 
 
 class DeliveryUnknown(DesktopError):
-    """The request was sent but no reply arrived: it may or may not have acted."""
+    """Execution may have acted, but no reliable delivery result is available."""
+
+
+FILE_READ_LIMIT = 2 * 1024 * 1024
 
 
 RENDERERS = ("pixman", "gles2", "vulkan")
@@ -297,8 +300,8 @@ def request(session, operation, controller=None, **arguments):
     LeaseHeld and nothing is sent. Anonymous requests run without a lease when
     none is held. Reads, destroy, take and release are never refused by a lease.
 
-    Raises DeliveryUnknown when the request was sent but no reply arrived; the
-    operation may have run, so it must not be repeated blindly.
+    Raises DeliveryUnknown when a sent request has no reliable reply or fails
+    after mutation starts. It may have partly run; never repeat it blindly.
     """
     info = manifest(session)
     endpoint = info["control_socket"]
@@ -1300,9 +1303,34 @@ def file_condition(path, contains, key, value):
     from .effects import ini_values
 
     try:
-        text = path.read_text(errors="replace")
-    except OSError:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+        with os.fdopen(descriptor, "rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode):
+                return f"{path.name} is not a regular file"
+            data = stream.read(FILE_READ_LIMIT + 1)
+            after = os.fstat(stream.fileno())
+        if len(data) > FILE_READ_LIMIT:
+            return f"{path.name} exceeds the {FILE_READ_LIMIT}-byte file read limit"
+
+        def version(info):
+            return (
+                info.st_dev,
+                info.st_ino,
+                info.st_size,
+                info.st_mtime_ns,
+                info.st_ctime_ns,
+            )
+
+        if version(before) != version(after) or version(after) != version(path.stat()):
+            return f"{path.name} changed during the file read"
+        text = data.decode("utf-8")
+    except FileNotFoundError:
         return f"no file {path.name}"
+    except UnicodeDecodeError:
+        return f"{path.name} is not valid UTF-8; content condition unavailable"
+    except OSError:
+        return f"{path.name} could not be read; content condition unavailable"
     if contains is not None and str(contains) not in text:
         return f"{path.name} does not contain {str(contains)[:60]!r}"
     if key is not None:

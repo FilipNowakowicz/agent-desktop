@@ -73,6 +73,10 @@ session home (or an absolute path), and `--file ~/.config/App/app.conf --key
 section/key --value 4` for a setting in an INI-style file (GSettings keyfiles,
 `.conf`, `.ini`; GVariant type prefixes and quotes are ignored). These read the
 files directly and work as step expectations too.
+File waits and file step expectations accept only regular files, read at most
+2 MiB and require valid UTF-8. A nonregular, oversized, unreadable or changing
+file cannot satisfy the condition; the timeout result explains the unavailable
+evidence. A successful read describes that interval, not future stability.
 
 ## Semantic UI (accessibility)
 
@@ -239,8 +243,12 @@ Acknowledged browser input or navigation keeps `delivered: true` when its page
 read fails, with `observation_error`. Batches stop at either failure, preserving
 the completed prefix and current result instead of continuing or resubmitting.
 A disconnected transport still raises `DeliveryUnknown`; it cannot prove that
-execution stopped. These deadlines do not provide application transactions or
-guarantee that an external effect happened at most once.
+execution stopped. Desktop input, activation, UI actions, application launch and
+configuration writes also raise `DeliveryUnknown` when an error follows the
+start of mutation: a prefix may have executed. Validation failures before any
+mutation remain ordinary errors. Reconcile the actual state before retrying;
+there is no automatic rollback. These deadlines do not provide application
+transactions or guarantee that an external effect happened at most once.
 
 On a host session, `desktop_browser` uses your own Firefox if you started it
 with `--remote-debugging-port=0` (Firefox then writes

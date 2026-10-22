@@ -130,6 +130,9 @@ def main():
     tree.add_argument("--app")
     tree.add_argument("--window")
     tree.add_argument("--max-nodes", type=int, default=300)
+    check = sub.add_parser("check", help="evaluate a scoped read-only predicate")
+    check.add_argument("session")
+    check.add_argument("predicate", type=json.loads, help="JSON predicate object")
     act = sub.add_parser("ui-action", help="press, focus or set_text on a UI node")
     act.add_argument("session")
     act.add_argument("node")
@@ -340,6 +343,10 @@ def main():
             session = args.pop("session")
             options = {k: v for k, v in args.items() if v not in (None, False)}
             result = request(session, "browser", controller, **options)
+        elif command == "check":
+            from .checks import evaluate
+
+            result = evaluate(args["session"], args["predicate"], controller)
         elif command in ("ui", "ui-action"):
             session = args.pop("session")
             result = request(session, command.replace("-", "_"), controller, **args)

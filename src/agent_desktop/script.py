@@ -32,6 +32,7 @@ __all__ = [
     "wait",
     "browser",
     "screenshot",
+    "check",
 ]
 
 SESSION = os.environ.get("AGENT_DESKTOP_SESSION", "")
@@ -102,7 +103,7 @@ class UIListing(list):
         self.coverage = dict(coverage)
 
     def require_complete(self):
-        if self.coverage.get("truncated") or self.coverage.get("unreadable"):
+        if not core.ui_complete(self.coverage):
             raise LookupError(
                 "The UI listing was incomplete; uniqueness is unknown. "
                 "Filter by app or window and read again before acting."
@@ -284,6 +285,13 @@ def wait(timeout=10, **conditions):
 def browser(action, **arguments):
     """desktop_browser in the session's bridged Firefox; returns its reply."""
     return request("browser", action=action, **arguments)
+
+
+def check(predicate):
+    """Read a scoped predicate; compare status to satisfied/violated/unknown."""
+    from .checks import evaluate
+
+    return evaluate(SESSION, predicate, CONTROLLER)
 
 
 def screenshot():

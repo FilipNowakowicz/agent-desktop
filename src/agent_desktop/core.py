@@ -251,6 +251,40 @@ def controller_id(controller=None):
     return controller or os.environ.get("AGENT_DESKTOP_CONTROLLER") or None
 
 
+def request_budget(operation, arguments):
+    """Worker budget in seconds; transport allows another five seconds to reply.
+
+    Browser batches get the sum of their step budgets rather than the default
+    socket timeout. These are execution budgets, not evidence of task success.
+    """
+    if operation == "type":
+        text = arguments.get("text")
+        return 30 + (len(text) * 0.03 if isinstance(text, str) else 0)
+    if operation == "browser":
+        if arguments.get("action") == "steps":
+            steps = arguments.get("steps")
+            if isinstance(steps, list) and 1 <= len(steps) <= 30:
+                return sum(
+                    request_budget("browser", step)
+                    if isinstance(step, dict) and step.get("action") != "steps"
+                    else 30
+                    for step in steps
+                )
+        if arguments.get("action") == "wait":
+            timeout, seconds = arguments.get("timeout", 10), arguments.get("seconds", 0)
+            if (
+                isinstance(timeout, (int, float))
+                and 0 <= timeout <= 60
+                and isinstance(seconds, (int, float))
+                and 0 <= seconds <= 30
+            ):
+                # Target discovery and the last condition read can each wait
+                # for a command reply beyond the requested polling interval.
+                return 90 + timeout + seconds
+        return 180  # target discovery, input/navigation, then page/element reads
+    return 30
+
+
 def request(session, operation, controller=None, **arguments):
     """Send one operation to a session's supervisor and return its result.
 
@@ -268,21 +302,25 @@ def request(session, operation, controller=None, **arguments):
     """
     info = manifest(session)
     endpoint = info["control_socket"]
-    message = {"operation": operation, **arguments}
+    budget = request_budget(operation, arguments)
+    message = {
+        "operation": operation,
+        **arguments,
+        "deadline": time.monotonic() + budget,
+    }
     controller = controller_id(controller)
     if controller is not None:
         message["controller"] = controller
     sent = False
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-            # Typing is paced (about 8 ms per key), so long text takes longer.
-            text = arguments.get("text") if operation == "type" else None
-            connection.settimeout(
-                30 + (len(text) * 0.03 if isinstance(text, str) else 0)
-            )
+            connection.settimeout(budget + 5)
             connection.connect(endpoint)
-            connection.sendall((json.dumps(message) + "\n").encode())
+            payload = (json.dumps(message) + "\n").encode()
+            # A failed send can have transmitted enough for execution. Once
+            # sending starts, only a reply can establish the delivery result.
             sent = True
+            connection.sendall(payload)
             with connection.makefile("rb") as stream:
                 line = stream.readline(262145)
             if len(line) > 262144:
@@ -1098,8 +1136,8 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
                 result["effects"] = request(
                     session, "effects", controller, effect_id=first[0]
                 )
-            except DesktopError:
-                pass
+            except DesktopError as error:
+                result["effects_error"] = str(error)
         return result
     finally:
         if temporary:

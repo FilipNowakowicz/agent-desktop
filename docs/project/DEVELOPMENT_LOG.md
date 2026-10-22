@@ -1,5 +1,55 @@
 # Development log
 
+## 2026-10-22 — R2: request deadlines and preserved delivery evidence
+
+Implemented on `fix/delivery-deadlines`, based on R1 at `19f5e88`; this stage
+depends on R1. Work uses a separate worktree and leaves the original research
+checkout unchanged.
+
+`core.request` now gives browser waits budgets covering their requested pause,
+polling interval and command replies, and browser batches the sum of their step
+budgets. A monotonic deadline travels to the local worker; queued expired
+requests are refused before execution, and browser commands cap their reply
+wait at the shared deadline. The socket allows five further seconds for the
+worker response. Failed or partially completed sends are conservatively
+`DeliveryUnknown`, with no resubmission.
+
+Acknowledged browser input/navigation/close retains `delivered: true` when its
+follow-up DOM/page/tab read fails, alongside `observation_error`. An interrupted
+mutation acknowledgement returns `delivered: null` and `uncertain: true`.
+Batches stop in either case with the completed prefix, current result and
+uncertain step when applicable. Malformed batch step shapes are rejected before
+any step runs. Optional MCP screenshots are read eagerly inside the preservation
+boundary, including image-file failures. Optional effect collection reports
+`effects_error` without erasing the action result.
+
+Validation (NixOS, existing repaired runtime, uv-managed CPython 3.12.13):
+
+- `uv sync --managed-python --locked`: 34 packages resolved, 33 installed.
+- `uv run ruff check src scripts tests benchmarks`, `uv run ruff format --check
+  src scripts tests benchmarks`, `uv run python -m compileall -q src scripts
+  tests benchmarks`, and `git diff --check`: clean.
+- `uv run python -m unittest discover -s tests -p test_delivery.py -v`: 12 passed.
+  Injected lost replies/partial sends, expired queued requests and shared command
+  deadlines, uncertain browser steps, acknowledged navigation/read failures,
+  optional capture/missing image files and effect recorder failures.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -p test_browser.py -v`: 8 passed in 65.396 s.
+  Disposable private Firefox completed a DOM wait delayed by 31 seconds (beyond
+  the previous 30-second socket limit), retained independently read input receipt
+  after injected optional capture failure, and passed all browser target tests.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -v`: 208 run in 264.317 s, 189 passed, 19 skipped.
+  This run began before the final four delivery tests and two private-browser
+  tests were added; those passed in the focused runs above. Skips cover absent
+  optional desktop applications/tools and the opt-in visible desktop.
+
+Limits: browser commands already sent may continue after a deadline or caller
+disconnect; neither cancellation nor at-most-once external effects is promised.
+Transport loss still requires reconciliation. Budgets are bounds on local
+waiting, not a claim that the application has completed the intended task.
+Durable operation IDs/status and scoped outcome checks remain a later stage.
+
 ## 2026-10-22 — R1: preserve UI coverage and browser target identity
 
 Implemented the first bounded completion-correctness stage on

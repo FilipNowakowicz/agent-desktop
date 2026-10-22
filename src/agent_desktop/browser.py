@@ -120,10 +120,14 @@ class Browser:
         self.socket.close()
 
     def command(self, method, params, timeout=30):
+        deadline = time.monotonic() + timeout
+        if getattr(self, "deadline", None) is not None:
+            deadline = min(deadline, self.deadline)
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Browser operation deadline reached before {method}")
         self.next_id += 1
         ident = self.next_id
         self.socket.send(json.dumps({"id": ident, "method": method, "params": params}))
-        deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:

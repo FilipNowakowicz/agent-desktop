@@ -139,6 +139,10 @@ input leaves the screen still too, so check the image. On their own,
 `screenshot --settle-ms MS` (worker request `settle_ms`, `settle_timeout_ms`)
 waits the same way before capturing. This saves a model round trip after most
 inputs; `AGENT_DESKTOP_LOOK=0` hides the option (an experiment baseline).
+If an optional MCP capture or image read fails after input, the original action
+result is returned with `observation_error`; observe before repeating the action.
+Optional effect collection failures similarly return `effects_error` alongside
+the action result. Neither error means that the input was undone.
 `AGENT_DESKTOP_LOOK_DELTA=1` (experimental, MCP) returns only the changed part
 of the screen since the last screenshot shown, the whole screen above 40%
 change, or no image with `unchanged: true`; it did not reduce input tokens
@@ -182,6 +186,19 @@ change the selection. `open` with `new_tab` can also recover by creating and
 selecting a new tab. Page-state replies include the context ID. These IDs track
 tabs, not document versions: navigating within the same tab can change its
 contents without changing the ID.
+
+Browser waits and batches receive execution budgets that include their requested
+waits and command replies; the transport waits five seconds longer than that
+budget. Batches receive the sum of their step budgets. Expired queued requests
+are refused before execution, and browser commands share the request deadline.
+This does not cancel work already sent to Firefox. A lost mutation acknowledgement
+returns `delivered: null` and `uncertain: true`; reconcile before retrying.
+Acknowledged browser input or navigation keeps `delivered: true` when its page
+read fails, with `observation_error`. Batches stop at either failure, preserving
+the completed prefix and current result instead of continuing or resubmitting.
+A disconnected transport still raises `DeliveryUnknown`; it cannot prove that
+execution stopped. These deadlines do not provide application transactions or
+guarantee that an external effect happened at most once.
 
 On a host session, `desktop_browser` uses your own Firefox if you started it
 with `--remote-debugging-port=0` (Firefox then writes

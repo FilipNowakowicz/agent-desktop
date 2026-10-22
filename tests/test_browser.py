@@ -6,10 +6,11 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from test_runtime import wait_for
 
-from agent_desktop import core
+from agent_desktop import core, mcp_server
 from agent_desktop.worker import owned_processes
 
 PAGE = """<!doctype html><meta charset="utf-8"><title>Bridge form</title>
@@ -62,6 +63,29 @@ class BrowserTests(unittest.TestCase):
 
     def browser(self, action, **arguments):
         return core.request(self.session, "browser", action=action, **arguments)
+
+    def test_delayed_wait_exceeds_old_socket_timeout(self):
+        self.page.write_text(
+            '<title>Delayed</title><p id="out">pending</p>'
+            '<script>setTimeout(() => {out.textContent = "ready"}, 31000)</script>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        result = self.browser("wait", text="ready", exact=True, timeout=60)
+        self.assertTrue(result["satisfied"], result)
+
+    def test_input_receipt_survives_optional_capture_failure(self):
+        self.browser("start", url=self.page.as_uri())
+        delivered = self.browser("fill", selector="#fullname", value="received once")
+        with mock.patch.object(
+            mcp_server, "call", side_effect=core.DesktopError("capture failed")
+        ):
+            result = mcp_server.looked(self.session, delivered, True)
+        self.assertTrue(result["delivered"])
+        self.assertEqual(result["observation_error"], "capture failed")
+        self.assertEqual(
+            self.browser("find", selector="#fullname")["items"][0]["value"],
+            "received once",
+        )
 
     def test_fill_and_submit_a_form_without_coordinates(self):
         with self.assertRaisesRegex(core.DesktopError, "start"):

@@ -175,20 +175,32 @@ def looked(session, result, screenshot, observation=None):
     if not screenshot:
         return result
     scale = observation_scale(observation)
-    capture = call(
-        session,
-        "screenshot",
-        **({"scale": scale} if scale != 1 else {}),
-        settle_ms=SETTLE_MS,
-        settle_timeout_ms=SETTLE_TIMEOUT_MS,
-        **({"changed_only": True} if LOOK_DELTA else {}),
-    )
+    try:
+        capture = call(
+            session,
+            "screenshot",
+            **({"scale": scale} if scale != 1 else {}),
+            settle_ms=SETTLE_MS,
+            settle_timeout_ms=SETTLE_TIMEOUT_MS,
+            **({"changed_only": True} if LOOK_DELTA else {}),
+        )
+        picture = (
+            None
+            if capture.get("unchanged")
+            else Image(path=capture["path"]).to_image_content()
+        )
+    except Exception as error:
+        return {
+            **result,
+            "observation_error": str(error),
+            "recovery": "Observe the desktop before repeating the action; its result is preserved.",
+        }
     if capture.get("unchanged"):
         # Nothing on screen differs from the last screenshot shown: no image.
         return {**result, "screenshot": capture}
     return [
         TextContent(type="text", text=json.dumps({**result, "screenshot": capture})),
-        Image(path=capture["path"]),
+        picture,
     ]
 
 

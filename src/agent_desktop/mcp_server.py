@@ -459,6 +459,7 @@ def desktop_browser(
     within: str | None = None,
     steps: list[dict] | None = None,
     seconds: float | None = None,
+    context: str | None = None,
 ) -> dict:
     """Use Firefox in a private session through its DOM, without screenshots.
 
@@ -474,7 +475,9 @@ def desktop_browser(
     and select need exactly one visible, enabled match, otherwise nothing is
     done and the matches are listed. Replies include the page url and title,
     and the element's value afterwards (never a password's). tab picks a tab by
-    index from "tabs"; later calls stay on it. within narrows a target to the
+    index from "tabs"; context picks its stable context id instead (not both).
+    Later calls stay on that context even if tabs reorder. If it closes, actions
+    fail with target_lost; list tabs and explicitly select again. within narrows a target to the
     row, list item, form or dialog containing that text, e.g. text="Edit",
     within="mallory". action "steps" runs a list of these actions in one call
     (steps=[{"action": "fill", "selector": "#u", "value": "admin"},
@@ -495,6 +498,7 @@ def desktop_browser(
         "exact": exact,
         "value": value,
         "tab": tab,
+        "context": context,
         "new_tab": new_tab,
         "gone": gone,
         "timeout": timeout,

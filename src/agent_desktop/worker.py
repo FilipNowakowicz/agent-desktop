@@ -952,21 +952,34 @@ class Worker:
             if not self.attach_browser():
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
-            context = bridge.target(request.get("tab"))
+            if action == "tabs":
+                if request.get("tab") is not None or request.get("context") is not None:
+                    bridge.target(request.get("tab"), request.get("context"))
+                return {"tabs": bridge.tabs()[1]}
+            creating = (
+                action == "open"
+                and request.get("new_tab")
+                and request.get("tab") is None
+                and request.get("context") is None
+            )
+            context = (
+                None
+                if creating
+                else bridge.target(request.get("tab"), request.get("context"))
+            )
             if (
                 host
                 and action in ("open", "click", "fill", "select", "close")
                 and not (action == "open" and request.get("new_tab"))
                 and request.get("tab") is None
+                and request.get("context") is None
                 and context not in self.agent_tabs
             ):
                 raise ValueError(
                     "On the person's Firefox, act only in tabs you opened (open "
                     "with new_tab, in the background) or name a tab explicitly "
-                    "with tab; their current tab is left alone."
+                    "with tab or context; their current tab is left alone."
                 )
-            if action == "tabs":
-                return {"tabs": bridge.tabs()[1]}
             if action == "open":
                 url = request.get("url")
                 if not isinstance(url, str) or not url:
@@ -991,7 +1004,8 @@ class Worker:
             if action == "close":
                 bridge.command("browsingContext.close", {"context": context})
                 self.agent_tabs.discard(context)
-                bridge.context = None
+                # Keep the closed identity: later actions require an explicit
+                # selection rather than silently inheriting another tab.
                 return {"closed": True, "tabs": bridge.tabs()[1]}
             if action == "find":
                 return bridge.find(context, **target)
@@ -1133,7 +1147,7 @@ class Worker:
             [],
             context,
         )
-        return json.loads(browser.remote_value(state))
+        return {**json.loads(browser.remote_value(state)), "context": context}
 
     def ui_snapshot(self):
         """The focused window's UI as comparable lines, for effect reports."""

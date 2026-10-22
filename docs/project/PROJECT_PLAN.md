@@ -1,11 +1,22 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-15. This document records the chosen direction, implemented
+Updated: 2026-10-22. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
 
 ## Development status
+
+Current implementation stage: **R1, UI evidence and browser target identity**.
+Unique-target actions refuse truncated/unreadable accessibility listings;
+script queries retain source coverage, and rendered listings expose read failures.
+Browser tabs expose stable context IDs; losing or closing a selected context
+requires explicit reselection instead of silently choosing another tab.
+This is a bounded correctness stage, not a general completion guarantee.
+Next candidates are deadline/partial-delivery contracts, script child cleanup,
+and effect-ledger coverage/retention; then scoped predicates and resumable
+operations. These later stages remain unimplemented. See the development log
+for validation and remaining limits.
 
 Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must

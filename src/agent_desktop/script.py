@@ -81,8 +81,34 @@ CONTAINERS = (
 )
 
 
+class UIListing(list):
+    """Visible results with coverage for the source read, before filtering.
+
+    Complete means the requested accessibility scope was read without errors
+    or limits; it does not cover offscreen or virtualized application data.
+    """
+
+    def __init__(self, items, coverage):
+        super().__init__(items)
+        self.coverage = dict(coverage)
+
+    def require_complete(self):
+        if self.coverage.get("truncated") or self.coverage.get("unreadable"):
+            raise LookupError(
+                "The UI listing was incomplete; uniqueness is unknown. "
+                "Filter by app or window and read again before acting."
+            )
+
+
 def listing(window=None, app=None):
-    return request("ui", window=window, app=app, max_nodes=2000)["nodes"]
+    tree = request("ui", window=window, app=app, max_nodes=2000)
+    return UIListing(
+        tree["nodes"],
+        {
+            **{k: v for k, v in tree.items() if k != "nodes"},
+            "scope": {"window": window, "app": app, "visible_only": True},
+        },
+    )
 
 
 def subtree(nodes, index):
@@ -128,8 +154,9 @@ def find(
     value, actions. element is a name substring (whole with exact), text a
     substring of the text or value, state e.g. "checked" or "enabled";
     within="SKU-1" keeps only nodes in the row, list item, dialog or form
-    that contains that text."""
-    nodes = listing(window, app)
+    that contains that text. The list's .coverage describes the source read;
+    a partial read can establish presence, not uniqueness or absence."""
+    source = nodes = listing(window, app)
     if within is not None:
         nodes = scoped(nodes, within)
     matched = [
@@ -146,12 +173,15 @@ def find(
             index < other <= index + len(subtree(nodes, index)) for other in matched
         )
     ]
-    return [nodes[index] for index in innermost]
+    return UIListing([nodes[index] for index in innermost], source.coverage)
 
 
 def rows(window=None, app=None, within=None):
-    """Visible table rows (or list items) as lists of their cell texts."""
-    nodes = listing(window, app)
+    """Visible rows as lists of cell texts, with source-read .coverage.
+
+    This does not enumerate offscreen or virtualized records.
+    """
+    source = nodes = listing(window, app)
     if within is not None:
         nodes = scoped(nodes, within)
     found = []
@@ -164,12 +194,13 @@ def rows(window=None, app=None, within=None):
             ]
             if cells:
                 found.append(cells)
-    return found
+    return UIListing(found, source.coverage)
 
 
 def one(element=None, **query):
     """The one node that matches (a whole-name match wins over substrings)."""
     found = find(element, **query)
+    found.require_complete()
     if len(found) > 1 and element is not None and not query.get("exact"):
         whole = [n for n in found if n["name"] == element]
         if len(whole) == 1:

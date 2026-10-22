@@ -95,6 +95,16 @@ receive no input); Firefox needs `GNOME_ACCESSIBILITY=1`,
 which sessions set; Qt 6 (kdialog) works;
 X11-only and custom-drawn applications may expose little. Like other input, actions are refused while a person has control.
 
+Listings report truncation (including its limiting reason) and unreadable
+subtrees. A name-based action in `desktop_actions`, or a script's `one`,
+`press`, `set_text` or `select`, refuses an incomplete listing even if only one
+match was returned. Narrow by `app` or `window` and read again. A script's
+`find` and `rows` remain list-compatible and expose source-read metadata in
+`.coverage`; filtering with `within` preserves those limits. A returned element
+can establish presence, but partial results cannot establish uniqueness or
+absence. Even a complete listing covers only visible accessibility content,
+not offscreen, virtualized or persisted application data.
+
 An action reported as delivered is only what the application said it accepted;
 verify the effect. Observed exceptions: in a GTK 3 menu bar (Thunar), `click`
 on any menu opened the first menu, so open menus with a pointer click or the
@@ -145,7 +155,7 @@ session. Then:
 | Action | Does |
 | --- | --- |
 | `open` | navigate to `url` and wait for the load (`new_tab` for a new tab) |
-| `tabs` | list tabs with url and title; `tab` picks one for later calls |
+| `tabs` | list tabs with stable `context` IDs, url and title; `tab` or `context` picks one for later calls |
 | `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
 | `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
@@ -162,12 +172,23 @@ listed. Replies carry the page url and title and the element's value afterwards,
 never a password's. The bridge is a worker operation: it needs the controller
 lease and is refused while a person has control.
 
+Use `context` (CLI `--context`) from `tabs` to select a stable browser target.
+The integer `tab` index (CLI `--tab`) selects by the current ordering; supply
+only one of these selectors. Once selected, a context stays selected across
+tab reordering. If it closes, subsequent actions fail with `target_lost` rather
+than selecting another tab, including after an explicit `close`. List tabs and
+explicitly choose another context or index to continue; listing alone does not
+change the selection. `open` with `new_tab` can also recover by creating and
+selecting a new tab. Page-state replies include the context ID. These IDs track
+tabs, not document versions: navigating within the same tab can change its
+contents without changing the ID.
+
 On a host session, `desktop_browser` uses your own Firefox if you started it
 with `--remote-debugging-port=0` (Firefox then writes
 `WebDriverBiDiServer.json` into the profile; `MOZ_APP_DATA` or the usual profile
 roots are searched). The agent never starts or restarts it. It can read any
 tab, but opens its own tabs in the background (`open` with `new_tab`) and acts
-only there or in a tab named with `tab`; your current tab is left alone. This
+only there or in a tab named with `tab` or `context`; your current tab is left alone. This
 uses your logins and does not move your pointer or keyboard, so it works while
 you use the computer. While a bridge session is connected, pages can see
 `navigator.webdriver` and Firefox shows that it is remote-controlled. Any local

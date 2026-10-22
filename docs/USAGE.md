@@ -566,6 +566,47 @@ For the reproduced stock wlroots 0.19.3/0.20.2 X11 mapping failure, see the
 optional [project-local runtime repair](../runtime/README.md). If a window does
 not appear, inspect `status`, `windows` and `logs` before sending input.
 
+### Experimental Python scripts
+
+With `AGENT_DESKTOP_RUN=1` on the MCP server, `desktop_run(session, code,
+timeout=60, screenshot=false)` runs Python against an explicit private session.
+Host sessions are refused. The script starts with
+`from agent_desktop.script import *`; use `print` for returned text and checks
+such as `assert` or `wait` for expected results. For example:
+
+```python
+launch(["foot", "--config=/dev/null", "--title=Task terminal", "sh"])
+wait(title="Task terminal")
+print([window["title"] for window in windows()])
+```
+
+A job ends when the script returns, fails, reaches its timeout (1–300 seconds),
+or its MCP call is cancelled. An independent Linux supervisor terminates its
+ordinary process group, escalates to SIGKILL after a short grace period, and
+reaps its children. Inherited output handles do not extend the call indefinitely.
+Cleanup can add about 1.5 seconds beyond the script deadline. The reply includes
+`cleanup.state` (`complete`, `incomplete` or `unknown`) and its scope. Cancellation
+waits for cleanup and sends no reply, as required by MCP.
+
+Use `launch(argv, cwd=None)` to deliberately start an application through the
+session worker: that application belongs to the desktop and survives script
+cancellation. Directly spawning background children ties them to the script job,
+including when its main script returns successfully. Descendants that detach
+from the process group are outside the cleanup guarantee and can continue.
+These lifecycle controls do not sandbox unrestricted Python.
+
+`operations` counts helper calls whose responses returned and lists calls still
+in flight or with uncertain delivery. An operation already sent to the desktop
+worker may finish after its script has stopped. Check the actual desktop or
+output before repeating it. Returned helper calls do not prove that the overall
+task succeeded. The journal covers the supplied helpers, not arbitrary Python,
+direct calls to `core` or external subprocess effects. Output returns the last
+8,000 characters of stdout and stderr; buffered text can be lost on termination.
+The supervisor drains output into bounded tails and reports `output_truncated`
+for each stream. Temporary output tails and the helper journal are removed when
+the job returns. The journal is capped near 1 MiB; `operations.truncated` marks
+lost coverage, counts become lower bounds, and delivery remains unknown.
+
 ### Action trace
 
 Each session records its recent actions in `trace.jsonl`: input, launch, focus,

@@ -209,6 +209,7 @@ class MCPCancelTests(unittest.IsolatedAsyncioTestCase):
             environment = os.environ.copy()
             environment["AGENT_DESKTOP_STATE_DIR"] = str(root / "state")
             environment["XDG_RUNTIME_DIR"] = str(root / "runtime")
+            environment["AGENT_DESKTOP_RUN"] = "1"
             server = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
@@ -270,10 +271,36 @@ class MCPCancelTests(unittest.IsolatedAsyncioTestCase):
                 )
                 # Past the end of the cancelled wait, the server still answers.
                 await asyncio.sleep(4)
+                # Cancel a real script job through MCP, not just its Python
+                # API; the child must be reaped before cancellation settles.
+                pid_file = root / "script-child"
+                code = (
+                    "import subprocess,sys,time\nfrom pathlib import Path\n"
+                    "child = subprocess.Popen([sys.executable, '-c', "
+                    "'import time; time.sleep(30)'])\n"
+                    f"Path({str(pid_file)!r}).write_text(str(child.pid))\n"
+                    "time.sleep(30)\n"
+                )
+                await send(call(5, "desktop_run", {"session": session, "code": code}))
+                async with asyncio.timeout(10):
+                    while not pid_file.exists():
+                        await asyncio.sleep(0.02)
+                pid = int(pid_file.read_text())
+                await send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/cancelled",
+                        "params": {"requestId": 5, "reason": "test cleanup"},
+                    }
+                )
+                async with asyncio.timeout(5):
+                    while Path(f"/proc/{pid}").exists():
+                        await asyncio.sleep(0.02)
                 await send(call(4, "desktop_destroy", {"session": session}))
                 destroyed = await reply(4)
                 self.assertNotIn("error", destroyed)
                 self.assertNotIn(3, [message.get("id") for message in seen])
+                self.assertNotIn(5, [message.get("id") for message in seen])
             finally:
                 server.stdin.close()
                 await server.wait()

@@ -2,10 +2,9 @@
 
 import functools
 import json
+import math
 import os
 import re
-import subprocess
-import sys
 import time
 import uuid
 
@@ -14,7 +13,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.shared.session import RequestResponder
 from mcp.types import TextContent
 
-from . import core
+from . import core, script_jobs
 
 INSTRUCTIONS = """\
 Private Linux desktops that do not touch the user's own screen. Create a session,
@@ -229,13 +228,14 @@ def log_call(name, started, ok):
         pass
 
 
-def tool(**options):
+def tool(*, cancellable=False, **options):
     """Register a tool that runs in a worker thread.
 
     FastMCP runs synchronous tools on its event loop, so one long wait would
     block every other request of the server, including other sessions. A
     cancelled call stops waiting for its thread (the request it made to the
-    session still finishes) and is not answered.
+    session still finishes) and is not answered. Cancellable script jobs
+    instead signal their job and wait for bounded process cleanup.
     """
 
     def register(function):
@@ -244,10 +244,13 @@ def tool(**options):
             started = time.time()
             ok = False
             try:
-                result = await anyio.to_thread.run_sync(
-                    functools.partial(function, *args, **kwargs),
-                    abandon_on_cancel=True,
-                )
+                invoke = functools.partial(function, *args, **kwargs)
+                if cancellable:
+                    result = await script_jobs.cancellable_call(invoke)
+                else:
+                    result = await anyio.to_thread.run_sync(
+                        invoke, abandon_on_cancel=True
+                    )
                 ok = True
                 return result
             finally:
@@ -792,9 +795,6 @@ def desktop_destroy(session: str) -> dict:
     return core.destroy(session)
 
 
-RUN_OUTPUT_LIMIT = 8000
-
-
 def desktop_run(
     session: str, code: str, timeout: float = 60, screenshot: bool = False
 ) -> dict | list:
@@ -812,13 +812,18 @@ def desktop_run(
     title=, app_id=, element=, role=, text=, state=, gone=, stable_ms=,
     file=, contains=, key=, value=) raising TimeoutError; browser(action,
     ...) as desktop_browser; home() (the session home as a Path);
-    screenshot() -> path. element matches a name substring; lookups raise
+    screenshot() -> path; launch(argv, cwd=None) starts a session-owned app
+    that outlives the script. element matches a name substring; lookups raise
     LookupError unless exactly one element matches. Any exception stops the
     script; earlier steps stay done. Use print for what you want back.
 
     Returns exit_code, stdout and stderr (the last 8000 characters each) and
-    seconds; timeout (at most 300 s) stops the script. With screenshot=true
-    the reply also contains the settled screen.
+    seconds; timeout (at most 300 s) and cancellation stop and reap the ordinary
+    script process group. cleanup reports the result; detached descendants are
+    not guaranteed. Launch persistent apps through the session worker. operations
+    reports helper calls that returned and any call with unknown delivery; a
+    worker call already in flight may still finish. With screenshot=true the
+    reply also contains the settled screen.
     """
     info = core.manifest(session)
     if info.get("mode") == "host":
@@ -826,41 +831,24 @@ def desktop_run(
             "desktop_run is not available on the host session: the person is "
             "at this screen. Use single steps there."
         )
-    timeout = min(max(float(timeout), 1), 300)
+    timeout = float(timeout)
+    if not math.isfinite(timeout):
+        raise core.DesktopError("Script timeout must be finite")
+    timeout = min(max(timeout, 1), 300)
     environment = {
         **os.environ,
         "AGENT_DESKTOP_SESSION": session,
         "AGENT_DESKTOP_CONTROLLER": CONTROLLER,
     }
-    started = time.monotonic()
-    try:
-        done = subprocess.run(
-            [sys.executable, "-I", "-c", "from agent_desktop.script import *\n" + code],
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        result = {
-            "exit_code": done.returncode,
-            "stdout": done.stdout[-RUN_OUTPUT_LIMIT:],
-            "stderr": done.stderr[-RUN_OUTPUT_LIMIT:],
-        }
-    except subprocess.TimeoutExpired as expired:
-        output = expired.stdout or b""
-        if isinstance(output, bytes):
-            output = output.decode(errors="replace")
-        result = {
-            "exit_code": None,
-            "timed_out": True,
-            "stdout": output[-RUN_OUTPUT_LIMIT:],
-        }
-    result["seconds"] = round(time.monotonic() - started, 2)
+    result = script_jobs.run(code, environment, timeout)
+    cancelled = script_jobs.CANCELLATION.get()
+    if cancelled is not None and cancelled.is_set():
+        return result
     return looked(session, result, screenshot)
 
 
 if RUN:
-    tool(structured_output=False)(desktop_run)
+    tool(structured_output=False, cancellable=True)(desktop_run)
 
 
 # Experiment baseline (AGENT_DESKTOP_GUARDS=0): sequences without the

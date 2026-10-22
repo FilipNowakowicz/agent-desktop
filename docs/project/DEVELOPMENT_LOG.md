@@ -1,5 +1,63 @@
 # Development log
 
+## 2026-10-22 — R3: supervise script jobs and preserve delivery uncertainty
+
+Implemented on `fix/script-job-supervision` in a separate worktree, based on
+R1 (`19f5e88`). This stage depends on R1; integration with the parallel deadline
+stage must retain its screenshot/error handling. The original research checkout
+was not edited.
+
+A dedicated Linux subreaper owns each `desktop_run` script. Ending the script
+normally, timing out or cancelling its MCP request terminates its ordinary
+process group, escalates to SIGKILL after 300 ms and reaps descendants. The
+leader remains unreaped until both group signals are sent so its PID cannot be
+reused as an unrelated group ID during cleanup. The supervisor drains stdout
+and stderr into bounded 32 KB byte tails; each reply still returns the last
+8,000 characters and now exposes truncation. Children holding inherited output
+handles cannot prolong the call indefinitely. The helper journal is capped near
+1 MiB, with explicit lost coverage and unknown delivery after truncation.
+
+`launch(argv, cwd=None)` deliberately starts a session-worker-owned app outside
+the script job; it survives cancellation. Helper calls journal start and returned
+response boundaries without arguments or payloads. Replies distinguish returned
+calls from pending/uncertain delivery, preserving earlier uncertainty after later
+successful reads. Killing a caller does not retract an operation already sent
+to the desktop worker. Cancelled MCP calls wait for cleanup and send no reply.
+
+Validation (NixOS, existing repaired labwc/wlroots runtime; uv-managed CPython
+3.12.13):
+
+- `uv sync --managed-python --locked` completed.
+- `uv run ruff check src scripts tests benchmarks`,
+  `uv run ruff format --check src scripts tests benchmarks`,
+  `uv run python -m compileall -q src scripts tests benchmarks`, and
+  `git diff --check`: clean.
+- `uv run python -m unittest discover -s tests -p test_script_jobs.py -v`:
+  12 passed. Covers redirected children, inherited output handles, SIGTERM
+  resistance, timeout, cancellation, successful-parent cleanup, detached-child
+  limits, output flooding, capped journals and retained delivery uncertainty.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -p test_run.py -v`: 5 passed. The private desktop
+  received typed text and produced the checked file; a session-launched Foot
+  application and screenshot access survived script cancellation. A timed-out
+  screenshot caller reported unknown delivery while the worker still finished.
+- The same runtime PATH with `test_mcp.py`: 2 passed. Real stdio cancellation
+  reaped a child, suppressed cancelled replies and kept the connection usable.
+- Full local suite with the same runtime PATH: 211 tests in 285.655 seconds,
+  192 passed and 19 skipped (optional applications/visible mode unavailable).
+  This run began before the final bounded-output refinements; the final
+  12 job tests, 5 private desktop script tests and 2 stdio tests were rerun
+  separately after those changes. The final job tests include three newly
+  added capture/journal/exception checks beyond that full-suite discovery.
+
+Limits: detached descendants are outside the cleanup contract; incomplete
+cleanup is explicit. The 1-second reaping budget and 300 ms signal grace extend
+past the script deadline. Arbitrary Python/direct `core` calls are outside the
+helper journal. These are lifecycle and evidence controls, not a security
+sandbox, rollback or overall task-completion proof. No host activation, personal
+profile, real account or paid model use was involved. Cross-distribution Checks
+remain an integration gate for this runtime change.
+
 ## 2026-10-22 — R2 protocol-boundary follow-up
 
 Review found that an oversized reply could bypass delivery-uncertainty handling.

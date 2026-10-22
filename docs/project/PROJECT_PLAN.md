@@ -17,12 +17,21 @@ The current correctness stack implements these bounded stages:
 | R4 | Observational effect reports; unknown baselines; bounded retention; watcher/document coverage and FODS support | Temporal evidence is not causal attribution or complete filesystem coverage |
 | R5a | Experimental scoped file/config/UI/browser state predicates with satisfied, violated and unknown results | Checks describe current state, not task completion or action causality |
 | R5b | Durable private GUI/browser jobs with per-step delivery evidence, reconnectable status, cooperative cancellation and optional scoped checks | No retry/resume/rollback; in-flight worker commands finish or remain uncertain; crashed jobs may retain their controller lease |
+| R6 | Experimental offline evidence report separating requested actions, delivery, observations, scoped checks and recovery choices | Saved evidence is not newly verified; human review benefit is unmeasured |
 
-Each stage has a separate PR and exact validation in the development log.
+All planned correctness stages are implemented. Cumulative validation passed
+285 local tests (19 skipped) and the Ubuntu/Nix/Fedora/Arch matrix;
+see the development log for exact evidence. Each stage has a separate PR.
 Legacy file waits and expectations use bounded regular-file reads, strict UTF-8
-and read/path stability checks. One bounded evidence-review experiment (R6)
-follows as a separate stage. The full matrix validates the combined stack before
+and read/path stability checks. The full matrix validates the combined stack before
 integration; individual stages retain their focused and local desktop evidence.
+
+A bounded R6 evidence-review experiment is available: saved run/operation/check
+JSON becomes an offline HTML timeline that distinguishes delivery from checks,
+keeps unknowns visible and exposes redacted evidence. The synthetic planted-
+failure fixture and private-Firefox visual smoke validate presentation only;
+human review benefit remains unmeasured. Reusable procedures, automatic replay,
+a live review service and wider UI product work remain deferred.
 
 Repository: `FilipNowakowicz/agent-desktop` (public since 2026-10-09). Development stages use
 pull requests; successful stages may be integrated after checks. Every stage must

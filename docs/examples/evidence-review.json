@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "fixture": "Synthetic planted failures; no real user data or external actions",
+  "session": "private-demo",
+  "operation_id": "example-export-review",
+  "state": "delivery_unknown",
+  "steps": [
+    {
+      "index": 0,
+      "request": {"action": "open", "url": "https://example.invalid/reports?token=demo-query-secret"},
+      "dispatch_state": "observed",
+      "result": {"context": "report-tab"},
+      "checks": [{
+        "predicate": {"kind": "browser_context", "context": "report-tab"},
+        "status": "satisfied",
+        "scope": "The selected browser context at the recorded observation",
+        "reason": "The expected report tab was present.",
+        "evidence": {"context": "report-tab", "present": true}
+      }]
+    },
+    {
+      "index": 1,
+      "request": {"action": "key", "key": "ctrl+s"},
+      "dispatch_state": "acknowledged",
+      "result": {"delivered": true},
+      "checks": [{
+        "predicate": {"kind": "file", "path": "~/exports/summary.csv", "exists": true},
+        "status": "violated",
+        "scope": "The output file at the specified path",
+        "reason": "The save shortcut returned, but summary.csv was not found in the output folder.",
+        "evidence": {"exists": false}
+      }]
+    },
+    {
+      "index": 2,
+      "request": {"action": "click", "element": "Export"},
+      "dispatch_state": "uncertain",
+      "result": {"observation_error": "The follow-up screenshot was unavailable."},
+      "checks": [{
+        "predicate": {"kind": "ui", "query": {"element": "Export finished"}, "claim": "exists"},
+        "status": "unknown",
+        "scope": "The visible application window at the recorded observation",
+        "reason": "The accessibility listing was incomplete; absence cannot be established.",
+        "evidence": {"truncated": true, "unreadable": 1}
+      }]
+    }
+  ],
+  "recovery": "Inspect the report tab and the output folder before retrying Export. Its click may already have happened. Resolve the missing-file check and collect complete evidence before continuing."
+}

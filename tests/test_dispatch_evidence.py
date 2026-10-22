@@ -285,6 +285,12 @@ class FileConditionEvidenceTests(unittest.TestCase):
         self.assertFalse(result["satisfied"])
         self.assertIn("not valid UTF-8", result["reason"])
 
+    def test_binary_and_large_files_can_satisfy_presence_only(self):
+        for contents in (b"binary\xff", b"x" * (core.FILE_READ_LIMIT + 1)):
+            with self.subTest(size=len(contents)):
+                self.path.write_bytes(contents)
+                self.assertTrue(self.wait()["satisfied"])
+
     def test_oversized_file_cannot_match_a_readable_prefix(self):
         self.path.write_bytes(b"needle" + b"x" * core.FILE_READ_LIMIT)
         result = self.wait(contains="needle")

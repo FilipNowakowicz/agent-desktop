@@ -67,6 +67,15 @@ def main():
         action="store_true",
         help="also create, capture and destroy a session",
     )
+    review = sub.add_parser(
+        "review", help="render saved evidence as a private offline HTML report"
+    )
+    review.add_argument(
+        "--input", required=True, help="saved run, operation or predicate JSON"
+    )
+    review.add_argument(
+        "--output", required=True, help="local HTML file (created with mode 0600)"
+    )
     sub.add_parser("profiles")
     sub.add_parser("usage", help="disk used by sessions, screenshots and profiles")
     pruning = sub.add_parser("prune", help="delete stopped/failed sessions' state")
@@ -316,6 +325,10 @@ def main():
             result = doctor(with_smoke=args["smoke"])
             print(json.dumps(result, indent=2))
             return 0 if result["status"] != "fail" else 1
+        elif command == "review":
+            from .review import from_file
+
+            result = from_file(args["input"], args["output"])
         elif command == "profiles":
             result = profiles()
         elif command == "usage":

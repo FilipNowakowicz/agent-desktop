@@ -719,7 +719,8 @@ A job ends when the script returns, fails, reaches its timeout (1–300 seconds)
 or its MCP call is cancelled. An independent Linux supervisor terminates its
 ordinary process group, escalates to SIGKILL after a short grace period, and
 reaps its children. Inherited output handles do not extend the call indefinitely.
-Cleanup can add about 1.5 seconds beyond the script deadline. The reply includes
+Ordinary cleanup can add about 1.5 seconds beyond the script deadline;
+unresponsive-supervisor recovery has a further bounded grace period. The reply includes
 `cleanup.state` (`complete`, `incomplete` or `unknown`) and its scope. Cancellation
 waits for cleanup and sends no reply, as required by MCP.
 
@@ -742,6 +743,49 @@ for each stream. Temporary output tails and the helper journal are removed when
 the job returns. The journal is capped near 1 MiB; `operations.truncated` marks
 lost coverage, counts become lower bounds, and delivery remains unknown.
 
+A stopped script supervisor also has a bounded recovery path: the parent verifies
+the ordinary group identity before killing it and lets the supervisor reap it.
+Unknown cleanup or unavailable output remains explicit; timeout does not imply
+that an already-issued application operation was cancelled.
+
+### Offline evidence review (experimental)
+
+Save a run, operation status reply or scoped predicate result as JSON, then create
+an offline report:
+
+```sh
+uv run agent-desktop review --input evidence.json --output review.html
+# A synthetic example with one satisfied, one violated and one unknown check:
+uv run agent-desktop review --input docs/examples/evidence-review.json --output review.html
+```
+
+For a durable operation, export its status first:
+
+```sh
+uv run agent-desktop operation SESSION status --operation-id ID > evidence.json
+```
+
+Open the generated HTML locally. Its numbered action timeline keeps delivery
+separate from outcome checks (`satisfied`, `violated` or `unknown`), calls out
+observation failures and gives recovery advice. Native disclosure controls show
+the saved evidence. A returned response never receives a general task-success
+label. Missing checks or omitted evidence remain unknown. The report is a view
+of saved evidence; it does not perform new checks or replay actions.
+
+The input can contain `steps` with `request`, `dispatch_state`, `result` and
+optional `checks`. Checks can also appear at the top level, with `predicate`,
+`status`, `scope`, `reason` and `evidence`. A saved predicate result works directly.
+Inputs are limited to 2 MiB and generated reports to 4 MiB, with explicit coverage
+limits for long or deeply nested evidence. Output replaces the requested file
+atomically with mode 0600.
+
+Text/value/equality fields, command arguments, structured file paths, captured
+output, secret-like fields, private file URLs and URL credentials/query strings
+are redacted by default. Review free-form reasons before sharing: field
+redaction cannot identify every private detail. The report contains no JavaScript,
+remote assets, external links or action controls. This is a bounded local
+experiment; whether it helps people catch failures remains unmeasured.
+
 ### Action trace
 
 Each session records its recent actions in `trace.jsonl`: input, launch, focus,
@@ -760,7 +804,7 @@ Set `AGENT_DESKTOP_TRACE=0` before creating a session to turn it off.
 
 See the [compatibility matrix](COMPATIBILITY.md) for the scope of validation.
 
-A stopped script supervisor also has a bounded recovery path: the parent verifies
-the ordinary group identity before killing it and lets the supervisor reap it.
-Unknown cleanup or unavailable output remains explicit; timeout does not imply
-that an already-issued application operation was cancelled.
+
+Existence-only file waits inspect regular-file metadata and accept binary or
+large files without reading their contents. Strict UTF-8 decoding and the 2 MiB
+read limit apply when a text or configuration content condition is requested.

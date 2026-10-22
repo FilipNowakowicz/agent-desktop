@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-10-22 — Bound recovery from an unresponsive script supervisor
+
+Script timeout/cancellation now also bounds waiting for its dedicated supervisor.
+The script waits behind a start gate until its group leader identity is published.
+If normal cleanup exceeds three seconds, the parent stops the supervisor (so it
+cannot reap/reuse the leader ID), verifies the leader's parent/group/start time,
+SIGKILLs the ordinary group, and resumes the supervisor to reap it. Helper waiting
+then has a two-second grace and final kill/wait bound; unavailable status remains
+unknown, never successful cleanup. Missing output files are marked truncated.
+
+`uv run python -m unittest discover -s tests -p test_script_jobs.py -v`: 13 passed
+in 12.586 s, including a real script that SIGSTOPs its supervisor and would
+otherwise defeat the timeout; it returns boundedly and the leader is reaped.
+Detached descendants remain outside the group contract. Ruff and whitespace
+checks passed. This follow-up is included in final cumulative validation.
+
 ## 2026-10-22 — Integration validation and cookie-fixture correction
 
 R1 full matrix [39720166244](https://github.com/FilipNowakowicz/agent-desktop/actions/runs/39720166244)
@@ -9,7 +25,7 @@ The first cumulative R2–R5a local desktop run executed 253 tests in 318.881 s:
 privacy test searched for the digit `1` in the full response, which legitimately
 contained it in a random temporary path. Replaced the cookie values with distinct
 synthetic sentinels and assert neither sentinel appears in the report, while
-retaining exact database-value checks. All four cookie-import unit tests passed
+retaining exact database-value checks. All three cookie-import unit tests passed
 afterward. No production cookie behavior changed. The final cumulative suite
 and matrix will validate the completed operation/report integration.
 

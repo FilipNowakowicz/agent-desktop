@@ -701,3 +701,8 @@ uv run agent-desktop trace SESSION --limit 20
 Set `AGENT_DESKTOP_TRACE=0` before creating a session to turn it off.
 
 See the [compatibility matrix](COMPATIBILITY.md) for the scope of validation.
+
+A stopped script supervisor also has a bounded recovery path: the parent verifies
+the ordinary group identity before killing it and lets the supervisor reap it.
+Unknown cleanup or unavailable output remains explicit; timeout does not imply
+that an already-issued application operation was cancelled.

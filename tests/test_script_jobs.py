@@ -91,6 +91,21 @@ class ScriptJobTests(unittest.TestCase):
         self.assertEqual(result["cleanup"]["state"], "complete", result)
         self.assert_child_reaped()
 
+    def test_stopped_supervisor_does_not_defeat_script_timeout(self):
+        pid_file = self.root / "pid"
+        code = (
+            "import os,signal,time\nfrom pathlib import Path\n"
+            f"Path({str(pid_file)!r}).write_text(str(os.getpid()))\n"
+            "os.kill(os.getppid(), signal.SIGSTOP)\ntime.sleep(30)\n"
+        )
+        result = script_jobs.run(code, dict(os.environ), 0.5)
+        self.assertTrue(result["timed_out"], result)
+        self.assertTrue(result["supervisor_recovered"], result)
+        self.assertEqual(result["cleanup"]["state"], "complete", result)
+        self.assertLess(result["seconds"], 7)
+        pid = int(pid_file.read_text())
+        self.assertFalse(Path(f"/proc/{pid}").exists())
+
     def test_reports_returned_and_in_flight_operations(self):
         code = (
             "import time\nfrom agent_desktop.script_jobs import operation\n"

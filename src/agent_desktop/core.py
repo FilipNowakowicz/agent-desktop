@@ -1168,12 +1168,36 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
                 pass  # e.g. the session was destroyed; the lease went with it
 
 
-def run_steps(session, actions, observation, controller, first=None, timeout=None):
+def run_steps(
+    session,
+    actions,
+    observation,
+    controller,
+    first=None,
+    timeout=None,
+    progress=None,
+    cancelled=None,
+):
+    def report(index, state, result=None):
+        if progress is not None:
+            progress(index, state, result)
+
+    def cancellation(index):
+        if cancelled is not None and cancelled():
+            result = stopped(
+                index, len(actions), "Cancellation requested before dispatch"
+            )
+            result["stopped"]["cancelled"] = True
+            return result
+        return None
+
     started = time.monotonic()
     baseline = observation or request(session, "observe", controller)["observation"]
     # Keep a cropped or scaled screenshot's coordinate mapping for every step.
     mapping = "@" + observation.partition("@")[2] if "@" in (observation or "") else ""
     for index, step in enumerate(actions):
+        if result := cancellation(index):
+            return result
         if timeout is not None and time.monotonic() - started > timeout:
             return stopped(index, len(actions), f"run timeout ({timeout} s) reached")
         arguments = {k: v for k, v in step.items() if k not in ("action", "expect")}
@@ -1185,8 +1209,12 @@ def run_steps(session, actions, observation, controller, first=None, timeout=Non
             if action == "ui_action" and "node" not in arguments:
                 target = {k: arguments.pop(k) for k in TARGET_KEYS if k in arguments}
                 arguments["node"] = resolve_element(session, controller, **target)
+            if result := cancellation(index):
+                return result
+            report(index, "dispatching")
             if action == "wait":
                 waited = wait(session, **arguments, controller=controller)
+                report(index, "acknowledged", waited)
                 if not waited["satisfied"]:
                     return stopped(index, len(actions), f"wait: {waited['reason']}")
             elif action == "focus":
@@ -1195,6 +1223,8 @@ def run_steps(session, actions, observation, controller, first=None, timeout=Non
                 reply = request(
                     session, action, controller, observation=baseline, **arguments
                 )
+            if action != "wait":
+                report(index, "acknowledged", reply)
             if (
                 first is not None
                 and not first
@@ -1208,10 +1238,13 @@ def run_steps(session, actions, observation, controller, first=None, timeout=Non
             # idempotent. Report the step so the caller can check the desktop.
             result = stopped(index, len(actions), str(error))
             result["stopped"]["uncertain"] = True
+            report(index, "uncertain", {"reason": str(error)})
             return result
         except DesktopError as error:
+            report(index, "failed", {"reason": str(error)})
             return stopped(index, len(actions), str(error))
         except TypeError as error:
+            report(index, "failed", {"reason": str(error)})
             hint = (
                 "; wait accepts title, app_id, gone, stable_ms, timeout, element, "
                 "role, text, state, exact, seconds, file, contains, key and value"
@@ -1238,6 +1271,7 @@ def run_steps(session, actions, observation, controller, first=None, timeout=Non
                 return result
         try:
             baseline = request(session, "observe", controller)["observation"] + mapping
+            report(index, "observed", {"observation": baseline})
         except DesktopError as error:
             # The step was delivered; report it rather than an unqualified error.
             return stopped(

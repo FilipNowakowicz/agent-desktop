@@ -179,6 +179,16 @@ def main():
     steps.add_argument("actions", type=json.loads)
     steps.add_argument("--observation")
     steps.add_argument("--timeout", type=float, help="bound the whole run (seconds)")
+    jobs = sub.add_parser(
+        "operation", help="start, inspect or cancel a durable private-session operation"
+    )
+    jobs.add_argument("session")
+    jobs.add_argument("action", choices=("start", "status", "cancel"))
+    jobs.add_argument("--operation-id")
+    jobs.add_argument("--actions", type=json.loads)
+    jobs.add_argument("--kind", choices=("actions", "browser"), default="actions")
+    jobs.add_argument("--observation")
+    jobs.add_argument("--timeout", type=float, default=600)
     steps.add_argument(
         "--screenshot",
         action="store_true",
@@ -355,6 +365,10 @@ def main():
             result = run_actions(**args, controller=controller)
             if look:
                 result["screenshot"] = settled_screenshot(args["session"], controller)
+        elif command == "operation":
+            from .operations import operate
+
+            result = operate(**args, controller=controller)
         elif command == "wait":
             result = wait(**args, controller=controller)
         elif command == "lease":

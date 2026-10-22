@@ -459,6 +459,33 @@ def desktop_actions(
 
 
 @tool()
+def desktop_operation(
+    session: str,
+    action: str = "status",
+    operation_id: str | None = None,
+    actions: list[dict] | None = None,
+    kind: str = "actions",
+    observation: str | None = None,
+    timeout: float = 600,
+) -> dict:
+    """Submit, inspect or cooperatively cancel a durable PRIVATE-session job.
+
+    start returns an operation_id and submitted state, not proof of delivery.
+    kind=actions uses desktop_actions steps; kind=browser uses browser steps
+    (at most 30). status without an id lists retained jobs, so a lost submission
+    reply can be reconciled. Each step retains dispatch state and evidence.
+    Cancellation stops future dispatch after in-flight work returns; it cannot
+    undo input or interrupt Firefox/worker commands already running. An uncertain
+    step requires reconciliation, never resubmission. No host sessions or resume.
+    """
+    from .operations import operate
+
+    return operate(
+        session, action, operation_id, actions, kind, observation, CONTROLLER, timeout
+    )
+
+
+@tool()
 def desktop_browser(
     session: str,
     action: str,

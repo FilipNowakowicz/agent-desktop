@@ -162,6 +162,7 @@ def main():
     bridge.add_argument("--exact", action="store_true")
     bridge.add_argument("--value", help="text to fill or option to select")
     bridge.add_argument("--tab", type=int)
+    bridge.add_argument("--context", help="stable context id from browser tabs")
     bridge.add_argument("--new-tab", action="store_true")
     bridge.add_argument("--gone", action="store_true")
     bridge.add_argument("--timeout", type=float)

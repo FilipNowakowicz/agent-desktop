@@ -118,6 +118,55 @@ class BrowserTests(unittest.TestCase):
         with self.assertRaisesRegex(core.DesktopError, "LeaseHeld"):
             self.browser("fill", text="Full name", value="Grace")
 
+    def test_closed_target_requires_explicit_rebinding(self):
+        started = self.browser("start", url=self.page.as_uri())
+        first = started["tabs"][0]["context"]
+        self.browser("wait", selector="#fullname", timeout=20)
+        second = self.browser("open", url=self.page.as_uri(), new_tab=True)["context"]
+        self.assertNotEqual(first, second)
+        self.browser("close", context=second)
+        self.assertEqual(self.browser("tabs")["tabs"][0]["context"], first)
+        for selection in ({}, {"context": second}):
+            with self.assertRaisesRegex(core.DesktopError, "target_lost"):
+                self.browser("fill", selector="#fullname", value="wrong", **selection)
+        # Explicit selection recovers; no rejected action reached the other tab.
+        self.assertEqual(
+            self.browser("find", selector="#fullname", context=first)["items"][0][
+                "value"
+            ],
+            "",
+        )
+        self.assertEqual(
+            self.browser("fill", selector="#fullname", value="Ada")["now"]["value"],
+            "Ada",
+        )
+        self.browser("open", url="about:blank", new_tab=True)
+        self.browser("close")
+        # Creating a new tab is explicit and needs no surviving prior target.
+        self.assertEqual(
+            self.browser("open", url="about:blank", new_tab=True)["url"], "about:blank"
+        )
+
+    def test_tab_closed_outside_the_bridge_does_not_retarget(self):
+        first = self.browser("start", url=self.page.as_uri())["tabs"][0]["context"]
+        self.browser("wait", selector="#fullname", timeout=20)
+        second = self.browser("open", url=self.page.as_uri(), new_tab=True)["context"]
+        # Close the foreground tab via actual input to this private desktop,
+        # independently of the bridge's own close action.
+        core.request(self.session, "screenshot")
+        core.request(self.session, "key", key="w", modifiers=["ctrl"])
+        wait_for(
+            lambda: all(t["context"] != second for t in self.browser("tabs")["tabs"])
+        )
+        with self.assertRaisesRegex(core.DesktopError, "target_lost"):
+            self.browser("fill", selector="#fullname", value="wrong")
+        self.assertEqual(
+            self.browser("find", selector="#fullname", context=first)["items"][0][
+                "value"
+            ],
+            "",
+        )
+
     def test_attaches_to_a_firefox_started_with_the_port(self):
         launched = core.request(
             self.session,

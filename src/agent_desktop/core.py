@@ -1002,6 +1002,11 @@ def resolve_element(
         raise DesktopError(f"state must be one of {', '.join(STATE_TESTS)}")
     scope = {k: v for k, v in (("window", window), ("app", app)) if v is not None}
     tree = request(session, "ui", controller, max_nodes=2000, **scope)
+    if tree["truncated"] or tree.get("unreadable"):
+        raise DesktopError(
+            "The UI listing was incomplete; uniqueness is unknown. "
+            "Filter by app or window and read again before acting."
+        )
     found = [
         n for n in tree["nodes"] if node_matches(n, element, role, text, state, exact)
     ]
@@ -1011,11 +1016,7 @@ def resolve_element(
             found = whole
     described = f"{element!r}" if element is not None else "the target"
     if not found:
-        incomplete = tree["truncated"] or tree.get("unreadable")
-        raise DesktopError(
-            f"No visible element matches {described}"
-            + (" (the UI listing was incomplete)" if incomplete else "")
-        )
+        raise DesktopError(f"No visible element matches {described}")
     if len(found) > 1:
         sample = "; ".join(f"{n['role']} {n['name']!r}" for n in found[:4])
         raise DesktopError(
@@ -1216,7 +1217,15 @@ def render_tree(tree):
             line += f" actions={','.join(actions)}"
         lines.append(line)
     if tree["truncated"]:
-        lines.append("… truncated: filter by app or window, or raise max_nodes")
+        reason = tree.get("truncated_by") or "limit reached"
+        lines.append(
+            f"… truncated ({reason}): filter by app or window, or raise max_nodes"
+        )
+    if tree.get("unreadable"):
+        lines.append(
+            f"… incomplete: {tree['unreadable']} unreadable UI subtree(s); "
+            "absence and uniqueness are unknown"
+        )
     return "\n".join(lines) or "(no accessible elements)"
 
 

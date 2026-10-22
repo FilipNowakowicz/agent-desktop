@@ -237,8 +237,15 @@ class HostTests(unittest.TestCase):
         self.assertEqual(titles[-1], "done ok")
         closed = browser("close")
         self.assertEqual(len(closed["tabs"]), len(titles) - 1)
-        with self.assertRaisesRegex(core.DesktopError, "tabs you opened"):
+        with self.assertRaisesRegex(core.DesktopError, "target_lost"):
             browser("close")
+        # Discovery must still work, and stable IDs can explicitly select a tab
+        # on the private desktop standing in for the person's Firefox.
+        remaining = browser("tabs")["tabs"]
+        self.assertEqual(len(remaining), len(titles) - 1)
+        self.assertIn("Danger", browser("text", context=tabs[0]["context"])["text"])
+        with self.assertRaisesRegex(core.DesktopError, "tabs you opened"):
+            browser("click", text="Danger")
 
     @unittest.skipUnless(shutil.which("systemd-inhibit"), "no systemd-inhibit")
     def test_keeps_the_computer_awake_until_it_ends(self):

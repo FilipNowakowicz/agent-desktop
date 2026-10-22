@@ -1,5 +1,72 @@
 # Development log
 
+## 2026-10-22 — R1: preserve UI coverage and browser target identity
+
+Implemented the first bounded completion-correctness stage on
+`fix/ui-coverage-browser-target`, based directly on `origin/main` at `711f1ca`,
+with no stacked dependency. Work is isolated in a separate worktree; the
+existing uncommitted research checkout is unchanged.
+
+Name-based action resolution now refuses truncated or unreadable accessibility
+listings before dispatch, even when exactly one match was observed. Script
+`find` and `rows` return list-compatible results with source `.coverage`, retained
+through `within` filtering; `one` and its action helpers require a complete read.
+Rendered trees report unreadable subtree counts and truncation reasons, including
+empty partial reads. A fresh app/window-scoped read can still resolve a target.
+Positive existence waits remain valid on partial evidence; absence waits remain
+unsatisfied when coverage is unavailable.
+
+Browser tab lists expose stable context IDs, accepted by CLI `--context`, MCP
+`context`, and browser steps. Automatic initial selection remains available;
+once bound, target loss raises `target_lost` until an explicit valid selection.
+Closing a target retains its identity rather than resetting selection. Tab
+listing does not rebind; creating a new tab explicitly can recover. Page-state
+replies include the context. Existing host ownership gates also apply to context
+selection; host tests use a private desktop, never the physical screen.
+
+Validation (NixOS, existing repaired labwc/wlroots 0.20.2 runtime; uv-managed
+CPython 3.12.13):
+
+- `uv sync --managed-python --locked`: 34 packages resolved, 33 installed.
+- `uv run ruff check src scripts tests benchmarks`,
+  `uv run ruff format --check src scripts tests benchmarks`,
+  `uv run python -m compileall -q src scripts tests benchmarks`, and
+  `git diff --check`: clean.
+- `uv run python -m unittest discover -s tests -p test_completion_targets.py -v`:
+  8 passed. Injected missing coverage prevents name-based dispatch, while
+  presence and a fresh complete narrowed scope remain usable; disappeared and
+  reordered browser contexts cannot silently redirect work.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -p test_browser.py -v`: 6 passed. Disposable private
+  Firefox tests verify explicit close, an independent close through actual
+  private-session keyboard input, rejected input leaving the remaining field
+  unchanged, explicit recovery and new-tab recovery.
+- The same runtime PATH with `test_host.py`: 10 passed, including the private
+  stand-in Firefox ownership and recovery test. The first broad run used the
+  legacy assertion expecting an ownership error after close; updated it to
+  expect `target_lost` and retain the ownership checks after explicit recovery.
+
+- Final full local desktop suite:
+  `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -v`: **200 run, 181 passed, 19 skipped, no failures**
+  (244.577 s). Skips cover unavailable LibreOffice/Mousepad/Xterm/Xev,
+  wlr-randr and GTK/Qt dialog tools, opt-in visible mode and unusable GLES2
+  rendering. Actual private Chromium, Firefox, input, screenshots, lifecycle,
+  script and takeover tests ran. Local logs: `artifacts/r1/desktop-suite-final.log`,
+  `browser-final.log` and `host-final.log` in the implementation worktree.
+- The full cross-distribution CI matrix was not dispatched; it remains required
+  before merging this runtime change. PR validation uses the Lint workflow.
+
+Remaining limits: complete accessibility means the requested visible scope was
+read without errors or limits, not that offscreen/virtualized records are
+covered. Subtree filtering cannot repair missing source coverage; an unrelated
+unreadable subtree may require a narrower fresh read. Context IDs identify tabs,
+not document versions, and do not eliminate races or prove task completion.
+Deadline/partial-delivery contracts, script child supervision, effect-ledger
+coverage and general predicate/resumption APIs are deferred to later stages.
+No host activation, personal profile access, paid model trials or publishing
+changes were performed.
+
 ## 2026-10-15 — Import a site's login from the person's Firefox
 
 The maintainer wants login-gated work to use their existing logins without

@@ -145,18 +145,39 @@ class Browser:
                 title = self.evaluate("document.title", context["context"])
             except BrowserError:
                 title = None  # privileged pages (about:, extensions) refuse scripts
-            tabs.append({"tab": index, "url": context["url"], "title": title})
+            tabs.append(
+                {
+                    "tab": index,
+                    "context": context["context"],
+                    "url": context["url"],
+                    "title": title,
+                }
+            )
         return tree, tabs
 
-    def target(self, tab=None):
+    def target(self, tab=None, context=None):
+        if tab is not None and context is not None:
+            raise ValueError("Choose either tab or context, not both")
         tree = self.command("browsingContext.getTree", {"maxDepth": 0})["contexts"]
-        if not tree:
-            raise BrowserError("Firefox has no open tab")
-        if tab is not None:
-            if not isinstance(tab, int) or not 0 <= tab < len(tree):
+        contexts = {c["context"] for c in tree}
+        if context is not None:
+            if not isinstance(context, str) or context not in contexts:
+                raise BrowserError(
+                    "target_lost: requested browser context is unavailable"
+                )
+            self.context = context
+        elif tab is not None:
+            if type(tab) is not int or not 0 <= tab < len(tree):
                 raise ValueError(f"tab must be 0 to {len(tree) - 1}")
             self.context = tree[tab]["context"]
-        elif self.context not in {c["context"] for c in tree}:
+        elif self.context is not None and self.context not in contexts:
+            raise BrowserError(
+                "target_lost: selected browser context disappeared; "
+                "list tabs and explicitly choose a context or tab"
+            )
+        elif self.context is None:
+            if not tree:
+                raise BrowserError("Firefox has no open tab")
             self.context = tree[-1]["context"]
         return self.context
 

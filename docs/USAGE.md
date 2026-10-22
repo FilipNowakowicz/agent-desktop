@@ -305,6 +305,56 @@ focused, selected, expanded, collapsed, editable, pressed, busy or idle, and
 used now as `disabled`. `press` also works on check boxes and radio buttons
 that only offer `check` (Chromium).
 
+## Durable operations (experimental, private sessions)
+
+Long sequences can run independently of a CLI or MCP connection. Submission
+returns an operation ID and `state: submitted`; it does not claim input delivery.
+Use `desktop_operation` with `action="start"`, an `actions` list and
+`kind="actions"` (the guarded action steps above) or `kind="browser"` (up to
+30 browser steps). CLI equivalents:
+
+```sh
+uv run agent-desktop operation SESSION start --kind browser \
+  --actions '[{"action":"wait","seconds":2},{"action":"click","selector":"#save"}]'
+uv run agent-desktop operation SESSION status --operation-id ID
+uv run agent-desktop operation SESSION cancel --operation-id ID
+# List summaries, including IDs when a submission reply was lost:
+uv run agent-desktop operation SESSION status
+```
+
+Status and cancellation use local files and stay responsive while the worker is
+busy. One operation runs per session. The controller lease, human takeover gates,
+observation guards and browser target identity still apply. A helper holds an
+extended lease during execution, then restores the named caller's original
+duration or releases its temporary lease. Session destruction cleans up the
+helper using the session process token. A helper crash may leave its lease until
+expiry; reconcile recorded input and explicitly release that recorded controller
+with `--controller CONTROLLER lease SESSION --release` when appropriate.
+
+Each step retains its request, dispatch state, acknowledged result and available
+observation evidence. States distinguish `completed`, `stopped`, `cancelled`
+and `delivery_unknown`. Cancellation requests stop future dispatch once in-flight
+work replies; they cannot undo input or interrupt a Firefox command already
+running. Human takeover requests also wait behind the synchronous worker.
+An uncertain step remains unknown even when cancellation was requested. There
+is no automatic retry, replay or resume: reconnect, inspect and reconcile first.
+`timeout` (up to 600 seconds) prevents new steps after the run budget; already
+issued requests can take longer to finish.
+
+An optional `predicates` list (CLI `--predicates`, at most 20 scoped checks)
+is validated before submission and evaluated after dispatch with the same
+controller. Its `verification` is separate: `satisfied`, `violated`, `unknown`
+or `not_requested`. `state: completed` means the sequence executed, not that
+the task succeeded; checks describe their recorded scope and time only.
+
+Records retain typed action data in private session state. Keep exports private:
+`uv run agent-desktop operation SESSION status --operation-id ID > evidence.json`.
+The latest 32 operation records are retained per session; older terminal records
+expire on submission. Requests are capped at 64 KiB, predicates at 16 KiB, each
+step/check result at 4 KiB and each record at 512 KiB. Evidence truncation is
+explicit; a truncated check is unknown. Missing, malformed or contradictory
+status evidence is unknown and cannot justify repeating input.
+
 ## Effect ledger (experimental)
 
 Create sessions with `AGENT_DESKTOP_EFFECTS=1` in the environment of the CLI or

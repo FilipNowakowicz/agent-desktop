@@ -1,5 +1,48 @@
 # Development log
 
+## 2026-10-22 — Final cumulative correctness validation
+
+The complete R1–R6 implementation, including dispatch and supervisor recovery
+hardening and metadata-only file-existence compatibility, passed on cumulative
+source `3cd70289`. Decision: integrate PRs #133–#139 in dependency order only
+with their current Lint checks green. Restacking replaces merged ancestry and
+must preserve the file tree; the final main source/configuration must match the
+matrix-tested source. R1 already merged through #132.
+
+Validation:
+
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run python -m
+  unittest discover -s tests -v`: **304 run, 285 passed, 19 skipped,
+  no failures**, 316.085 s. Exact output is in the implementation worktree at
+  `artifacts/integration/final-desktop-suite-refreshed.log`. Skips cover missing
+  optional applications/tools, opt-in visible mode and unavailable GLES2.
+- [Checks 39755942631](https://github.com/FilipNowakowicz/agent-desktop/actions/runs/39755942631):
+  Ubuntu, Nix, Fedora and Arch all passed, including their desktop suites and
+  configured loaded input/lifecycle repetitions. The prior cumulative matrix
+  was superseded to include the final binary/large-file existence regression.
+  This is cumulative cross-distribution coverage; individual PR prefixes retain
+  their separately recorded local validation rather than separate matrix runs.
+- Ruff check/format and compileall over src/scripts/tests/benchmarks, plus
+  whitespace checks: clean. All PR Lint checks passed before restacking and are
+  checked again at the current head before each merge.
+- `uv run python artifacts/integration/operation-review-smoke.py`: an actual
+  private-session application wrote a result. A durable operation completed
+  while its checks independently returned satisfied, violated and unknown;
+  recorded verification remained violated. Its generated HTML retained these
+  distinctions and mode 0600. Session cleanup left no owned processes.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run
+  scripts/review_demo.py --visual`: private Firefox verified the synthetic
+  report's text, native disclosure expansion, screenshots and cleanup. Saved
+  evidence/screenshot artifacts are under `artifacts/evidence-review/`.
+
+Only this validation record and plan status changed after the tested source.
+Remaining limits are deliberate: visible/scoped evidence is not universal task
+completion, in-flight application work may finish after cancellation, detached
+script descendants are outside the ordinary-group guarantee, and the offline
+review interface's human benefit remains unmeasured. No paid model runs, personal
+profiles, real accounts, host activation, package release or publishing occurred.
+The original uncommitted research checkout remains untouched.
+
 ## 2026-10-22 — Preserve metadata-only file existence waits
 
 Final integration review found that strict content reads also rejected binary

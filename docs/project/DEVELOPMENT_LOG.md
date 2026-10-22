@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-10-22 — Integration validation and cookie-fixture correction
+
+R1 full matrix [39720166244](https://github.com/FilipNowakowicz/agent-desktop/actions/runs/39720166244)
+passed Ubuntu, Nix, Fedora and Arch; PR #132 merged as `f80f511`.
+The first cumulative R2–R5a local desktop run executed 253 tests in 318.881 s:
+233 passed, 19 skipped, one unrelated fixture assertion failed. The cookie
+privacy test searched for the digit `1` in the full response, which legitimately
+contained it in a random temporary path. Replaced the cookie values with distinct
+synthetic sentinels and assert neither sentinel appears in the report, while
+retaining exact database-value checks. All four cookie-import unit tests passed
+afterward. No production cookie behavior changed. The final cumulative suite
+and matrix will validate the completed operation/report integration.
+
 ## 2026-10-22 — R5a: scoped state predicates
 
 Added experimental `checks.evaluate` with CLI `check`, MCP `desktop_check` and

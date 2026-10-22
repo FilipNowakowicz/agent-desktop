@@ -191,9 +191,11 @@ class Accessibility:
             raise ValueError("Unknown UI node identifier")
         return match.groups()
 
-    def focus(self, node_id, timeout=1):
+    def focus(self, node_id, timeout=1, before_mutation=None):
         """Grab focus and wait until the node reports it."""
         node = self.parse(node_id)
+        if before_mutation:
+            before_mutation()
         self.call(node, "org.a11y.atspi.Component", "GrabFocus")
         deadline = time.monotonic() + timeout
         while "focused" not in self.describe(node)[0]["states"]:
@@ -338,17 +340,23 @@ class Accessibility:
             "unreadable": unreadable,
         }
 
-    def act(self, node_id, action, text=None):
+    def act(self, node_id, action, text=None, before_mutation=None):
         node = self.parse(node_id)
         method = None
+
+        def mutate(*args):
+            if before_mutation:
+                before_mutation()
+            return self.call(*args)
+
         if action == "focus":
-            done = self.call(node, "org.a11y.atspi.Component", "GrabFocus")[0]
+            done = mutate(node, "org.a11y.atspi.Component", "GrabFocus")[0]
         elif action == "select":
             # A tab or list item: select it within its parent (Selection).
             parent = tuple(self.get(node, ACCESSIBLE, "Parent"))
             index = self.call(node, ACCESSIBLE, "GetIndexInParent")[0]
             try:
-                done = self.call(
+                done = mutate(
                     parent, "org.a11y.atspi.Selection", "SelectChild", "i", (index,)
                 )[0]
             except AccessibilityError as error:
@@ -376,14 +384,14 @@ class Accessibility:
                         f"no select or check action (it has {names})"
                     ) from None
                 method = names[choice]
-                done = self.call(
+                done = mutate(
                     node, "org.a11y.atspi.Action", "DoAction", "i", (choice,)
                 )[0]
         elif action == "set_text":
             if not isinstance(text, str) or len(text) > 10000:
                 raise ValueError("set_text needs text of at most 10000 characters")
             try:
-                done = self.call(
+                done = mutate(
                     node, "org.a11y.atspi.EditableText", "SetTextContents", "s", (text,)
                 )[0]
             except AccessibilityError as error:
@@ -397,9 +405,7 @@ class Accessibility:
             index = next((folded.index(n) for n in wanted if n in folded), None)
             if index is None:
                 raise ValueError(f"Node offers no {action} action; it has {names}")
-            done = self.call(node, "org.a11y.atspi.Action", "DoAction", "i", (index,))[
-                0
-            ]
+            done = mutate(node, "org.a11y.atspi.Action", "DoAction", "i", (index,))[0]
         if not done:
             raise AccessibilityError(f"The application refused {action}")
         result = {"node": node_id, "action": action, "delivered": True}

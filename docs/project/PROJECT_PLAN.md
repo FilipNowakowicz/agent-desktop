@@ -12,12 +12,15 @@ The current correctness stack implements these bounded stages:
 | Stage | Implemented behavior | Remaining limits |
 | --- | --- | --- |
 | R1 | Incomplete UI reads refuse unique-target actions; stable browser context IDs and explicit recovery after target loss | Visible accessibility scope; tab identity is not document identity |
-| R2 | Shared request/command budgets; completed prefixes and known delivery survive optional observation/effect failures | Already-issued application work may finish after disconnect; uncertain replies require reconciliation |
+| R2 | Shared request/command budgets; completed prefixes and known delivery survive optional observation/effect failures; mutation-stage errors retain uncertainty | Already-issued application work may finish after disconnect; uncertain replies require reconciliation |
 | R3 | Ordinary script groups stopped/reaped; bounded output and helper journals; deliberate session launches survive | Detached descendants are outside the cleanup contract; no sandbox or rollback |
 | R4 | Observational effect reports; unknown baselines; bounded retention; watcher/document coverage and FODS support | Temporal evidence is not causal attribution or complete filesystem coverage |
 | R5a | Experimental scoped file/config/UI/browser state predicates with satisfied, violated and unknown results | Checks describe current state, not task completion or action causality |
 
 Each stage has a separate PR and exact validation in the development log.
+Legacy file waits and step expectations now use bounded regular-file reads,
+strict UTF-8 and read/path stability checks, matching the refusal to infer a
+successful content condition from unavailable evidence.
 Durable operation handles (R5b) and one bounded evidence-review experiment (R6)
 follow as separate stages. The full matrix validates the combined stack before
 integration; individual stages retain their focused and local desktop evidence.

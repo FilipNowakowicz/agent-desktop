@@ -115,7 +115,7 @@ def search(query, app=None, limit=5, directory=None):
     ]
 
 
-def write_ini(path, key, value):
+def write_ini(path, key, value, before_mutation=None):
     """Set "[section] name" in an INI/GLib keyfile, keeping other lines."""
     section, _, name = key.partition("] ")
     header = section + "]"
@@ -131,11 +131,13 @@ def write_ini(path, key, value):
             index += 1
         else:
             lines.insert(index, f"{name}={value}")
+    if before_mutation:
+        before_mutation()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n")
 
 
-def apply(home, app, control, directory=None):
+def apply(home, app, control, directory=None, before_mutation=None):
     """Write the configuration change learned for `control` ("Menu > Label",
     the label alone, or the control text desktop_atlas returned) into a
     session home. Only verified entries with keyfile/INI effects are applied.
@@ -182,7 +184,9 @@ def apply(home, app, control, directory=None):
         if done:
             unchanged.append(line)
         else:
-            write_ini(path, effect["key"], effect["to"])
+            write_ini(
+                path, effect["key"], effect["to"], before_mutation=before_mutation
+            )
             written.append(line)
     return {
         "app": app,

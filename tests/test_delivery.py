@@ -157,6 +157,24 @@ class DeliveryTests(unittest.TestCase):
         self.assertIsNone(result["results"][1]["delivered"])
         bridge.click.assert_called_once()
 
+    def test_unexpected_browser_mutation_error_preserves_uncertainty(self):
+        for error in (RuntimeError("adapter failed"), ValueError("bad reply")):
+            with self.subTest(error=error):
+                worker, bridge = self.worker()
+                bridge.click.side_effect = error
+                result = worker.browser_request({"action": "click"})
+                self.assertIsNone(result["delivered"])
+                self.assertTrue(result["uncertain"])
+                self.assertEqual(result["error"], str(error))
+                bridge.click.assert_called_once()
+
+    def test_browser_validation_error_before_click_remains_known(self):
+        worker, bridge = self.worker()
+        bridge.element.side_effect = ValueError("target missing")
+        with self.assertRaisesRegex(ValueError, "target missing"):
+            worker.browser_request({"action": "click"})
+        bridge.click.assert_not_called()
+
     def test_expired_batch_stops_before_next_step(self):
         worker, bridge = self.worker()
         result = worker.browser_steps(

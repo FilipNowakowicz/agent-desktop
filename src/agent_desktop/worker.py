@@ -539,6 +539,7 @@ class Worker:
                 "No way to start an application outside the session: needs "
                 "Hyprland (hyprctl) or a systemd user manager"
             )
+        self.mark_mutation()
         result = subprocess.run(
             launcher, env=self.env, capture_output=True, text=True, timeout=10
         )
@@ -1123,7 +1124,7 @@ class Worker:
                 "action must be start, tabs, open, close, find, text, wait, click, "
                 "fill, select or steps"
             )
-        except (browser.BrowserError, ConnectionClosed, TimeoutError, OSError) as error:
+        except Exception as error:
             if isinstance(error, ConnectionClosed):
                 self.browser = None
             if mutation_started:
@@ -1134,7 +1135,11 @@ class Worker:
                     "error": str(error),
                     "recovery": "Observe/reconcile before retrying; browser input may have run.",
                 }
-            raise ValueError(str(error)) from None
+            if isinstance(
+                error, (browser.BrowserError, ConnectionClosed, TimeoutError, OSError)
+            ):
+                raise ValueError(str(error)) from None
+            raise
         finally:
             if self.browser:
                 self.browser[0].deadline = None
@@ -1767,8 +1772,19 @@ class Worker:
         time.sleep(0.05)
         pointer.button(button, False)
 
+    def mark_mutation(self):
+        """A mutation call is about to start; errors cannot establish rollback."""
+        self.mutation_started = True
+
+    def error_reply(self, error):
+        reply = {"ok": False, "error": f"{type(error).__name__}: {error}"}
+        if getattr(self, "mutation_started", False):
+            reply["uncertain"] = True
+        return reply
+
     def handle_with_effects(self, request):
         """Optional instrumentation cannot erase known execution results."""
+        self.mutation_started = False
         record = None
         effect_error = None
         if (
@@ -1933,6 +1949,7 @@ class Worker:
             app = uuid.uuid4().hex[:12]
             log_path = self.root / f"app-{app}.log"
             with log_path.open("ab") as log:
+                self.mark_mutation()
                 process = subprocess.Popen(
                     [executable, *argv[1:]],
                     env=self.env,
@@ -1957,7 +1974,9 @@ class Worker:
             window = request.get("window")
             if not isinstance(window, str):
                 raise ValueError("Focus requires a window identifier")
-            focused = self.toplevels.activate(window)
+            focused = self.toplevels.activate(
+                window, before_mutation=self.mark_mutation
+            )
             return {
                 "session": self.info["id"],
                 "operation": operation,
@@ -2020,19 +2039,27 @@ class Worker:
                 if node not in self.ui_ids:
                     raise ValueError("Unknown or expired UI node id; list the UI again")
                 node = self.ui_ids[node]
+            prior_mutation = getattr(self, "mutation_started", False)
             try:
                 return {
                     **accessibility.act(
-                        node, request.get("action"), request.get("text")
+                        node,
+                        request.get("action"),
+                        request.get("text"),
+                        before_mutation=self.mark_mutation,
                     ),
                     "node": request["node"],
                 }
             except Unsupported as error:
+                # Explicit unsupported-method replies establish that attempt
+                # did not execute; retain any earlier mutation in this request.
+                self.mutation_started = prior_mutation
                 if request["action"] != "set_text":
                     # Nothing was sent; say why instead of guessing other input.
                     raise ValueError(str(error)) from None
                 # e.g. Chromium: focus the field, verify, then replace by typing.
-                accessibility.focus(node)
+                accessibility.focus(node, before_mutation=self.mark_mutation)
+                self.mark_mutation()
                 self.keyboard().key(self.keysyms.resolve("a"), ["ctrl"], 1)
                 self.keyboard().type(request["text"])
                 return {
@@ -2052,6 +2079,7 @@ class Worker:
                 request.get("app"),
                 request.get("control"),
                 request.get("atlas"),
+                before_mutation=self.mark_mutation,
             )
         if operation == "effects":
             if not self.effects:
@@ -2071,11 +2099,18 @@ class Worker:
             return self.frame(request.get("since"))
         if operation in INPUT_OPERATIONS and request.get("observation") is not None:
             self.check_observation(request["observation"])
-        if operation == "scroll" and (
-            request.get("x") is not None or request.get("y") is not None
-        ):
-            # Scroll at a position: move there first (same coordinates as click).
-            self.handle({**request, "operation": "move"})
+        if operation == "scroll":
+            dx, dy = request.get("dx", 0), request.get("dy", 0)
+            if not all(
+                isinstance(v, int) and not isinstance(v, bool) and abs(v) <= 100
+                for v in (dx, dy)
+            ):
+                raise ValueError(
+                    "Scroll amounts are wheel notches: integers between -100 and 100"
+                )
+            if request.get("x") is not None or request.get("y") is not None:
+                # Validate the whole request before moving the pointer.
+                self.handle({**request, "operation": "move"})
         if operation in ("click", "move", "drag"):
             button = request.get("button", "left")
             if button not in BUTTONS:
@@ -2101,6 +2136,7 @@ class Worker:
             pointer = self.pointer()
             for point in points:
                 pointer.check(*point)
+            self.mark_mutation()
             if operation == "drag":
                 self.drag(pointer, points[0], points[1], button)
             else:
@@ -2120,7 +2156,9 @@ class Worker:
             for index, part in enumerate(re.findall(r"[\t\n]+|[^\t\n]+", text)):
                 if index and not host:
                     self.settle()
-                self.keyboard().type(part)
+                keyboard = self.keyboard()
+                self.mark_mutation()
+                keyboard.type(part)
             self.last_keys = ("type", time.monotonic())
         elif operation == "key":
             key = request.get("key")
@@ -2150,18 +2188,14 @@ class Worker:
             ):
                 raise ValueError("Repeat must be an integer from 1 to 100")
             self.settle_after("type", host)
-            self.keyboard().key(self.keysyms.resolve(key), modifiers, repeat)
+            keyboard = self.keyboard()
+            keysym = self.keysyms.resolve(key)
+            self.mark_mutation()
+            keyboard.key(keysym, modifiers, repeat)
             self.last_keys = ("key", time.monotonic())
         elif operation == "scroll":
-            dx, dy = request.get("dx", 0), request.get("dy", 0)
-            if not all(
-                isinstance(v, int) and not isinstance(v, bool) and abs(v) <= 100
-                for v in (dx, dy)
-            ):
-                raise ValueError(
-                    "Scroll amounts are wheel notches: integers between -100 and 100"
-                )
             pointer = self.pointer()
+            self.mark_mutation()
             pointer.scroll(dy, dx)
             pointer.sync()
         else:
@@ -2206,6 +2240,7 @@ class Worker:
                     continue
                 trace = None
                 with connection:
+                    self.mutation_started = False
                     connection.settimeout(5)
                     try:
                         with connection.makefile("rb") as stream:
@@ -2227,10 +2262,7 @@ class Worker:
                             ]
                         reply = {"ok": True, "result": result}
                     except Exception as error:
-                        reply = {
-                            "ok": False,
-                            "error": f"{type(error).__name__}: {error}",
-                        }
+                        reply = self.error_reply(error)
                     self.trace_finish(trace, reply)
                     trace = None
                     encoded = (json.dumps(reply) + "\n").encode()

@@ -19,6 +19,62 @@ import anyio
 CANCELLATION = contextvars.ContextVar("script_cancellation", default=None)
 OUTPUT_LIMIT = 8000
 JOURNAL_LIMIT = 1024 * 1024
+SUPERVISOR_GRACE = 3
+
+
+def identity(pid):
+    """Process identity used only to reconcile the dedicated job supervisor."""
+    try:
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        return {
+            "state": fields[0],
+            "parent": int(fields[1]),
+            "group": int(fields[2]),
+            "start": int(fields[19]),
+        }
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def recover_supervisor(supervisor, root):
+    """Bound waiting for a stopped helper, retaining unknown cleanup on failure.
+
+    Stop the supervisor before examining its child: it cannot reap the group
+    leader and release its PID while we validate and signal that group.
+    """
+    try:
+        supervisor.send_signal(signal.SIGSTOP)
+        deadline = time.monotonic() + 0.5
+        while time.monotonic() < deadline:
+            state = identity(supervisor.pid)
+            if state is None or state["state"] in ("T", "t", "Z", "X"):
+                break
+            time.sleep(0.01)
+        if state and state["state"] in ("T", "t"):
+            try:
+                leader = json.loads((root / "leader.json").read_text())
+                pid = leader["pid"]
+                current = identity(pid) if type(pid) is int and pid > 1 else None
+                if (
+                    current
+                    and current["parent"] == supervisor.pid
+                    and current["group"] == pid
+                    and current["start"] == leader["start"]
+                ):
+                    os.killpg(pid, signal.SIGKILL)
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+        supervisor.send_signal(signal.SIGCONT)
+        supervisor.terminate()
+        try:
+            supervisor.wait(timeout=2)
+            return True
+        except subprocess.TimeoutExpired:
+            supervisor.kill()
+            supervisor.wait(timeout=1)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return False
 
 
 async def cancellable_call(function):
@@ -108,6 +164,8 @@ def run(code, environment, timeout):
             start_new_session=True,
         )
         reason = None
+        stopping_at = None
+        recovered = False
         while supervisor.poll() is None:
             if reason is None:
                 if cancelled is not None and cancelled.is_set():
@@ -115,14 +173,26 @@ def run(code, environment, timeout):
                 elif time.monotonic() - started >= timeout:
                     reason = "timed_out"
                 if reason:
+                    stopping_at = time.monotonic()
                     supervisor.terminate()
+            elif time.monotonic() - stopping_at >= SUPERVISOR_GRACE:
+                recovered = recover_supervisor(supervisor, root)
+                break
             time.sleep(0.02)
-        supervisor.wait()
+        if supervisor.poll() is not None:
+            supervisor.wait()
         try:
             status = json.loads((root / "status.json").read_text())
         except (OSError, ValueError):
             status = {"exit_code": None, "cleanup": {"state": "unknown"}}
         result = dict(status)
+        if stopping_at is not None and supervisor.poll() is None:
+            result["cleanup"] = {
+                "state": "unknown",
+                "scope": "ordinary script process group",
+            }
+        if recovered:
+            result["supervisor_recovered"] = True
         if reason:
             result[reason] = True
             result["exit_code"] = None
@@ -137,6 +207,7 @@ def run(code, environment, timeout):
                         result.setdefault("output_truncated", {})[name] = True
             except OSError:
                 result[name] = ""
+                result.setdefault("output_truncated", {})[name] = True
         journal = root / "operations.jsonl"
         # Keep the returned summary bounded; preserve failed/unfinished calls
         # independently so a later successful read cannot erase uncertainty.
@@ -190,13 +261,37 @@ def supervise(root):
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    # Gate script execution until its identity has been published for the
+    # parent's bounded recovery path. A helper failure before publication
+    # leaves a child that exits without executing user code.
+    bootstrap = (
+        "import sys,time\nfrom pathlib import Path\n"
+        "gate,code = map(Path,sys.argv[1:])\nend=time.monotonic()+5\n"
+        "while not gate.exists():\n"
+        " if time.monotonic()>=end: sys.exit(1)\n time.sleep(.01)\n"
+        "exec(compile(code.read_text(),'<desktop_run>','exec'))\n"
+    )
     process = subprocess.Popen(
-        [sys.executable, "-I", "-c", (root / "code.py").read_text()],
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            bootstrap,
+            str(root / "start"),
+            str(root / "code.py"),
+        ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
     )
+    leader = identity(process.pid)
+    if leader is None:
+        raise RuntimeError("Script exited before identity publication")
+    (root / "leader.json").write_text(
+        json.dumps({"pid": process.pid, "start": leader["start"]})
+    )
+    (root / "start").touch()
     stop_readers = threading.Event()
     tails = {"stdout": bytearray(), "stderr": bytearray()}
     totals = {"stdout": 0, "stderr": 0}

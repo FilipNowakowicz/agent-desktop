@@ -1,5 +1,71 @@
 # Development log
 
+## 2026-10-22 — Preserve mutation uncertainty and harden legacy file waits
+
+The worker now marks the boundary before desktop input, application launch,
+window activation, accessibility calls and atlas writes. Errors after that
+boundary return `uncertain: true`, which the client raises as `DeliveryUnknown`;
+a partial action must not look like a known non-delivery. The marker resets per
+request, including before decoding a new socket message. Known validation
+failures and explicit unsupported accessibility methods retain ordinary errors.
+Positioned scrolling now validates its amounts before moving the pointer.
+The browser boundary also preserves uncertainty for unexpected exceptions after
+input initiation, rather than only for known transport/library exception types;
+validation failures before initiation remain known errors.
+
+Legacy `wait --file` and file step expectations previously used unbounded,
+lossy text reads. They now read only regular files, use nonblocking open and a
+2 MiB cap, reject invalid UTF-8, and compare descriptor/path versions around the
+read. Unavailable or changing evidence cannot satisfy the wait. These checks
+cover the read interval, not future file stability; no mutation rollback or
+application transaction is provided.
+
+Validation in `/home/user/agent-desktop-dispatch`, based on cumulative R5a
+`e3d1324` (integration must carry these fixes onto the later stack):
+
+- `uv sync --managed-python --locked` completed. Ruff check/format over src,
+  scripts, tests and benchmarks; compileall and diff whitespace checks clean.
+- `uv run python -m unittest discover -s tests -p test_dispatch_evidence.py -v`:
+  18 passed (0.645 s), including real worker/client Unix-socket error handling,
+  no automatic replay, marker reset after an uncertain request, partial
+  pointer/keyboard/UI/launch/atlas/focus errors, and known prevalidation failures.
+  File regressions cover invalid UTF-8, size limits, descriptor/path mutation and
+  a FIFO check in a bounded child process so a blocking-open regression cannot
+  hang the test runner. These injected failures do not establish real-world
+  application reliability.
+- `uv run python -m unittest discover -s tests -p test_delivery.py -v`:
+  15 passed (0.022 s), including injected `RuntimeError`/`ValueError` after
+  browser click initiation and a known validation refusal before dispatch.
+- `PATH=/home/user/.local/share/agent-desktop/runtime/bin:$PATH uv run python
+  -m unittest discover -s tests -v`: 270 run, 250 passed, 19 skipped, 1 failure
+  (296.488 s). The failure is the old cookie-import fixture's
+  `assertNotIn("1", str(result))`: its random temporary source path contained
+  digit `1`. The fixture is unchanged here; distinct cookie sentinels are already
+  fixed in the later integration base. Focused `CookieImportTests` rerun:
+  3 passed (0.417 s). The full run started before the last socket regression and
+  browser exception refinement; the final affected suites are the passing
+  focused runs above. Full output retained at
+  `/tmp/agent-desktop-dispatch-tests.log`.
+
+No personal profiles, real account checks, paid model trials or host activation
+were used. Cross-distribution integration validation remains a separate gate.
+
+## 2026-10-22 — Bound recovery from an unresponsive script supervisor
+
+Script timeout/cancellation now also bounds waiting for its dedicated supervisor.
+The script waits behind a start gate until its group leader identity is published.
+If normal cleanup exceeds three seconds, the parent stops the supervisor (so it
+cannot reap/reuse the leader ID), verifies the leader's parent/group/start time,
+SIGKILLs the ordinary group, and resumes the supervisor to reap it. Helper waiting
+then has a two-second grace and final kill/wait bound; unavailable status remains
+unknown, never successful cleanup. Missing output files are marked truncated.
+
+`uv run python -m unittest discover -s tests -p test_script_jobs.py -v`: 13 passed
+in 12.586 s, including a real script that SIGSTOPs its supervisor and would
+otherwise defeat the timeout; it returns boundedly and the leader is reaped.
+Detached descendants remain outside the group contract. Ruff and whitespace
+checks passed. This follow-up is included in final cumulative validation.
+
 ## 2026-10-22 — Integration validation and cookie-fixture correction
 
 R1 full matrix [39720166244](https://github.com/FilipNowakowicz/agent-desktop/actions/runs/39720166244)
@@ -9,7 +75,7 @@ The first cumulative R2–R5a local desktop run executed 253 tests in 318.881 s:
 privacy test searched for the digit `1` in the full response, which legitimately
 contained it in a random temporary path. Replaced the cookie values with distinct
 synthetic sentinels and assert neither sentinel appears in the report, while
-retaining exact database-value checks. All four cookie-import unit tests passed
+retaining exact database-value checks. All three cookie-import unit tests passed
 afterward. No production cookie behavior changed. The final cumulative suite
 and matrix will validate the completed operation/report integration.
 

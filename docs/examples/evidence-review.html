@@ -1,0 +1,275 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>Desktop evidence review</title><style>
+:root { color-scheme:light; font-family:Cantarell,'DejaVu Sans',sans-serif;
+ color:#213b61; background:#f8fafc; font-size:16px; line-height:1.55; }
+* { box-sizing:border-box; } body { margin:0; } main { max-width:1100px;
+ margin:auto; padding:48px 32px 64px; } h1 { font-size:2rem; line-height:1.2;
+ margin:0 0 12px; font-weight:650; letter-spacing:-.025em; }
+h2 { font-size:1.25rem; margin:32px 0 16px; } h3 { overflow-wrap:anywhere; font-size:1.12rem;
+ margin:0 0 10px; } p { overflow-wrap:anywhere; max-width:75ch; margin:10px 0; } .intro { color:#52647c; }
+.notice { border-left:5px solid #815100; padding:16px 20px; background:#fff6e5;
+ margin:24px 0; } .notice h2 { margin:0 0 8px; } .notice p { margin:0; }
+.meta { overflow-wrap:anywhere; display:flex; flex-wrap:wrap; gap:8px 24px; color:#52647c; font-size:.9rem; }
+.timeline { padding:0; margin:0; list-style:none; counter-reset:step; }
+.step { counter-increment:step; position:relative; margin-left:16px;
+ padding:0 0 30px 36px; border-left:2px solid #c4d1e0; }
+.step::before { content:counter(step); position:absolute; left:-17px; top:0;
+ width:32px; height:32px; display:grid; place-items:center; border-radius:50%;
+ color:#fff; background:#213b61; font-weight:600; font-size:.9rem; }
+.step:last-child { padding-bottom:0; border-left-color:transparent; }
+.delivery { border-bottom:1px solid #d7e0eb; padding:0 0 12px; margin:0 0 14px; }
+.label { color:#52647c; margin-right:8px; } .acknowledged,.observed { color:#2c60a7; }
+.unknown,.uncertain,.pending,.dispatching { color:#815100; }
+.violated,.failed { color:#8f3434; } .satisfied { color:#176254; }
+.checks { margin:0; padding:0; list-style:none; } .check { margin:14px 0; }
+.check strong { display:block; } .check p { margin:4px 0; }
+.scope { font-size:.9rem; color:#52647c; } details { margin-top:12px; }
+summary { cursor:pointer; color:#2c60a7; width:fit-content; }
+summary:focus-visible { outline:3px solid #2c60a7; outline-offset:4px; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#edf2f7;
+ color:#213b61; padding:16px; margin:10px 0 0; font-size:.82rem; max-height:26rem;
+ overflow:auto; } .recovery { margin-top:32px; border-top:2px solid #213b61;
+ padding-top:16px; } .recovery h2 { margin:0 0 8px; }
+footer { margin-top:40px; color:#52647c; font-size:.85rem; }
+@media(max-width:600px) { main { padding:28px 20px 40px; } h1 { font-size:1.65rem; }
+ .step { padding-left:28px; } .meta { display:block; } .meta span { display:block; } }
+@media print { main { max-width:none; padding:0; } pre { max-height:none; }
+ details { break-inside:avoid; } }
+</style></head><body><main>
+<h1>Desktop evidence review</h1>
+<p class="intro">Read what was requested, what returned, and what the checks actually establish.</p>
+<div class="meta"><span>Session: private-demo</span>
+<span>Operation: example-export-review</span></div>
+<section class="notice" aria-labelledby="finding"><h2 id="finding">Review the result before continuing</h2>
+<p>1 satisfied, 1 violated, 1 unknown. At least one action has unconfirmed delivery. Follow-up observation failed.</p></section>
+<p>Delivery responses alone do not confirm task completion. Check statuses below are recorded evidence, not new verification.</p>
+<h2>Requested actions</h2><ol class="timeline">
+<li class="step"><h3>Open page</h3><p class="delivery"><span class="label">Delivery</span><strong class="observed">Response and observation recorded</strong></p>
+<ul class="checks">
+<li class="check"><strong class="satisfied">Satisfied: Browser context</strong><p>The expected report tab was present.</p><p class="scope">Scope: The selected browser context at the recorded observation</p><details><summary>Check evidence</summary><pre>{
+  &quot;predicate&quot;: {
+    &quot;kind&quot;: &quot;browser_context&quot;,
+    &quot;context&quot;: &quot;report-tab&quot;
+  },
+  &quot;status&quot;: &quot;satisfied&quot;,
+  &quot;scope&quot;: &quot;The selected browser context at the recorded observation&quot;,
+  &quot;reason&quot;: &quot;The expected report tab was present.&quot;,
+  &quot;evidence&quot;: {
+    &quot;context&quot;: &quot;report-tab&quot;,
+    &quot;present&quot;: true
+  }
+}</pre></details></li>
+</ul>
+<details><summary>Action and response evidence</summary><pre>{
+  &quot;index&quot;: 0,
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;open&quot;,
+    &quot;url&quot;: &quot;https://example.invalid/reports [query or fragment redacted]&quot;
+  },
+  &quot;dispatch_state&quot;: &quot;observed&quot;,
+  &quot;result&quot;: {
+    &quot;context&quot;: &quot;report-tab&quot;
+  },
+  &quot;checks&quot;: [
+    {
+      &quot;predicate&quot;: {
+        &quot;kind&quot;: &quot;browser_context&quot;,
+        &quot;context&quot;: &quot;report-tab&quot;
+      },
+      &quot;status&quot;: &quot;satisfied&quot;,
+      &quot;scope&quot;: &quot;The selected browser context at the recorded observation&quot;,
+      &quot;reason&quot;: &quot;The expected report tab was present.&quot;,
+      &quot;evidence&quot;: {
+        &quot;context&quot;: &quot;report-tab&quot;,
+        &quot;present&quot;: true
+      }
+    }
+  ]
+}</pre></details></li>
+<li class="step"><h3>Send key: ctrl+s</h3><p class="delivery"><span class="label">Delivery</span><strong class="acknowledged">Response returned</strong></p>
+<ul class="checks">
+<li class="check"><strong class="violated">Violated: Output file</strong><p>The save shortcut returned, but summary.csv was not found in the output folder.</p><p class="scope">Scope: The output file at the specified path</p><details><summary>Check evidence</summary><pre>{
+  &quot;predicate&quot;: {
+    &quot;kind&quot;: &quot;file&quot;,
+    &quot;path&quot;: &quot;[redacted]&quot;,
+    &quot;exists&quot;: true
+  },
+  &quot;status&quot;: &quot;violated&quot;,
+  &quot;scope&quot;: &quot;The output file at the specified path&quot;,
+  &quot;reason&quot;: &quot;The save shortcut returned, but summary.csv was not found in the output folder.&quot;,
+  &quot;evidence&quot;: {
+    &quot;exists&quot;: false
+  }
+}</pre></details></li>
+</ul>
+<details><summary>Action and response evidence</summary><pre>{
+  &quot;index&quot;: 1,
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;key&quot;,
+    &quot;key&quot;: &quot;ctrl+s&quot;
+  },
+  &quot;dispatch_state&quot;: &quot;acknowledged&quot;,
+  &quot;result&quot;: {
+    &quot;delivered&quot;: true
+  },
+  &quot;checks&quot;: [
+    {
+      &quot;predicate&quot;: {
+        &quot;kind&quot;: &quot;file&quot;,
+        &quot;path&quot;: &quot;[redacted]&quot;,
+        &quot;exists&quot;: true
+      },
+      &quot;status&quot;: &quot;violated&quot;,
+      &quot;scope&quot;: &quot;The output file at the specified path&quot;,
+      &quot;reason&quot;: &quot;The save shortcut returned, but summary.csv was not found in the output folder.&quot;,
+      &quot;evidence&quot;: {
+        &quot;exists&quot;: false
+      }
+    }
+  ]
+}</pre></details></li>
+<li class="step"><h3>Click Export</h3><p class="delivery"><span class="label">Delivery</span><strong class="uncertain">Delivery unknown</strong></p>
+<p class="unknown">Observation unavailable: The follow-up screenshot was unavailable.</p>
+<ul class="checks">
+<li class="check"><strong class="unknown">Unknown: Visible UI</strong><p>The accessibility listing was incomplete; absence cannot be established.</p><p class="scope">Scope: The visible application window at the recorded observation</p><details><summary>Check evidence</summary><pre>{
+  &quot;predicate&quot;: {
+    &quot;kind&quot;: &quot;ui&quot;,
+    &quot;query&quot;: {
+      &quot;element&quot;: &quot;Export finished&quot;
+    },
+    &quot;claim&quot;: &quot;exists&quot;
+  },
+  &quot;status&quot;: &quot;unknown&quot;,
+  &quot;scope&quot;: &quot;The visible application window at the recorded observation&quot;,
+  &quot;reason&quot;: &quot;The accessibility listing was incomplete; absence cannot be established.&quot;,
+  &quot;evidence&quot;: {
+    &quot;truncated&quot;: true,
+    &quot;unreadable&quot;: 1
+  }
+}</pre></details></li>
+</ul>
+<details><summary>Action and response evidence</summary><pre>{
+  &quot;index&quot;: 2,
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;click&quot;,
+    &quot;element&quot;: &quot;Export&quot;
+  },
+  &quot;dispatch_state&quot;: &quot;uncertain&quot;,
+  &quot;result&quot;: {
+    &quot;observation_error&quot;: &quot;The follow-up screenshot was unavailable.&quot;
+  },
+  &quot;checks&quot;: [
+    {
+      &quot;predicate&quot;: {
+        &quot;kind&quot;: &quot;ui&quot;,
+        &quot;query&quot;: {
+          &quot;element&quot;: &quot;Export finished&quot;
+        },
+        &quot;claim&quot;: &quot;exists&quot;
+      },
+      &quot;status&quot;: &quot;unknown&quot;,
+      &quot;scope&quot;: &quot;The visible application window at the recorded observation&quot;,
+      &quot;reason&quot;: &quot;The accessibility listing was incomplete; absence cannot be established.&quot;,
+      &quot;evidence&quot;: {
+        &quot;truncated&quot;: true,
+        &quot;unreadable&quot;: 1
+      }
+    }
+  ]
+}</pre></details></li>
+</ol>
+<section class="recovery"><h2>Before continuing</h2><p>Inspect the report tab and the output folder before retrying Export. Its click may already have happened. Resolve the missing-file check and collect complete evidence before continuing.</p></section>
+<details><summary>All saved evidence, with redactions</summary><pre>{
+  &quot;schema_version&quot;: 1,
+  &quot;fixture&quot;: &quot;Synthetic planted failures; no real user data or external actions&quot;,
+  &quot;session&quot;: &quot;private-demo&quot;,
+  &quot;operation_id&quot;: &quot;example-export-review&quot;,
+  &quot;state&quot;: &quot;delivery_unknown&quot;,
+  &quot;steps&quot;: [
+    {
+      &quot;index&quot;: 0,
+      &quot;request&quot;: {
+        &quot;action&quot;: &quot;open&quot;,
+        &quot;url&quot;: &quot;https://example.invalid/reports [query or fragment redacted]&quot;
+      },
+      &quot;dispatch_state&quot;: &quot;observed&quot;,
+      &quot;result&quot;: {
+        &quot;context&quot;: &quot;report-tab&quot;
+      },
+      &quot;checks&quot;: [
+        {
+          &quot;predicate&quot;: {
+            &quot;kind&quot;: &quot;browser_context&quot;,
+            &quot;context&quot;: &quot;report-tab&quot;
+          },
+          &quot;status&quot;: &quot;satisfied&quot;,
+          &quot;scope&quot;: &quot;The selected browser context at the recorded observation&quot;,
+          &quot;reason&quot;: &quot;The expected report tab was present.&quot;,
+          &quot;evidence&quot;: {
+            &quot;context&quot;: &quot;report-tab&quot;,
+            &quot;present&quot;: true
+          }
+        }
+      ]
+    },
+    {
+      &quot;index&quot;: 1,
+      &quot;request&quot;: {
+        &quot;action&quot;: &quot;key&quot;,
+        &quot;key&quot;: &quot;ctrl+s&quot;
+      },
+      &quot;dispatch_state&quot;: &quot;acknowledged&quot;,
+      &quot;result&quot;: {
+        &quot;delivered&quot;: true
+      },
+      &quot;checks&quot;: [
+        {
+          &quot;predicate&quot;: {
+            &quot;kind&quot;: &quot;file&quot;,
+            &quot;path&quot;: &quot;[redacted]&quot;,
+            &quot;exists&quot;: true
+          },
+          &quot;status&quot;: &quot;violated&quot;,
+          &quot;scope&quot;: &quot;The output file at the specified path&quot;,
+          &quot;reason&quot;: &quot;The save shortcut returned, but summary.csv was not found in the output folder.&quot;,
+          &quot;evidence&quot;: {
+            &quot;exists&quot;: false
+          }
+        }
+      ]
+    },
+    {
+      &quot;index&quot;: 2,
+      &quot;request&quot;: {
+        &quot;action&quot;: &quot;click&quot;,
+        &quot;element&quot;: &quot;Export&quot;
+      },
+      &quot;dispatch_state&quot;: &quot;uncertain&quot;,
+      &quot;result&quot;: {
+        &quot;observation_error&quot;: &quot;The follow-up screenshot was unavailable.&quot;
+      },
+      &quot;checks&quot;: [
+        {
+          &quot;predicate&quot;: {
+            &quot;kind&quot;: &quot;ui&quot;,
+            &quot;query&quot;: {
+              &quot;element&quot;: &quot;Export finished&quot;
+            },
+            &quot;claim&quot;: &quot;exists&quot;
+          },
+          &quot;status&quot;: &quot;unknown&quot;,
+          &quot;scope&quot;: &quot;The visible application window at the recorded observation&quot;,
+          &quot;reason&quot;: &quot;The accessibility listing was incomplete; absence cannot be established.&quot;,
+          &quot;evidence&quot;: {
+            &quot;truncated&quot;: true,
+            &quot;unreadable&quot;: 1
+          }
+        }
+      ]
+    }
+  ],
+  &quot;recovery&quot;: &quot;Inspect the report tab and the output folder before retrying Export. Its click may already have happened. Resolve the missing-file check and collect complete evidence before continuing.&quot;
+}</pre></details>
+<footer>Experimental local review. Text, values, command arguments, structured file paths and URL queries are redacted by default. Review before sharing: free-form evidence can still contain private information. This report performs no actions, opens no external links, and does not contact a service. Human review benefit has not been measured.</footer></main></body></html>

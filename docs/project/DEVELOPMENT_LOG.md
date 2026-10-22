@@ -1,5 +1,71 @@
 # Development log
 
+## 2026-10-22 — R6: an offline evidence-review experiment
+
+Implemented `feat/evidence-review` in a separate worktree, based on R1
+(`19f5e88`), with no runtime code dependency on the parallel R2–R5 work. It accepts
+the saved operation/check JSON contracts; integration should retain the other
+stages' CLI branches and documentation. This is the chosen bounded R6 experiment,
+not a measured claim that review improves human outcomes.
+
+`agent-desktop review --input evidence.json --output review.html` renders a
+numbered action timeline, separate delivery and predicate states, observation
+failures, scope, reasons, recovery advice and native evidence disclosures. Missing
+or malformed checks and capped evidence stay unknown. The page performs no
+checks, actions or replay and has no JavaScript, remote assets or external links.
+It escapes saved content, defaults to redacting text/value/output/sensitive
+fields, equality values, command arguments, structured file paths, private file
+URLs and HTTP URL credentials/query/fragment data, and atomically creates mode-0600
+output. Input is capped at 2 MiB; rendered output at 4 MiB, with traversal, step,
+check and string bounds plus explicit coverage warnings. Non-regular inputs are
+refused without blocking on named pipes. Free-form privacy redaction remains
+best effort.
+
+Design plan: a left-aligned reading surface on slate `#f8fafc`, navy `#213b61`
+for hierarchy, blue `#2c60a7` for delivery/evidence controls, amber `#815100` for
+unknowns, red `#8f3434` for violated checks and teal `#176254` only for scoped
+satisfied checks. Cantarell/DejaVu Sans use local fonts. Actual sequential actions
+justify timeline numbering; no aggregate success badge or remote decoration.
+Review of the first private-Firefox screenshots replaced raw protocol labels
+with readable action/check labels and removed a redundant uncertainty sentence.
+The final screenshot shows a blue returned response directly above its red
+missing-file check; expanding the native disclosure reveals the actual
+`exists: false` evidence.
+
+Validation (uv-managed CPython 3.12.13; visual smoke uses the existing repaired
+labwc/wlroots runtime and disposable private Firefox):
+
+- `uv sync --managed-python --locked` completed.
+- `uv run python -m unittest discover -s tests -p test_review.py -v`: 11 passed.
+  A planted delivered save independently lacks its expected output file and
+  remains visibly violated; unknown delivery/failed observations remain visible.
+  Other checks cover escaped markup/no external references, nested redaction,
+  bounded input/output, atomic mode-0600 output without following a target
+  symlink, refusing a named pipe without waiting for a writer, and rendering
+  through the CLI without creating a desktop.
+- `uv run agent-desktop review --input docs/examples/evidence-review.json
+  --output docs/examples/evidence-review.html` produced the checked-in 13,525-byte
+  synthetic HTML artifact. Its query secret is absent from the report.
+- `PATH="$HOME/.local/share/agent-desktop/runtime/bin:$PATH" uv run
+  scripts/review_demo.py --visual` passed. Actual page text contains satisfied,
+  violated and unknown checks and unknown delivery; the missing-file disclosure
+  opens. Three screenshots and `validation.json` are under
+  `artifacts/evidence-review/`. Session destruction left no owned processes.
+  Two earlier harness requests (unsupported title operation and an ambiguous
+  disclosure selector) were refused; the final harness uses supported reads and
+  an explicit direct-descendant selector.
+
+The initial full local suite ran 209 tests in 254.688 s with 190 passed and
+19 skipped. Final privacy/FIFO refinements were subsequently covered by all 11
+focused report tests; final cumulative validation covers integration. Ruff,
+formatting, compileall and whitespace checks passed after the final edits.
+
+Remaining limits: evidence is supplied, not independently authenticated by this
+renderer. Synthetic fixtures and visual inspection do not measure human review
+benefit, end-to-end task success or mobile usability. The design includes a
+narrow-screen layout and keyboard-focus styling; no touch-device trial was run.
+No paid models, personal profiles, account access or host activation were used.
+
 ## 2026-10-22 — R5b: durable private operation handles
 
 Implemented on `feat/operation-handles`, based on the R5a stack `e3d1324`.

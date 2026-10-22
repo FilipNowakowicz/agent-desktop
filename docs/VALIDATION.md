@@ -31,6 +31,22 @@ demand: `gh workflow run checks.yml --ref BRANCH`. Run it before merging changes
 to the runtime, packaging or CI, and at milestones; otherwise run the desktop
 suite locally and record the result in the PR.
 
+## Offline evidence review
+
+```sh
+uv run python -m unittest discover -s tests -p test_review.py -v
+uv run scripts/review_demo.py
+# Optional: headless private Firefox, screenshots and teardown (no host profile).
+uv run scripts/review_demo.py --visual
+```
+
+The demo writes a synthetic report and validation evidence under
+`artifacts/evidence-review/`. The planted save shortcut has a returned delivery
+response and a violated missing-file check; a later click has uncertain delivery
+and an unknown UI check. Visual mode reads their actual page text, opens a native
+check disclosure and captures the page before destroying its private desktop.
+This validates rendering and safe presentation, not human failure-detection rates.
+
 ## Original headless experiment
 
 The runtime needs `labwc`, `grim` and `dbus-daemon`; tests also use `foot`.

@@ -2,11 +2,21 @@
 
 This is a thinking board of directions the project could take. It is **not
 current work and not a promise**. Current direction lives in
-[PROJECT_PLAN.md](PROJECT_PLAN.md), and the active test plan is
-[effect first](../research/2026-10-11-effect-first.md). Use the board when
+[PROJECT_PLAN.md](PROJECT_PLAN.md); the earlier
+[effect-first test plan](../research/2026-10-11-effect-first.md) is historical. Use the board when
 choosing what comes next: add ideas, record evidence for or against them, and
 change their status. Do not delete an idea that was rejected; mark it and say
 why.
+
+## Current sequencing (2026-10-23)
+
+The maintainer's current priority is the
+[functionality-first product direction](PRODUCT_DIRECTION.md), with a concrete
+[runtime roadmap](FUNCTIONALITY_ROADMAP.md) and a deferred
+[installation/human-interface design](USER_EXPERIENCE.md). MCP stays an interface
+to the runtime. Reusable-procedure research is preserved in the
+[validity assessment](../research/2026-10-22-procedure-validity.md), but is not a
+prerequisite for the product. Older rankings below do not override this order.
 
 Status values: **idea** (not tested), **testing** (an experiment is running),
 **supported** or **weakened** (evidence, with a link), **adopted** (moved

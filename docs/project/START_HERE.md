@@ -21,6 +21,13 @@ The [compatibility matrix](../COMPATIBILITY.md) describes tested configurations.
 4. Choose a bounded change from the plan, validate it, and open a reviewable PR.
    Record completed work, exact validation, failures and remaining gaps.
 
+The 2026-10-23 direction is **functionality first**. Read the
+[product handoff](PRODUCT_DIRECTION.md), then the
+[functional implementation roadmap](FUNCTIONALITY_ROADMAP.md). The
+[first-install and human-interface design](USER_EXPERIENCE.md) is saved for later;
+its backend requirements matter now, but frontend polish and learned-procedure
+research are not the next milestone.
+
 The foundation already includes persistent labwc sessions, private D-Bus,
 supervisor/guardian cleanup, virtual input, screenshots, CLI/MCP control,
 observation tokens, viewers, cooperative takeover, profiles and AT-SPI access.

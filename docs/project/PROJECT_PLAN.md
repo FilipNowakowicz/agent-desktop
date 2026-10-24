@@ -1,9 +1,36 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-22. This document records the chosen direction, implemented
+Updated: 2026-10-23. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
+
+## Current priority — functionality first (2026-10-23)
+
+The maintainer reaffirmed a complete Linux desktop environment for existing
+agents as the product goal and explicitly prioritised underlying functionality
+over installation polish and user-interface implementation. The negative script
+and reuse experiments do not invalidate that product; learned procedures remain
+optional research rather than its foundation.
+
+The saved conversation handoff is split into:
+
+- [Product direction and architecture](PRODUCT_DIRECTION.md): decisions,
+  MCP/API/CLI/UI responsibilities, sequencing, deferred ideas and open choices.
+- [Functionality roadmap](FUNCTIONALITY_ROADMAP.md): audit current guarantees,
+  test correctness under interruption, validate browser/native/mixed workflows,
+  then persistence and lifecycle stress. Build on R1–R6 rather than repeat them.
+- [Future first-install and human interface](USER_EXPERIENCE.md): installation,
+  connection, viewer, takeover, login, artifacts, access and reconnect behavior.
+  Preserve required backend contracts now; defer frontend implementation.
+- [Procedure-validity research](../research/2026-10-22-procedure-validity.md):
+  literature, competing baselines, independent checks, held-out variations and
+  stop criteria. The bounded experiment is deferred, not the next product gate.
+
+This priority supersedes older "next work" research recommendations below.
+The handoff documents are plans, not new implemented capabilities. MCP remains
+a supported headless interface to the same runtime used by direct integrations
+and a future human UI. No new general agent or separate chat product is required.
 
 ## Development status
 
@@ -47,7 +74,7 @@ update this status and the development log with completed work and remaining gap
 | Extensions A/B | Waits, sequences, crops, semantic UI, takeover, profiles, host guard implemented | Validate usefulness and failure behaviour in real work before expanding |
 | Portable machine / strong isolation | Deferred options | Explicit product and threat-model decision, then targeted feasibility evidence |
 
-Next work follows the [review plan](../reviews/2026-10-05-project-review/plan.md),
+Earlier alpha work followed the [review plan](../reviews/2026-10-05-project-review/plan.md),
 with the review's open questions decided in
 [decisions.md](../reviews/2026-10-05-project-review/decisions.md). Implemented:
 correctness fixes (#42–#44), preflight (#46–#47), bounded retention (#48), environment
@@ -56,8 +83,8 @@ controller lease (#55), no keyring prompts (#56), the action trace (#58), and th
 two pilot batches with their fixes (#72–#79, [diary](../trials/pilot.md)).
 The daily-use alpha gates are closed (2026-10-08). The wlroots fix is
 proposed upstream as wlroots!5477 ([runtime/UPSTREAM.md](../../runtime/UPSTREAM.md));
-the local patch stays until a release contains it. Next work is the research direction
-below. Extensions should follow observed needs.
+the local patch stays until a release contains it. The research progression below
+is historical; current work follows the functionality-first priority above.
 
 Research for the next direction: the
 [2026-10-07 recommendation](../research/2026-10-07-next-direction.md) proposes

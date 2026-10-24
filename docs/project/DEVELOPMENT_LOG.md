@@ -1,5 +1,42 @@
 # Development log
 
+## 2026-10-23 — Save product, functionality and usability direction
+
+Recorded the maintainer's functionality-first priority in the project plan and
+added an implementation handoff:
+
+- [Product direction](PRODUCT_DIRECTION.md): complete desktop environment,
+  existing-agent integrations, shared runtime behind MCP/API/CLI and a future UI,
+  decisions versus proposals, deferred work and open choices.
+- [Functionality roadmap](FUNCTIONALITY_ROADMAP.md): baseline audit, correctness
+  under interruption, independent browser/native/mixed-workflow checks,
+  persistence and lifecycle acceptance criteria.
+- [Future user experience](USER_EXPERIENCE.md): first installation, connection,
+  private/host environment choice, live viewer, takeover/login, artifacts,
+  meaningful activity and reconnection, with backend dependencies and later
+  implementation slices.
+- [Procedure-validity assessment](../research/2026-10-22-procedure-validity.md):
+  preserved the earlier conversation's literature/experiment report as deferred
+  research, adding a status clarification for the newer main revision.
+
+Branch `docs/runtime-product-direction` is based directly on main `4277ed1`,
+with no stacked PR dependencies. Work used a separate worktree to preserve the
+older research checkout and its uncommitted completion-review changes. Main's
+R1–R6 implementation status was checked before writing; these documents do not
+claim new runtime functionality or repeat those stages as missing work.
+
+Validation: `uv run --project /home/user/agent-desktop --no-sync python` ran a
+local Markdown path/whitespace check: 8 changed documents, 79 local link targets,
+none missing and no trailing whitespace; `git diff --check` clean. Reviewed the staged scope for
+documentation-only changes and checked links against the branch's tracked/new
+files rather than relying on uncommitted files in the older checkout. No runtime
+tests, desktop sessions, paid inference or full CI matrix were needed or run.
+Literature sources remain the 2026-10-22 review, not a new literature search.
+
+Remaining work: execute the baseline/gap inventory and select a concrete runtime
+failure for a bounded implementation stage. Installer/UI work and learned
+procedures remain deferred. No release, host change or merge is authorized here.
+
 ## 2026-10-22 — Final cumulative correctness validation
 
 The complete R1–R6 implementation, including dispatch and supervisor recovery

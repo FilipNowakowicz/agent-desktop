@@ -1,5 +1,29 @@
 # Development log
 
+## 2026-10-24 — Reconcile unpublished correctness research stash
+
+Compared all six stashed paths against main `f0af8b9` (also origin/main at
+inspection). Restored the missing 2026-10-15 correctness report, original JSON
+observations and probe script, plus its historical validation entry below.
+Added an archival warning and a plan link: R1–R6 supersede the proposed repairs,
+and the old probes require the reviewed revision `711f1ca`, not current main.
+Restored the procedure-validity report's link to the recovered review.
+
+The stashed procedure-validity report is already preserved in main with a newer
+status clarification. Its duplicate log entry and the stale plan paragraph were
+not reapplied; the existing 2026-10-23 entry records that report's integration.
+Remove the stash after the recovered material is committed and checked.
+Branch `docs/recover-stashed-correctness-research` is based directly on main
+`f0af8b9`, with no stacked dependencies.
+
+Validation: `uv sync --managed-python --locked`; `uv run ruff check
+ docs/research/completion_probes.py`; `uv run ruff format --check
+ docs/research/completion_probes.py`; local Markdown link/whitespace checks;
+JSON parsing and ten-observation count; exact byte comparison of the restored
+probe script and JSON with the stash; `git diff --check`. No runtime code
+changed. Historical probes and desktop tests were not rerun: the archived
+failure reproductions target old behavior, and this change only preserves records.
+
 ## 2026-10-23 — Save product, functionality and usability direction
 
 Recorded the maintainer's functionality-first priority in the project plan and
@@ -581,6 +605,46 @@ Deadline/partial-delivery contracts, script child supervision, effect-ledger
 coverage and general predicate/resumption APIs are deferred to later stages.
 No host activation, personal profile access, paid model trials or publishing
 changes were performed.
+
+## 2026-10-15 — Completion correctness and general expansion review
+
+Historical entry recovered on 2026-10-24. Implementation status below describes
+the original review at `711f1ca`; R1–R6 subsequently superseded its repair proposals.
+
+Reviewed source at `711f1ca`, the current plan and historical D1/E6 evidence.
+Added [a general correctness report](../research/2026-10-15-completion-correctness.md),
+[reproducible probes](../research/completion_probes.py) and
+[their output](../research/2026-10-15-completion-probes.json) on
+`research/completion-correctness-2026-10-15`, based directly on `main`, with no
+stacked dependency. The report separates reproduced boundary behaviour,
+source-inspected limitations and proposed extensions. No runtime code changed.
+
+Ten focused observations cover incomplete UI target selection and rendering,
+silent browser retargeting, a 60-second browser wait with a 30-second transport
+timeout, lost delivery evidence after capture failure, a child continuing after
+script timeout, effect baseline eviction, failed watcher registration and
+silent document truncation. The report groups these into seven fix areas and
+proposes bounded stages; implementation remains open.
+
+Validation:
+- `uv sync --managed-python --locked`: 34 packages resolved, 33 checked;
+- `uv run python docs/research/completion_probes.py`: completed; exact JSON
+  retained in the linked artifact (ten observations, not ten passing tests);
+- `uv run python -m unittest discover -s tests -p test_correctness.py -v`:
+  5 passed;
+- `uv run python -m unittest discover -s tests -p test_tree_bounds.py -v`:
+  5 passed.
+- `uv run ruff check docs/research/completion_probes.py` and
+  `uv run ruff format --check docs/research/completion_probes.py`: clean;
+  `git diff --check`: clean. Local report links resolve and the saved JSON
+  contains all ten observations.
+
+The probes use mocked boundary responses, temporary files and a short-lived
+child process that exits after writing a marker. No GUI session, personal
+profile, network service or paid model was used by the probes. External primary
+documentation was read for design comparisons. The full desktop suite, model
+benchmarks, live browser failure scenarios and long-session memory tests were
+not run; real-world incidence and the proposed improvements remain unmeasured.
 
 ## 2026-10-15 — Import a site's login from the person's Firefox
 

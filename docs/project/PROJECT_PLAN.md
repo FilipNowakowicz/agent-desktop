@@ -46,6 +46,11 @@ The current correctness stack implements these bounded stages:
 | R5b | Durable private GUI/browser jobs with per-step delivery evidence, reconnectable status, cooperative cancellation and optional scoped checks | No retry/resume/rollback; in-flight worker commands finish or remain uncertain; crashed jobs may retain their controller lease |
 | R6 | Experimental offline evidence report separating requested actions, delivery, observations, scoped checks and recovery choices | Saved evidence is not newly verified; human review benefit is unmeasured |
 
+The [original correctness review](../research/2026-10-15-completion-correctness.md)
+and its probe output are retained as historical evidence from `711f1ca`.
+Its repair proposals are superseded by the implemented stages above; its old
+probe script is not a current regression suite. Procedure reuse remains deferred.
+
 All planned correctness stages are implemented. Cumulative validation passed
 285 local tests (19 skipped) and the Ubuntu/Nix/Fedora/Arch matrix;
 see the development log for exact evidence. Each stage has a separate PR.

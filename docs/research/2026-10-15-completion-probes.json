@@ -1,0 +1,47 @@
+{
+  "incomplete_unique_target": "example",
+  "script_drops_coverage": {
+    "id": "example",
+    "name": "Save",
+    "role": "button",
+    "states": [],
+    "depth": 1
+  },
+  "unreadable_rendering": "(no accessible elements)",
+  "closed_browser_target": "unrelated-tab",
+  "browser_60s_wait_transport_timeout": 30,
+  "delivery_result_lost_on_capture_error": "capture failed",
+  "odf_silent_partial_read": {
+    "expected_rows": 1001,
+    "returned_rows": 1000,
+    "last": "S!A1000: x"
+  },
+  "effect_baseline_eviction": {
+    "first": {
+      "path": "~/existing.txt",
+      "change": "modified",
+      "bytes": 3,
+      "diff": [
+        "-old",
+        "+new"
+      ]
+    },
+    "eighth": {
+      "path": "~/existing.txt",
+      "change": "created",
+      "bytes": 3,
+      "diff": [
+        "+new"
+      ]
+    }
+  },
+  "failed_watch_registration": {
+    "return": null,
+    "watches": {}
+  },
+  "script_child_after_timeout": {
+    "timed_out": true,
+    "marker_at_return": false,
+    "marker_after_return": true
+  }
+}

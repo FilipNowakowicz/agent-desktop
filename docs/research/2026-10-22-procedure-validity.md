@@ -51,7 +51,7 @@ uncommitted research changes. No previous benchmark was rerun here.
   sorting, deletion, identity corruption or broader side effects.
 - The user describes scoped checks and durable operations as available runtime
   capabilities. Treat those as the intended experiment platform; this checkout
-  is older: its then-uncommitted completion review still
+  is older: its [then-uncommitted completion review](2026-10-15-completion-correctness.md) still
   proposes richer predicates/resumable operations. `script.listing` returns only
   `nodes`, discarding coverage metadata. Pin and verify the actual experiment
   revision before relying on those newer capabilities. This investigation did

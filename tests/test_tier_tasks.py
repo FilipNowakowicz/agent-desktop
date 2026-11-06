@@ -25,7 +25,7 @@ SEEDS = (101, 102, 103, 7, 8)
 
 
 def js_set(**fields):
-    return "".join(f"set({k},{v!r});" for k, v in fields.items())
+    return "".join(f"set(document.getElementById('{k}'),{v!r});" for k, v in fields.items())
 
 
 # Each solver returns (python side effect or None, javascript) for a variant.

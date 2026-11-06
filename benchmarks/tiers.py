@@ -131,8 +131,8 @@ class IncidentTriage(Task):
             "<button id=go>File report</button><p id=err style='color:#b00'></p>",
             "go.onclick=()=>{if(!svc.value||!n.value||!first.value||!req.value)"
             "{err.textContent='Fill in every field.';return}"
-            "document.body.innerHTML='<h2>Report filed</h2>';"
-            "report({service:svc.value,count:+n.value,first:first.value,req:req.value})};",
+            "const st={service:svc.value,count:+n.value,first:first.value,req:req.value};"
+            "document.body.innerHTML='<h2>Report filed</h2>';report(st)};",
         )
         prompt = (
             "Prepare the incident report in the browser. The incident notes are "
@@ -292,7 +292,7 @@ class ConfigRollout(Task):
             "<input id=n type=number> <button id=done>Close change request</button></p>"
             "<p id=err style='color:#b00'></p>",
             "done.onclick=()=>{if(!n.value){err.textContent='Enter the number changed.';return}"
-            "document.body.innerHTML='<h2>Change request closed</h2>';report({changed:+n.value})};",
+            "const st={changed:+n.value};document.body.innerHTML='<h2>Change request closed</h2>';report(st)};",
         )
         prompt = (
             "Carry out the change request in the browser. A terminal is open in "
@@ -450,8 +450,8 @@ class MeetingSlot(Task):
             "{err.textContent='Choose a day, a start time and a room.';return}err.textContent='';"
             "q.textContent='Invite Alice and Bob to '+room.value+' on '+day.value+' at '+"
             "start.value.trim()+'?';m.style.display='block'};no.onclick=()=>m.style.display='none';"
-            "yes.onclick=()=>{m.style.display='none';document.body.innerHTML="
-            "'<h2>Invitations sent</h2>';report({day:day.value,start:start.value,room:room.value})};",
+            "yes.onclick=()=>{m.style.display='none';const st={day:day.value,start:start.value,room:room.value};"
+            "document.body.innerHTML='<h2>Invitations sent</h2>';report(st)};",
         )
         prompt = (
             "Book the project sync for Alice and Bob in the booking page in the "

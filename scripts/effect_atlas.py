@@ -349,7 +349,8 @@ def perform(run, control, click=True):
     node = next(n for n in run.check_boxes() if n["name"] == control["label"])
     state = "checked" in node["states"]
     if click:
-        core.request(run.session, "ui_action", node=node["id"], action="click")
+        action = "toggle" if node["role"] == "toggle button" else "click"
+        core.request(run.session, "ui_action", node=node["id"], action=action)
         core.wait(run.session, stable_ms=400, timeout=5)
     run.close_dialog()
     return state

@@ -4,10 +4,12 @@
   "controls": 13,
   "with_effect": 12,
   "verified": 8,
+  "negative_control_run": 10,
+  "negative_control_false_pass": 0,
   "errors": 0,
   "noise_keys": 0,
   "interaction_keys": [],
-  "minutes": 3.2
+  "minutes": 3.8
  },
  "atlas": [
   {
@@ -30,7 +32,8 @@
    ],
    "verified": false,
    "state_shown": null,
-   "restored_by_click": false
+   "restored_by_click": false,
+   "negative_control_verified": false
   },
   {
    "kind": "menu",
@@ -46,7 +49,8 @@
    ],
    "verified": false,
    "state_shown": null,
-   "restored_by_click": false
+   "restored_by_click": false,
+   "negative_control_verified": false
   },
   {
    "kind": "menu",
@@ -82,7 +86,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -104,7 +109,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -126,7 +132,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -148,7 +155,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -170,7 +178,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -192,7 +201,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -214,7 +224,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",
@@ -236,7 +247,8 @@
    ],
    "verified": true,
    "state_shown": true,
-   "restored_by_click": true
+   "restored_by_click": true,
+   "negative_control_verified": false
   },
   {
    "kind": "check box",

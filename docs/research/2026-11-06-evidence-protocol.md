@@ -70,9 +70,9 @@ affected by load; comparisons within a part are interleaved or matched.
      staging configs only, write a rollback note with the old values, resolve.
   4. `tier-meeting-slot` (two Mousepad windows, Chromium): find the only slot
      satisfying all constraints and book it; a policy modal steals focus.
-  5. `tier-restart-recovery` (Mousepad, Chromium): update six rows from a
-     delivery note; after the third save the app "restarts" to a login screen
-     whose credentials are in a note.
+  5. `tier-moving-target` (Mousepad, Chromium; renamed before any control or model run): update stock rows from a
+     delivery note; after the second save the note is corrected on disk and a banner
+     says so.
   6. `tier-file-triage` (foot, Mousepad): sort files by a rule note, delete only
      byte-identical duplicates (near-duplicates present), write a manifest.
 - Controls before any model run: for each task a positive control (a scripted

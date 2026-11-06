@@ -135,7 +135,7 @@ def triage(context, variant):
         if variant == "near-duplicate-deleted":
             expected = {p: t for p, t in expected.items() if "budget-v2" not in p}
         if variant == "no-dedupe":
-            expected["misc/photo-final-2.txt"] = expected["misc/photo-final.txt"]
+            expected["misc/photo-final.txt"] = expected["misc/photo-final-2.txt"]
         for rel, text in expected.items():
             (context.inbox / rel).parent.mkdir(parents=True, exist_ok=True)
             (context.inbox / rel).write_text(text)

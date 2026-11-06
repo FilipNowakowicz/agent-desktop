@@ -6,12 +6,11 @@ from collections import Counter
 from math import comb
 
 rows = [json.loads(entry) for entry in open(sys.argv[1])]
-stock_lib = None
 libs = {
     a: Counter(tuple(r["wlroots"]) for r in rows if r["arm"] == a)
     for a in ("stock", "patched")
 }
-valid = [r for r in rows if r["ok"] is not None and len(libs and r["wlroots"]) == 1]
+valid = [r for r in rows if r["ok"] is not None and len(r["wlroots"]) == 1]
 # integrity: each arm must use exactly one library, and the two must differ
 arm_lib = {a: libs[a].most_common(1)[0][0] for a in libs}
 valid = [r for r in valid if tuple(r["wlroots"]) == arm_lib[r["arm"]]]
@@ -39,16 +38,16 @@ def cp(k, m, alpha=0.05):  # Clopper-Pearson via bisection
 
     lo = 0.0 if k == 0 else None
     if lo is None:
-        entry, h = 0.0, 1.0
+        low, high = 0.0, 1.0
         for _ in range(60):
-            mid = (entry + h) / 2
-            (h, entry) = (mid, entry) if 1 - cdf(k - 1, mid) > alpha / 2 else (h, mid)
-        lo = h
-    entry, h = 0.0, 1.0
+            mid = (low + high) / 2
+            low, high = (low, mid) if 1 - cdf(k - 1, mid) > alpha / 2 else (mid, high)
+        lo = high
+    low, high = 0.0, 1.0
     for _ in range(60):
-        mid = (entry + h) / 2
-        (entry, h) = (mid, h) if cdf(k, mid) > alpha / 2 else (entry, mid)
-    return lo, entry
+        mid = (low + high) / 2
+        low, high = (mid, high) if cdf(k, mid) > alpha / 2 else (low, mid)
+    return lo, low
 
 
 out = {

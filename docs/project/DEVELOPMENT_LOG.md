@@ -14,6 +14,18 @@ Protocol committed before the runs: docs/research/2026-11-06-evidence-protocol.m
 
 Also recorded that wlroots!5477 was closed unmerged.
 
+Post-merge review of #142 recomputed the wlroots, atlas and tier figures from the
+raw records; they hold, with these corrections. The tier p-value is 0.23, not
+about 0.24, and haiku's median is 22.5 turns over the 16 runs that reported turns.
+Two of haiku's three failures were `desktop_request_human` handoffs that waited
+for the 900 s timeout with no cost reported, so bulk-entry separates willingness
+to use a noted password as much as ability (evidence/TIER-RESULTS.md). Every
+benchmark tool profile now disables `desktop_request_human` and `desktop_control`.
+Unreported protocol deviations are now listed in evidence/ATLAS-RESULTS.md and
+evidence/TIER-RESULTS.md. Validated the merged PR head with 305 tests on the
+managed runtime: 286 passed, 19 skipped for missing optional applications, tier
+controls included. Also updated certifi for GHSA-6q48-6c7w-9gw2 (#143).
+
 ## 2026-10-24 — Reconcile unpublished correctness research stash
 
 Compared all six stashed paths against main `f0af8b9` (also origin/main at

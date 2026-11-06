@@ -5,9 +5,8 @@ Status: submitted 2026-10-08 as
 from `filip.nowakowicz/wlroots:xwm-map-at-associate` (one commit on master
 `c5c57cd3`, `xwayland/xwm.c` +6). Fork permission came from
 [freedesktop/freedesktop#4178](https://gitlab.freedesktop.org/freedesktop/freedesktop/-/work_items/4178).
-It was closed unmerged. The description below was submitted with a short test
-plan added. Keep the local patch until a packaged release contains an equivalent
-fix.
+It was closed unmerged on 2026-10-14. The description below was submitted with a
+short test plan added.
 
 Retire the local patch once a packaged wlroots release contains an equivalent
 fix. Check each new wlroots release's `xwayland_surface_associate`.

@@ -7,6 +7,7 @@ taken, a duplicate, the wrong environment, the uncorrected data, nothing at
 all) must fail. The untouched start state is the "nothing at all" variant.
 """
 
+import ast
 import random
 import shutil
 import subprocess
@@ -189,9 +190,6 @@ class TierControls(unittest.TestCase):
             home=str(directory),
         )
         task.setup(context)
-        if task.name == "tier-moving-target":
-            # What a run that never rereads the note would produce.
-            context.uncorrected = None
         solver = SOLVERS[task.name][0]
         if task.name == "tier-moving-target":
             context.uncorrected = uncorrected(context)
@@ -247,14 +245,11 @@ def uncorrected(context):
         m = tiers.re.match(r"(SKU-\d+)\s+\+(\d+)", line)
         if m:
             first[m.group(1)] = int(m.group(2))
-    start = {}
-    for s, v in context.answer.items():
-        start[s] = v
     # Recover the initial stock from the page rows.
     rows = tiers.re.search(
         r"const rows=(\[.*?\]);let cur", (context.directory / "page.html").read_text()
     )
-    initial = {r["sku"]: r["stock"] for r in eval(rows.group(1))}  # noqa: S307 (own data)
+    initial = {r["sku"]: r["stock"] for r in ast.literal_eval(rows.group(1))}
     return {s: initial[s] + first.get(s, 0) for s in initial}
 
 

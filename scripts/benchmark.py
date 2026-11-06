@@ -43,15 +43,14 @@ SUITES = {
 # sequences and semantic UI were added (screenshot region/scale arguments remain
 # available in both). Harness-owned lifecycle and launch are always disabled.
 # request_host (the person's own screen) is also disabled: benchmarks run in
-# private sessions only.
-LIFECYCLE = ["create", "destroy", "launch", "request_host"]
+# private sessions only. So are request_human and control: no person is there
+# to answer, so a handoff would only wait for the agent timeout.
+LIFECYCLE = ["create", "destroy", "launch", "request_host", "request_human", "control"]
 NEWER = [
     "wait",
     "actions",
     "ui",
     "ui_action",
-    "request_human",
-    "control",
     "profiles",
 ]
 # D1 "code": the agent looks with screenshots, ui, windows and wait, and acts

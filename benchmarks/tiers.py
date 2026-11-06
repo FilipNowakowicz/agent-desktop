@@ -627,14 +627,14 @@ class FileTriage(Task):
             "2026-03-14_minutes.txt": minutes,
             "2026-03-20_budget.txt": budget,
             "2026-03-20_budget-v2.txt": budget.rstrip("\n"),  # one byte shorter: keep
-            "2026-04-02_notes.txt": notes,
-            "2026-04-02_notes copy.txt": notes,  # exact duplicate: delete
+            "2026-04-02_notes.txt": notes,  # exact duplicate: delete
+            "2026-04-02_notes copy.txt": notes,  # exact duplicate, sorts first: keep
             "2026-05-01_summary.txt": summary,
             "summary-old.txt": summary,  # exact duplicate of a dated file: delete
             "readme.txt": body("readme"),
             "todo.txt": body("todo"),
-            "photo-final.txt": photo,
-            "photo-final-2.txt": photo,  # exact duplicate: delete
+            "photo-final.txt": photo,  # exact duplicate: delete
+            "photo-final-2.txt": photo,  # exact duplicate, sorts first: keep
             "photo-final-2b.txt": photo.replace(photo.splitlines()[1], "x" * 10, 1),
             "scratch.tmp": body("scratch"),
             "session.tmp": body("session"),

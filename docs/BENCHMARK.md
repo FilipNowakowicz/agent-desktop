@@ -226,6 +226,19 @@ were about twice as fast as a person new to them and more often complete; the
 remaining three tasks have no human time. This is a single, guided,
 first-time attempt, not a matched human baseline.
 
+## Tier suite (2026-11-06)
+
+`--suite tiers` (`benchmarks/tiers.py`) holds six longer multi-application tasks
+with distractors, rules found in notes and mid-task interruptions.
+`tests/test_tier_tasks.py` runs positive and negative controls for every task
+without a model, and `scripts/tier_runs.sh` is the driver for the matched runs.
+Haiku, Sonnet and Opus passed 15/18, 17/18 and 18/18, which is not significant,
+and four of the six tasks still saturate. See the
+[results and failure audit](../evidence/TIER-RESULTS.md) and the
+[protocol](research/2026-11-06-evidence-protocol.md). No person takes part in a
+benchmark, so every tool profile disables `desktop_request_host`,
+`desktop_request_human` and `desktop_control`.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

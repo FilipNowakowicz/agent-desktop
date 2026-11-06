@@ -11,6 +11,16 @@ from agent_desktop import mcp_server
 from scripts import benchmark
 
 
+class ToolProfileTests(unittest.TestCase):
+    def test_every_profile_disables_tools_needing_a_person(self):
+        # Nobody answers a handoff in a benchmark: it would wait for the timeout.
+        for profile, disabled in benchmark.TOOL_PROFILES.items():
+            with self.subTest(profile=profile):
+                self.assertLessEqual(
+                    {"request_host", "request_human", "control"}, set(disabled)
+                )
+
+
 class TimeSplitTests(unittest.TestCase):
     def test_overlapping_calls_count_once(self):
         with tempfile.TemporaryDirectory() as directory:

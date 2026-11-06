@@ -14,7 +14,6 @@ import random
 import re
 import threading
 import time
-from pathlib import Path
 
 from .atlas import ini_value
 from .tasks import Task, chromium, code, page
@@ -74,13 +73,19 @@ class IncidentTriage(Task):
         slow = ms(900, 1500)
         slowest_at = random.choice(legit)
         for when in legit:
-            add(target, random.choice([500, 502, 503, 504]),
-                when, slow if when == slowest_at else ms(150, slow - 1))
+            add(
+                target,
+                random.choice([500, 502, 503, 504]),
+                when,
+                slow if when == slowest_at else ms(150, slow - 1),
+            )
         context.answer = {
             "service": target,
             "count": count,
             "first": clock(first),
-            "slowest": next(r[4] for r in rows if r[0] == slowest_at and r[1] == target),
+            "slowest": next(
+                r[4] for r in rows if r[0] == slowest_at and r[1] == target
+            ),
         }
         # Decoys: load-test errors on the target (earlier and slower), a
         # service with more load-test errors than the target has real ones,
@@ -100,8 +105,18 @@ class IncidentTriage(Task):
         for _ in range(230):
             svc = random.choice(SERVICES)
             status = random.choice([200, 200, 200, 201, 301, 404, 429])
-            when = second(base - 3000, base + 5000) if random.random() < 0.7 else second(*inside)
-            add(svc, status, when, random.randint(10, 400), random.choice(["web", "web", "app", "loadtest"]))
+            when = (
+                second(base - 3000, base + 5000)
+                if random.random() < 0.7
+                else second(*inside)
+            )
+            add(
+                svc,
+                status,
+                when,
+                random.randint(10, 400),
+                random.choice(["web", "web", "app", "loadtest"]),
+            )
         rows.sort()
         folder = context.directory / "logs"
         folder.mkdir()
@@ -158,8 +173,17 @@ class IncidentTriage(Task):
 
 # --- 2. bulk entry with a session expiry ------------------------------------
 
-VENDORS = ["Nordlys Taxi", "Fjord Catering", "Bergen Print", "Oslo Parking",
-           "Aker Office Supply", "Vest Hotel", "Kysten Train", "Arctic Coffee", "Maple Books"]
+VENDORS = [
+    "Nordlys Taxi",
+    "Fjord Catering",
+    "Bergen Print",
+    "Oslo Parking",
+    "Aker Office Supply",
+    "Vest Hotel",
+    "Kysten Train",
+    "Arctic Coffee",
+    "Maple Books",
+]
 
 
 class BulkEntry(Task):
@@ -172,23 +196,29 @@ class BulkEntry(Task):
         ids = random.sample(range(1000, 9999), 12)
         lines = []
         for index in range(9):
-            lines.append({
-                "id": f"EXP-{ids[index]}",
-                "date": f"2026-10-{random.randint(1, 28):02d}",
-                "vendor": VENDORS[index],
-                "amount": random.randint(120, 4800),
-            })
+            lines.append(
+                {
+                    "id": f"EXP-{ids[index]}",
+                    "date": f"2026-10-{random.randint(1, 28):02d}",
+                    "vendor": VENDORS[index],
+                    "amount": random.randint(120, 4800),
+                }
+            )
         filed = random.sample(range(9), 3)
         ledger = [dict(lines[i], amount=lines[i]["amount"]) for i in filed]
         ledger += [
-            {"id": f"EXP-{ids[9 + k]}", "date": "2026-09-30",
-             "vendor": "Older Vendor", "amount": 100 + k}
+            {
+                "id": f"EXP-{ids[9 + k]}",
+                "date": "2026-09-30",
+                "vendor": "Older Vendor",
+                "amount": 100 + k,
+            }
             for k in range(3)
         ]
         random.shuffle(ledger)
         password = code(8).lower()
         context.answer = {
-            "new": [l for i, l in enumerate(lines) if i not in filed],
+            "new": [entry for i, entry in enumerate(lines) if i not in filed],
             "ledger": ledger,
         }
         note = context.directory / "october-expenses.txt"
@@ -196,7 +226,8 @@ class BulkEntry(Task):
             "Expenses to enter (amounts in NOK)\n"
             f"Ledger login if it asks: finance / {password}\n\n"
             + "".join(
-                f"{l['id']} | {l['date']} | {l['vendor']} | {l['amount']}\n" for l in lines
+                f"{entry['id']} | {entry['date']} | {entry['vendor']} | {entry['amount']}\n"
+                for entry in lines
             )
         )
         page_html = page(
@@ -236,14 +267,14 @@ class BulkEntry(Task):
         want = {r["id"]: r for r in context.answer["ledger"] + context.answer["new"]}
         got = {r["id"]: r for r in rows}
         key = lambda r: (r["id"], r["date"], r["vendor"], r["amount"])  # noqa: E731
-        ok = (
-            len(rows) == len(got) == len(want)
-            and all(i in got and key(got[i]) == key(want[i]) for i in want)
+        ok = len(rows) == len(got) == len(want) and all(
+            i in got and key(got[i]) == key(want[i]) for i in want
         )
         return ok, {"rows": len(rows), "expected": len(want)}
 
 
 # --- 3. configuration rollout with a rollback note ---------------------------
+
 
 class ConfigRollout(Task):
     """Edit staging only, keep prod, write the old values into a note."""
@@ -262,7 +293,9 @@ class ConfigRollout(Task):
         for env in ("staging", "prod"):
             (root / env).mkdir(parents=True)
         for name in names:
-            timeout = random.choice([800, 1000, 1200, 1500, 1800]) if name in low else 3000
+            timeout = (
+                random.choice([800, 1000, 1200, 1500, 1800]) if name in low else 3000
+            )
             retries = random.randint(0, 2) if name in low else 2
             if name in low:
                 context.old[name] = (timeout, retries)
@@ -317,23 +350,31 @@ class ConfigRollout(Task):
                 for s in ("client", "admin")
                 for k in ("timeout_ms", "retries")
             }
-            if (got[("client", "timeout_ms")], got[("client", "retries")]) != ("2500", "3"):
+            if (got[("client", "timeout_ms")], got[("client", "retries")]) != (
+                "2500",
+                "3",
+            ):
                 problems.append(f"{name} client values {got}")
-            if (got[("admin", "timeout_ms")], got[("admin", "retries")]) != ("1000", "1"):
+            if (got[("admin", "timeout_ms")], got[("admin", "retries")]) != (
+                "1000",
+                "1",
+            ):
                 problems.append(f"{name} admin changed")
             if ini_value(path, "client", "pool") != "8":
                 problems.append(f"{name} pool changed")
         notes = context.note.read_text().lower().splitlines()
         for name, (timeout, retries) in context.old.items():
-            lines = [l for l in notes if name in l]
+            lines = [entry for entry in notes if name in entry]
             if not any(
-                re.search(rf"\b{timeout}\b", l) and re.search(rf"\b{retries}\b", l.replace(str(timeout), ""))
-                for l in lines
+                re.search(rf"\b{timeout}\b", entry)
+                and re.search(rf"\b{retries}\b", entry.replace(str(timeout), ""))
+                for entry in lines
             ):
                 problems.append(f"rollback note lacks {name}")
         if len(notes) and any(
-            n for n in ("catalog", "orders", "billing") if n not in context.low
-            and any(n in l for l in notes)
+            n
+            for n in ("catalog", "orders", "billing")
+            if n not in context.low and any(n in entry for entry in notes)
         ):
             problems.append("rollback note lists an unchanged service")
         if state is None or state.get("changed") != len(context.low):
@@ -416,16 +457,19 @@ class MeetingSlot(Task):
                 f"{person}'s calendar: busy times\n\n"
                 + "".join(
                     f"{DAYS[d]}\n"
-                    + "".join(f"  {t} busy\n" for t in listing(calendar[d])) + "\n"
+                    + "".join(f"  {t} busy\n" for t in listing(calendar[d]))
+                    + "\n"
                     for d in range(3)
                 )
             )
             files.append(path)
         room_html = "".join(
-            f"<tr><td>{ROOMS[r]}" + "".join(
+            f"<tr><td>{ROOMS[r]}"
+            + "".join(
                 f"<td>booked: {', '.join(listing(rooms[r][d])) or 'nothing'}"
                 for d in range(3)
-            ) + "</tr>"
+            )
+            + "</tr>"
             for r in range(3)
         )
         day_options = "".join(f"<option>{d}</option>" for d in DAYS)
@@ -437,7 +481,8 @@ class MeetingSlot(Task):
             "Rules: Bob takes no meetings before 10:00; nothing may overlap the lunch "
             "hour 12:00 to 13:00; Alice leaves at 16:00 on Wednesday. Meetings start "
             "on the hour or half hour. There is exactly one slot and room that works.</p>"
-            "<table border=1 cellpadding=5><tr><th>Room" + "".join(f"<th>{d}" for d in DAYS)
+            "<table border=1 cellpadding=5><tr><th>Room"
+            + "".join(f"<th>{d}" for d in DAYS)
             + f"</tr>{room_html}</table>"
             f"<p>Day <select id=day><option value=''>Choose</option>{day_options}</select> "
             "Start (HH:MM) <input id=start size=6> Room <select id=room><option value=''>"
@@ -457,7 +502,11 @@ class MeetingSlot(Task):
             "Book the project sync for Alice and Bob in the booking page in the "
             "browser. Their calendars are open in the text editor."
         )
-        return [editor(files[0]), editor(files[1]), chromium(context, page_html)], prompt
+        return [
+            editor(files[0]),
+            editor(files[1]),
+            chromium(context, page_html),
+        ], prompt
 
     def check(self, context):
         state = context.reports.last()
@@ -473,6 +522,7 @@ class MeetingSlot(Task):
 
 
 # --- 5. delivery note that changes after the second save ---------------------
+
 
 class MovingTarget(Task):
     """Stock receipts from a note; after two saves the note is corrected."""
@@ -495,8 +545,9 @@ class MovingTarget(Task):
         context.answer = final
         note = context.directory / "delivery-note.txt"
         context.note = note
-        first = "Delivery note: add these quantities to the stock on hand\n\n" + "".join(
-            f"{s}  +{receipt[s]}\n" for s in order
+        first = (
+            "Delivery note: add these quantities to the stock on hand\n\n"
+            + "".join(f"{s}  +{receipt[s]}\n" for s in order)
         )
         note.write_text(first)
         corrected = first + (
@@ -545,11 +596,16 @@ class MovingTarget(Task):
         if state is None:
             return False, "nothing reported"
         got = {r["sku"]: r["stock"] for r in state["rows"]}
-        wrong = {s: (got.get(s), want) for s, want in context.answer.items() if got.get(s) != want}
+        wrong = {
+            s: (got.get(s), want)
+            for s, want in context.answer.items()
+            if got.get(s) != want
+        }
         return not wrong, wrong or "ok"
 
 
 # --- 6. file triage ----------------------------------------------------------
+
 
 class FileTriage(Task):
     """Rules in a note: delete temp files and exact duplicates, file the rest."""
@@ -631,7 +687,8 @@ class FileTriage(Task):
                     "missing": sorted(set(context.expected) - set(actual)),
                     "extra": sorted(set(actual) - set(context.expected)),
                     "wrong_content": sorted(
-                        p for p in set(actual) & set(context.expected)
+                        p
+                        for p in set(actual) & set(context.expected)
                         if actual[p] != context.expected[p]
                     ),
                 }
@@ -640,7 +697,11 @@ class FileTriage(Task):
         if not manifest.exists():
             problems.append("no manifest")
         else:
-            lines = [l.strip() for l in manifest.read_text().splitlines() if l.strip()]
+            lines = [
+                entry.strip()
+                for entry in manifest.read_text().splitlines()
+                if entry.strip()
+            ]
             if lines != sorted(context.expected):
                 problems.append({"manifest": lines})
         return not problems, problems or "ok"

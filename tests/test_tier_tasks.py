@@ -25,7 +25,9 @@ SEEDS = (101, 102, 103, 7, 8)
 
 
 def js_set(**fields):
-    return "".join(f"set(document.getElementById('{k}'),{v!r});" for k, v in fields.items())
+    return "".join(
+        f"set(document.getElementById('{k}'),{v!r});" for k, v in fields.items()
+    )
 
 
 # Each solver returns (python side effect or None, javascript) for a variant.
@@ -43,7 +45,9 @@ def incident(context, variant):
         a["first"] = "14:00:05"
     elif variant == "wrong-request":
         a["slowest"] = "r-zzzzzz"
-    return None, js_set(svc=a["service"], n=a["count"], first=a["first"], req=a["slowest"]) + "go.click();"
+    return None, js_set(
+        svc=a["service"], n=a["count"], first=a["first"], req=a["slowest"]
+    ) + "go.click();"
 
 
 def bulk(context, variant):
@@ -54,7 +58,7 @@ def bulk(context, variant):
         entries = entries[:-1]
     if variant == "wrong-amount":
         entries[0] = dict(entries[0], amount=entries[0]["amount"] + 1)
-    script = "const E=%r;const wait=ms=>new Promise(r=>setTimeout(r,ms));(async()=>{" % (entries,)
+    script = f"const E={entries!r};const wait=ms=>new Promise(r=>setTimeout(r,ms));(async()=>{{"
     script += (
         "for(let i=0;i<E.length;i++){const e=E[i];"
         "if(!login.hidden){set(u,'finance');set(p,PW);si.click()}"
@@ -62,7 +66,9 @@ def bulk(context, variant):
         "await wait(1600)}"
     )
     if variant == "no-login":
-        script = script.replace("if(!login.hidden){set(u,'finance');set(p,PW);si.click()}", "")
+        script = script.replace(
+            "if(!login.hidden){set(u,'finance');set(p,PW);si.click()}", ""
+        )
     script += "})();"
     return None, script
 
@@ -83,13 +89,16 @@ def rollout(context, variant):
                     text = text.replace("timeout_ms = 1000", "timeout_ms = 2500")
                 path.write_text(text)
         if variant == "high-too":
-            high = next(n for n in ("orders", "billing", "catalog") if n not in context.low)
+            high = next(
+                n for n in ("orders", "billing", "catalog") if n not in context.low
+            )
             path, text = context.files[("staging", high)]
             path.write_text(text.replace("timeout_ms = 3000", "timeout_ms = 2500", 1))
         if variant != "no-note":
             context.note.write_text(
                 "".join(
-                    f"{n}: timeout {t}, retries {r}\n" for n, (t, r) in context.old.items()
+                    f"{n}: timeout {t}, retries {r}\n"
+                    for n, (t, r) in context.old.items()
                 )
             )
 
@@ -105,7 +114,9 @@ def meeting(context, variant):
         room = (room + 1) % 3
     if variant == "wrong-start":
         start += 1
-    return None, js_set(day=tiers.DAYS[day], start=tiers.hm(start), room=tiers.ROOMS[room]) + "book.click();yes.click();"
+    return None, js_set(
+        day=tiers.DAYS[day], start=tiers.hm(start), room=tiers.ROOMS[room]
+    ) + "book.click();yes.click();"
 
 
 def moving(context, variant):
@@ -115,10 +126,10 @@ def moving(context, variant):
     if variant == "uncorrected":
         target = dict(context.uncorrected)
     script = (
-        "const T=%r;const wait=ms=>new Promise(r=>setTimeout(r,ms));(async()=>{"
+        f"const T={target!r};const wait=ms=>new Promise(r=>setTimeout(r,ms));(async()=>{{"
         "for(const [sku,v] of Object.entries(T)){const i=rows.findIndex(r=>r.sku===sku);"
         "if(rows[i].stock===v)continue;app.querySelectorAll('button')[i].click();"
-        "set(st,v);sv.click();await wait(300)}})();" % (target,)
+        "set(st,v);sv.click();await wait(300)}})();"
     )
     return None, script
 
@@ -148,12 +159,18 @@ def triage(context, variant):
 
 
 SOLVERS = {
-    "tier-incident-triage": (incident, ["loadtest-counted", "wrong-service", "wrong-first", "wrong-request"]),
+    "tier-incident-triage": (
+        incident,
+        ["loadtest-counted", "wrong-service", "wrong-first", "wrong-request"],
+    ),
     "tier-bulk-entry": (bulk, ["missing-last", "wrong-amount", "no-login"]),
     "tier-config-rollout": (rollout, ["prod-too", "admin-too", "high-too", "no-note"]),
     "tier-meeting-slot": (meeting, ["wrong-room", "wrong-start"]),
     "tier-moving-target": (moving, ["uncorrected"]),
-    "tier-file-triage": (triage, ["near-duplicate-deleted", "no-dedupe", "no-manifest"]),
+    "tier-file-triage": (
+        triage,
+        ["near-duplicate-deleted", "no-dedupe", "no-manifest"],
+    ),
 }
 
 
@@ -166,7 +183,10 @@ class TierControls(unittest.TestCase):
         reports = Reports()
         self.addCleanup(reports.close)
         context = types.SimpleNamespace(
-            directory=directory, reports=reports, report_url=reports.url, home=str(directory)
+            directory=directory,
+            reports=reports,
+            report_url=reports.url,
+            home=str(directory),
         )
         task.setup(context)
         if task.name == "tier-moving-target":
@@ -185,11 +205,18 @@ class TierControls(unittest.TestCase):
                 )
             process = subprocess.Popen(
                 [
-                    CHROMIUM, "--headless", "--disable-gpu", "--no-sandbox",
+                    CHROMIUM,
+                    "--headless",
+                    "--disable-gpu",
+                    "--no-sandbox",
                     f"--user-data-dir={directory / 'profile'}",
-                    "--virtual-time-budget=25000", "--dump-dom", page.as_uri(),
+                    "--virtual-time-budget=25000",
+                    "--dump-dom",
+                    page.as_uri(),
                 ],
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
                 start_new_session=True,
             )
             process.communicate(timeout=60)
@@ -224,7 +251,9 @@ def uncorrected(context):
     for s, v in context.answer.items():
         start[s] = v
     # Recover the initial stock from the page rows.
-    rows = tiers.re.search(r"const rows=(\[.*?\]);let cur", (context.directory / "page.html").read_text())
+    rows = tiers.re.search(
+        r"const rows=(\[.*?\]);let cur", (context.directory / "page.html").read_text()
+    )
     initial = {r["sku"]: r["stock"] for r in eval(rows.group(1))}  # noqa: S307 (own data)
     return {s: initial[s] + first.get(s, 0) for s in initial}
 

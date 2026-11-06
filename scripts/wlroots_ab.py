@@ -43,7 +43,7 @@ def labwc_pids():
 
 
 def wlroots_of(maps):
-    libs = {l.split()[-1] for l in maps.splitlines() if "libwlroots" in l}
+    libs = {entry.split()[-1] for entry in maps.splitlines() if "libwlroots" in entry}
     return sorted(libs)
 
 
@@ -56,14 +56,16 @@ def one(runtime, base_path):
         new = {p: m for p, m in labwc_pids().items() if p not in before}
         row["wlroots"] = sorted({x for m in new.values() for x in wlroots_of(m)})
         core.request(
-            session, "launch",
+            session,
+            "launch",
             argv=["xterm", "-u8", "-title", TITLE, "-e", "sleep", "60"],
         )
         start = time.monotonic()
         mapped = None
         while time.monotonic() - start < TIMEOUT:
-            if any(w["title"] == TITLE
-                   for w in core.request(session, "windows")["windows"]):
+            if any(
+                w["title"] == TITLE for w in core.request(session, "windows")["windows"]
+            ):
                 mapped = time.monotonic() - start
                 break
             time.sleep(0.05)
@@ -93,7 +95,9 @@ def main():
     base_path = os.environ["PATH"]
     rng = random.Random(args.seed)
     stop = multiprocessing.Event()
-    load = [multiprocessing.Process(target=busy, args=(stop,)) for _ in range(args.load)]
+    load = [
+        multiprocessing.Process(target=busy, args=(stop,)) for _ in range(args.load)
+    ]
     for p in load:
         p.start()
     try:
@@ -103,8 +107,9 @@ def main():
                 rng.shuffle(order)
                 for arm in order:
                     row = one(arms[arm], base_path)
-                    row.update(arm=arm, pair=i, t=time.time(),
-                               loadavg=os.getloadavg()[0])
+                    row.update(
+                        arm=arm, pair=i, t=time.time(), loadavg=os.getloadavg()[0]
+                    )
                     fh.write(json.dumps(row) + "\n")
                     fh.flush()
     finally:

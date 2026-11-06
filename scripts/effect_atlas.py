@@ -274,9 +274,10 @@ class Run:
             return [n for n in nodes if n["role"] == "page tab"]
         found = []
         for index, node in enumerate(nodes):
-            if node["role"] == "list item" and node["depth"] == self.spec["dialog"][
-                "pages_depth"
-            ]:
+            if (
+                node["role"] == "list item"
+                and node["depth"] == self.spec["dialog"]["pages_depth"]
+            ):
                 label = next(
                     (
                         m["name"]
@@ -403,11 +404,7 @@ def discover(spec):
             top = min((n["depth"] for n in tabs), default=0)
             for tab in [n["name"] for n in tabs if n["depth"] == top]:
                 run.select_tab(tab, top)
-                inner = [
-                    n
-                    for n in run.page_tabs()
-                    if n["depth"] > top
-                ]
+                inner = [n for n in run.page_tabs() if n["depth"] > top]
                 if not inner:
                     collect([(top, tab)])
                 for sub in inner:

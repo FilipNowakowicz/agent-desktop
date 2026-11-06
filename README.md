@@ -157,9 +157,10 @@ The [research notes](docs/project/RESEARCH_FINDINGS.md) and dated reviews are hi
 The daily-use alpha gates closed on 2026-10-08: two supported installations, a
 20-task pilot at 20/20 on the fixed build, and a real login handoff that
 persisted across sessions. Current benchmarks do not establish a general
-reliability or performance advantage over other runtimes. A fix for the X11
-mapping failure is proposed upstream as
-[wlroots!5477](https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5477).
+reliability or performance advantage over other runtimes. The X11 mapping
+failure is fixed by a local wlroots patch; the upstream proposal,
+[wlroots!5477](https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5477),
+was closed unmerged.
 
 ## Research
 

@@ -430,7 +430,7 @@ def trial(spec, control, click=True):
         run.close()
 
 
-def verify(spec, control, effect, default_config):
+def verify(spec, control, effect, default_config, negative=False):
     """Apply the learned keys to a default configuration and check the app
     honours them: the control shows the learned state (check boxes), and one
     more click returns each key to its default value."""
@@ -438,7 +438,7 @@ def verify(spec, control, effect, default_config):
     try:
         run.start()
         run.quit()  # creates the default configuration
-        for name, key, _old, new in effect:
+        for name, key, _old, new in [] if negative else effect:
             path = run.home / name
             if new is None:
                 return {"verified": False, "reason": "learned a removal"}
@@ -518,10 +518,10 @@ def main():
             if effect:
                 try:
                     entry.update(verify(spec, control, effect, default))
-                    if args.negative_control and all(o is not None for _n, _k, o, _v in effect):
-                        flat = [(n, k, o, o) for n, k, o, _v in effect]
+                    if args.negative_control:
+                        # Nothing written: the control must show its default.
                         entry["negative_control_verified"] = verify(
-                            spec, control, flat, default
+                            spec, control, effect, default, negative=True
                         )["verified"]
                 except Exception as error:
                     entry["verify_error"] = f"{type(error).__name__}: {error}"

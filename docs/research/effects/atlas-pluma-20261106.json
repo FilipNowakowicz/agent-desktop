@@ -1,0 +1,507 @@
+{
+ "summary": {
+  "app": "pluma",
+  "controls": 29,
+  "with_effect": 19,
+  "verified": 19,
+  "negative_control_run": 19,
+  "negative_control_false_pass": 0,
+  "errors": 6,
+  "noise_keys": 0,
+  "interaction_keys": [],
+  "minutes": 8.3
+ },
+ "atlas": [
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Toolbar",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] toolbar-visible",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Statusbar",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] statusbar-visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Side Pane",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] side-pane-visible",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Bottom Pane",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Undo",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Redo",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Cut",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Copy",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Paste",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Select All",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Preferences",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Enable text wrapping",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] wrap-mode",
+     "from": null,
+     "to": "'GTK_WRAP_NONE'"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Do not split words over two lines",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] wrap-mode",
+     "from": null,
+     "to": "'GTK_WRAP_CHAR'"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Highlight current line",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] highlight-current-line",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Highlight matching bracket",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] bracket-matching",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display line numbers",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] display-line-numbers",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display right margin at column",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] display-right-margin",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display grid pattern",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] background-pattern",
+     "from": null,
+     "to": "'grid'"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "View"
+    ]
+   ],
+   "label": "Display overview map",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] display-overview-map",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Insert spaces instead of tabs",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] insert-spaces",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Enable automatic indentation",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] auto-indent",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Create a backup copy of files before saving",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] create-backup-copy",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Autosave files every",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] auto-save",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Show spaces",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] enable-space-drawer-space",
+     "from": null,
+     "to": "'show-all'"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Show trailing spaces only",
+   "default": false,
+   "effect": []
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Show tabs",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] enable-space-drawer-tab",
+     "from": null,
+     "to": "'show-all'"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Show trailing tabs only",
+   "default": false,
+   "effect": []
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Show newlines",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] enable-space-drawer-newline",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Font & Colours"
+    ]
+   ],
+   "label": "Use the system fixed width font (Monospace 10)",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/mate/pluma] use-default-font",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  }
+ ]
+}

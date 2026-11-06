@@ -57,6 +57,49 @@ APPS = {
         "quit": {"key": "q", "modifiers": ["ctrl"]},
         "config": ".config",
     },
+    "xed": {
+        "argv": ["env", "GSETTINGS_BACKEND=keyfile", "xed"],
+        "app_id": "xed",
+        "menus": ["View", "Edit", "Tools"],
+        "dialog": {
+            "menu": "Edit",
+            "item": "Preferences",
+            "title": "Xed Preferences",
+            "close_button": "Close",
+            "pages": "list",
+            "pages_depth": 3,
+            "toggles": True,
+        },
+        "quit": {"key": "q", "modifiers": ["ctrl"]},
+        "config": ".config",
+    },
+    "pluma": {
+        "argv": ["env", "GSETTINGS_BACKEND=keyfile", "pluma"],
+        "app_id": "pluma",
+        "menus": ["View", "Edit"],
+        "dialog": {
+            "menu": "Edit",
+            "item": "Preferences",
+            "title": "Pluma Preferences",
+            "close_button": "Close",
+        },
+        "quit": {"key": "q", "modifiers": ["ctrl"]},
+        "config": ".config",
+    },
+    "galculator": {
+        "argv": ["galculator"],
+        "app_id": "galculator",
+        "menus": ["View"],
+        "precreate": [".config/galculator"],
+        "dialog": {
+            "menu": "Edit",
+            "item": "Preferences",
+            "title": "galculator Preferences",
+            "close_button": "Close",
+        },
+        "quit": {"key": "q", "modifiers": ["ctrl"]},
+        "config": ".config",
+    },
 }
 
 
@@ -165,6 +208,9 @@ class Run:
         self.home = core.session_path(self.session) / "home"
 
     def start(self):
+        # Some applications create only the last directory of their config path.
+        for directory in self.spec.get("precreate", []):
+            (self.home / directory).mkdir(parents=True, exist_ok=True)
         core.request(self.session, "launch", argv=self.spec["argv"])
         if not core.wait(
             self.session, app_id=self.spec["app_id"], timeout=30, stable_ms=800
@@ -220,21 +266,53 @@ class Run:
     def dialog_nodes(self):
         return self.nodes(window=self.spec["dialog"]["title"])
 
+    def page_tabs(self):
+        """Pages of the preferences dialog: notebook tabs, or (spec "pages":
+        "list") the rows of a sidebar list at "pages_depth", named by their label."""
+        nodes = self.dialog_nodes()
+        if self.spec["dialog"].get("pages") != "list":
+            return [n for n in nodes if n["role"] == "page tab"]
+        found = []
+        for index, node in enumerate(nodes):
+            if (
+                node["role"] == "list item"
+                and node["depth"] == self.spec["dialog"]["pages_depth"]
+            ):
+                label = next(
+                    (
+                        m["name"]
+                        for m in nodes[index + 1 :]
+                        if m["role"] == "label" and m["depth"] > node["depth"]
+                    ),
+                    "",
+                )
+                found.append({**node, "name": label})
+        return found
+
     def select_tab(self, tab, depth=None):
         """Select a notebook tab through its parent's accessibility Selection."""
         node = next(
             n
-            for n in self.dialog_nodes()
-            if n["role"] == "page tab"
-            and n["name"] == tab
-            and (depth is None or n["depth"] == depth)
+            for n in self.page_tabs()
+            if n["name"] == tab and (depth is None or n["depth"] == depth)
         )
         if "selected" not in node["states"]:
             core.request(self.session, "ui_action", node=node["id"], action="select")
             core.wait(self.session, stable_ms=400, timeout=5)
 
     def check_boxes(self):
-        return [n for n in self.dialog_nodes() if n["role"] == "check box"]
+        """Check boxes; with spec "toggles", unnamed toggle buttons (switches)
+        are named by the label before them."""
+        nodes = self.dialog_nodes()
+        found = [n for n in nodes if n["role"] == "check box"]
+        if self.spec["dialog"].get("toggles"):
+            label = ""
+            for node in nodes:
+                if node["role"] == "label" and node["name"].strip():
+                    label = node["name"]
+                elif node["role"] == "toggle button" and not node["name"].strip():
+                    found.append({**node, "name": label})
+        return found
 
     def close_dialog(self):
         button = self.spec["dialog"].get("close_button")
@@ -285,7 +363,8 @@ def perform(run, control, click=True):
     node = next(n for n in run.check_boxes() if n["name"] == control["label"])
     state = "checked" in node["states"]
     if click:
-        core.request(run.session, "ui_action", node=node["id"], action="click")
+        action = "toggle" if node["role"] == "toggle button" else "click"
+        core.request(run.session, "ui_action", node=node["id"], action=action)
         core.wait(run.session, stable_ms=400, timeout=5)
     run.close_dialog()
     return state
@@ -321,15 +400,11 @@ def discover(spec):
                             }
                         )
 
-            tabs = [n for n in run.dialog_nodes() if n["role"] == "page tab"]
+            tabs = run.page_tabs()
             top = min((n["depth"] for n in tabs), default=0)
             for tab in [n["name"] for n in tabs if n["depth"] == top]:
                 run.select_tab(tab, top)
-                inner = [
-                    n
-                    for n in run.dialog_nodes()
-                    if n["role"] == "page tab" and n["depth"] > top
-                ]
+                inner = [n for n in run.page_tabs() if n["depth"] > top]
                 if not inner:
                     collect([(top, tab)])
                 for sub in inner:
@@ -352,7 +427,7 @@ def trial(spec, control, click=True):
         run.close()
 
 
-def verify(spec, control, effect, default_config):
+def verify(spec, control, effect, default_config, negative=False):
     """Apply the learned keys to a default configuration and check the app
     honours them: the control shows the learned state (check boxes), and one
     more click returns each key to its default value."""
@@ -360,7 +435,7 @@ def verify(spec, control, effect, default_config):
     try:
         run.start()
         run.quit()  # creates the default configuration
-        for name, key, _old, new in effect:
+        for name, key, _old, new in [] if negative else effect:
             path = run.home / name
             if new is None:
                 return {"verified": False, "reason": "learned a removal"}
@@ -389,6 +464,11 @@ def main():
     parser.add_argument("app", choices=sorted(APPS))
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--negative-control",
+        action="store_true",
+        help="also verify each effect with its keys written at their default value",
+    )
     args = parser.parse_args()
     spec = APPS[args.app]
     started = time.monotonic()
@@ -435,6 +515,11 @@ def main():
             if effect:
                 try:
                     entry.update(verify(spec, control, effect, default))
+                    if args.negative_control:
+                        # Nothing written: the control must show its default.
+                        entry["negative_control_verified"] = verify(
+                            spec, control, effect, default, negative=True
+                        )["verified"]
                 except Exception as error:
                     entry["verify_error"] = f"{type(error).__name__}: {error}"
         atlas.append(entry)
@@ -444,6 +529,10 @@ def main():
         "controls": len(atlas),
         "with_effect": sum(bool(e.get("effect")) for e in atlas),
         "verified": sum(bool(e.get("verified")) for e in atlas),
+        "negative_control_run": sum("negative_control_verified" in e for e in atlas),
+        "negative_control_false_pass": sum(
+            bool(e.get("negative_control_verified")) for e in atlas
+        ),
         "errors": sum("error" in e for e in atlas),
         "noise_keys": len(noise),
         "interaction_keys": sorted(f"{n} {k}" for n, k in common),

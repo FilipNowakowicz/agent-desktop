@@ -27,6 +27,7 @@ from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.realistic import REALISTIC_TASKS  # noqa: E402
 from benchmarks.tasks import TASKS, Reports  # noqa: E402
+from benchmarks.tiers import TIER_TASKS  # noqa: E402
 
 SUITES = {
     "standard": TASKS,
@@ -35,12 +36,15 @@ SUITES = {
     "effects": EFFECT_TASKS,
     "atlas": ATLAS_TASKS,
     "realistic": REALISTIC_TASKS,
+    "tiers": TIER_TASKS,
 }
 
 # Tool profiles for comparisons. "basic" is the tool set before waiting, action
 # sequences and semantic UI were added (screenshot region/scale arguments remain
 # available in both). Harness-owned lifecycle and launch are always disabled.
-LIFECYCLE = ["create", "destroy", "launch"]
+# request_host (the person's own screen) is also disabled: benchmarks run in
+# private sessions only.
+LIFECYCLE = ["create", "destroy", "launch", "request_host"]
 NEWER = [
     "wait",
     "actions",

@@ -1,0 +1,382 @@
+{
+ "summary": {
+  "app": "xed",
+  "controls": 40,
+  "with_effect": 4,
+  "verified": 3,
+  "errors": 25,
+  "noise_keys": 1,
+  "interaction_keys": [],
+  "minutes": 6.7
+ },
+ "atlas": [
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Toolbar",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/x/editor/preferences/ui] toolbar-visible",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Menubar",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/x/editor/preferences/ui] menubar-visible",
+     "from": null,
+     "to": "false"
+    }
+   ],
+   "verify_error": "RuntimeError: menu View not found in []"
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Statusbar",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/x/editor/preferences/ui] statusbar-visible",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Side Pane",
+   "effect": [
+    {
+     "file": "~/.config/glib-2.0/settings/keyfile",
+     "key": "[org/x/editor/preferences/ui] side-panel-visible",
+     "from": null,
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": null,
+   "restored_by_click": true
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Bottom Pane",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Overview Map",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Word wrap",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Larger Text",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Smaller Text",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Normal size",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Join Lines",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Highlight Mode",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Undo",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Redo",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Cut",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Copy",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Paste",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Duplicate",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Select All",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Toggle Comment",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Toggle Comment Block",
+   "error": "DesktopError: ValueError: Node offers no click action; it has []"
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Sort lines",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Edit",
+   "label": "Preferences",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "menu",
+   "menu": "Tools",
+   "label": "Autocheck Spelling",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "Tools",
+   "label": "Document Statistics",
+   "error": "RuntimeError: application did not quit"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Use the system fixed width font (Adwaita Mono 11)",
+   "default": true,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Display line numbers",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Display overview map",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Display right margin",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Draw whitespace",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Highlight the current line",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Highlight matching brackets",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Use spaces instead of tabs",
+   "default": true,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Automatic indentation",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Word wrap",
+   "default": true,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Editor"
+    ]
+   ],
+   "label": "Split words over two lines",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Save"
+    ]
+   ],
+   "label": "Create a backup copy of files before saving",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Save"
+    ]
+   ],
+   "label": "Autosave files",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Save"
+    ]
+   ],
+   "label": "Ensure Trailing Newline",
+   "default": true,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Theme"
+    ]
+   ],
+   "label": "Use dark theme variant (if available)",
+   "default": false,
+   "error": "DesktopError: ValueError: Node offers no click action; it has ['toggle']"
+  }
+ ]
+}

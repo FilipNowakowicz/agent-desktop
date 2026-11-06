@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-11-06 — Evidence round
+
+Protocol committed before the runs: docs/research/2026-11-06-evidence-protocol.md.
+
+- wlroots stock vs repaired, 1000 shuffled pairs under load: 15/972 failed on
+  stock against 0/1000 repaired (Fisher p = 2.3e-5), or 17/1000 against 0/1000
+  without the integrity exclusion (p = 1.4e-5). See evidence/WLROOTS-RESULTS.md.
+- Effect atlas: galculator, xed and pluma added, with negative controls writing
+  nothing: 47 run, 0 false passes (docs/research/effects/atlas-*-20261106.json).
+- Tier suite: six harder tasks over three seeds and three model tiers gave 15/18,
+  17/18 and 18/18 (not significant). See evidence/TIER-RESULTS.md.
+
+Also recorded that wlroots!5477 was closed unmerged.
+
 ## 2026-10-24 — Reconcile unpublished correctness research stash
 
 Compared all six stashed paths against main `f0af8b9` (also origin/main at

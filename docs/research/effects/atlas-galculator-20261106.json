@@ -1,0 +1,274 @@
+{
+ "summary": {
+  "app": "galculator",
+  "controls": 13,
+  "with_effect": 12,
+  "verified": 8,
+  "negative_control_run": 10,
+  "negative_control_false_pass": 0,
+  "errors": 0,
+  "noise_keys": 0,
+  "interaction_keys": [],
+  "minutes": 3.7
+ },
+ "atlas": [
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Basic Mode",
+   "effect": []
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Scientific Mode",
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] mode",
+     "from": "0",
+     "to": "1"
+    }
+   ],
+   "verified": false,
+   "state_shown": null,
+   "restored_by_click": false,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Paper Mode",
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] mode",
+     "from": "0",
+     "to": "2"
+    }
+   ],
+   "verified": false,
+   "state_shown": null,
+   "restored_by_click": false,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "menu",
+   "menu": "View",
+   "label": "Show menu bar",
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] show_menu_bar",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verify_error": "RuntimeError: menu View not found in []"
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Display"
+    ]
+   ],
+   "label": "Number base units",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] display_module_number",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Display"
+    ]
+   ],
+   "label": "Open brackets",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] display_module_open",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Display"
+    ]
+   ],
+   "label": "Arithmetic operation",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] display_module_arith",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Display"
+    ]
+   ],
+   "label": "Notation",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] display_module_notation",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Display"
+    ]
+   ],
+   "label": "Angle base units",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] display_module_angle",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Buttons"
+    ]
+   ],
+   "label": "Use custom button font",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] custom_button_font",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "Numbers"
+    ]
+   ],
+   "label": "Show thousands separator",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] dec_sep",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ]
+   ],
+   "label": "Remember display value on exit",
+   "default": false,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] remembers_display",
+     "from": "false",
+     "to": "true"
+    }
+   ],
+   "verified": true,
+   "state_shown": true,
+   "restored_by_click": true,
+   "negative_control_verified": false
+  },
+  {
+   "kind": "check box",
+   "tab": [
+    [
+     3,
+     "General"
+    ]
+   ],
+   "label": "Show menu bar",
+   "default": true,
+   "effect": [
+    {
+     "file": "~/.config/galculator/galculator.conf",
+     "key": "[general] show_menu_bar",
+     "from": "true",
+     "to": "false"
+    }
+   ],
+   "verify_error": "RuntimeError: menu Edit not found in []"
+  }
+ ]
+}

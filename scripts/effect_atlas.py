@@ -73,6 +73,19 @@ APPS = {
         "quit": {"key": "q", "modifiers": ["ctrl"]},
         "config": ".config",
     },
+    "pluma": {
+        "argv": ["env", "GSETTINGS_BACKEND=keyfile", "pluma"],
+        "app_id": "pluma",
+        "menus": ["View", "Edit"],
+        "dialog": {
+            "menu": "Edit",
+            "item": "Preferences",
+            "title": "Pluma Preferences",
+            "close_button": "Close",
+        },
+        "quit": {"key": "q", "modifiers": ["ctrl"]},
+        "config": ".config",
+    },
     "galculator": {
         "argv": ["galculator"],
         "app_id": "galculator",

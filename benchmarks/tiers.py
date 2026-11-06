@@ -135,7 +135,7 @@ class IncidentTriage(Task):
             "document.body.innerHTML='<h2>Report filed</h2>';report(st)};",
         )
         prompt = (
-            "Prepare the incident report in the browser. The incident notes are "
+            "File the incident report in the browser. The incident notes are "
             "open in the text editor and the access log is in the terminal's "
             "directory."
         )

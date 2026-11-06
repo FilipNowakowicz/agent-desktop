@@ -454,6 +454,11 @@ def main():
     parser.add_argument("app", choices=sorted(APPS))
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--negative-control",
+        action="store_true",
+        help="also verify each effect with its keys written at their default value",
+    )
     args = parser.parse_args()
     spec = APPS[args.app]
     started = time.monotonic()
@@ -500,6 +505,11 @@ def main():
             if effect:
                 try:
                     entry.update(verify(spec, control, effect, default))
+                    if args.negative_control and all(o is not None for _n, _k, o, _v in effect):
+                        flat = [(n, k, o, o) for n, k, o, _v in effect]
+                        entry["negative_control_verified"] = verify(
+                            spec, control, flat, default
+                        )["verified"]
                 except Exception as error:
                     entry["verify_error"] = f"{type(error).__name__}: {error}"
         atlas.append(entry)
@@ -509,6 +519,10 @@ def main():
         "controls": len(atlas),
         "with_effect": sum(bool(e.get("effect")) for e in atlas),
         "verified": sum(bool(e.get("verified")) for e in atlas),
+        "negative_control_run": sum("negative_control_verified" in e for e in atlas),
+        "negative_control_false_pass": sum(
+            bool(e.get("negative_control_verified")) for e in atlas
+        ),
         "errors": sum("error" in e for e in atlas),
         "noise_keys": len(noise),
         "interaction_keys": sorted(f"{n} {k}" for n, k in common),

@@ -156,7 +156,7 @@ class DispatchEvidenceTests(unittest.TestCase):
         self.keyboard.key.side_effect = BrokenPipeError("key reply lost")
         with self.assertRaises(core.DeliveryUnknown):
             self.request("key", key="a")
-        self.keyboard.key.assert_called_once_with(97, [], 1)
+        self.keyboard.key.assert_called_once_with(97, [], 1, None)
 
     def test_launch_failure_after_process_creation_is_unknown(self):
         process = mock.Mock()

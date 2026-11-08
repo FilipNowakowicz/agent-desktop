@@ -1092,6 +1092,8 @@ SEQUENCE_ACTIONS = (
     "scroll",
     "type",
     "key",
+    "key_down",
+    "key_up",
     "ui_action",
     "focus",
     "wait",
@@ -1168,7 +1170,21 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
                 pass  # e.g. the session was destroyed; the lease went with it
 
 
-def run_steps(
+def run_steps(session, actions, observation, controller, *options, **named):
+    """Dispatch a sequence; keys it held never outlive it, however it ends."""
+    try:
+        return dispatch_steps(
+            session, actions, observation, controller, *options, **named
+        )
+    finally:
+        if any(step.get("action") == "key_down" for step in actions):
+            try:
+                request(session, "release_keys", controller)
+            except DesktopError:
+                pass  # the worker releases them after KEY_HOLD_SECONDS
+
+
+def dispatch_steps(
     session,
     actions,
     observation,

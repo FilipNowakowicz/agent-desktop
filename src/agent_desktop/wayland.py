@@ -229,6 +229,9 @@ class VirtualPointer:
 MODIFIERS = {"shift": 1, "ctrl": 4, "alt": 8, "logo": 64}
 CONTROL_KEYSYMS = {"\n": 0xFF0D, "\t": 0xFF09, "\b": 0xFF08, "\x1b": 0xFF1B}
 SHIFT = MODIFIERS["shift"]
+# Physical keys pressed for a chord, and the mask each key contributes while held.
+MODIFIER_CODES = {"shift": 42, "ctrl": 29, "alt": 56, "logo": 125}
+MODIFIER_BITS = {29: 4, 97: 4, 42: 1, 54: 1, 56: 8, 100: 8, 125: 64}
 
 # A US keyboard layout on real evdev codes. Applications such as Chromium also
 # interpret physical codes (e.g. 14 is Backspace), so characters must not land
@@ -327,6 +330,7 @@ for _code, _pair in US_ROWS.items():
     for _level, _char in enumerate(_pair):
         FIXED.setdefault(ord(_char), (_code, _level))
 FIXED.update({keysym: (code, 0) for keysym, code in NAMED_KEYS.items()})
+NAMED_MODIFIERS = {k for k, code in NAMED_KEYS.items() if code in MODIFIER_BITS}
 
 
 def char_keysym(character):
@@ -391,6 +395,90 @@ class Keysyms:
         return keysym
 
 
+class XkbRuleNames(ctypes.Structure):
+    _fields_ = [
+        (name, ctypes.c_char_p)
+        for name in ("rules", "model", "layout", "variant", "options")
+    ]
+
+
+class BindLayout:
+    """Which physical key produces each keysym under a configured layout.
+
+    Hyprland matches shortcuts by reading a key's code through its configured
+    layout, ignoring the sending keyboard's keymap. A chord for "l" must therefore
+    use the code that means "l" there (on Dvorak, not the US position).
+    """
+
+    def __init__(self, library, **names):
+        library.xkb_context_new.restype = ctypes.c_void_p
+        library.xkb_context_new.argtypes = [ctypes.c_int]
+        library.xkb_context_unref.argtypes = [ctypes.c_void_p]
+        library.xkb_keymap_new_from_names.restype = ctypes.c_void_p
+        library.xkb_keymap_new_from_names.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(XkbRuleNames),
+            ctypes.c_int,
+        ]
+        library.xkb_keymap_unref.argtypes = [ctypes.c_void_p]
+        for function in ("xkb_keymap_min_keycode", "xkb_keymap_max_keycode"):
+            getattr(library, function).restype = ctypes.c_uint32
+            getattr(library, function).argtypes = [ctypes.c_void_p]
+        library.xkb_keymap_key_get_syms_by_level.restype = ctypes.c_int
+        library.xkb_keymap_key_get_syms_by_level.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+            ctypes.POINTER(ctypes.POINTER(ctypes.c_uint32)),
+        ]
+        rules = XkbRuleNames(
+            **{key: value.encode() for key, value in names.items() if value}
+        )
+        context = library.xkb_context_new(0)
+        if not context:
+            raise WaylandError("Cannot create an xkb context")
+        try:
+            keymap = library.xkb_keymap_new_from_names(context, ctypes.byref(rules), 0)
+            if not keymap:
+                raise WaylandError(f"Cannot compile the keyboard layout: {names}")
+            try:
+                self.rows, self.places = self.read(library, keymap)
+            finally:
+                library.xkb_keymap_unref(keymap)
+        finally:
+            library.xkb_context_unref(context)
+
+    @staticmethod
+    def read(library, keymap):
+        rows = {}
+        places = {}
+        first = library.xkb_keymap_min_keycode(keymap)
+        last = library.xkb_keymap_max_keycode(keymap)
+        for level in (0, 1):
+            for xkb_code in range(first, last + 1):
+                symbols = ctypes.POINTER(ctypes.c_uint32)()
+                count = library.xkb_keymap_key_get_syms_by_level(
+                    keymap, xkb_code, 0, level, ctypes.byref(symbols)
+                )
+                code = xkb_code - 8
+                if count != 1 or code <= 0:
+                    continue
+                keysym = symbols[0]
+                row = rows.setdefault(code, [])
+                if level == len(row) and keysym not in row:
+                    row.append(keysym)
+                places.setdefault(keysym, (code, level == 1))
+        return rows, places
+
+    def place(self, keysym):
+        """(code, shifted, keysyms of that key), or None if no key produces it."""
+        if keysym not in self.places:
+            return None
+        code, shifted = self.places[keysym]
+        return code, shifted, self.rows[code]
+
+
 class VirtualKeyboard:
     """A persistent virtual keyboard with a US layout plus on-demand extra keys.
 
@@ -408,6 +496,10 @@ class VirtualKeyboard:
         self.extra = {}  # pool code -> keysym
         self.recent = list(POOL)  # least recently used first
         self.pinned = set()  # pool codes needed by keys not yet sent
+        self.overrides = {}  # code -> keysyms, for the key being sent
+        self.held = {}  # code -> keysyms it was given while held, or None
+        self.mask = 0  # modifiers from held keys
+        self.uploaded = None
         self.dirty = True
         self.upload()
         self.connection.roundtrip()
@@ -423,6 +515,8 @@ class VirtualKeyboard:
             symbols[code] = [keysym]
         for code, keysym in self.extra.items():
             symbols[code] = [keysym]
+        symbols.update({c: row for c, row in self.held.items() if row})
+        symbols.update(self.overrides)
         codes = sorted(symbols)
         lines = [
             "xkb_keymap {",
@@ -445,6 +539,10 @@ class VirtualKeyboard:
 
     def upload(self):
         data = self.keymap()
+        self.dirty = False
+        if data == self.uploaded:
+            return
+        self.uploaded = data
         with tempfile.TemporaryFile(dir=self.scratch) as stream:
             stream.write(data)
             stream.flush()
@@ -453,7 +551,6 @@ class VirtualKeyboard:
                 self.id, 0, struct.pack("=II", 1, len(data)), fd=stream.fileno()
             )
             self.connection.roundtrip()
-        self.dirty = False
 
     def lookup(self, keysym):
         """(code, shifted) for a keysym, or None if the extra pool is exhausted."""
@@ -476,14 +573,14 @@ class VirtualKeyboard:
         if self.dirty:
             self.upload()
         for code, shifted in keys:
-            state = mask | (SHIFT if shifted else 0)
-            if state:
+            state = self.mask | mask | (SHIFT if shifted else 0)
+            if state != self.mask:
                 self.modifiers(state)
             for _ in range(repeat):
                 self.tap(code)
-            if state:
-                self.modifiers(0)
-        self.pinned.clear()
+            if state != self.mask:
+                self.modifiers(self.mask)
+        self.pinned = {code for code in self.held if code in POOL}
 
     def tap(self, code):
         self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, 1))
@@ -507,11 +604,91 @@ class VirtualKeyboard:
         self.send(pending)
         self.connection.roundtrip()
 
-    def key(self, keysym, modifiers=(), repeat=1):
-        mask = 0
+    def key(self, keysym, modifiers=(), repeat=1, layout=None):
+        """Press real modifier keys around a key, as a physical keyboard would.
+
+        Release shortcuts fire on the modifier's own release event, which a
+        modifier mask alone never produces. `layout` places the key where a
+        compositor resolving shortcuts through it expects to find it.
+        """
+        placed = layout.place(keysym) if layout else None
+        if placed:
+            code, shifted, row = placed
+            self.overrides = {code: row}
+            self.dirty = True
+            key = code, shifted
+        else:
+            key = self.lookup(keysym)
+        if self.dirty:
+            self.upload()
+        pressed = []
         for name in modifiers:
-            mask |= MODIFIERS[name]
-        self.send([self.lookup(keysym)], mask, repeat)
+            code = MODIFIER_CODES[name]
+            if code not in self.held and code not in pressed:
+                self.event(code, 1)
+                pressed.append(code)
+                self.mask |= MODIFIER_BITS[code]
+                self.modifiers(self.mask)
+        self.send([key], 0, repeat)
+        for code in reversed(pressed):
+            self.event(code, 0)
+            self.mask &= ~MODIFIER_BITS[code]
+            self.modifiers(self.mask)
+        if self.overrides:
+            self.overrides = {}
+            self.dirty = True
+        self.connection.roundtrip()
+
+    def event(self, code, state):
+        self.connection.send(self.id, 1, struct.pack("=III", timestamp(), code, state))
+
+    def down(self, keysym, layout=None):
+        """Press a key and leave it held until up() or release_all()."""
+        placed = None if keysym in NAMED_MODIFIERS else layout and layout.place(keysym)
+        if placed:
+            code, _, row = placed
+        else:
+            found = self.lookup(keysym)
+            if found is None:
+                raise ValueError("Too many keys are held")
+            code, row = found[0], None
+        if code in self.held:
+            raise ValueError("That key is already held")
+        self.held[code] = row
+        self.dirty = self.dirty or bool(row)
+        if self.dirty:
+            self.upload()
+        self.event(code, 1)
+        if code in MODIFIER_BITS:
+            self.mask |= MODIFIER_BITS[code]
+            self.modifiers(self.mask)
+        self.connection.roundtrip()
+
+    def up(self, keysym, layout=None):
+        placed = None if keysym in NAMED_MODIFIERS else layout and layout.place(keysym)
+        code = placed[0] if placed else FIXED.get(keysym, (None,))[0]
+        if code is None:
+            code = next((c for c, k in self.extra.items() if k == keysym), None)
+        if code not in self.held:
+            raise ValueError("That key is not held")
+        self.lift(code)
+        self.connection.roundtrip()
+
+    def lift(self, code):
+        self.event(code, 0)
+        row = self.held.pop(code)
+        self.pinned.discard(code)
+        if code in MODIFIER_BITS and not any(
+            MODIFIER_BITS.get(other) == MODIFIER_BITS[code] for other in self.held
+        ):
+            self.mask &= ~MODIFIER_BITS[code]
+            self.modifiers(self.mask)
+        self.dirty = self.dirty or bool(row)
+
+    def release_all(self):
+        """Release every held key, modifiers last."""
+        for code in sorted(self.held, key=lambda c: c in MODIFIER_BITS):
+            self.lift(code)
         self.connection.roundtrip()
 
 

@@ -324,7 +324,8 @@ def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dic
 
 @tool()
 def desktop_windows(session: str) -> dict:
-    """List private desktop windows: id, title, app_id, states and parent."""
+    """List desktop windows: id, title, app_id, states and parent. On a Hyprland
+    host session each also has its workspace, when it can be told apart."""
     return call(session, "windows")
 
 
@@ -447,7 +448,8 @@ def desktop_actions(
     drag, scroll, type, key, key_down, key_up, ui_action, focus or wait (e.g.
     {"action": "wait", "seconds": 1}). key_down and key_up take "key" (a keysym or
     logo/ctrl/alt/shift) to hold a key across steps; everything held is released
-    when the run ends, however it ends. A ui_action step names its UI action as "name", e.g.
+    when the run ends, however it ends, and after the screenshot=true image, so
+    that image can show what a held key displays. A ui_action step names its UI action as "name", e.g.
     {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}.
     Pass the observation token of the screenshot you planned from; coordinates
     in every step are then in that screenshot's image. Input is sent only while
@@ -472,8 +474,19 @@ def desktop_actions(
     (also when the run stopped early), once it has been still for 0.3 s (at most
     3 s; "settled" says which).
     """
-    result = core.run_actions(session, actions, observation, CONTROLLER, timeout)
-    return looked(session, result, screenshot, observation)
+    try:
+        result = core.run_actions(
+            session,
+            actions,
+            observation,
+            CONTROLLER,
+            timeout,
+            release_held=not screenshot,
+        )
+        return looked(session, result, screenshot, observation)
+    finally:
+        if screenshot:
+            core.release_held_keys(session, actions, CONTROLLER)
 
 
 @tool()

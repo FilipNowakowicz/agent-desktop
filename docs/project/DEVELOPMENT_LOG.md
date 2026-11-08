@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-11-08 — Activity summaries and field-report follow-ups
+
+`agent-desktop activity` summarises action traces as counts only, so a report like the
+Hyprland one no longer needs transcripts. Windows on a Hyprland host report their
+workspace, matched by app id and title since toplevels and clients share no identifier.
+With `screenshot=true`, a batch's held keys are released after the image.
+
 ## 2026-11-08 — GPU desktops through the MCP and clearer host errors
 
 `desktop_create` and `create` take `renderer` and `render_device`. A host desktop on a

@@ -2026,7 +2026,8 @@ class Worker:
                 "logs": str(log_path),
             }
         if operation == "windows":
-            return {"windows": self.toplevels.current()}
+            windows = self.toplevels.current()
+            return {"windows": self.with_workspaces(windows) if host else windows}
         if operation == "focus":
             window = request.get("window")
             if not isinstance(window, str):
@@ -2354,6 +2355,37 @@ class Worker:
                 ),
             )
         self.bind_layout_cache = (now + BIND_LAYOUT_SECONDS, *result)
+        return result
+
+    def with_workspaces(self, windows):
+        """Windows with their Hyprland workspace, matched by app id and title.
+
+        Toplevels and Hyprland clients share no identifier, so identical windows
+        on different workspaces are left without one.
+        """
+        if not self.env.get("HYPRLAND_INSTANCE_SIGNATURE"):
+            return windows
+        try:
+            clients = json.loads(
+                subprocess.run(
+                    ["hyprctl", "-j", "clients"],
+                    env=self.env,
+                    capture_output=True,
+                    timeout=2,
+                    check=True,
+                ).stdout
+            )
+            places = {}
+            for client in clients:
+                key = client["class"], client["title"]
+                places.setdefault(key, set()).add(client["workspace"]["name"])
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+            return windows
+        result = []
+        for window in windows:
+            found = places.get((window["app_id"], window["title"]), ())
+            one = {"workspace": next(iter(found))} if len(found) == 1 else {}
+            result.append({**window, **one})
         return result
 
     def hyprland_option(self, name):

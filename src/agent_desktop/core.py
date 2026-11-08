@@ -11,6 +11,8 @@ import sys
 import threading
 import time
 import uuid
+from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -771,6 +773,72 @@ def trace(session, limit=50):
     return {"session": session, "records": records}
 
 
+def activity(session=None, days=None):
+    """How sessions were used, summarised from their action traces.
+
+    Holds counts and error types only: no arguments, text or window titles.
+    """
+    if days is not None and days <= 0:
+        raise DesktopError("Days must be positive")
+    paths = (
+        [session_path(session) / "trace.jsonl"]
+        if session
+        else sorted(state_root().glob("*/trace.jsonl"))
+    )
+    since = time.time() - days * 86400 if days else 0
+    operations, errors, modes = Counter(), Counter(), Counter()
+    moments, screenshots = [], []
+    input_calls = with_token = counted_sessions = 0
+    for path in paths:
+        used = 0
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+            mode = json.loads(path.with_name("session.json").read_text())["mode"]
+        except (OSError, ValueError, KeyError):
+            continue
+        for line in lines:
+            try:
+                record = json.loads(line)
+                moment, operation = record["at"], record["operation"]
+            except (ValueError, KeyError, TypeError):
+                continue
+            if moment < since:
+                continue
+            used += 1
+            moments.append(moment)
+            operations[operation] += 1
+            arguments = record.get("arguments") or {}
+            if operation in ACTIVITY_INPUT:
+                input_calls += 1
+                with_token += arguments.get("observation") is not None
+            if operation == "screenshot":
+                screenshots.append(arguments)
+            if record.get("error"):
+                kind = record["error"].partition(":")[0]
+                errors[kind if kind.isidentifier() else "other"] += 1
+        if used:
+            counted_sessions += 1
+            modes[mode] += 1
+
+    def stamp(at):
+        return datetime.fromtimestamp(at, UTC).isoformat(timespec="seconds")
+
+    return {
+        "sessions": counted_sessions,
+        "sessions_by_mode": dict(modes),
+        "first": stamp(min(moments)) if moments else None,
+        "last": stamp(max(moments)) if moments else None,
+        "calls": sum(operations.values()),
+        "calls_by_operation": dict(operations.most_common()),
+        "errors_by_type": dict(errors.most_common()),
+        "input_calls": input_calls,
+        "input_calls_with_observation": with_token,
+        "screenshots": len(screenshots),
+        "screenshots_cropped": sum(1 for a in screenshots if a.get("region")),
+        "screenshots_scaled": sum(1 for a in screenshots if a.get("scale")),
+    }
+
+
 def supervisor_alive(info):
     marker = f"AGENT_DESKTOP_SESSION_TOKEN={info['token']}".encode()
     for key in ("guardian_pid", "worker_pid"):
@@ -1092,6 +1160,10 @@ def resolve_element(
     return found[0]["id"]
 
 
+ACTIVITY_INPUT = (
+    *("click", "move", "drag", "scroll", "type", "key"),
+    *("key_down", "key_up", "focus", "ui_action"),
+)
 SEQUENCE_ACTIONS = (
     "click",
     "move",
@@ -1107,7 +1179,14 @@ SEQUENCE_ACTIONS = (
 )
 
 
-def run_actions(session, actions, observation=None, controller=None, timeout=None):
+def run_actions(
+    session,
+    actions,
+    observation=None,
+    controller=None,
+    timeout=None,
+    release_held=True,
+):
     """Run up to 50 actions, stopping at the first surprise.
 
     Each input action is sent only if windows, focus and output are as they were
@@ -1158,7 +1237,15 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
         return stopped(0, len(actions), str(error))
     first = []  # effect_id of the first step, when the ledger is on
     try:
-        result = run_steps(session, actions, observation, controller, first, timeout)
+        result = run_steps(
+            session,
+            actions,
+            observation,
+            controller,
+            first,
+            timeout,
+            release_held=release_held,
+        )
         if first:
             # Everything the sequence changed, including writes after its last
             # step's reply (experimental effect ledger).
@@ -1177,18 +1264,29 @@ def run_actions(session, actions, observation=None, controller=None, timeout=Non
                 pass  # e.g. the session was destroyed; the lease went with it
 
 
-def run_steps(session, actions, observation, controller, *options, **named):
-    """Dispatch a sequence; keys it held never outlive it, however it ends."""
+def release_held_keys(session, actions, controller):
+    """Release what a sequence held; the worker's timeout covers any failure."""
+    if isinstance(actions, list) and any(
+        isinstance(step, dict) and step.get("action") == "key_down" for step in actions
+    ):
+        try:
+            request(session, "release_keys", controller)
+        except DesktopError:
+            pass
+
+
+def run_steps(
+    session, actions, observation, controller, *options, release_held=True, **named
+):
+    """Dispatch a sequence. Keys it held end with it, however it ends, unless the
+    caller will release them itself (to look at the screen first)."""
     try:
         return dispatch_steps(
             session, actions, observation, controller, *options, **named
         )
     finally:
-        if any(step.get("action") == "key_down" for step in actions):
-            try:
-                request(session, "release_keys", controller)
-            except DesktopError:
-                pass  # the worker releases them after KEY_HOLD_SECONDS
+        if release_held:
+            release_held_keys(session, actions, controller)
 
 
 def dispatch_steps(

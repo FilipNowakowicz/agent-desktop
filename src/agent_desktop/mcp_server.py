@@ -428,8 +428,10 @@ def desktop_actions(
     """Run up to 50 steps in one call, e.g. click a field, type, press Return.
 
     Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
-    drag, scroll, type, key, ui_action, focus or wait (e.g. {"action": "wait",
-    "seconds": 1}). A ui_action step names its UI action as "name", e.g.
+    drag, scroll, type, key, key_down, key_up, ui_action, focus or wait (e.g.
+    {"action": "wait", "seconds": 1}). key_down and key_up take "key" (a keysym or
+    logo/ctrl/alt/shift) to hold a key across steps; everything held is released
+    when the run ends, however it ends. A ui_action step names its UI action as "name", e.g.
     {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}.
     Pass the observation token of the screenshot you planned from; coordinates
     in every step are then in that screenshot's image. Input is sent only while
@@ -706,8 +708,10 @@ def desktop_key(
     screenshot: bool = False,
 ) -> dict | list:
     """Send a keysym such as Return or Right, optionally with ctrl/alt/shift/logo
-    modifiers (or as a chord: "ctrl+t", "ctrl+shift+Tab") and repeated up to 100
-    times. delivered means sent to the compositor, not handled by the app.
+    modifiers (super, meta, win and cmd also mean logo; or as a chord: "ctrl+t",
+    "ctrl+shift+Tab") and repeated up to 100 times. delivered means sent to the
+    compositor, not handled by the app. To hold a key across other input, use
+    key_down and key_up steps in desktop_actions.
 
     With screenshot=true the reply also contains the screen once it has been still
     for 0.3 s (at most 3 s; "settled" says which), with its observation token,

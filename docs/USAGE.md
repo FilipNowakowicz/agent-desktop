@@ -661,7 +661,16 @@ on real key codes (Shift for capitals and symbols). Characters a US keyboard lac
 be typed regardless of layout: up to 10000 characters per request, paced at
 about 8 ms per key (`AGENT_DESKTOP_KEY_INTERVAL_MS`). `key` accepts `repeat` (1–100) for repeated presses such as arrow keys. `key` accepts
 XKB keysym names (validated with the compositor's libxkbcommon) and ctrl/alt/shift/logo
-modifiers, or chords such as `ctrl+t` or `ctrl+shift+Tab`. `scroll` takes optional
+modifiers (`super`, `meta`, `win` and `cmd` mean `logo`), or chords such as `ctrl+t` or
+`ctrl+shift+Tab`. Modifiers are pressed and released as real keys, so release-triggered
+shortcuts fire. On a Hyprland host, keys are placed for its configured layout, because it
+matches shortcuts through that layout rather than the sending keyboard's; a `warning` in
+the reply says when it could not be read. `key_down` and `key_up` steps in
+`desktop_actions` hold a key across steps, for example `Super_L` during `Tab` presses.
+Everything held is released when the run ends, when a person takes control, and after
+30 seconds if the client disappears. A compositor nested inside a private session is
+not detected: give it a US layout or `input:resolve_binds_by_sym` if letter shortcuts land
+on the wrong key. `scroll` takes optional
 `x`/`y` (CLI `--x/--y`) to move there first. `delivered` means the input was sent
 to the compositor, not that the application handled it: on the host, a
 layer-shell panel (quick settings, a launcher) can hold keyboard focus without

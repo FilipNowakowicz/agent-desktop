@@ -146,6 +146,7 @@ It is not a security boundary: applications run as your user (see above).
 | [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
 | [Validation](docs/VALIDATION.md) | Checks, lifecycle experiments and application smoke tests |
 | [Benchmarks](docs/BENCHMARK.md) | Task definitions, recorded results and comparison limits |
+| [Hyprland field report](docs/trials/2026-11-07-hyprland-overhaul.md) | How agents used the MCP to rebuild and demo a real desktop, with usage statistics and the problems found |
 | [Contributing](CONTRIBUTING.md) / [security](SECURITY.md) | Development workflow, testing boundaries and reporting vulnerabilities |
 | [Start here](docs/project/START_HERE.md) | Contributor orientation and continuation workflow |
 | [Project plan](docs/project/PROJECT_PLAN.md) / [development log](docs/project/DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |

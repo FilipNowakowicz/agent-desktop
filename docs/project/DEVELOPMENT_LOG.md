@@ -1,5 +1,14 @@
 # Development log
 
+## 2026-11-08 — Hyprland overhaul field report
+
+Reconstructed how agents used the MCP during the Hyprland overhaul from transcripts:
+docs/trials/2026-11-07-hyprland-overhaul.md (233 calls, 32 desktops, 2 errors). The
+main failure, shortcuts landing on the wrong key under a non-US layout, was reproduced
+with the unchanged `VirtualKeyboard` against a nested Hyprland 0.57.1 set to Dvorak in
+a guarded private session: `logo+l` fired SUPER+n, `logo+o` fired SUPER+r. No host
+session was used for that test.
+
 ## 2026-11-06 — Evidence round
 
 Protocol committed before the runs: docs/research/2026-11-06-evidence-protocol.md.

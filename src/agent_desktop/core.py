@@ -38,14 +38,15 @@ def render_nodes():
     return nodes
 
 
-def compositor_renderer():
+def compositor_renderer(renderer=None, device=None):
     """The compositor's renderer and render node: software unless configured.
 
     A GPU renderer without a device lets wlroots choose the node, which on a
     machine with two GPUs can be one it cannot initialize.
     """
-    renderer = os.environ.get("AGENT_DESKTOP_RENDERER") or "pixman"
-    device = os.environ.get("AGENT_DESKTOP_RENDER_DEVICE") or None
+    if renderer != "pixman":
+        device = device or os.environ.get("AGENT_DESKTOP_RENDER_DEVICE") or None
+    renderer = renderer or os.environ.get("AGENT_DESKTOP_RENDERER") or "pixman"
     if renderer not in RENDERERS:
         raise DesktopError(
             f"AGENT_DESKTOP_RENDERER must be one of {', '.join(RENDERERS)}"
@@ -353,7 +354,13 @@ def request(session, operation, controller=None, **arguments):
 
 
 def create(
-    mode="headless", tools=None, profile=None, guard_host=False, _host_minutes=None
+    mode="headless",
+    tools=None,
+    profile=None,
+    guard_host=False,
+    _host_minutes=None,
+    renderer=None,
+    render_device=None,
 ):
     if mode == "host":
         # Only approve_host/request_host may attach to the person's own screen.
@@ -361,11 +368,11 @@ def create(
             raise DesktopError(
                 "Host sessions need the person's approval: use request_host"
             )
-        if profile is not None or guard_host:
-            raise DesktopError("Host sessions take no profile or host guard")
+        if profile is not None or guard_host or renderer or render_device:
+            raise DesktopError("Host sessions take no profile, host guard or renderer")
     elif mode not in ("headless", "visible"):
         raise DesktopError("Mode must be headless or visible")
-    renderer = compositor_renderer() if mode != "host" else None
+    renderer = compositor_renderer(renderer, render_device) if mode != "host" else None
     home = None
     if profile is not None:
         home = profile_path(profile) / "home"

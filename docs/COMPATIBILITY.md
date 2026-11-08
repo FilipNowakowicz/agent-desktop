@@ -43,7 +43,9 @@ The fixture is a native Wayland foot 1.28.0 terminal on the initial machine.
 Headless rendering uses pixman, one output and scale 1. Tested text includes ASCII,
 `café`, Greek lambda and 300 CJK ideographs. Typed text uses a generated per-character
 keymap, so it is layout-independent; key chords use keysym names. Input methods (IME),
-dead keys and applications that interpret physical layouts are not covered.
+dead keys and applications that interpret physical layouts are not covered. On a Hyprland host,
+shortcuts are placed for its configured layout (checked against nested Hyprland 0.57.1 on
+Dvorak). A compositor nested in a private session is not detected and receives US positions.
 
 The Mousepad file-dialog test waits 200 ms after requesting the location field
 and 300 ms after typing a path, because GTK creates and validates these widgets

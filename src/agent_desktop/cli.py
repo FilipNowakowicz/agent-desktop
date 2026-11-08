@@ -58,6 +58,10 @@ def main():
         action="store_true",
         help="block the system bus and host-affecting commands for session apps",
     )
+    new.add_argument(
+        "--renderer", help="pixman (software, the default), gles2 or vulkan"
+    )
+    new.add_argument("--render-device", help="render node for a GPU renderer")
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
@@ -318,7 +322,8 @@ def main():
         if command == "create":
             mode, profile = args.pop("mode"), args.pop("profile")
             guard = args.pop("guard_host")
-            result = create(mode, tools=args, profile=profile, guard_host=guard)
+            gpu = {k: args.pop(k) for k in ("renderer", "render_device")}
+            result = create(mode, tools=args, profile=profile, guard_host=guard, **gpu)
         elif command == "list":
             result = sessions()
         elif command == "doctor":

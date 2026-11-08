@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-11-08 — GPU desktops through the MCP and clearer host errors
+
+`desktop_create` and `create` take `renderer` and `render_device`. A host desktop on a
+terminal that is not showing now refuses input and screenshots with the reason, using
+`XDG_VTNR` of the instance from its lock file against `/sys/class/tty/tty0/active`
+(checked read-only against the live session; refusal itself is unit tested). Tool timeouts
+no longer expose the command line. Screenshots with a locker or display off carry a
+warning, `screenshot=true` without a token reuses the session's last whole-screen scale,
+and activity refusals mention input from programs outside these tools.
+
+Validated with the desktop suite on the managed runtime: 321 tests, 19 skipped for missing
+optional applications. A real `create --renderer gles2 --render-device /dev/dri/renderD128`
+reported that renderer in `status` and a bad renderer was refused. No real host session
+was used; the off-screen refusal has not been seen on a real inactive terminal.
+
 ## 2026-11-08 — Real key sequences and layout-aware shortcuts
 
 Chords now press and release real modifier keys, `desktop_actions` gains `key_down` and

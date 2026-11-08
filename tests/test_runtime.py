@@ -428,6 +428,54 @@ class RuntimeTests(unittest.TestCase):
         time.sleep(1)
         self.assertFalse(marker.exists())
 
+    def keyboard_fixture(self, session):
+        directory = self.root / f"held-{session}"
+        directory.mkdir()
+        script = Path(__file__).resolve().parents[1] / "scripts/m0_terminal.py"
+        title = f"Held fixture {session}"
+        core.request(
+            session,
+            "launch",
+            argv=[
+                "foot",
+                "--config=/dev/null",
+                f"--title={title}",
+                sys.executable,
+                str(script),
+                str(directory),
+            ],
+        )
+        wait_for(directory.joinpath("ready").exists)
+        wait_for(
+            lambda: any(
+                w["title"] == title and "activated" in w["states"]
+                for w in core.request(session, "windows")["windows"]
+            )
+        )
+        return directory
+
+    def test_held_keys_apply_across_steps_and_end_with_the_run(self):
+        session = self.new_session()
+        directory = self.keyboard_fixture(session)
+        result = core.run_actions(
+            session,
+            [
+                {"action": "key_down", "key": "shift"},
+                {"action": "key", "key": "a"},
+                {"action": "key_up", "key": "Shift_L"},
+                {"action": "key", "key": "b"},
+                {"action": "key_down", "key": "shift"},
+                {"action": "key_up", "key": "a"},
+            ],
+        )
+        # The stray key_up stopped the run with shift still held.
+        self.assertEqual(result["completed"], 5)
+        self.assertIn("not held", result["stopped"]["reason"])
+        core.request(session, "key", key="c")
+        core.request(session, "key", key="Return")
+        wait_for(directory.joinpath("typed.txt").exists)
+        self.assertEqual(directory.joinpath("typed.txt").read_text(), "Abc")
+
     def test_focus_and_stale_observations(self):
         session = self.new_session()
         first = self.fixture(session)

@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-11-08 — Real key sequences and layout-aware shortcuts
+
+Chords now press and release real modifier keys, `desktop_actions` gains `key_down` and
+`key_up`, and `modifiers` accepts the same aliases as chord syntax. Held keys are released
+when a run ends, when a person takes control, at cleanup and after 30 s without a client.
+On a Hyprland host, keys are placed for the configured layout, read through `hyprctl`.
+
+Validated against nested Hyprland 0.57.1 set to Dvorak in a guarded private session.
+Directly connected: `logo+l/n/o/r/c/j/d/e/minus/bracketleft/1/Tab` and
+XF86AudioRaiseVolume each fired their own bind, and a SUPER tap fired a release bind.
+Through `agent-desktop key` and the parent labwc: `logo+1` and `logo+Tab` now fire, which
+was the nested failure in the field report; letters there still use US positions, since
+private sessions do not detect a nested compositor. A held SUPER with Tab fired through
+`agent-desktop actions`. No real host session was used; layout placement on a host was
+tested by pointing the worker's option reader at the nested instance.
+
 ## 2026-11-08 — Hyprland overhaul field report
 
 Reconstructed how agents used the MCP during the Hyprland overhaul from transcripts:

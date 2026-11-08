@@ -23,11 +23,13 @@ from .atspi import Accessibility, Unsupported, wait_for_registry
 from .effects import EffectLedger, ui_lines
 from .wayland import (
     BUTTONS,
+    BindLayout,
     InputActivity,
     Keysyms,
     Toplevels,
     VirtualKeyboard,
     VirtualPointer,
+    WaylandError,
     clear_selection,
     peer_pid,
 )
@@ -218,7 +220,10 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
     raise RuntimeError("Session processes remain after cleanup")
 
 
-INPUT_OPERATIONS = ("click", "move", "drag", "scroll", "type", "key")
+INPUT_OPERATIONS = (
+    *("click", "move", "drag", "scroll", "type", "key"),
+    *("key_down", "key_up"),
+)
 # Operations that change the desktop; they need the controller lease (below).
 MUTATING_OPERATIONS = (
     *INPUT_OPERATIONS,
@@ -237,6 +242,16 @@ CHORD_MODIFIERS = {
     "win": "logo",
     "cmd": "logo",
 }
+# Names key_down and key_up accept for a modifier, as physical keys.
+HELD_MODIFIERS = {
+    "logo": "Super_L",
+    "ctrl": "Control_L",
+    "alt": "Alt_L",
+    "shift": "Shift_L",
+}
+# Keys left held by a client that vanished are released after this long.
+KEY_HOLD_SECONDS = 30
+BIND_LAYOUT_SECONDS = 10
 KEYBOARD = re.compile(r"[a-z0-9_]{1,32}(-[a-z0-9_]{1,32})?")
 CONTROLLER_ID = re.compile(r"[A-Za-z0-9._:@-]{1,64}")
 # Requests recorded in the session's action trace (trace.jsonl).
@@ -385,6 +400,9 @@ def lease_seconds_default():
 
 
 class Worker:
+    held_since = None  # when keys were last held down
+    bind_layout_cache = None
+
     def __init__(self, root):
         self.root = root
         self.info = json.loads((root / "session.json").read_text())
@@ -1815,6 +1833,7 @@ class Worker:
                 "Request deadline expired before execution; nothing delivered"
             )
         operation = request["operation"]
+        warning = None
         if operation == "destroy":
             self.stop = True
             return {"status": "stopping"}
@@ -1835,7 +1854,11 @@ class Worker:
                 f"{operation} is not available on the host session: the person "
                 "is at this screen. Use a private session for it."
             )
-        if host and operation in (*INPUT_OPERATIONS, "focus"):
+        if operation == "release_keys":
+            # A safety path: keys come up even when input is otherwise refused.
+            self.release_held_keys()
+            return {"session": self.info["id"], "released": True}
+        if host and operation in (*INPUT_OPERATIONS, "focus") and operation != "key_up":
             unavailable = self.host_unavailable()
             if unavailable:
                 raise ScreenUnavailable(
@@ -1907,6 +1930,7 @@ class Worker:
             self.save_control()
             return self.control_state()
         if operation == "take":
+            self.release_held_keys()
             return self.take(request.get("wayvnc", "wayvnc"), request.get("keyboard"))
         if operation == "release":
             return self.release(
@@ -2166,16 +2190,20 @@ class Worker:
             if isinstance(key, str) and "+" in key[1:] and isinstance(modifiers, list):
                 # Chord syntax: "ctrl+t", "ctrl+shift+Tab".
                 *named, key = key.split("+")
-                modifiers = [
-                    *modifiers,
-                    *(CHORD_MODIFIERS.get(m.lower(), m) for m in named),
-                ]
+                modifiers = [*modifiers, *named]
             if not isinstance(key, str) or not re_key(key):
                 raise ValueError(
                     f"Invalid key name {key!r}: use an XKB keysym such as Return, "
                     "Tab, Escape or t, with modifiers (ctrl, alt, shift, logo) or "
                     'chord syntax such as "ctrl+t"'
                 )
+            if isinstance(modifiers, list):
+                modifiers = [
+                    CHORD_MODIFIERS.get(m.lower(), m.lower())
+                    if isinstance(m, str)
+                    else m
+                    for m in modifiers
+                ]
             if not isinstance(modifiers, list) or any(
                 m not in ("ctrl", "alt", "shift", "logo") for m in modifiers
             ):
@@ -2190,9 +2218,34 @@ class Worker:
             self.settle_after("type", host)
             keyboard = self.keyboard()
             keysym = self.keysyms.resolve(key)
+            layout, warning = self.bind_layout()
             self.mark_mutation()
-            keyboard.key(keysym, modifiers, repeat)
+            keyboard.key(keysym, modifiers, repeat, layout)
             self.last_keys = ("key", time.monotonic())
+        elif operation in ("key_down", "key_up"):
+            key = request.get("key")
+            if isinstance(key, str):
+                name = CHORD_MODIFIERS.get(key.lower(), key)
+                key = HELD_MODIFIERS.get(name, name)
+            if not isinstance(key, str) or not re_key(key):
+                raise ValueError(
+                    f"Invalid key name {key!r}: use an XKB keysym such as Tab or "
+                    "Super_L, or a modifier name (ctrl, alt, shift, logo)"
+                )
+            keyboard = self.keyboard()
+            keysym = self.keysyms.resolve(key)
+            layout, warning = self.bind_layout()
+            if operation == "key_down":
+                self.settle_after("key", host)
+                self.mark_mutation()
+                keyboard.down(keysym, layout)
+                self.held_since = time.monotonic()
+            else:
+                self.mark_mutation()
+                keyboard.up(keysym, layout)
+                if not keyboard.held:
+                    self.held_since = None
+                self.last_keys = ("key", time.monotonic())
         elif operation == "scroll":
             pointer = self.pointer()
             self.mark_mutation()
@@ -2200,7 +2253,87 @@ class Worker:
             pointer.sync()
         else:
             raise ValueError(f"Unsupported operation: {operation}")
-        return {"session": self.info["id"], "operation": operation, "delivered": True}
+        reply = {"session": self.info["id"], "operation": operation, "delivered": True}
+        return {**reply, "warning": warning} if warning else reply
+
+    def bind_layout(self):
+        """(layout shortcuts resolve through, warning), for Hyprland hosts.
+
+        (None, None) elsewhere, or when Hyprland resolves shortcuts through each
+        keyboard's own keymap and the virtual keyboard's positions already match.
+        """
+        if self.info["mode"] != "host" or not self.env.get(
+            "HYPRLAND_INSTANCE_SIGNATURE"
+        ):
+            return None, None
+        now = time.monotonic()
+        if self.bind_layout_cache and now < self.bind_layout_cache[0]:
+            return self.bind_layout_cache[1:]
+        try:
+            options = {
+                name: self.hyprland_option(name)
+                for name in (
+                    "resolve_binds_by_sym",
+                    "kb_file",
+                    *("kb_rules", "kb_model", "kb_layout", "kb_variant", "kb_options"),
+                )
+            }
+            if options["resolve_binds_by_sym"]:
+                result = None, None
+            elif options["kb_file"]:
+                raise WaylandError("input:kb_file layouts are not read")
+            else:
+                result = (
+                    BindLayout(
+                        self.keysyms.library,
+                        rules=options["kb_rules"],
+                        model=options["kb_model"],
+                        layout=options["kb_layout"],
+                        variant=options["kb_variant"],
+                        options=options["kb_options"],
+                    ),
+                    None,
+                )
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            WaylandError,
+            subprocess.SubprocessError,
+        ):
+            result = (
+                None,
+                (
+                    "Could not read Hyprland's keyboard layout, so shortcuts use US key "
+                    "positions and may fire the wrong bind. Verify the result."
+                ),
+            )
+        self.bind_layout_cache = (now + BIND_LAYOUT_SECONDS, *result)
+        return result
+
+    def hyprland_option(self, name):
+        """One input: option's value; an unset string reads as empty."""
+        reply = json.loads(
+            subprocess.run(
+                ["hyprctl", "-j", "getoption", f"input:{name}"],
+                env=self.env,
+                capture_output=True,
+                timeout=2,
+                check=True,
+            ).stdout
+        )
+        for field in ("str", "bool", "int"):
+            if field in reply:
+                return "" if reply[field] == "[[EMPTY]]" else reply[field]
+        raise KeyError(name)
+
+    def release_held_keys(self):
+        self.held_since = None
+        if self.virtual_keyboard and self.virtual_keyboard.held:
+            try:
+                self.virtual_keyboard.release_all()
+            except (OSError, WaylandError):
+                self.virtual_keyboard.held.clear()
 
     def serve(self):
         endpoint = self.info["control_socket"]
@@ -2234,6 +2367,11 @@ class Worker:
                         self.release("viewer disconnected")
                     except RuntimeError:
                         pass  # recorded in the control state; the person decides
+                if (
+                    self.held_since is not None
+                    and time.monotonic() - self.held_since > KEY_HOLD_SECONDS
+                ):
+                    self.release_held_keys()
                 try:
                     connection, _ = server.accept()
                 except TimeoutError:
@@ -2405,6 +2543,7 @@ class Worker:
         notify("The agent stopped using your screen", "Host session ended.", self.env)
 
     def cleanup(self):
+        self.release_held_keys()
         if self.info["mode"] == "host":
             return self.cleanup_host()
         if self.toplevels and self.compositor and self.compositor.poll() is None:

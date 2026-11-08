@@ -116,7 +116,7 @@ jobs:
       matrix:
         include:
           - name: fedora
-            image: fedora:latest
+            image: fedora:44
             install: >-
               dnf install -y --setopt=install_weak_deps=False git tar gzip
               labwc foot grim wayvnc wl-clipboard at-spi2-core wlr-randr dbus-daemon xorg-x11-server-Xwayland

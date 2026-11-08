@@ -565,7 +565,12 @@ example `/dev/dri/renderD128`. `agent-desktop doctor` lists the accessible nodes
 with their drivers; on a machine with two GPUs, name one, since the node wlroots
 picks by itself may be one it cannot use. Invalid values are refused at
 `create`, a render node set for your own desktop (`WLR_RENDER_DRM_DEVICE`) is
-not inherited, and `status` reports the session's renderer.
+not inherited, and `status` reports the session's renderer. `agent-desktop create
+--renderer gles2 --render-device /dev/dri/renderD128` and the same `desktop_create`
+arguments set this for one session and override the variables. A GPU renderer also needs
+the Mesa matching the runtime, supplied by the server's environment on systems such as
+NixOS. Testing a compositor or shell inside a session generally needs one; give the nested
+compositor its own headless output if its window stays blank.
 
 ## Saved logins (profiles)
 

@@ -450,13 +450,16 @@ class Worker:
     def command(self, tool, *arguments, timeout=10):
         if self.compositor and self.compositor.poll() is not None:
             raise RuntimeError("Private compositor has exited")
-        result = subprocess.run(
-            [self.info["tools"][tool], *map(str, arguments)],
-            env=self.env,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            result = subprocess.run(
+                [self.info["tools"][tool], *map(str, arguments)],
+                env=self.env,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"{tool} did not finish within {timeout} s") from None
         if result.returncode:
             raise RuntimeError(
                 f"{tool} failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -496,8 +499,12 @@ class Worker:
         ]
 
     def host_unavailable(self):
-        """Why the person's screen cannot take input now, or None: a screen
-        locker is running, or Hyprland reports every display switched off."""
+        """Why the person's screen cannot take input now, or None: another
+        terminal is showing, a screen locker is running, or Hyprland reports
+        every display switched off."""
+        off_screen = self.host_off_screen()
+        if off_screen:
+            return off_screen
         for entry in Path("/proc").iterdir():
             if entry.name.isdigit():
                 try:
@@ -521,6 +528,30 @@ class Worker:
                 return None
             if monitors and not any(m.get("dpmsStatus", True) for m in monitors):
                 return "the display is switched off"
+        return None
+
+    def host_off_screen(self):
+        """Which terminal is showing when it is not this session's Hyprland.
+
+        A compositor on an inactive terminal draws nothing, so capture hangs
+        and input reaches nobody. None when it cannot be determined.
+        """
+        signature = self.env.get("HYPRLAND_INSTANCE_SIGNATURE")
+        runtime = self.env.get("XDG_RUNTIME_DIR")
+        if not signature or not runtime:
+            return None
+        try:
+            lock = Path(runtime, "hypr", signature, "hyprland.lock")
+            pid = int(lock.read_text().split()[0])
+            environment = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+            active = Path("/sys/class/tty/tty0/active").read_text().strip()
+        except (OSError, ValueError, IndexError):
+            return None
+        terminal = next(
+            (v[9:].decode() for v in environment if v.startswith(b"XDG_VTNR=")), None
+        )
+        if terminal and active != f"tty{terminal}":
+            return f"this desktop is on tty{terminal}, but {active} is on screen"
         return None
 
     def user_active(self):
@@ -1867,15 +1898,17 @@ class Worker:
                 )
             if self.user_active():
                 raise UserActive(
-                    "The person is using the computer; nothing was sent. Wait a "
-                    "few seconds (desktop_wait with seconds) and try again."
+                    "The person is using the computer, or a program outside these "
+                    "tools sent input; nothing was sent. Wait a few seconds "
+                    "(desktop_wait with seconds) and try again."
                 )
             if request.get("observation") is not None and any(
                 moment > self.screenshot_at for moment in self.person_input()
             ):
                 raise StaleObservation(
-                    "The person used the computer after that screenshot; nothing "
-                    "was sent. Take a new screenshot (its token can look the same "
+                    "The person, or a program outside these tools, used the "
+                    "computer after that screenshot; nothing was sent. Take a "
+                    "new screenshot (its token can look the same "
                     "when the windows did not change; it is still the one to use)."
                 )
         # destroy, take, release and viewer_start stay available to everyone:
@@ -2008,6 +2041,12 @@ class Worker:
                 "window": focused,
             }
         if operation == "screenshot":
+            off_screen = self.host_off_screen() if host else None
+            if off_screen:
+                raise ScreenUnavailable(
+                    f"No screenshot: {off_screen}. Tell the person, or wait until "
+                    "this desktop is showing."
+                )
             self.screenshot_at = time.monotonic()
             settled = None
             if request.get("settle_ms") is not None:
@@ -2031,6 +2070,12 @@ class Worker:
                     self.seen = self.capture_pixels()  # for later changed_only
             if settled:
                 capture.update(settled)
+            hidden = self.host_unavailable() if host else None
+            if hidden:
+                capture["warning"] = (
+                    f"{hidden}: the compositor may blank this capture, so it "
+                    "may not show the person's windows"
+                )
             # Another client's screenshot must not vouch for the controller.
             if not self.active_lease() or self.lease["holder"] == controller:
                 self.needs_screenshot = False

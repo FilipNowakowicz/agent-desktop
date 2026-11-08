@@ -168,12 +168,16 @@ SETTLE_MS = 300
 SETTLE_TIMEOUT_MS = 3000
 
 
+# Each session's last whole-screen scale, for replies with no observation token.
+SCALES = {}
+
+
 def looked(session, result, screenshot, observation=None):
     """`result`, plus the settled screen when `screenshot` is true, at the scale
-    of the screenshot the input was planned from."""
+    of the screenshot the input was planned from, or else the session's last."""
     if not screenshot:
         return result
-    scale = observation_scale(observation)
+    scale = observation_scale(observation) if observation else SCALES.get(session, 1)
     try:
         capture = call(
             session,
@@ -263,7 +267,11 @@ def tool(*, cancellable=False, **options):
 
 @tool()
 def desktop_create(
-    mode: str = "headless", profile: str | None = None, guard_host: bool = False
+    mode: str = "headless",
+    profile: str | None = None,
+    guard_host: bool = False,
+    renderer: str | None = None,
+    render_device: str | None = None,
 ) -> dict:
     """Create a private Linux desktop. Visible mode opens a nested host Wayland window.
 
@@ -273,9 +281,17 @@ def desktop_create(
     added later: name one from the start when a site may need a login. guard_host blocks the
     system bus and common host-affecting commands (power, network, Bluetooth,
     brightness, pkill) for applications in the session; use it when testing
-    panels, widgets or scripts that could change the real machine.
+    panels, widgets or scripts that could change the real machine. renderer is
+    pixman (software, the default), gles2 or vulkan; a compositor or shell under
+    test usually needs gles2, with render_device such as /dev/dri/renderD128.
     """
-    return core.create(mode, profile=profile, guard_host=guard_host)
+    return core.create(
+        mode,
+        profile=profile,
+        guard_host=guard_host,
+        renderer=renderer,
+        render_device=render_device,
+    )
 
 
 @tool()
@@ -668,6 +684,8 @@ def desktop_screenshot(
         scale=scale,
         **({"track": True} if LOOK_DELTA and region is None else {}),
     )
+    if region is None:
+        SCALES[session] = scale or 1
     return [
         TextContent(type="text", text=json.dumps(capture)),
         Image(path=capture["path"]),

@@ -4,6 +4,7 @@ import os
 
 from .core import (
     DesktopError,
+    activity,
     answer_host,
     create,
     delete_profile,
@@ -12,6 +13,7 @@ from .core import (
     logs,
     profiles,
     prune,
+    release_held_keys,
     request,
     request_host,
     run_actions,
@@ -65,6 +67,11 @@ def main():
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
+    used = sub.add_parser(
+        "activity", help="how sessions were used: counts and error types, no content"
+    )
+    used.add_argument("session", nargs="?")
+    used.add_argument("--days", type=float, help="only the last N days")
     checkup = sub.add_parser("doctor", help="check the runtime before first use")
     checkup.add_argument(
         "--smoke",
@@ -326,6 +333,8 @@ def main():
             result = create(mode, tools=args, profile=profile, guard_host=guard, **gpu)
         elif command == "list":
             result = sessions()
+        elif command == "activity":
+            result = activity(args["session"], args["days"])
         elif command == "doctor":
             result = doctor(with_smoke=args["smoke"])
             print(json.dumps(result, indent=2))
@@ -383,9 +392,17 @@ def main():
             result = request(session, command.replace("-", "_"), controller, **args)
         elif command == "actions":
             look = args.pop("screenshot")
-            result = run_actions(**args, controller=controller)
-            if look:
-                result["screenshot"] = settled_screenshot(args["session"], controller)
+            try:
+                result = run_actions(
+                    **args, controller=controller, release_held=not look
+                )
+                if look:
+                    result["screenshot"] = settled_screenshot(
+                        args["session"], controller
+                    )
+            finally:
+                if look:
+                    release_held_keys(args["session"], args["actions"], controller)
         elif command == "operation":
             from .operations import operate
 

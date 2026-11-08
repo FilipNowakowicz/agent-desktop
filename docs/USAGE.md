@@ -572,6 +572,12 @@ the Mesa matching the runtime, supplied by the server's environment on systems s
 NixOS. Testing a compositor or shell inside a session generally needs one; give the nested
 compositor its own headless output if its window stays blank.
 
+## Activity summary
+
+`agent-desktop activity [SESSION] [--days N]` summarises the action traces of one session or
+all of them: calls by operation, error types, sessions by mode, and how input and
+screenshots were made. It holds counts only, never arguments, text or window titles.
+
 ## Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create
@@ -672,7 +678,8 @@ shortcuts fire. On a Hyprland host, keys are placed for its configured layout, b
 matches shortcuts through that layout rather than the sending keyboard's; a `warning` in
 the reply says when it could not be read. `key_down` and `key_up` steps in
 `desktop_actions` hold a key across steps, for example `Super_L` during `Tab` presses.
-Everything held is released when the run ends, when a person takes control, and after
+Everything held is released when the run ends (after the image, with `screenshot=true`,
+so it can show what a held key displays), when a person takes control, and after
 30 seconds if the client disappears. A compositor nested inside a private session is
 not detected: give it a US layout or `input:resolve_binds_by_sym` if letter shortcuts land
 on the wrong key. `scroll` takes optional

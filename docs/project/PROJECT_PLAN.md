@@ -188,8 +188,8 @@ first for sites the user is signed into. Open, in rough order of value:
   own Firefox, acting in background tabs with their live logins and no
   remote-control marks; it needs signing, a per-site permission model, and its
   synthetic events are untrusted (a few sites reject them);
-- workspace awareness on the host: windows on other Hyprland workspaces, and
-  focusing one;
+- workspace awareness on the host: focusing a window on another Hyprland workspace
+  (windows now report their workspace);
 - host screenshots that wait for compositor animations (one caught a workspace
   switch halfway);
 - richer `find` items for buttons (class, a usable selector);

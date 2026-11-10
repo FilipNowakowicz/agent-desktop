@@ -1,5 +1,18 @@
 # Development log
 
+## 2026-11-10 — Cloud setup field report
+
+Reconstructed from transcripts how an agent used the MCP to set up a Google Cloud project
+and Tailscale through their web consoles with imported logins:
+docs/trials/2026-11-08-gcp-tailscale-setup.md (138 calls, 4 private desktops, 1 tool
+error, 11 of 53 browser batches stopped early, one with uncertain delivery). Main
+findings: generated credentials were read into the agent's transcript until it built its
+own clipboard-to-file route, Google refuses sign-in in the BiDi-controlled browser so the
+login handoff cannot succeed there, `import-cookies` copies every account on a site,
+printed `agent-desktop` commands do not run when the CLI is not on PATH, label clicks
+on switches were reported delivered with no effect, and 1280×720 is too small for some
+console menus. No code was changed; the ranked follow-ups are in the project plan.
+
 ## 2026-11-08 — Activity summaries and field-report follow-ups
 
 `agent-desktop activity` summarises action traces as counts only, so a report like the

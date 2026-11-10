@@ -1,6 +1,6 @@
 # Agent Desktop project plan
 
-Updated: 2026-10-23. This document records the chosen direction, implemented
+Updated: 2026-11-10. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
@@ -195,6 +195,28 @@ first for sites the user is signed into. Open, in rough order of value:
 - richer `find` items for buttons (class, a usable selector);
 - a non-blocking wait for control to return, and adding a profile to a running
   session.
+
+Field feedback (2026-11-08, [cloud setup report](../trials/2026-11-08-gcp-tailscale-setup.md)):
+the maintainer had an agent do Google Cloud and Tailscale console setup in the
+background with imported logins. Accepted for follow-up, in order:
+1. moving secrets without the agent reading them: a browser step that sends an
+   element's text or the session clipboard to a command's stdin or a 0600 file and
+   returns only length, prefix and digest (generated keys otherwise reach the
+   transcript through `text`);
+2. a login route sites accept: start the profile's Firefox without the remote agent
+   for the human's turn, then restart it under BiDi (Google refuses sign-in in the
+   controlled browser); until then, document `import-cookies --from` a clean profile
+   and warn that the handoff fails there;
+3. account-aware imports: warn when a site has several signed-in accounts, and a
+   supported way to drop a site's cookies from a profile;
+4. person-facing commands (`take_command`, `paste_command`, instruction text) that run
+   as printed when the CLI is not on PATH;
+5. reporting a switch or checkbox's checked state before and after a click, so a
+   delivered click with no effect is visible;
+6. a session size option for create (1280×720 left a console menu off-screen);
+7. stopped and uncertain batch steps counted in `activity`;
+8. for shell testing: allowing `hyprctl` against a nested instance a guarded session
+   started, and guidance for the matching Mesa on NixOS.
 
 Longer-range directions (writing programs instead of clicking, structured access to
 every app, learning from the person, a shared skill registry and others) are

@@ -117,8 +117,10 @@ Prefer directions that:
 - **Assumption dropped:** the agent checks progress by looking.
 - **Idea, evidence and test plan:** [effect first](../research/2026-10-11-effect-first.md)
   §3 and E2.
-- **Status:** testing is planned, with E2 as the gate. Under D1 it becomes the
-  assertion library.
+- **Status:** weakened. E2 missed its gate on 2026-10-11 (turns −4.5%, wall time
+  +15% with Opus; [effect-first A/B](../research/2026-10-11-effect-first-ab.md)), and
+  E3 missed its own ([observation discipline](../research/2026-10-11-observation-discipline.md)).
+  The features stay experimental.
 
 ### D4. Learn from the person
 
@@ -222,6 +224,19 @@ Prefer directions that:
   (striped URL bar, robot icon, sometimes blocked by Cloudflare); cookie import
   into a profile is the interim path.
 
+### B1–B5 and C1–C3 (2026-11-10)
+
+- **Ideas:** a desktop subagent (B1), using the GUI once and then calling the API (B2),
+  an agent-aware desktop shell (B3), forkable sessions pinned with Nix (B4), previews
+  of NixOS rebuilds (B5), a NixOS maintenance system (C1), Linux as a backend for
+  other systems (C2), and control below the operating system (C3). Each one names the
+  assumption it drops, a cheapest test and a gate in the
+  [big-directions notes](../research/2026-11-10-big-directions-wip.md).
+- **Status:** idea. Their placement in the
+  [execution plan](PROJECT_PLAN.md#execution-plan-2026-11-11): B1 is in Now (N10); B3
+  is in Next (X4) and Later (L1); B4, B5, C1, C2 and C3's VM route are in Later; B2
+  and C3's hardware route are parked.
+
 ## Product and platform notes
 
 These are not directions on their own, but they constrain the directions.
@@ -240,3 +255,5 @@ These are not directions on their own, but they constrain the directions.
 - 2026-10-13: D1 cheapest test run (`desktop_run`, 18 runs): gate not met.
 - 2026-10-15: D10 added after a login-gated task; cookie import adopted as the
   interim path.
+- 2026-11-11: D3 marked weakened. B1–B5 and C1–C3 added as ideas, and every
+  direction placed in the execution plan in PROJECT_PLAN.md.

@@ -1,5 +1,29 @@
 # Development log
 
+## 2026-11-11 — Execution plan
+
+Gathered everything planned or proposed into one execution plan at the top of
+PROJECT_PLAN.md, in four tiers (Now, Next, Later, Parked) plus maintenance. The
+sources were the cloud report's eight follow-ups and its scale and fixed-wait notes,
+the residuals from the Hyprland report, the open items from the 2026-10-15 daily-use
+list and the Hyprland report's note on opening URLs in the person's Firefox, roadmap stages F0–F3 with the R1–R6 limits, the M4 gate, directions D1–D10,
+big-directions candidates B1–B5 and C1–C3, the human-interface slices and open product
+decisions, the effect-ledger next steps, the remaining section 7 ideas, and the
+wlroots and Fedora upkeep. Each item appears once, with its source, dependencies and
+acceptance check or gate. The plan works on field follow-ups first, with the F0 audit running alongside them.
+
+Status was checked in the source before items were called open. For example,
+windows report their Hyprland workspace (#149), but focusing a window on another
+workspace is still missing. Section 1 now follows the 2026-11-10 decision that
+testing desktop software is in scope. On the directions board, D3 is marked
+weakened (E2 and E3 missed their gates), and B1–B5 and C1–C3 are added as ideas.
+The ten Now items (N1–N10) are grouped into three GitHub issues, #161–#163,
+since the maintainer preferred a few issues to one per item. The maintainer accepted
+the proposed defaults for all five questions.
+
+Documentation only; no runtime tests were needed. Validation: a local check of
+Markdown links and anchors in the changed files, and `git diff --check`.
+
 ## 2026-11-10 — Cloud setup field report
 
 Reconstructed from transcripts how an agent used the MCP to set up a Google Cloud project

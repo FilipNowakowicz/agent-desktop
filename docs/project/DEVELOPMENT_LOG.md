@@ -10,6 +10,14 @@ reports used 10–11 of the 29 tools. The A/B protocol
 (docs/research/2026-11-11-desktop-subagent-protocol.md) and the subagent definition
 (`benchmarks/agents/desktop.json`) are committed before any counted run. The run itself,
 42 sessions, waits for the maintainer to agree a model budget.
+## 2026-11-11 — Event and approval contract (X4, design)
+
+Added docs/project/EVENT_CONTRACT.md. It lists the human moments that both field
+reports lost time on, and where each one already exists in the runtime. It proposes
+the smallest consumer contract: `agent-desktop events [--follow]`, printing JSON lines
+derived only from state the runtime already writes, with N2's printed commands and the
+trace's rule of no content. Answers keep using the existing `take`, `release` and
+`host approve`/`deny` verbs. Design only; nothing is implemented yet.
 
 ## 2026-11-11 — A killed operation helper gives back its lease (X1, first F1 patch)
 

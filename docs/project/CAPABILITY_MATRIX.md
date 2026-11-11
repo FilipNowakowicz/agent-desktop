@@ -45,7 +45,8 @@ validation behind each feature.
 | Durable jobs keep per-step delivery evidence, cancellation and reconnectable status (R5b) | tested | `test_operations` |
 | A runner crash before or after dispatch is told apart | tested | `test_operations` (crash phases, from saved records) |
 | A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
-| Interruption during application work, after a committed effect, or during evidence collection | untested | The roadmap's F1 list. Only record-level phases are tested |
+| Interruption during application work, after a committed effect, or before evidence collection; cancellation during application work | tested | `test_interruptions` (2026-11-11). The helper is killed or cancelled at each boundary in a real session |
+| Interruption during evidence collection itself | untested | Too short a window to hit without a fault-injection hook. The record validator refuses `satisfied` without all checks |
 | Takeover while a job runs, and control acknowledgement time | untested | Takeover is tested on its own (`test_takeover`), not during a job |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
 
@@ -126,7 +127,7 @@ holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
 ## Order for F1
 
 1. Release or restore the lease when a job's runner dies (done 2026-11-11).
-2. Interrupt at each F1 boundary: before dispatch, after dispatch and before the
+2. (Done 2026-11-11, apart from during evidence collection) Interrupt at each F1 boundary: before dispatch, after dispatch and before the
    acknowledgement, during application work, after a committed effect, and during
    evidence collection. Use the existing operation fixtures and a real session.
 3. Run takeover while a job is running, and measure how long control takes to be

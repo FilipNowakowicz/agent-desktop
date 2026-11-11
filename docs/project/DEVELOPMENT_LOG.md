@@ -10,6 +10,24 @@ seed 1, cut main-context tokens 93–97% and cost about 75% at equal success, bu
 wall time rose 51–58%, so the gate was not met. Results and deviations are in
 docs/research/2026-11-11-desktop-subagent-pilot.md. The full 42-run protocol was not
 run.
+## 2026-11-11 — F1 interruption boundaries (F1-a, #181)
+
+New `tests/test_interruptions.py` kills a durable browser job's helper at each
+boundary, using real private sessions with Firefox, and compares the record with the
+page:
+- **During application work:** a click whose page handler finishes 1.5 s later.
+- **After a committed effect.**
+- **Before evidence collection:** the checks never ran, so `verification` stays
+  `unknown` with no checks.
+
+A further test cancels during application work. All four pass on current `main`:
+acknowledged steps stay acknowledged, the page's own work lands exactly once,
+nothing is replayed, and reading the record again sends nothing. One observation, not
+a defect: a cancel that arrives during a job's last step, a pause, ends `completed`
+with `cancel_requested` set, because cancellation is checked between steps. The
+test therefore has a step after the pause, and checks that it stays `pending`.
+Interrupting during evidence collection itself is still untested; the window is too
+short to hit without a fault-injection hook.
 
 ## 2026-11-11 — Events report live state only
 

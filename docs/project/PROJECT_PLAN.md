@@ -65,7 +65,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 
 | ID | Item | Source | Depends on |
 | --- | --- | --- | --- |
-| X1 | F1: correctness under interruption | Roadmap F1 | N9 |
+| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11 |
 | X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
 | X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5 |
@@ -156,7 +156,7 @@ The current correctness stack implements these bounded stages:
 | R3 | Ordinary script groups stopped/reaped; bounded output and helper journals; deliberate session launches survive | Detached descendants are outside the cleanup contract; no sandbox or rollback |
 | R4 | Observational effect reports; unknown baselines; bounded retention; watcher/document coverage and FODS support | Temporal evidence is not causal attribution or complete filesystem coverage |
 | R5a | Experimental scoped file/config/UI/browser state predicates with satisfied, violated and unknown results | Checks describe current state, not task completion or action causality |
-| R5b | Durable private GUI/browser jobs with per-step delivery evidence, reconnectable status, cooperative cancellation and optional scoped checks | No retry/resume/rollback; in-flight worker commands finish or remain uncertain; crashed jobs may retain their controller lease |
+| R5b | Durable private GUI/browser jobs with per-step delivery evidence, reconnectable status, cooperative cancellation and optional scoped checks | No retry/resume/rollback; in-flight worker commands finish or remain uncertain. A crashed job's lease is given back by the next status read that finds it dead (2026-11-11) |
 | R6 | Experimental offline evidence report separating requested actions, delivery, observations, scoped checks and recovery choices | Saved evidence is not newly verified; human review benefit is unmeasured |
 
 The [original correctness review](../research/2026-10-15-completion-correctness.md)

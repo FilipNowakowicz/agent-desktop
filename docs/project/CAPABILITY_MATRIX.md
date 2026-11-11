@@ -44,7 +44,7 @@ validation behind each feature.
 | Lost replies and interrupted sends are uncertain and never retried (R2) | tested | `test_delivery`, `test_dispatch_evidence` |
 | Durable jobs keep per-step delivery evidence, cancellation and reconnectable status (R5b) | tested | `test_operations` |
 | A runner crash before or after dispatch is told apart | tested | `test_operations` (crash phases, from saved records) |
-| A killed runner releases its controller lease | missing | **Reproduced 2026-11-11, below.** This is the first F1 failure |
+| A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
 | Interruption during application work, after a committed effect, or during evidence collection | untested | The roadmap's F1 list. Only record-level phases are tested |
 | Takeover while a job runs, and control acknowledgement time | untested | Takeover is tested on its own (`test_takeover`), not during a job |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
@@ -93,7 +93,7 @@ validation behind each feature.
 | Controller lease: exclusivity, expiry, sequences not interleaved | tested | `test_lease` |
 | Repeated create/use/destroy under load | tested | `scripts/lifecycle_stress.py`, `scripts/soak.py` (manual runs in the log) |
 | Detached descendants that clear their environment | unsupported | Accepted limit (review decisions, 2026-10-08); needs cgroups or a container |
-| A crashed job's lease | missing | Same failure as under durable execution |
+| A crashed job's lease | tested | Fixed with the durable-execution case above |
 
 ## First F1 failure
 
@@ -121,11 +121,11 @@ job took for itself (`release_lease: true`) is released, and a client's lease th
 the job extended goes back to its normal length. Nothing is replayed, and the step
 stays `uncertain`. The independent check is that another controller's request is
 accepted right after `status` reports the dead runner, while a live runner still
-holds the lease. This is the first X1 (F1) patch.
+holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
 
 ## Order for F1
 
-1. Release or restore the lease when a job's runner dies (above).
+1. Release or restore the lease when a job's runner dies (done 2026-11-11).
 2. Interrupt at each F1 boundary: before dispatch, after dispatch and before the
    acknowledgement, during application work, after a committed effect, and during
    evidence collection. Use the existing operation fixtures and a real session.

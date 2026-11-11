@@ -290,9 +290,39 @@ def status(session, operation_id):
             for step in record["steps"]:
                 if step["dispatch_state"] == "dispatching":
                     step["dispatch_state"] = "uncertain"
+            record["lease_cleanup"] = abandoned_lease(session, record)
             save(path, record)
     record["cancel_requested"] = path.with_suffix(".cancel").exists()
     return record
+
+
+def abandoned_lease(session, record):
+    """Undo the hour-long lease of a job whose process died, as its own cleanup would.
+
+    Only a lease the job's controller still holds is touched: a temporary one
+    is released and a named client's goes back to its own duration. Nothing
+    is replayed. Returns "complete", "not_held" or "unknown".
+    """
+    controller = record.get("controller")
+    try:
+        lease = core.request(session, "status").get("lease") or {}
+        if lease.get("holder") != controller:
+            return "not_held"
+        if record.get("release_lease"):
+            core.request(session, "lease", controller, action="release")
+        else:
+            seconds = record.get("lease_seconds")
+            if type(seconds) not in (int, float) or not 1 <= seconds <= 3600:
+                seconds = None
+            core.request(
+                session,
+                "lease",
+                controller,
+                **({"seconds": seconds} if seconds else {}),
+            )
+        return "complete"
+    except Exception:  # A status read must never fail over cleanup.
+        return "unknown"
 
 
 def list_operations(session):
@@ -616,6 +646,9 @@ def run_job(session, operation_id):
         lease_reply = core.request(session, "lease", controller)
         acquired = True
         lease_seconds = lease_reply.get("lease", {}).get("seconds", 60)
+        # Saved so that a reader can restore it if this process is killed.
+        record["lease_seconds"] = lease_seconds
+        save(path, record)
         # A wait can exceed the ordinary inactivity lease. Keep exclusive
         # ownership through the bounded job, then restore the named caller's
         # duration (anonymous jobs release their temporary lease).

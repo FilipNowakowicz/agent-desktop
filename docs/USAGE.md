@@ -372,9 +372,13 @@ busy. One operation runs per session. The controller lease, human takeover gates
 observation guards and browser target identity still apply. A helper holds an
 extended lease during execution, then restores the named caller's original
 duration or releases its temporary lease. Session destruction cleans up the
-helper using the session process token. A helper crash may leave its lease until
-expiry; reconcile recorded input and explicitly release that recorded controller
-with `--controller CONTROLLER lease SESSION --release` when appropriate.
+helper using the session process token. If the helper is killed, the next status
+read that finds it gone gives back its lease, as its own cleanup would: a temporary
+lease is released, and a named caller's goes back to its own duration. The record
+shows this as `lease_cleanup` (`complete`, `not_held` or `unknown`). Nothing is
+replayed, so reconcile recorded input before acting again. If `lease_cleanup` is
+`unknown`, release that recorded controller explicitly with `--controller
+CONTROLLER lease SESSION --release`.
 
 Each step retains its request, dispatch state, acknowledged result and available
 observation evidence. States distinguish `completed`, `stopped`, `cancelled`

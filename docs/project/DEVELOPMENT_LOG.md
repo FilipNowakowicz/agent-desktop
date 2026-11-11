@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-11-11 — F0 capability matrix (N9)
+
+Added docs/project/CAPABILITY_MATRIX.md. It pins the environment, lists the cases
+of each roadmap contract as tested, untested, missing or unsupported with their
+tests, and names the first remaining F1 failure. That failure was reproduced: when a
+durable job's helper is killed, `status` correctly reports `delivery_unknown`, but
+the helper's 3600-second lease stays, and another controller is refused with
+`LeaseHeld … 3597 s left`. The matching F0 items in the roadmap are ticked. One F0
+item stays open: re-running each historical failure against current code. Documentation
+only.
+
 ## 2026-11-11 — Account-aware cookie imports and forget-site (N6)
 
 `import-cookies` now warns when it copies a site that keeps several accounts signed

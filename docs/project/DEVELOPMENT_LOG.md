@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-11-11 — Desktop size and enlarged crops (N4)
+
+`create --size WIDTHxHEIGHT` and `desktop_create(size=...)` set a headless desktop's
+size, from 640×480 to 3840×2400. The worker gives the single headless output a
+custom mode through `wlr-output-management` before the pointer and applications
+start, and `status` reports the size. Firefox otherwise opened 1280 wide on a
+1920×1080 output, so a sized desktop also gets a labwc window rule that maximises
+Firefox. The default stays 1280×720: a larger default would make every screenshot
+bigger for tasks that do not need it. Cropped screenshots may now be enlarged up to
+twice their size, and observation tokens map those coordinates back.
+
+Validated on the managed runtime: a 1920×1080 session reports that size, whole
+screenshots are 1920×1080, a 200×50 crop at scale 2 is 400×100, and Firefox's
+viewport is wider than 1280. Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — A login route that sites accept (N7)
 
 `desktop_request_human(login=true)` changes what a takeover does with the bridged

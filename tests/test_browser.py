@@ -1,5 +1,7 @@
 """Browser bridge: a private Firefox driven through WebDriver BiDi (real browser)."""
 
+import functools
+import json
 import os
 import shutil
 import tempfile
@@ -119,6 +121,106 @@ class BrowserTests(unittest.TestCase):
         opened = self.browser("open", url="about:blank", new_tab=True)
         self.assertEqual(opened["url"], "about:blank")
         self.assertEqual(len(self.browser("tabs")["tabs"]), 2)
+
+    def test_send_moves_a_secret_without_returning_it(self):
+        planted = "tskey-auth-PLANTED0123456789"
+        self.page.write_text(
+            '<title>Key</title><h1>Your key</h1><pre id="key">\n'
+            + planted
+            + "\n</pre><pre>other</pre>"
+            '<button id="copy" onclick="navigator.clipboard.writeText('
+            "key.textContent.trim()).then(() => {state.textContent = 'Copied'}, "
+            "(e) => {state.textContent = 'Failed ' + e})\">"
+            'Copy</button><p id="state"></p>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(self.browser("wait", selector="#key", timeout=20)["satisfied"])
+        home = Path(
+            core.manifest(self.session)["home"]
+            or core.session_path(self.session) / "home"
+        )
+        replies = []
+        sent = self.browser("send", selector="#key", to_file="key.txt")
+        replies.append(sent)
+        self.assertEqual(sent["bytes"], len(planted))
+        self.assertEqual(sent["prefix"], "tske")
+        written = home / "key.txt"
+        self.assertEqual(written.read_text(), planted)
+        self.assertEqual(written.stat().st_mode & 0o777, 0o600)
+        # An existing file is kept unless overwrite; ambiguity lists nothing.
+        with self.assertRaisesRegex(core.DesktopError, "exists") as refused:
+            self.browser("send", selector="#key", to_file="~/key.txt")
+        replies.append(str(refused.exception))
+        with self.assertRaisesRegex(core.DesktopError, "2 visible") as refused:
+            self.browser("send", selector="pre", to_file="other.txt")
+        replies.append(str(refused.exception))
+        self.assertFalse((home / "other.txt").exists())
+        # A command that echoes its input: its output is discarded.
+        echoed = self.browser(
+            "send",
+            selector="#key",
+            reveal=0,
+            to_command=[
+                "sh",
+                "-c",
+                'tee "$HOME/stdin.txt"; tee /dev/stderr <"$HOME/stdin.txt"',
+            ],
+        )
+        replies.append(echoed)
+        self.assertEqual(echoed["exit_status"], 0)
+        self.assertNotIn("prefix", echoed)
+        self.assertEqual((home / "stdin.txt").read_text(), planted)
+        # The clipboard source, after a page's Copy button.
+        self.browser("click", selector="#copy")
+        copied = self.browser("wait", text="Copied", timeout=10)
+        self.assertTrue(copied["satisfied"], self.browser("text", selector="#state"))
+        clipped = self.browser(
+            "steps",
+            steps=[{"action": "send", "source": "clipboard", "to_file": "clip.txt"}],
+        )
+        replies.append(clipped)
+        self.assertIsNone(clipped["stopped"], clipped)
+        self.assertEqual((home / "clip.txt").read_text(), planted)
+        for reply in replies:
+            self.assertNotIn(planted, json.dumps(reply))
+        # Nothing the runtime keeps holds it: traces, journals, logs, records.
+        leaks = []
+        for path in self.root.rglob("*"):
+            if (
+                not path.is_file()
+                or path.is_symlink()
+                or home in path.parents
+                or path == self.page
+            ):
+                continue
+            try:
+                if planted.encode() in path.read_bytes():
+                    leaks.append(path)
+            except OSError:
+                continue
+        self.assertEqual(leaks, [])
+
+    def test_send_hides_the_file_from_effect_reports(self):
+        planted = "tskey-client-PLANTEDEFFECTS42"
+        self.page.write_text(f'<title>Key</title><pre id="key">{planted}</pre>')
+        with mock.patch.dict(os.environ, {"AGENT_DESKTOP_EFFECTS": "1"}):
+            session = core.create()["session"]
+        token = core.manifest(session)["token"]
+        try:
+            request = functools.partial(core.request, session, "browser")
+            request(action="start", url=self.page.as_uri())
+            self.assertTrue(
+                request(action="wait", selector="#key", timeout=20)["satisfied"]
+            )
+            sent = request(action="send", selector="#key", to_file="key.txt")
+            self.assertNotIn(planted, json.dumps(sent))
+            listed = [
+                f for f in sent["effects"].get("files", []) if f["path"] == "~/key.txt"
+            ]
+            self.assertEqual(listed[0]["content"], "hidden", sent["effects"])
+        finally:
+            core.destroy(session)
+            wait_for(lambda: not owned_processes(token))
 
     def test_start_as_a_named_controller(self):
         # MCP clients name a controller; the request takes the lease, and the

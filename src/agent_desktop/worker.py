@@ -32,6 +32,7 @@ from .wayland import (
     WaylandError,
     clear_selection,
     peer_pid,
+    read_selection,
 )
 
 PR_SET_CHILD_SUBREAPER = 36
@@ -265,6 +266,9 @@ TRACE_FIELDS = (
     *("window", "node", "action", "observation", "region", "scale", "force"),
 )
 TRACE_BYTES = 1024 * 1024
+# Values moved by browser "send" (secrets such as generated API keys).
+SECRET_BYTES = 64 * 1024
+SECRET_COMMAND_SECONDS = 60
 
 
 def trace_arguments(request):
@@ -989,6 +993,8 @@ class Worker:
                     request.get("controller"),
                     request.get("deadline"),
                 )
+            if action == "send":
+                return self.send_secret(request, target)
             host = self.info["mode"] == "host"
             if action == "start" and host:
                 if not self.attach_browser():
@@ -1171,7 +1177,7 @@ class Worker:
                 return self.browser_observed(result, observe)
             raise ValueError(
                 "action must be start, tabs, open, close, find, text, wait, click, "
-                "fill, select or steps"
+                "fill, select, send or steps"
             )
         except Exception as error:
             if isinstance(error, ConnectionClosed):
@@ -1192,6 +1198,141 @@ class Worker:
         finally:
             if self.browser:
                 self.browser[0].deadline = None
+
+    def send_secret(self, request, target):
+        """Move a value to a file or a command's stdin without returning it.
+
+        The source is one page element's text (or a field's value) or the
+        session clipboard. The reply gives only its length, an optional short
+        prefix and a SHA-256 digest; command output is discarded, since a
+        command could print its input. This keeps the value out of the agent's
+        transcript and the runtime's records; it is not confinement.
+        """
+        from . import browser
+
+        host = self.info["mode"] == "host"
+        to_file, to_command = request.get("to_file"), request.get("to_command")
+        if (to_file is None) == (to_command is None):
+            raise ValueError("send needs exactly one of to_file or to_command")
+        if to_command is not None and (
+            not isinstance(to_command, list)
+            or not 1 <= len(to_command) <= 64
+            or not all(isinstance(a, str) and a for a in to_command)
+        ):
+            raise ValueError("to_command must be a list of 1 to 64 arguments")
+        if to_command is not None and host:
+            raise ValueError("to_command is for private sessions only")
+        reveal = request.get("reveal", 4)
+        if (
+            not isinstance(reveal, int)
+            or isinstance(reveal, bool)
+            or not 0 <= reveal <= 8
+        ):
+            raise ValueError("reveal must be between 0 and 8 characters")
+        home = Path(self.env["HOME"])
+        if to_file is not None:
+            if not isinstance(to_file, str) or not to_file:
+                raise ValueError("to_file must be a path")
+            path = Path(to_file)
+            if to_file == "~" or to_file.startswith("~/"):
+                path = home / to_file[2:]
+            elif not path.is_absolute():
+                path = home / path
+            if not path.parent.is_dir():
+                raise ValueError(f"No such directory: {path.parent}")
+        source = request.get("source", "element")
+        if source == "clipboard":
+            if host:
+                raise ValueError("The clipboard source is for private sessions only")
+            try:
+                value = read_selection(self.info["wayland_display"], SECRET_BYTES)
+            except (OSError, WaylandError) as error:
+                raise ValueError(f"Clipboard not read: {error}") from None
+            if not value:
+                raise ValueError("The session clipboard is empty")
+        elif source == "element":
+            if not (target["selector"] or target["text"]):
+                raise ValueError(
+                    "send needs a selector or a text (or source clipboard)"
+                )
+            if not self.attach_browser():
+                raise ValueError('No bridged Firefox; use action "start" first')
+            bridge = self.browser[0]
+            bridge.deadline = request.get("deadline")
+            context = bridge.target(request.get("tab"), request.get("context"))
+            # Count first: an ambiguity error must not list the matches' text.
+            count = bridge.find(context, **target)["count"]
+            if count != 1:
+                raise ValueError(
+                    f"{count} visible elements match; send needs exactly one "
+                    "(matches are not listed, since they may hold the value)"
+                )
+            element, _ = bridge.element(context, **target)
+            value = browser.remote_value(
+                bridge.call(
+                    "(e) => (e instanceof HTMLInputElement || e instanceof "
+                    "HTMLTextAreaElement) ? e.value : e.innerText",
+                    [element],
+                    context,
+                )
+            )
+            if not isinstance(value, str):
+                raise ValueError("The element has no text")
+            value = value.encode()
+            if len(value) > SECRET_BYTES:
+                raise ValueError(f"The value is longer than {SECRET_BYTES} bytes")
+        else:
+            raise ValueError('source must be "element" or "clipboard"')
+        if request.get("strip", True):
+            value = value.strip()
+        if not value:
+            raise ValueError("The value is empty")
+        result = {
+            "sent": True,
+            "bytes": len(value),
+            "sha256": hashlib.sha256(value).hexdigest(),
+        }
+        if reveal:
+            result["prefix"] = value.decode(errors="replace")[:reveal]
+        if to_file is not None:
+            if self.effects:
+                self.effects.hide(path)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
+            flags |= os.O_TRUNC if request.get("overwrite") is True else os.O_EXCL
+            try:
+                descriptor = os.open(path, flags, 0o600)
+            except FileExistsError:
+                raise ValueError(
+                    f"{path} exists; pass overwrite to replace it"
+                ) from None
+            except OSError as error:
+                raise ValueError(f"Not written: {error}") from None
+            try:
+                os.fchmod(descriptor, 0o600)
+                os.write(descriptor, value)
+            finally:
+                os.close(descriptor)
+            return {**result, "to_file": str(path)}
+        try:
+            finished = subprocess.run(
+                to_command,
+                input=value,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=self.env,
+                cwd=home,
+                timeout=SECRET_COMMAND_SECONDS,
+            )
+        except FileNotFoundError:
+            raise ValueError(f"No such program: {to_command[0]}") from None
+        except subprocess.TimeoutExpired:
+            return {
+                **result,
+                "exit_status": None,
+                "timed_out": True,
+                "note": "The command was killed after the value was sent to it.",
+            }
+        return {**result, "exit_status": finished.returncode}
 
     @staticmethod
     def browser_observed(result, observe):

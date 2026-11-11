@@ -211,6 +211,7 @@ session. Then:
 | `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
 | `wait` | until an element is found, or `gone` (up to 60 s); `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
+| `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
 
 `within` narrows a target to the row, list item, form or dialog containing a
 text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
@@ -249,6 +250,35 @@ start of mutation: a prefix may have executed. Validation failures before any
 mutation remain ordinary errors. Reconcile the actual state before retrying;
 there is no automatic rollback. These deadlines do not provide application
 transactions or guarantee that an external effect happened at most once.
+
+### Moving secrets without reading them
+
+Generated credentials (API keys, auth keys, OAuth client secrets shown once in a
+dialog) should not pass through the agent's transcript. Do not read them with
+`text` or a screenshot; use `send`:
+
+```sh
+agent-desktop browser SESSION send --selector 'pre.key' --to-file keys/tailnet
+agent-desktop browser SESSION send --source clipboard \
+  --to-command 'gh secret set TS_OAUTH_SECRET --repo OWNER/REPO'
+```
+
+The source is the one visible element matching `selector` or `text` (a field's
+value, otherwise its text), or with `source="clipboard"` the session clipboard,
+for example after clicking the page's Copy button. Surrounding whitespace is
+removed. `to_file` creates a new 0600 file (relative paths are in the session
+home; `overwrite` replaces an existing one). `to_command` runs in the session
+with the value on stdin, and its output is discarded, since a command could print
+its input. The reply carries only `bytes`, `sha256`, the `exit_status` for a
+command, and a `prefix` of `reveal` characters (default 4, 0 for none) to check
+that the right value was moved. If several elements match, nothing is sent and
+the matches are not listed. With the effect ledger on, the file is reported as
+changed with `"content": "hidden"`.
+
+This keeps the value out of the agent's replies, the action trace, operation
+records and effect reports. It is not confinement: the file belongs to the same
+user, and a shell the agent controls can still read it. The clipboard source and
+`to_command` are for private sessions only.
 
 On a host session, `desktop_browser` uses your own Firefox if you started it
 with `--remote-debugging-port=0` (Firefox then writes

@@ -1,5 +1,28 @@
 # Development log
 
+## 2026-11-11 — Moving secrets without reading them (N1)
+
+`desktop_browser` action `send` (CLI `browser SESSION send`) moves a value to a new 0600
+file (`to_file`) or to a command's stdin (`to_command`) and replies with only its byte
+count, SHA-256 and an optional prefix of up to 8 characters (`reveal`, default 4). The
+source is one visible element's text, or a field's value, or with `source="clipboard"`
+the session clipboard, which the runtime reads itself through data-control. Command
+output is discarded, because a command could echo its input. Ambiguous matches are
+refused without listing them, since the usual list shows the matches' text. With the
+effect ledger on, the file is reported with `"content": "hidden"`, and the recorder
+never reads or keeps its text. The server instructions now say to use `send` for
+generated credentials. Clipboard and command destinations are for private sessions only.
+
+Validated with the full desktop suite on the managed runtime: 329 tests, 19 skipped for
+missing optional applications. The new real-Firefox test plants a key in a `<pre>`, sends
+it to a file, to `tee` and, through a page Copy button, from the clipboard. It then
+checks every file under the test's state and runtime directories, except the session
+home and the page itself, and finds no copy of the key. A second session with effects on
+reports the file as hidden. The CLI's browser command also kept dropping `0` values
+(`--tab 0`); it now keeps them, since `--reveal 0` needs that. Limit: this keeps the
+value out of the transcript and the runtime's records; it is not confinement from a
+same-user shell.
+
 ## 2026-11-11 — Execution plan
 
 Gathered everything planned or proposed into one execution plan at the top of

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import shlex
 
 from .core import (
     DesktopError,
@@ -176,6 +177,7 @@ def main():
             "click",
             "fill",
             "select",
+            "send",
             "steps",
         ),
     )
@@ -192,6 +194,15 @@ def main():
     bridge.add_argument("--seconds", type=float, help="wait: pause first (up to 30)")
     bridge.add_argument("--within", help="text of the row, item or form holding it")
     bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
+    bridge.add_argument(
+        "--source", choices=("element", "clipboard"), help="send: what to move"
+    )
+    bridge.add_argument("--to-file", help="send: a new 0600 file (relative: home)")
+    bridge.add_argument(
+        "--to-command", type=shlex.split, help="send: a command reading stdin"
+    )
+    bridge.add_argument("--reveal", type=int, help="send: prefix characters (0-8)")
+    bridge.add_argument("--overwrite", action="store_true", help="send: replace")
     steps = sub.add_parser(
         "actions", help="run a JSON list of steps, stopping on surprises"
     )
@@ -381,7 +392,10 @@ def main():
             result = view(**args)
         elif command == "browser":
             session = args.pop("session")
-            options = {k: v for k, v in args.items() if v not in (None, False)}
+            # Keep 0 (tab 0, reveal 0); drop unset options and unset flags.
+            options = {
+                k: v for k, v in args.items() if v is not None and v is not False
+            }
             result = request(session, "browser", controller, **options)
         elif command == "check":
             from .checks import evaluate

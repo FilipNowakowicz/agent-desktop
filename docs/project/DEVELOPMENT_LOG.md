@@ -9,7 +9,9 @@ click behind the session-expiry modal landed on its "Sign out" button. A probe
 reproduced it (a click on `#under` ran `#over`'s handler). `click` and `fill` now
 hit-test the element's centre after scrolling it into view, and refuse with
 `covered: …` before any input when something else is there. A label for the
-element counts as the element. Regression test in `test_browser`.
+element, or the control a label is for, counts as the element; both custom-control
+layouts (a styled span over a hidden checkbox, an input stretched over its label)
+are tested. Regression tests in `test_browser`.
 
 **F2 browser dataset edit (`test_dataset_workflow`).** A loopback service owns 44
 records and serves 12 per page. The page source contains no records. The driver
@@ -25,12 +27,17 @@ missed target to a sign-out.
 - Trial 2: a slow save, with the helper killed after the Save click was
   acknowledged. The record says `delivery_unknown`; the driver reconciles from
   the page and does not resubmit; the service received one submission.
-- Trial 3 (held out, first run after the driver was written against 1 and 2):
+- Trial 3 was held out: it first ran after the driver was written against
+  trials 1 and 2, and passed. Its kill injection and the driver's
+  reconciliation were then refined, so it is now a regular regression trial:
   start on page 4, the modal after the first save, delayed saves, and the helper
   killed with the dialog filled but not saved. The driver retries once, because
   nothing was submitted. Its second planned kill did not happen: that edit's
   first step was refused as `covered` by the modal, which the driver dismissed
   ("Stay signed in") before retrying.
+- A job that completes is still reconciled from the page (waiting for the
+  reload after the save) before any retry, so a slow re-render cannot cause
+  a second submission.
 
 Not covered yet: virtualised lists, viewport changes, disconnects and
 agent-driven runs. The native document and mixed workflows remain.

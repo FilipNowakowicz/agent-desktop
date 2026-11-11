@@ -578,7 +578,9 @@ def desktop_browser(
     60 s; seconds pauses first, up to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
     keys) and "select" (an option of a <select> by text or value). click, fill
     and select need exactly one visible, enabled match, otherwise nothing is
-    done and the matches are listed. Replies include the page url and title,
+    done and the matches are listed. If a modal or overlay is on top of the
+    match, click and fill fail with covered: and send nothing; deal with it first.
+    Replies include the page url and title,
     and the element's value afterwards (never a password's). A click on a
     checkbox, radio or switch, or on its label, also returns toggle (before,
     after, changed): changed false means it was delivered and did nothing.

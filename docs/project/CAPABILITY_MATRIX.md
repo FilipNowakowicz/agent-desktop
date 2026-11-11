@@ -56,7 +56,7 @@ validation behind each feature.
 | --- | --- | --- |
 | Native Wayland and Xwayland applications: input, drag, scroll, screenshots | tested | `test_runtime` |
 | Browser through the DOM: forms, batches, rows, waits | tested | `test_browser`, `test_ui` (web form) |
-| Browser dataset edit end to end: paginated records, duplicate labels, a modal, delayed saves, helper killed before or after a save; checked against the service by ID (F2) | tested | `test_dataset_workflow` (three trials, one held out) |
+| Browser dataset edit end to end: paginated records, duplicate labels, a modal, delayed saves, helper killed before or after a save; checked against the service by ID (F2) | tested | `test_dataset_workflow` (three trials; the third was held out for its first run) |
 | A browser `click` or `fill` on an element under a modal or overlay is refused before input | tested | `test_browser` |
 | Accessibility actions in GTK and Qt dialogs | tested | `test_ui` |
 | Scripts in the session, bounded and supervised (R3) | tested | `test_run`, `test_script_jobs` |

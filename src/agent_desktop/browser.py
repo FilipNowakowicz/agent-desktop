@@ -116,7 +116,7 @@ class BrowserError(RuntimeError):
 
 
 # What a click at the element's centre would hit, if not the element itself:
-# null when the element (or a label for it) is on top there.
+# null when the element, or a label for it or the control it labels, is on top.
 UNCOVERED = """(e) => {
   e.scrollIntoView({block: "center", inline: "center"});
   const rect = [...e.getClientRects()].find((r) => r.width && r.height);
@@ -125,7 +125,10 @@ UNCOVERED = """(e) => {
   const y = (Math.max(rect.top, 0) + Math.min(rect.bottom, innerHeight)) / 2;
   const root = e.getRootNode();
   const hit = (root.elementFromPoint ? root : document).elementFromPoint(x, y);
-  if (!hit || hit === e || e.contains(hit) || hit.control === e) return null;
+  if (!hit || hit === e || e.contains(hit)) return null;
+  // A label and the control it is for are one target: a styled span inside
+  // the label over a hidden input, or an input stretched over its label.
+  if (hit.closest("label")?.control === e || e.control === hit) return null;
   if (hit.shadowRoot && hit.contains(e)) return null;
   const text = (hit.innerText || hit.textContent || "").trim().slice(0, 40);
   return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") +

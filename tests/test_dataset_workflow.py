@@ -427,13 +427,15 @@ class Driver:
             kill = self.kills.pop(index, None) if attempt == 0 else None
             result, submitted = self.run_edit(sku, kill)
             self.log.append(f"{sku} attempt {attempt + 1}: {result['state']}")
-            if result["state"] == "completed":
-                continue
             if submitted:
-                # The save may still land: reconcile from the page before any
-                # retry, and never submit again while it might be in flight.
+                # The save may still be in flight, or the page still reloading
+                # after it: reconcile from the page before any retry, and never
+                # submit again while it might land.
                 if self.landed(sku, timeout=15):
-                    self.log.append(f"{sku} reconciled from the page, not resubmitted")
+                    if result["state"] != "completed":
+                        self.log.append(
+                            f"{sku} reconciled from the page, not resubmitted"
+                        )
                     return
             else:
                 self.log.append(f"{sku} retried: nothing was submitted")
@@ -492,7 +494,8 @@ class DatasetWorkflowTests(unittest.TestCase):
         self.assertTrue(any("not resubmitted" in line for line in log), log)
 
     def test_helper_killed_before_saving_and_modal_over_the_page(self):
-        # Holdout combination: killed with the dialog filled but not saved,
+        # First held out (it passed on its first run), now a regular trial:
+        # killed with the dialog filled but not saved,
         # a later start page and the modal after the first save.
         log = self.trial(
             seed=37,

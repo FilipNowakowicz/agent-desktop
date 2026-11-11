@@ -40,14 +40,15 @@ stage; cleanup is required for every experiment, not postponed to the last stage
 
 ## F0: baseline and gap inventory
 
-- [ ] Pin runtime, application, platform and test fixture versions.
-- [ ] Inventory each contract as implemented/tested, implemented/untested,
+- [x] Pin runtime, application, platform and test fixture versions.
+- [x] Inventory each contract as implemented/tested, implemented/untested,
   missing or deliberately unsupported; link source and existing regression tests.
 - [ ] Reproduce relevant historical failures against current code. Record fixed
   cases as regressions rather than adding duplicate implementations.
-- [ ] Identify the first remaining concrete failure and its smallest reproducer.
+- [x] Identify the first remaining concrete failure and its smallest reproducer.
 
-Deliverable: a short capability matrix and prioritized failures. Exit when the
+Deliverable: a short capability matrix and prioritized failures. Done 2026-11-11:
+[CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md). Exit when the
 next patch has an observable expected behavior and an independent check. This
 stage is not another general literature review.
 

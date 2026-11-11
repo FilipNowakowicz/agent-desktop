@@ -158,11 +158,22 @@ exact. Observation failures, missing element fields, unsupported encodings and
 human control return unknown. Invalid predicates raise an input error. Reads
 are not atomic across the session; inspect current state before acting.
 
+## Desktop size
+
+Headless desktops are 1280×720 unless created with a size: `agent-desktop create
+--size 1920x1080` or `desktop_create(size="1920x1080")`, between 640×480 and
+3840×2400. Admin consoles and wide tables fit better at 1920×1080, where a 1280×720
+Firefox viewport left a page's action menu out of reach. Firefox opens maximised in
+a sized desktop. Larger desktops make larger screenshots, so scale them down.
+`status` reports the size. Visible and host sessions take the size of their window
+or screen.
+
 ## Partial and scaled screenshots
 
 `screenshot --region X,Y,W,H --scale 0.5` (MCP: `desktop_screenshot(region=...,
 scale=...)`) captures part of the desktop and/or shrinks it (0.1–1) to save image
-tokens. The result reports `region` and `scale`. Coordinates follow the token you
+tokens. With a region, `scale` up to 2 enlarges it, for small text or icons; the
+whole screen is never enlarged. The result reports `region` and `scale`. Coordinates follow the token you
 pass: with this screenshot's `observation`, input tools (and every step of an
 action sequence) take x/y in this image and convert them; without a token, x/y
 are desktop pixels. Do not convert manually and also pass the token, or the

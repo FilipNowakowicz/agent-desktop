@@ -907,6 +907,44 @@ def read_selection(display_path, limit, timeout=5):
                 os.close(write)
 
 
+def set_output_size(display_path, width, height, timeout=5):
+    """Give the compositor's single output a custom mode, through wlr-output-management."""
+    with Connection(display_path, timeout=timeout) as connection:
+        manager = connection.bind("zwlr_output_manager_v1", 1)
+        heads, state = [], {}
+
+        def manager_event(opcode, payload):
+            if opcode == 0:  # head(new_id)
+                heads.append(struct.unpack_from("=I", payload)[0])
+            elif opcode == 1:  # done(serial)
+                state["serial"] = struct.unpack_from("=I", payload)[0]
+
+        connection.listeners[manager] = manager_event
+        deadline = time.monotonic() + timeout
+        while "serial" not in state:
+            if time.monotonic() >= deadline:
+                raise WaylandError("Output manager sent no configuration")
+            connection.roundtrip()
+        if len(heads) != 1:
+            raise WaylandError(f"Expected one output, found {len(heads)}")
+        configuration = connection.new_id()
+        connection.send(manager, 0, struct.pack("=II", configuration, state["serial"]))
+        result = {}
+        connection.listeners[configuration] = lambda opcode, _payload: result.update(
+            outcome=("succeeded", "failed", "cancelled")[opcode]
+        )
+        head = connection.new_id()
+        connection.send(configuration, 0, struct.pack("=II", head, heads[0]))
+        connection.send(head, 1, struct.pack("=iii", width, height, 0))
+        connection.send(configuration, 2)  # apply
+        while "outcome" not in result:
+            if time.monotonic() >= deadline:
+                raise WaylandError("Output configuration was not answered")
+            connection.dispatch()
+        if result["outcome"] != "succeeded":
+            raise WaylandError(f"Output size {width}x{height} {result['outcome']}")
+
+
 class InputActivity:
     """Notices input on a compositor's seat through ext-idle-notify.
 

@@ -34,6 +34,7 @@ from .wayland import (
     clear_selection,
     peer_pid,
     read_selection,
+    set_output_size,
 )
 
 PR_SET_CHILD_SUBREAPER = 36
@@ -283,6 +284,8 @@ TOGGLE_STATE = (
     "[aria-pressed]'); return toggle ? toggle.getAttribute('aria-checked') ?? "
     "toggle.getAttribute('aria-pressed') : null; }"
 )
+# Cropped screenshots may be enlarged up to this factor.
+MAX_CROP_SCALE = 2
 
 
 def trace_arguments(request):
@@ -712,7 +715,16 @@ class Worker:
             '<keybind key="A-Tab"><action name="NextWindow"/></keybind>'
             '<keybind key="A-S-Tab"><action name="PreviousWindow"/></keybind>'
             '<keybind key="A-F4"><action name="Close"/></keybind>'
-            "</keyboard></labwc_config>\n"
+            "</keyboard>"
+            # A size is asked for to fit wide pages: Firefox otherwise opens at
+            # its own default width (1280), not the desktop's.
+            + (
+                '<windowRules><windowRule identifier="firefox">'
+                '<action name="Maximize"/></windowRule></windowRules>'
+                if self.info.get("size")
+                else ""
+            )
+            + "</labwc_config>\n"
         )
         for name in ("environment", "shutdown"):
             (config / name).write_text("")
@@ -781,6 +793,9 @@ class Worker:
                 self.start_bus()
                 if registryd:
                     self.start_registry(registryd)
+                if self.info.get("size"):
+                    # Before the pointer and applications, which read the size.
+                    set_output_size(display, *self.info["size"])
                 # Create the pointer before applications so its seat capability is stable.
                 self.virtual_pointer = VirtualPointer(display)
                 self.virtual_keyboard = VirtualKeyboard(display, self.root)
@@ -1568,9 +1583,18 @@ class Worker:
         ]
         return {p.pid for p in processes if p}
 
+    def output_size(self):
+        """The desktop's current [width, height] (None before it has started)."""
+        if self.virtual_pointer is None:
+            return None
+        self.virtual_pointer.connection.roundtrip()
+        output = self.virtual_pointer.output
+        return [output["width"], output["height"]]
+
     def screenshot(self, region=None, scale=None):
         self.virtual_pointer.connection.roundtrip()
         output = self.virtual_pointer.output
+        region_given = region is not None
         arguments = []
         if region is not None:
             if (
@@ -1597,12 +1621,17 @@ class Worker:
         else:
             region = [0, 0, output["width"], output["height"]]
         if scale is not None:
+            # Enlarging only helps a crop: a small region seen more sharply.
+            largest = MAX_CROP_SCALE if region_given else 1
             if (
                 not isinstance(scale, (int, float))
                 or isinstance(scale, bool)
-                or not 0.1 <= scale <= 1
+                or not 0.1 <= scale <= largest
             ):
-                raise ValueError("Scale must be between 0.1 and 1")
+                raise ValueError(
+                    "Scale must be between 0.1 and 1, or up to "
+                    f"{MAX_CROP_SCALE} with a region"
+                )
             arguments += ["-s", str(scale)]
         directory = self.root / "screenshots"
         directory.mkdir(exist_ok=True, mode=0o700)
@@ -2223,6 +2252,7 @@ class Worker:
                 "secret_service": self.info.get("secret_service", True),
                 "guard_host": bool(self.info.get("guard_host")),
                 "renderer": self.info.get("renderer"),
+                "size": self.output_size(),
                 "guard_removed_variables": self.info.get("guard_removed_variables", []),
                 "home_removed_variables": self.info.get("home_removed_variables", []),
                 "pinned_browsers": self.info.get("pinned_browsers", []),
@@ -3014,7 +3044,7 @@ def token_mapping(token):
         mapping = int(x), int(y), float(scale)
     except ValueError:
         raise ValueError("Malformed observation token") from None
-    if not 0.1 <= mapping[2] <= 1:
+    if not 0.1 <= mapping[2] <= MAX_CROP_SCALE:
         raise ValueError("Malformed observation token")
     return mapping
 

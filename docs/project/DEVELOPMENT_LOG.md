@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-11-11 — A login route that sites accept (N7)
+
+`desktop_request_human(login=true)` changes what a takeover does with the bridged
+Firefox. When the person takes control, the worker closes it through BiDi and
+reopens the same profile at the same page without `--remote-debugging-port`, so
+`navigator.webdriver` is false and sites such as Google do not refuse the sign-in.
+On release, it closes that Firefox by its window, which saves its cookies (in the
+first try, SIGTERM lost the newest cookie), and starts it again under the bridge.
+`last.browser` reports the restart or the error. A request without `login=true`
+while a bridged Firefox is open now carries a hint. The clean-profile
+`import-cookies --from` route stays documented as the fallback.
+
+Validated with a local HTTP page that reports `navigator.webdriver` on every load:
+`true` under the bridge, `false` during the person's turn, and `true` again after
+release. A cookie set during the turn is still present after the restart. A real
+Google sign-in was not attempted. Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — Commands that run as printed (N2)
 
 Commands printed for the person (`take_command`, `paste_command`, `host approve` in

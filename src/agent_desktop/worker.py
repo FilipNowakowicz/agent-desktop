@@ -1940,6 +1940,81 @@ class Worker:
         process.wait(timeout=3)
         raise TimeoutError("Viewer socket did not appear")
 
+    def bridged_firefox(self):
+        """(application id, process) of a running Firefox with a BiDi port, found
+        the way attach_browser finds it (its log), or None."""
+        for app, process in self.apps.items():
+            log = self.root / f"app-{app}.log"
+            if process.poll() is None and log.exists():
+                if BIDI_LISTENING.search(log.read_text(errors="replace")):
+                    return app, process
+        return None
+
+    def stop_firefox(self, process, bridge=None):
+        """Quit a Firefox and wait, so its profile is saved and unlocked."""
+        try:
+            if bridge is not None:
+                bridge.command("browser.close", {}, timeout=10)
+            elif not self.toplevels.close_app("firefox"):
+                process.terminate()
+            # Closing its windows, as a person would, makes Firefox write its
+            # cookies before it exits; a signal can lose the latest ones.
+            process.wait(timeout=20)
+        except Exception:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
+    def open_login_browser(self):
+        """For a person's login: the bridged Firefox, reopened without the
+        remote agent (sites see navigator.webdriver and refuse sign-in)."""
+        found = self.bridged_firefox()
+        if not found or not self.attach_browser():
+            return {"swapped": False, "reason": "no bridged Firefox was running"}
+        bridge = self.browser[0]
+        url = None
+        try:
+            tree = bridge.command("browsingContext.getTree", {"maxDepth": 0})
+            contexts = tree["contexts"]
+            chosen = bridge.context or (contexts[-1]["context"] if contexts else None)
+            url = next((c["url"] for c in contexts if c["context"] == chosen), None)
+        except Exception:
+            pass
+        self.stop_firefox(found[1], bridge)
+        bridge.socket.close()
+        self.browser = None
+        argv = ["firefox", *([url] if url and url != "about:blank" else [])]
+        executable = shutil.which("firefox", path=self.env.get("PATH"))
+        if not executable:
+            return {"swapped": False, "url": url, "error": "firefox not found"}
+        app = uuid.uuid4().hex[:12]
+        with (self.root / f"app-{app}.log").open("ab") as log:
+            self.apps[app] = subprocess.Popen(
+                [executable, *argv[1:]],
+                env=self.env,
+                cwd=self.env["HOME"],
+                stdout=log,
+                stderr=log,
+                start_new_session=True,
+            )
+        return {"swapped": True, "application": app, "url": url}
+
+    def restore_bridge(self, login):
+        """After the login: quit the plain Firefox, start it again under BiDi."""
+        process = self.apps.get(login.get("application"))
+        if process is not None and process.poll() is None:
+            self.stop_firefox(process)
+        lease = self.active_lease()
+        try:
+            self.start_browser(login.get("url"), lease["holder"] if lease else None)
+        except Exception as error:
+            return {
+                "restarted": False,
+                "error": str(error)[:300],
+                "recovery": 'Start the bridge again with desktop_browser "start".',
+            }
+        return {"restarted": True, "url": login.get("url")}
+
     def take(self, wayvnc, keyboard=None):
         endpoint = Path(self.info["runtime"]) / "takeover.sock"
         if keyboard is not None and (
@@ -1947,6 +2022,7 @@ class Worker:
         ):
             raise ValueError("Keyboard must look like us or us-dvorak")
         if self.control["owner"] != "human":
+            request = self.control.get("request") or {}
             self.takeover = self.start_vnc(
                 wayvnc,
                 endpoint,
@@ -1955,6 +2031,16 @@ class Worker:
                 keyboard=keyboard,
             )
             self.control["keyboard"] = keyboard
+            if request.get("login") and self.info["mode"] != "host":
+                # Only once the viewer runs, so a failed start leaves the
+                # bridged Firefox alone and control with the agent.
+                try:
+                    self.control["login_browser"] = self.open_login_browser()
+                except Exception as error:
+                    self.control["login_browser"] = {
+                        "swapped": False,
+                        "error": str(error)[:300],
+                    }
             self.control.update(owner="human", since=time.time())
             self.control["epoch"] += 1
             self.save_control()
@@ -2001,6 +2087,10 @@ class Worker:
             self.needs_screenshot = True
             self.seen = None
             self.save_control()
+            login = self.control.pop("login_browser", None)
+            if login and login.get("swapped"):
+                self.control["last"]["browser"] = self.restore_bridge(login)
+                self.save_control()
             print(f"Control returned to the agent: {how}", file=sys.stderr, flush=True)
         return self.control_state()
 
@@ -2170,8 +2260,19 @@ class Worker:
                     "Reason must be a nonempty string of at most 500 characters"
                 )
             self.control["request"] = {"reason": reason.strip(), "at": time.time()}
+            if request.get("login") is True:
+                self.control["request"]["login"] = True
             self.save_control()
-            return self.control_state()
+            state = self.control_state()
+            if not request.get("login") and self.info["mode"] != "host":
+                if self.bridged_firefox():
+                    state["hint"] = (
+                        "For a login in the bridged Firefox, pass login=true: "
+                        "sites such as Google refuse sign-in in a remote-"
+                        "controlled browser, so it is reopened without the "
+                        "bridge for the person's turn."
+                    )
+            return state
         if operation == "take":
             self.release_held_keys()
             return self.take(request.get("wayvnc", "wayvnc"), request.get("keyboard"))

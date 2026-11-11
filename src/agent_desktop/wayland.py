@@ -782,6 +782,15 @@ class Toplevels:
                 raise WaylandError(f"Window activation timed out: {window_id}")
             time.sleep(0.01)
 
+    def close_app(self, app_id):
+        """Ask the windows of one application to close; how many were asked."""
+        self.connection.roundtrip()
+        handles = [h for h, w in self.windows.items() if w["app_id"] == app_id]
+        for handle in handles:
+            self.connection.send(handle, 5)  # close
+        self.connection.roundtrip()
+        return len(handles)
+
     def close_all(self, timeout):
         """Ask every window to close, as a person would; True if all closed."""
         self.connection.roundtrip()

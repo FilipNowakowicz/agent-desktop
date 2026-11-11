@@ -69,6 +69,14 @@ def main():
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
+    feed = sub.add_parser(
+        "events",
+        help="JSON lines for a shell or notifier: requests, control, sessions",
+    )
+    feed.add_argument("--session")
+    feed.add_argument(
+        "--follow", action="store_true", help="keep printing changes as they happen"
+    )
     used = sub.add_parser(
         "activity", help="how sessions were used: counts and error types, no content"
     )
@@ -354,6 +362,18 @@ def main():
             result = sessions()
         elif command == "activity":
             result = activity(args["session"], args["days"])
+        elif command == "events":
+            from . import events
+
+            if args["follow"]:
+                try:
+                    events.follow(args["session"])
+                except KeyboardInterrupt:
+                    pass
+                return 0
+            for event in events.snapshot(args["session"]):
+                print(json.dumps(event))
+            return 0
         elif command == "doctor":
             result = doctor(with_smoke=args["smoke"])
             print(json.dumps(result, indent=2))

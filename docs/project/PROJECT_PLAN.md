@@ -68,7 +68,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11 |
 | X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
 | X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
-| X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5; contract proposed 2026-11-11 (EVENT_CONTRACT.md) |
+| X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5; contract proposed 2026-11-11 (EVENT_CONTRACT.md); first version done 2026-11-11 (agent-desktop events) |
 | X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None |
 | X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None |
 | X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None; done 2026-11-11 |

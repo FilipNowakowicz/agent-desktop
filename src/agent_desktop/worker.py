@@ -1926,6 +1926,8 @@ class Worker:
         self.info["control"] = {
             "owner": self.control["owner"],
             "request": self.control["request"],
+            # How control last came back (for `events`); no content.
+            "last": self.control["last"],
         }
         write_manifest(self.root, self.info)
 

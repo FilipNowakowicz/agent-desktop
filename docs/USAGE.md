@@ -672,6 +672,19 @@ A browser batch that stops early is not a tool error, so it is counted separatel
 went into fixed pauses rather than waiting for a text or selector. Traces written
 before 2026-11-11 do not record these.
 
+## Events for shells and notifiers
+
+`agent-desktop events [--session SESSION]` prints the current state as JSON lines:
+sessions, pending requests for you, who holds control, and a pending host request.
+With `--follow`, it then prints changes as they happen, so a desktop shell or
+notifier can show them. Examples are `human_requested` with the agent's reason and a
+`take_command` that runs as printed, `control_returned`, `host_requested` with
+`approve_command` and `deny_command`, `operation_finished`, `batch_stopped` and
+`step_uncertain`. You answer with the usual verbs (`take`, `release`, `host approve`,
+`host deny`); the stream itself approves nothing. It reads only files the runtime
+already writes and never prints typed text, page text, titles, URLs or arguments.
+The fields are listed in [the event contract](project/EVENT_CONTRACT.md).
+
 ## Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create

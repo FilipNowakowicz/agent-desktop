@@ -1,9 +1,9 @@
-# Event and approval contract (X4, proposed 2026-11-11)
+# Event and approval contract (X4, 2026-11-11)
 
 This is the contract between the runtime and anything that shows the person what
 agents are doing and lets them answer: a desktop shell (the B3 agent-aware desktop),
-a notification daemon or a terminal. It is a proposal. Nothing here is implemented
-until the plan row says so.
+a notification daemon or a terminal. The first version is implemented as
+`agent-desktop events` (see [USAGE.md](../USAGE.md#events-for-shells-and-notifiers)).
 
 ## Why
 
@@ -44,8 +44,7 @@ It prints one JSON object per line. Without `--follow`, it prints the current st
 every session as events and exits. With `--follow`, it then prints changes as they
 happen. It reads only what the runtime already writes (`session.json`,
 `host-request.json`, operation records, `trace.jsonl`), so there are no new writers
-and no daemon. Change detection uses inotify on the state directory, with a periodic
-rescan as a fallback.
+and no daemon. The first version rescans those files twice a second.
 
 ```json
 {"at": 1794220000.1, "event": "human_requested", "session": "3f2a…",

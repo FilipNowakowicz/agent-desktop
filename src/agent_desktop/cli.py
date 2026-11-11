@@ -112,6 +112,13 @@ def main():
         dest="source",
         help="Firefox profile directory (default: your default profile)",
     )
+    forget = sub.add_parser(
+        "forget-site", help="remove a site's cookies and storage from a profile"
+    )
+    forget.add_argument("profile")
+    forget.add_argument(
+        "--site", action="append", required=True, help="e.g. example.com; repeatable"
+    )
     for name, text in (
         ("view", "watch a session read-only"),
         ("take", "control a session yourself; closing the viewer hands it back"),
@@ -369,6 +376,10 @@ def main():
             result = import_firefox_cookies(
                 args["profile"], args["site"], args["source"]
             )
+        elif command == "forget-site":
+            from .cookies import forget_site
+
+            result = forget_site(args["profile"], args["site"])
         elif command == "logs":
             result = logs(args["session"])
         elif command == "host":

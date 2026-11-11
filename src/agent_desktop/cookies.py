@@ -20,6 +20,16 @@ from pathlib import Path
 
 from . import core
 
+# Sites where one browser can stay signed in to several accounts at once; an
+# import copies all of them, and the site's default account may be the wrong one.
+MULTI_ACCOUNT = (
+    "google.com",
+    "youtube.com",
+    "live.com",
+    "microsoft.com",
+    "microsoftonline.com",
+    "github.com",
+)
 SITE = re.compile(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+")
 # The pinned Firefox profile of a session home (see Worker.pin_browser_profiles).
 SESSION_FIREFOX = Path(".mozilla/agent-desktop")
@@ -166,11 +176,91 @@ def import_firefox_cookies(profile, sites, source=None):
         database.chmod(0o600)
     host = columns.index("host")
     hosts = sorted({row[host] for row in rows})
-    return {
+    result = {
         "profile": profile,
         "source": str(source),
         "sites": sites,
         "cookies": len(rows),
         "hosts": hosts,
         "detail": "Session-only cookies are not copied; values are never shown.",
+    }
+    several = sorted({m for m in MULTI_ACCOUNT for h in hosts if matches(h, [m])})
+    if several:
+        result["warning"] = (
+            f"{', '.join(several)} can keep several accounts signed in at once, "
+            "and every one of them was copied; the site's default account may not "
+            "be the one you want. To bring a single account, sign only that one in "
+            "to a fresh Firefox profile (MOZ_NO_REMOTE=1 firefox --new-instance "
+            "--profile DIR), then import with --from DIR. forget-site removes a "
+            "site from this profile again."
+        )
+    return result
+
+
+def storage_host(name):
+    """The host of a Firefox storage/default directory name, or None.
+
+    Names look like https+++accounts.example.com, with an optional +PORT and
+    ^attributes suffix.
+    """
+    scheme, separator, rest = name.partition("+++")
+    if not separator or not scheme.isalpha():
+        return None
+    return re.split(r"[+^]", rest, maxsplit=1)[0] or None
+
+
+def forget_site(profile, sites):
+    """Remove `sites` (and their subdomains) from a profile's Firefox.
+
+    Deletes their cookies and their site storage (localStorage, IndexedDB and
+    caches under storage/default). History, bookmarks and the session store are
+    left alone. The profile must not be in use.
+    """
+    sites = site_names(sites)
+    path = core.profile_path(profile)
+    if not path.is_dir():
+        raise core.DesktopError(f"No profile named {profile}")
+    target = path / "home" / SESSION_FIREFOX
+    with core.profile_lock(path).open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise core.DesktopError(
+                f"Profile {profile} is in use by a session; destroy it first"
+            ) from None
+        removed_cookies = 0
+        database = target / "cookies.sqlite"
+        if database.is_file() and not database.is_symlink():
+            connection = sqlite3.connect(database)
+            try:
+                hosts = [
+                    h
+                    for (h,) in connection.execute(
+                        "SELECT DISTINCT host FROM moz_cookies"
+                    )
+                    if matches(h, sites)
+                ]
+                with connection:
+                    for h in hosts:
+                        removed_cookies += connection.execute(
+                            "DELETE FROM moz_cookies WHERE host = ?", (h,)
+                        ).rowcount
+            except sqlite3.DatabaseError as error:
+                raise core.DesktopError(f"Unreadable cookies.sqlite: {error}") from None
+            finally:
+                connection.close()
+        removed_storage = []
+        storage = target / "storage" / "default"
+        if storage.is_dir() and not storage.is_symlink():
+            for entry in sorted(storage.iterdir()):
+                host = storage_host(entry.name)
+                if host and matches(host, sites) and not entry.is_symlink():
+                    shutil.rmtree(entry) if entry.is_dir() else entry.unlink()
+                    removed_storage.append(entry.name)
+    return {
+        "profile": profile,
+        "sites": sites,
+        "cookies_removed": removed_cookies,
+        "storage_removed": removed_storage,
+        "detail": "History, bookmarks and the session store are not changed.",
     }

@@ -713,6 +713,28 @@ logouts in your Firefox (run it again), and a site that binds a login to its
 device may still ask again. Cookies of a site are its credentials: anyone with
 the profile can act as you there.
 
+Some sites keep several accounts signed in at once in one browser (Google,
+Microsoft and GitHub, for example). An import copies all of them, and the site's
+default account in the session may not be the one the task needs, so the reply
+then carries a `warning`. To bring one account only, sign just that account in to
+a fresh Firefox profile and import from it:
+
+```sh
+MOZ_NO_REMOTE=1 firefox --new-instance --profile /tmp/one-account   # sign in, quit
+uv run agent-desktop import-cookies cloud --site google.com --from /tmp/one-account
+rm -r /tmp/one-account
+```
+
+`--no-remote` alone can open the running Firefox instead. To take a site out of a
+profile again, use `forget-site`. It removes the site's cookies and its site storage
+(`storage/default`: local storage, IndexedDB, caches), for subdomains too, and
+leaves history, bookmarks and the session store alone. The profile must not be
+in use:
+
+```sh
+uv run agent-desktop forget-site cloud --site google.com
+```
+
 `profiles` and a `create` with a profile report the profile's previous session
 (`last_session` / `previous_session`): its id and whether it ended `stopped`,
 `failed` (with the error) or `recovered`. After a failed or recovered end,

@@ -76,7 +76,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None; done 2026-11-11 with stand-ins; not yet seen on the real screen |
 | X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None |
-| X12 | Fedora drops the first typed character in Chromium, now and then (Checks run 43089078794). Loop `test_chromium_receives_every_character` locally under load with the store's Chromium | Development log 2026-11-11 | None |
+| X12 | Fedora drops the first typed character in Chromium, now and then (Checks run 43089078794). Loop `test_chromium_receives_every_character` locally under load with the store's Chromium. Local loop on 2026-11-11: 20 of 20 passed under load on NixOS with Chromium 156, so it does not reproduce here; it needs a Fedora machine | Development log 2026-11-11 | None |
 
 ### Later
 

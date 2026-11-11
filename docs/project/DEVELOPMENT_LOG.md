@@ -1,5 +1,15 @@
 # Development log
 
+## 2026-11-11 — Richer browser find items (X7)
+
+`find` items now carry up to four CSS classes and a `selector` that matches only that
+element at that moment: its id if unique, otherwise a short child path from the
+nearest ancestor with a unique id, checked with `querySelectorAll`. This was on the
+2026-10-15 daily-use list ("richer `find` items for buttons"). The selector depends on
+position, so it can change after the page changes. Validated with a real-Firefox fixture
+of two identical Edit buttons: each gets its own `#admin > …` selector, and clicking
+one of them works.
+
 ## 2026-11-11 — Activity counts stopped steps and fixed waits (N5)
 
 Browser traces now record each batch step's action, and for waits their pause and

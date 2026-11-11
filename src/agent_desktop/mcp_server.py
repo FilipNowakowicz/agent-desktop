@@ -564,7 +564,7 @@ def desktop_browser(
     started without it must be closed first. Then: "open" a url
     (new_tab for a new tab), "close" (the current tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
-    placeholder; exact for the whole text), "wait" (until found, or gone; up to
+    placeholder; exact for the whole text; each item has a unique selector), "wait" (until found, or gone; up to
     60 s; seconds pauses first, up to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
     keys) and "select" (an option of a <select> by text or value). click, fill
     and select need exactly one visible, enabled match, otherwise nothing is

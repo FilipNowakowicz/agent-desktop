@@ -352,6 +352,29 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(started["tabs"][0]["url"], self.page.as_uri())
         self.assertEqual(len(core.request(self.session, "status")["applications"]), 1)
 
+    def test_find_items_carry_classes_and_a_unique_selector(self):
+        rows = "".join(
+            f'<tr><td>{n}</td><td><button class="btn btn-small edit">Edit</button>'
+            "</td></tr>"
+            for n in ("alice", "bob")
+        )
+        self.page.write_text(
+            f'<title>Rows</title><div id="admin"><table>{rows}</table></div>'
+            '<button id="go" class="primary">Go</button>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(self.browser("wait", selector="#go", timeout=20)["satisfied"])
+        found = self.browser("find", text="Edit")
+        self.assertEqual(found["count"], 2)
+        selectors = [item["selector"] for item in found["items"]]
+        self.assertEqual(found["items"][0]["class"], "btn btn-small edit")
+        self.assertEqual(len(set(selectors)), 2)
+        self.assertTrue(all(s.startswith("#admin > ") for s in selectors), selectors)
+        # Each selector picks exactly its own element.
+        clicked = self.browser("click", selector=selectors[1])
+        self.assertTrue(clicked["delivered"])
+        self.assertEqual(self.browser("find", text="Go")["items"][0]["selector"], "#go")
+
     def test_steps_and_targets_within_a_row(self):
         rows = "".join(
             f"<tr><td>{n}</td><td><button onclick=\"document.title='{n}'\">Edit"

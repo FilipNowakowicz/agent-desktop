@@ -71,7 +71,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5 |
 | X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None |
 | X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None |
-| X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None |
+| X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None; done 2026-11-11 |
 | X8 | Add a profile to a running session | 2026-10-15 list | None |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None |

@@ -132,4 +132,6 @@ holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
    evidence collection. Use the existing operation fixtures and a real session.
 3. Run takeover while a job is running, and measure how long control takes to be
    acknowledged.
-4. Rerun the wrong-target and partial-coverage cases alongside interruptions.
+4. Rerun the wrong-target and partial-coverage cases alongside interruptions. The
+   browser target-loss case was done on 2026-11-11 (`test_interruptions`); the partial
+   accessibility coverage case is still open.

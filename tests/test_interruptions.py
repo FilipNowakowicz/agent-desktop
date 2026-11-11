@@ -6,6 +6,7 @@ work the application finishes later is not repeated, and verification is
 never claimed without its checks.
 """
 
+import json
 import shutil
 import signal
 import time
@@ -166,6 +167,51 @@ class InterruptionTests(unittest.TestCase):
         time.sleep(1)
         self.assertEqual(self.count(), "1")
         self.assertIsNone(core.request(self.session, "status")["lease"])
+
+    def test_target_lost_after_an_interrupted_job_is_not_retargeted(self):
+        # R1 under interruption: a job bound to one tab is killed, that tab
+        # closes, and a later job for the same context must refuse rather than
+        # act on whichever tab is left.
+        self.start_page()
+        context = self.browser("tabs")["tabs"][0]["context"]
+        self.browser("open", url=self.page.as_uri(), new_tab=True)
+        other = self.browser("tabs")["tabs"][-1]["context"]
+        job = operations.start(
+            self.session,
+            [
+                {"action": "wait", "seconds": 5, "context": context},
+                {"action": "click", "selector": "#add", "context": context},
+            ],
+            kind="browser",
+        )
+        self.kill_when(
+            job["operation_id"],
+            lambda r: r["steps"][0]["dispatch_state"] == "dispatching",
+        )
+        self.browser("close", context=context)
+        retry = operations.start(
+            self.session,
+            [{"action": "click", "selector": "#add", "context": context}],
+            kind="browser",
+        )
+        result = wait_for(
+            lambda: (
+                r
+                if (r := operations.status(self.session, retry["operation_id"]))[
+                    "state"
+                ]
+                in operations.TERMINAL
+                else None
+            ),
+            timeout=15,
+        )
+        # Refused before any input: a known stop, not an uncertain one.
+        self.assertEqual(result["state"], "stopped", result)
+        self.assertEqual(result["steps"][0]["dispatch_state"], "failed")
+        self.assertIn("target_lost", json.dumps(result))
+        self.assertEqual(
+            self.browser("text", selector="#count", context=other)["text"], "0"
+        )
 
 
 if __name__ == "__main__":

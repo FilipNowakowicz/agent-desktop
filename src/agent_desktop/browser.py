@@ -65,11 +65,36 @@ FIND = """
     found = found.filter((e) => scopes.some((c) => c && c.contains(e)));
   }
   if (pick) return found.length === 1 ? found[0] : null;
+  // A CSS selector that matches only this element now: its id if unique,
+  // else a short child path from the nearest ancestor with a unique id.
+  const unique = (q) => { try { return document.querySelectorAll(q).length === 1; }
+    catch (_) { return false; } };
+  const css = (e) => {
+    const byId = (n) => n.id && unique("#" + CSS.escape(n.id)) ? "#" + CSS.escape(n.id) : null;
+    if (byId(e)) return byId(e);
+    const parts = [];
+    let n = e;
+    while (n && n.parentElement && n !== document.body && parts.length < 8) {
+      const id = byId(n);
+      if (id) { parts.unshift(id); break; }
+      let part = n.tagName.toLowerCase();
+      const same = [...n.parentElement.children].filter((c) => c.tagName === n.tagName);
+      if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(n) + 1) + ")";
+      parts.unshift(part);
+      n = n.parentElement;
+    }
+    if (n === document.body) parts.unshift("body");
+    const q = parts.join(" > ");
+    return q.length <= 300 && unique(q) ? q : null;
+  };
   const describe = (e) => {
     const d = {tag: e.tagName.toLowerCase()};
     for (const k of ["id", "name", "type", "role", "href"]) {
       const v = e.getAttribute(k); if (v) d[k] = v.slice(0, 200);
     }
+    const classes = [...e.classList].slice(0, 4).join(" ");
+    if (classes) d.class = classes.slice(0, 120);
+    const q = css(e); if (q) d.selector = q;
     const t = own(e); if (t) d.text = t.slice(0, 120);
     const l = label(e); if (l) d.label = l.slice(0, 120);
     if ("value" in e && e.type !== "password" && e.tagName !== "BUTTON")

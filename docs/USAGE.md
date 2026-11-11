@@ -208,7 +208,7 @@ session. Then:
 | `tabs` | list tabs with stable `context` IDs, url and title; `tab` or `context` picks one for later calls |
 | `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
-| `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text) |
+| `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text); each item has its tag, attributes, classes and a `selector` that matches only that element at the moment |
 | `wait` | until an element is found, or `gone` (up to 60 s); `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |

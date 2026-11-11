@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-11-11 — Desktop subagent pilot (N10)
+
+`scripts/benchmark.py` gains a subagent arm (`AGENT_DESKTOP_BENCH_SUBAGENT=benchmarks/agents/desktop.json`).
+The main agent gets only the Task tool and no MCP server, and the desktop agent gets
+its own MCP server and the profile's tools. Records now carry `main_context_tokens`
+and `subagent_calls`. A four-run pilot on `hard-web-admin` and `real-inventory-cleanup`,
+seed 1, cut main-context tokens 93–97% and cost about 75% at equal success, but
+wall time rose 51–58%, so the gate was not met. Results and deviations are in
+docs/research/2026-11-11-desktop-subagent-pilot.md. The full 42-run protocol was not
+run.
+
 ## 2026-11-11 — Events report live state only
 
 Running `agent-desktop events` against the real state directory printed 16 events from

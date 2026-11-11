@@ -10,6 +10,8 @@ import sys
 import time
 from pathlib import Path
 
+from . import printed
+
 
 def main():
     path = Path(sys.argv[1])
@@ -26,7 +28,7 @@ def main():
                 "--action=deny=Decline",
                 "Allow an agent to use your screen?",
                 f"{request['reason']}\n{request['minutes']:g} min. Click to allow; "
-                "dismiss to decline. Terminal: agent-desktop host approve",
+                "dismiss to decline. Terminal: " + printed.command("host", "approve"),
             ],
             stdin=subprocess.DEVNULL,
             capture_output=True,

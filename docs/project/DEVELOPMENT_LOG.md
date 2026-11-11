@@ -1,5 +1,19 @@
 # Development log
 
+## 2026-11-11 — Commands that run as printed (N2)
+
+Commands printed for the person (`take_command`, `paste_command`, `host approve` in
+the approval notification, `host stop`, and the `import-cookies` instruction) now use
+`agent-desktop` only when PATH outside the server's own virtual environment finds it.
+Otherwise they use the installed script's absolute path. `uv run` puts that
+environment on the server's PATH but not on the person's, which is why the cloud
+report's maintainer got "command not found" twice. `AGENT_DESKTOP_CLI` overrides the
+form, and INTEGRATIONS.md describes `uv tool install --editable` for the short form.
+
+Validated with the full desktop suite on the managed runtime: 330 tests, 19 skipped.
+`test_printed` runs the printed command with this environment's `bin` removed from
+PATH, on a machine where `agent-desktop` is not otherwise installed, and it exits 0.
+
 ## 2026-11-11 — Richer browser find items (X7)
 
 `find` items now carry up to four CSS classes and a `selector` that matches only that

@@ -13,7 +13,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.shared.session import RequestResponder
 from mcp.types import TextContent
 
-from . import core, script_jobs
+from . import core, printed, script_jobs
 
 INSTRUCTIONS = """\
 Private Linux desktops that do not touch the user's own screen. Create a session,
@@ -164,6 +164,10 @@ async def cancel_without_reply(self):
 
 RequestResponder.cancel = cancel_without_reply
 
+# Commands the person is asked to run must work in their terminal as printed.
+INSTRUCTIONS = INSTRUCTIONS.replace(
+    "`agent-desktop import-cookies", f"`{printed.prefix()} import-cookies"
+)
 mcp = FastMCP("Agent Desktop", instructions=INSTRUCTIONS)
 
 # After input with screenshot=true: capture once the screen has been still for

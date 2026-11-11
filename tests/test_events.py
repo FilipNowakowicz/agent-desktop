@@ -68,6 +68,50 @@ class EventDerivationTests(unittest.TestCase):
         self.assertEqual(failed[0]["event"], "session_failed")
         self.assertEqual(failed[0]["error"], "boom")
 
+    def test_first_look_reports_only_live_state(self):
+        # Ended sessions keep their record, sometimes with a request still in it;
+        # a shell starting later must not raise banners for them.
+        self.write("old", status="stopped", control={"request": {"reason": "stale"}})
+        self.write("bad", status="failed", error="Compositor exited")
+        self.write("live", status="ready", control={"request": {"reason": "now"}})
+        host = self.root / core.HOST_REQUEST
+        host.write_text(json.dumps({"id": "h0", "answer": "approved", "expires": 0}))
+        finished = set()
+        first = events.changes({}, events.state(offsets={}, finished=finished))
+        self.assertEqual(self.names(first), ["session_ready", "human_requested"])
+        self.assertEqual(first[1]["reason"], "now")
+        self.assertEqual(finished, {"old", "bad"})
+        # A follower reads ended sessions once, then skips them.
+        self.write("old", status="stopped", control={"request": {"reason": "edited"}})
+        again = events.state(offsets={}, finished=finished)
+        self.assertEqual(set(again["sessions"]), {"live"})
+
+    def test_session_ending_with_a_request_is_only_stopped(self):
+        self.write("s1", status="ready", control={"request": {"reason": "x"}})
+        before = events.state(offsets={})
+        self.write("s1", status="stopped", control={"request": {"reason": "x"}})
+        self.assertEqual(
+            self.names(events.changes(before, events.state(offsets={}))),
+            ["session_stopped"],
+        )
+
+    def test_returned_control_carries_no_url(self):
+        self.write("s1", status="ready", control={"owner": "human"})
+        before = events.state(offsets={})
+        browser = {
+            "restarted": False,
+            "url": "https://private.example/path",
+            "error": "port\nmore",
+        }
+        self.write(
+            "s1",
+            status="ready",
+            control={"owner": "agent", "last": {"how": "released", "browser": browser}},
+        )
+        returned = events.changes(before, events.state(offsets={}))
+        self.assertEqual(returned[0]["browser"], {"restarted": False, "error": "port"})
+        self.assertNotIn("private.example", json.dumps(returned))
+
     def test_withdrawn_request(self):
         self.write("s1", status="ready", control={"request": {"reason": "x"}})
         before = events.state(offsets={})
@@ -215,6 +259,7 @@ class EventStreamTests(unittest.TestCase):
             self.assertTrue(requested["take_command"].endswith(f"take {session}"))
             core.request(session, "request_human", withdraw=True)
             self.assertTrue(self.wait_event("human_withdrawn"))
+            core.request(session, "request_human", reason="Still pending at destroy")
             job = operations.start(session, [{"action": "wait", "seconds": 0.2}])
             finished = self.wait_event("operation_finished", timeout=20)
             self.assertEqual(finished["operation"], job["operation_id"])
@@ -225,6 +270,8 @@ class EventStreamTests(unittest.TestCase):
             wait_for(lambda: not owned_processes(token))
         self.assertTrue(self.wait_event("session_stopped"))
         self.assertNotIn(planted, self.output.read_text())
+        # A later snapshot shows nothing for the ended session or its open request.
+        self.assertEqual(events.snapshot(), [])
 
 
 if __name__ == "__main__":

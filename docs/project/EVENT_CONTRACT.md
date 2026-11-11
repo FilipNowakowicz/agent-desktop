@@ -40,8 +40,10 @@ request, and takeover is cooperative routing, not a confidentiality boundary.
 agent-desktop events [--follow] [--session SESSION]
 ```
 
-It prints one JSON object per line. Without `--follow`, it prints the current state of
-every session as events and exits. With `--follow`, it then prints changes as they
+It prints one JSON object per line. Without `--follow`, it prints what is live now as
+events and exits: running sessions, their open requests and who controls them, and a
+pending host request. Ended sessions, answered requests and finished operations are
+history and are not repeated. With `--follow`, it then prints changes as they
 happen. It reads only what the runtime already writes (`session.json`,
 `host-request.json`, operation records, `trace.jsonl`), so there are no new writers
 and no daemon. The first version rescans those files twice a second.

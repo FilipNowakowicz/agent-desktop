@@ -15,6 +15,7 @@ from pathlib import Path
 from . import core, printed
 
 TERMINAL = {"completed", "stopped", "cancelled", "delivery_unknown"}
+LIVE = {"starting", "ready"}
 SESSION_EVENTS = {
     "starting": "session_started",
     "ready": "session_ready",
@@ -34,11 +35,14 @@ def first_line(text):
     return str(text).strip().splitlines()[0][:300] if text else None
 
 
-def state(session=None, offsets=None):
+def state(session=None, offsets=None, finished=None):
     """The persisted state events are derived from, plus new trace outcomes.
 
     `offsets` maps trace paths to the byte offset already read; it is updated.
+    `finished` holds sessions already seen stopped or failed. They cannot change
+    again, so a follower reads them once and then skips them. It is updated.
     """
+    finished = set() if finished is None else finished
     root = core.state_root()
     paths = (
         [root / session / "session.json"]
@@ -47,6 +51,8 @@ def state(session=None, offsets=None):
     )
     sessions, operations, outcomes = {}, {}, []
     for path in paths:
+        if path.parent.name in finished:
+            continue
         info = read_json(path)
         if not isinstance(info, dict) or not isinstance(info.get("id"), str):
             continue
@@ -60,6 +66,9 @@ def state(session=None, offsets=None):
             "request": control.get("request"),
             "last": control.get("last"),
         }
+        if info.get("status") not in LIVE:
+            finished.add(info["id"])
+            continue
         for record_path in sorted((path.parent / "operations").glob("*.json")):
             record = read_json(record_path)
             if isinstance(record, dict) and isinstance(record.get("operation_id"), str):
@@ -125,9 +134,15 @@ def human_commands(session):
 
 
 def changes(before, after):
-    """Events that turn `before` into `after` (`before` may be empty)."""
+    """Events that turn `before` into `after`.
+
+    With an empty `before` (the first look), only what is live now: running
+    sessions, their open requests and who controls them, and a pending host
+    request. Ended sessions, answers and finished operations are history.
+    """
     now = round(time.time(), 3)
     events = []
+    first = not before
 
     def emit(event, **fields):
         events.append({"at": now, "event": event, **fields})
@@ -135,6 +150,9 @@ def changes(before, after):
     old_sessions = before.get("sessions", {})
     for ident, current in after["sessions"].items():
         old = old_sessions.get(ident, {})
+        live = current["status"] in LIVE
+        if first and not live:
+            continue
         if (
             current["status"] != old.get("status")
             and current["status"] in SESSION_EVENTS
@@ -143,6 +161,8 @@ def changes(before, after):
             if current["status"] == "failed":
                 fields["error"] = current["error"]
             emit(SESSION_EVENTS[current["status"]], session=ident, **fields)
+        if not live:
+            continue  # requests and control left in an ended session's record
         request, old_request = current["request"], old.get("request")
         if request and request != old_request:
             emit(
@@ -159,15 +179,23 @@ def changes(before, after):
             emit("control_taken", session=ident)
         if current["owner"] == "agent" and old.get("owner") == "human":
             last = current.get("last") or {}
+            browser = last.get("browser")
+            if isinstance(browser, dict):
+                # No URL: only whether the bridge came back, and why not.
+                browser = {"restarted": browser.get("restarted")}
+                if last["browser"].get("error"):
+                    browser["error"] = first_line(last["browser"]["error"])
             emit(
                 "control_returned",
                 session=ident,
                 how=last.get("how"),
-                **({"browser": last["browser"]} if last.get("browser") else {}),
+                **({"browser": browser} if browser else {}),
             )
     old_operations = before.get("operations", {})
     for (ident, operation), current in after["operations"].items():
         old_state = (old_operations.get((ident, operation)) or {}).get("state")
+        if first:
+            break
         if current["state"] in TERMINAL and current["state"] != old_state:
             emit(
                 "operation_finished",
@@ -190,6 +218,9 @@ def changes(before, after):
                 approve_command=printed.command("host", "approve"),
                 deny_command=printed.command("host", "deny"),
             )
+        if first:
+            host["_expired"] = expired
+            return events
         if host.get("answer") and (not same or not old_host.get("answer")):
             emit("host_answered", request=host["id"], answer=host["answer"])
         was_expired = (
@@ -198,16 +229,17 @@ def changes(before, after):
         if expired and not was_expired:
             emit("host_expired", request=host["id"])
         host["_expired"] = expired
-    events += after.get("outcomes", [])
+    if not first:
+        events += after.get("outcomes", [])
     return events
 
 
 def follow(session=None, interval=0.5, out=sys.stdout, until=None):
     """Print the current state as events, then changes as they happen."""
-    offsets = {}
+    offsets, finished = {}, set()
     previous = {}
     while True:
-        current = state(session, offsets)
+        current = state(session, offsets, finished)
         for event in changes(previous, current):
             out.write(json.dumps(event) + "\n")
         out.flush()

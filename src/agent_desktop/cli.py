@@ -65,6 +65,7 @@ def main():
         "--renderer", help="pixman (software, the default), gles2 or vulkan"
     )
     new.add_argument("--render-device", help="render node for a GPU renderer")
+    new.add_argument("--size", help="WIDTHxHEIGHT of a headless desktop (1280x720)")
     for tool in ("labwc", "grim"):
         new.add_argument(f"--{tool}")
     sub.add_parser("list")
@@ -340,7 +341,7 @@ def main():
         if command == "create":
             mode, profile = args.pop("mode"), args.pop("profile")
             guard = args.pop("guard_host")
-            gpu = {k: args.pop(k) for k in ("renderer", "render_device")}
+            gpu = {k: args.pop(k) for k in ("renderer", "render_device", "size")}
             result = create(mode, tools=args, profile=profile, guard_host=guard, **gpu)
         elif command == "list":
             result = sessions()

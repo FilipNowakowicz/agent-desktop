@@ -281,6 +281,7 @@ def desktop_create(
     guard_host: bool = False,
     renderer: str | None = None,
     render_device: str | None = None,
+    size: str | None = None,
 ) -> dict:
     """Create a private Linux desktop. Visible mode opens a nested host Wayland window.
 
@@ -293,6 +294,9 @@ def desktop_create(
     panels, widgets or scripts that could change the real machine. renderer is
     pixman (software, the default), gles2 or vulkan; a compositor or shell under
     test usually needs gles2, with render_device such as /dev/dri/renderD128.
+    size is WIDTHxHEIGHT for a headless desktop (default 1280x720); admin
+    consoles and wide pages fit better at 1920x1080, at the cost of larger
+    screenshots (scale them down).
     """
     return core.create(
         mode,
@@ -300,6 +304,7 @@ def desktop_create(
         guard_host=guard_host,
         renderer=renderer,
         render_device=render_device,
+        size=size,
     )
 
 
@@ -719,7 +724,7 @@ def desktop_screenshot(
     Pass the observation token to input tools to refuse input if windows, focus
     or the output changed since this screenshot. To save image tokens, region
     [x, y, width, height] captures part of the desktop and scale (0.1-1) shrinks
-    the image. Input tools given this screenshot's observation interpret x/y as
+    the image; with a region, scale up to 2 enlarges small text. Input tools given this screenshot's observation interpret x/y as
     coordinates in this image; without an observation they are desktop pixels.
     """
     capture = call(

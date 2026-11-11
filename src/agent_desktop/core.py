@@ -40,6 +40,30 @@ def render_nodes():
     return nodes
 
 
+SIZE = re.compile(r"(\d{3,4})x(\d{3,4})")
+MIN_SIZE, MAX_SIZE = (640, 480), (3840, 2400)
+
+
+def session_size(size):
+    """[width, height] from "WxH" or a pair, within supported limits; None if unset."""
+    if size is None:
+        return None
+    if isinstance(size, str):
+        match = SIZE.fullmatch(size.strip().lower())
+        size = [int(match[1]), int(match[2])] if match else None
+    if (
+        not isinstance(size, (list, tuple))
+        or len(size) != 2
+        or not all(isinstance(v, int) and not isinstance(v, bool) for v in size)
+        or not all(MIN_SIZE[i] <= size[i] <= MAX_SIZE[i] for i in (0, 1))
+    ):
+        raise DesktopError(
+            f"Size must be WIDTHxHEIGHT between {MIN_SIZE[0]}x{MIN_SIZE[1]} and "
+            f"{MAX_SIZE[0]}x{MAX_SIZE[1]}, e.g. 1920x1080"
+        )
+    return [size[0], size[1]]
+
+
 def compositor_renderer(renderer=None, device=None):
     """The compositor's renderer and render node: software unless configured.
 
@@ -363,7 +387,11 @@ def create(
     _host_minutes=None,
     renderer=None,
     render_device=None,
+    size=None,
 ):
+    size = session_size(size)
+    if size and mode != "headless":
+        raise DesktopError("Only headless sessions take a size")
     if mode == "host":
         # Only approve_host/request_host may attach to the person's own screen.
         if _host_minutes is None:
@@ -437,6 +465,7 @@ def create(
         "profile": profile,
         "guard_host": bool(guard_host),
         "renderer": renderer,
+        "size": size,
         "home": str(home) if home else None,
         "profile_lock": str(profile_lock(home.parent)) if home else None,
         "token": uuid.uuid4().hex,

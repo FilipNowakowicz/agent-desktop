@@ -103,8 +103,8 @@ sessions alone cannot protect judge files from same-user arbitrary scripts.
 
 ## F3: persistence and lifecycle stress
 
-- [ ] Specify workspace versus session versus profile lifetimes. Document which
-  state persists and which processes must be recreated.
+- [x] Specify workspace versus session versus profile lifetimes. Document which
+  state persists and which processes must be recreated ([LIFETIMES.md](LIFETIMES.md)).
 - [ ] Test application restart, runtime restart, supervisor loss, viewer closure
   and repeated create/use/destroy cycles independently.
 - [ ] Check files, profiles, downloads and operation records after each event.

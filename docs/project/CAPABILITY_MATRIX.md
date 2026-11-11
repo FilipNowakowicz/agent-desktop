@@ -68,7 +68,7 @@ validation behind each feature.
 | Profiles keep a home across sessions; one session at a time | tested | `test_profiles` |
 | Browser logins survive sessions, including imported cookies | tested | `test_profiles` |
 | A profile whose supervisors died is recovered by the next session | tested | `test_profiles` |
-| Workspace, session and profile lifetimes written down as one specification | missing | The F3 first item |
+| Workspace, session and profile lifetimes written down as one specification | untested | Written in [LIFETIMES.md](LIFETIMES.md); the F3 stress tests check it |
 | Application restart or runtime upgrade with declared state preserved | untested | F3 |
 | Whole-system snapshots or reversing external effects | unsupported | Out of scope (roadmap F3 exit) |
 

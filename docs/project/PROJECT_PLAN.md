@@ -65,7 +65,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 
 | ID | Item | Source | Depends on |
 | --- | --- | --- | --- |
-| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11 |
+| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11; remaining steps in #181 |
 | X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
 | X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5; contract proposed 2026-11-11 (EVENT_CONTRACT.md); first version done 2026-11-11 (agent-desktop events) |
@@ -81,7 +81,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 
 | ID | Item | Source | Needs |
 | --- | --- | --- | --- |
-| L1 | Agent-aware desktop: a notification-based handoff used for a week, then a second field report | B3 | X4, Q3 |
+| L1 | Agent-aware desktop: a notification-based handoff used for a week, then a second field report | B3 | X4, Q3; shell banners proposed in nixos-config#498 (open, for the maintainer's review) |
 | L2 | QEMU VM session type driven through its display and QMP input. Cheapest test: change the boot order in OVMF setup, then reboot | C3 route 1 | None. Comes before L3 |
 | L3 | Preview a NixOS rebuild in a VM before switching | B5 | L2, Q3 |
 | L4 | A system for developing and maintaining NixOS with Claude | C1 | L3 |

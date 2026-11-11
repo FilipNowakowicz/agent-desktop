@@ -33,6 +33,15 @@ see [runtime/INSTALL.md](../runtime/INSTALL.md#selecting-a-runtime)), so the
 client does not need to adjust PATH. The protocol is also tested with the official Python SDK's
 stdio client.
 
+Some replies and notifications give the person a command to run (`take_command`,
+`paste_command`, `host approve`, `host stop`, `import-cookies`). `uv run` puts the
+project's virtual environment on the server's PATH but not on the terminal's, so
+these commands use `agent-desktop` only when it is on PATH outside that
+environment. Otherwise they use the installed script's absolute path, which runs
+as printed. To get the short form, put the CLI on PATH with
+`uv tool install --editable /absolute/path/to/agent-desktop`. A different form can
+be set with `AGENT_DESKTOP_CLI` in the server's environment.
+
 ### Claude Code
 
 This repository includes a project-scoped `.mcp.json` declaring the

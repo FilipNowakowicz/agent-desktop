@@ -19,6 +19,7 @@ import time
 import uuid
 from pathlib import Path
 
+from . import printed
 from .atspi import Accessibility, Unsupported, wait_for_registry
 from .effects import EffectLedger, ui_lines
 from .wayland import (
@@ -541,7 +542,7 @@ class Worker:
         notify(
             "An agent is using your screen",
             f"Until {until}. Using the mouse or keyboard pauses it; "
-            "stop it with: agent-desktop host stop",
+            f"stop it with: {printed.command('host', 'stop')}",
             self.env,
         )
 
@@ -1785,9 +1786,9 @@ class Worker:
             "session": self.info["id"],
             **self.control,
             "needs_screenshot": self.needs_screenshot,
-            "take_command": f"agent-desktop take {self.info['id']}",
+            "take_command": printed.command("take", self.info["id"]),
             # Sends the host clipboard in once, e.g. a password-manager entry.
-            "paste_command": f"agent-desktop take --paste {self.info['id']}",
+            "paste_command": printed.command("take", "--paste", self.info["id"]),
             "lease": self.lease_state(),
         }
 

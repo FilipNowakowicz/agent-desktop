@@ -2023,6 +2023,8 @@ class Worker:
     def take_requested(self):
         """A `take` is waiting behind the current request. A marker older than
         TAKE_MARKER_SECONDS was left by a client that died; it is ignored."""
+        if not self.info.get("runtime"):
+            return False
         try:
             written = (Path(self.info["runtime"]) / TAKE_REQUESTED).stat().st_mtime
         except OSError:
@@ -2865,7 +2867,8 @@ class Worker:
             server.bind(endpoint)
             server.listen(16)
             server.settimeout(0.5)
-            Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
+            if self.info.get("runtime"):
+                Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
             self.save("ready", worker_pid=os.getpid(), guardian_pid=os.getppid())
             while not self.stop:
                 if (

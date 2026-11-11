@@ -21,6 +21,9 @@ The [compatibility matrix](../COMPATIBILITY.md) describes tested configurations.
 4. Choose a bounded change from the plan, validate it, and open a reviewable PR.
    Record completed work, exact validation, failures and remaining gaps.
 
+What to work on next is in the **execution plan** at the top of the
+[project plan](PROJECT_PLAN.md#execution-plan-2026-11-11). Now items have GitHub issues.
+
 The 2026-10-23 direction is **functionality first**. Read the
 [product handoff](PRODUCT_DIRECTION.md), then the
 [functional implementation roadmap](FUNCTIONALITY_ROADMAP.md). The

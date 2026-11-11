@@ -1,9 +1,120 @@
 # Agent Desktop project plan
 
-Updated: 2026-11-10. This document records the chosen direction, implemented
+Updated: 2026-11-11. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
+
+## Execution plan (2026-11-11)
+
+This is the single ordered list of work that is planned or proposed. It collects the
+field-report follow-ups, the functionality roadmap, the open items from daily use,
+the [directions board](DIRECTIONS.md) and the
+[big-directions notes](../research/2026-11-10-big-directions-wip.md), and puts each
+item in exactly one place. The sections further down remain the sources and the
+history; where they give an order, this plan replaces it.
+
+How to use it:
+
+- **Now** items fit in one pull request each and are grouped into three GitHub
+  issues: #161 (account-bound web work), #162 (runtime and observation fixes) and
+  #163 (foundations). Start them in any
+  order unless a dependency is listed, with at most three in flight.
+- **Next** items start when Now items finish or their dependency lands. Open the
+  issue when the item starts.
+- **Later** items need a result from Now or Next, or a maintainer decision.
+- **Parked** items stay recorded with the reason. They come back only with new
+  evidence or a decision.
+- Each pull request branches from `main`, runs the local desktop suite from
+  [VALIDATION.md](../VALIDATION.md), adds a development log entry and updates its
+  row here. The full Checks matrix runs only for runtime, packaging or CI changes.
+
+### Decisions for the maintainer
+
+On 2026-11-11 the maintainer accepted the proposed defaults.
+
+| # | Question | Proposed default | Affects |
+| --- | --- | --- | --- |
+| Q1 | Should the F1–F3 roadmap or the field follow-ups be the main line? | **Decided 2026-11-11:** field follow-ups first. The F0 audit runs alongside them and feeds F1, and F1–F3 follow in Next | Order only |
+| Q2 | Is testing desktop software in scope? | Yes. The maintainer decided this on 2026-11-10, and section 1 is updated to match | Decided |
+| Q3 | Should the personal desktop drive B3 and B5, with the shell widgets kept in the NixOS configuration repository? | **Decided 2026-11-11:** yes. The general contract lives here | L1, L3 |
+| Q4 | May B2 generate calls to sites' internal endpoints, on the maintainer's own accounts only? | **Decided 2026-11-11:** not now. B2 stays parked | P1 |
+| Q5 | Should the agent-workflow repository be frozen? | **Decided 2026-11-11:** this repository needs no action | None |
+
+### Now
+
+| ID | Item | Source | Scope (one PR) | Depends on | Acceptance | Issue |
+| --- | --- | --- | --- | --- | --- | --- |
+| N1 | Move secrets without the agent reading them | Cloud report #1 | A browser step and a clipboard source that send an element's text or the session clipboard to a command's stdin or a 0600 file. It returns only the length, a short prefix and a digest | None | A planted secret appears at its destination byte for byte, and nowhere in tool results, action traces, operation journals, effect reports, review output or logs. Missing or ambiguous sources are refused | #161 |
+| N2 | Commands that run as printed | Cloud report #4 | `take_command`, `paste_command` and the `import-cookies` instruction are built from how the server was started, or the CLI goes on PATH through a documented `uv tool install` | None | With the server started as `uv --directory … run agent-desktop-mcp` and no CLI on PATH, every printed command runs | #161 |
+| N3 | Show when a click changes nothing | Cloud report #5 | When a browser click targets a checkbox, switch or radio, or its label, report the checked state before and after | None | In a fixture where a label click does not toggle the control, the step reports it unchanged. An ordinary toggle reports the change | #162 |
+| N4 | Session size and sharper crops | Cloud report #6, `--scale` above 1 | A size option for create through the CLI and MCP, possibly with a larger default for browser work, and crop scales up to 2 | None | The Firefox viewport follows the requested size, `status` reports it, and invalid sizes are refused | #162 |
+| N5 | Count stopped steps, uncertain steps and fixed waits in `activity` | Cloud report #7, the fixed-sleep habit | Summary counts, plus server-instruction text that prefers waiting for text or a selector after `open` | None | Counts from a fixture trace match the trace exactly | #162 |
+| N6 | Account-aware cookie imports and removing a site | Cloud report #3 | Warn when an import brings several signed-in accounts for one site, and add a supported command that drops one site's cookies and storage from a profile | None | The fixture profile's warning fires. Removal leaves other sites untouched and is refused while the profile is in use | #161 |
+| N7 | A login route that sites accept | Cloud report #2 | Stage a: documentation, plus an up-front warning for sites known to refuse. Stage b: the human's turn runs the profile's Firefox without the remote agent, and it restarts under BiDi after release | N2 | A fixture sees `navigator.webdriver` false during the human's turn. After release the bridge reconnects with the profile's new cookies | #161 |
+| N8 | Nested Hyprland testing in guarded sessions | Cloud report #8, Hyprland report residual | Allow `hyprctl` against a nested instance that the guarded session started, document how to find the matching Mesa, and place letters for a nested compositor's layout | None | `hyprctl` reaches the session's own nested instance and is still refused for the host | #162 |
+| N9 | F0 baseline and gap inventory | [Roadmap](FUNCTIONALITY_ROADMAP.md) F0, R1–R6 limits | A capability matrix of each contract (implemented and tested, implemented but untested, missing, or unsupported) with links to source and tests | None | The matrix exists, and the first F1 failure is named with its smallest reproducer | #163 |
+| N10 | Desktop subagent spike | Big directions B1, tool-schema cost | A Claude Code agent definition holding only the desktop tools, run against direct tools on E0 tasks and one console task. Also measure what the 29 tool schemas cost | None | Gate: main-context tokens fall 50% at equal success, with wall time no more than 10% worse. The result is recorded either way | #163 |
+
+Suggested order: N1 first, as the maintainer's accepted follow-up order has it. N2 and
+N5 are small and can go alongside it. Then N3 and N4, then N6 and N7. Accepted
+follow-ups 2 and 3 move later because N7 needs N2, and the small fixes clear faster. N9 and N10 can
+run in parallel at any point. N8 waits until shell testing resumes.
+
+### Next
+
+| ID | Item | Source | Depends on |
+| --- | --- | --- | --- |
+| X1 | F1: correctness under interruption | Roadmap F1 | N9 |
+| X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
+| X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
+| X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5 |
+| X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None |
+| X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None |
+| X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None |
+| X8 | Add a profile to a running session | 2026-10-15 list | None |
+| X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None |
+| X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None |
+
+### Later
+
+| ID | Item | Source | Needs |
+| --- | --- | --- | --- |
+| L1 | Agent-aware desktop: a notification-based handoff used for a week, then a second field report | B3 | X4, Q3 |
+| L2 | QEMU VM session type driven through its display and QMP input. Cheapest test: change the boot order in OVMF setup, then reboot | C3 route 1 | None. Comes before L3 |
+| L3 | Preview a NixOS rebuild in a VM before switching | B5 | L2, Q3 |
+| L4 | A system for developing and maintaining NixOS with Claude | C1 | L3 |
+| L5 | Forkable sessions pinned with Nix. Cheapest test: fork and discard on a settings task | B4 | None |
+| L6 | Structured access for Electron apps through the DevTools protocol: one app, A/B tested against pixels | D2 | None |
+| L7 | Human interface slices 1–5, along with [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md)'s open decisions on transport, toolkit, installer, supported application set and workspace retention | [USER_EXPERIENCE.md](USER_EXPERIENCE.md) | X1–X3 credible, X4 |
+| L8 | Linux as the agent's computer on Windows or macOS (WSL2 or Lima) | C2 | A Windows or Mac machine |
+| L9 | WebExtension that acts in the person's own Firefox | D10 | Weigh after N7 |
+
+### Parked
+
+| ID | Item | Reason |
+| --- | --- | --- |
+| P1 | B2: use the GUI once, then call the API | Waits on Q4 and N1 |
+| P2 | D1 scripts and E6 skills | Gates missed (2026-10-13, 2026-10-14) |
+| P3 | D3 effect first, E3 changed-only screenshots | Gates missed (2026-10-11). The features stay experimental |
+| P4 | D4 learning from the person, and the procedure-validity research | Optional research and not a product prerequisite |
+| P5 | D5 shared registry of app knowledge | Needs users and a publishing decision |
+| P6 | D6 many desktops working in parallel | A product framing to revisit with L7 |
+| P7 | D7 an intents layer for Linux applications | Long-term, and depends on application developers adopting it |
+| P8 | D8 continuous agent, D9 small specialist model | Need API credits or a GPU |
+| P9 | C3 route 2: physical machines through an IP-KVM device | Needs a hardware purchase; comes after L2 |
+| P10 | Strong isolation and the portable machine (sections 7D and 7E) | Needs a threat-model decision |
+| P11 | Effect-ledger and atlas follow-ups: making the ledger default-on, dconf and SQLite decoders, an ignore list, settings maps at scale, and document review with revert ([effect ledger](../research/2026-10-08-effect-ledger.md) next steps) | They belong to D3, which is weakened. Effect contracts were done as R4/R5a. Document revert overlaps L5. The speed plan's leftover S3 procedures fall under P4, and its S4 host hardening (lock and display-off refusal) has mostly shipped, though it was not rechecked in detail for this plan |
+| P12 | Section 7B–7C ideas not listed above: replay and GUI tests from traces, base and patched comparisons, and task-bound worktrees | Testing desktop software is now in scope (Q2), so revive these as rows when a testing task needs them |
+
+### Maintenance
+
+- **wlroots patch:** check each new wlroots release's `xwayland_surface_associate` and
+  retire the local patch once a release fixes it
+  ([runtime/UPSTREAM.md](../../runtime/UPSTREAM.md)).
+- **Fedora pin:** the Checks job is pinned to Fedora 44. Move it once a newer
+  release ships the wlroots 0.19 development package the repair needs.
+- **Security updates:** Dependabot and security updates are applied as they arrive.
 
 ## Current priority — functionality first (2026-10-23)
 
@@ -27,7 +138,8 @@ The saved conversation handoff is split into:
   literature, competing baselines, independent checks, held-out variations and
   stop criteria. The bounded experiment is deferred, not the next product gate.
 
-This priority supersedes older "next work" research recommendations below.
+This priority supersedes older "next work" research recommendations below. The
+[execution plan](#execution-plan-2026-11-11) orders it alongside the field follow-ups.
 The handoff documents are plans, not new implemented capabilities. MCP remains
 a supported headless interface to the same runtime used by direct integrations
 and a future human UI. No new general agent or separate chat product is required.
@@ -196,9 +308,12 @@ first for sites the user is signed into. Open, in rough order of value:
 - a non-blocking wait for control to return, and adding a profile to a running
   session.
 
+The items still open in this list are tracked as X4–X8, X10 and L9 in the execution plan.
+
 Field feedback (2026-11-08, [cloud setup report](../trials/2026-11-08-gcp-tailscale-setup.md)):
 the maintainer had an agent do Google Cloud and Tailscale console setup in the
-background with imported logins. Accepted for follow-up, in order:
+background with imported logins. Accepted for follow-up, in order (now tracked, with
+some items merged, as N1–N8 in the execution plan above):
 1. moving secrets without the agent reading them: a browser step that sends an
    element's text or the session clipboard to a command's stdin or a 0600 file and
    returns only length, prefix and digest (generated keys otherwise reach the
@@ -232,7 +347,7 @@ the implemented read-only viewer, whose disconnection preserves a headless sessi
 
 The project is Linux-first, with initial local validation on NixOS + Hyprland and headless CI on Ubuntu, Fedora and Arch. Other desktop installations need separate validation.
 
-The objective is **general computer use by existing agents**, beginning with a private desktop. Do not redirect the project into a specialized bug investigator or GUI testing framework. Testing and diagnostics can support general computer use; the project should retain that broader scope.
+The objective is **general computer use by existing agents**, beginning with a private desktop. Testing desktop applications and shells is in scope: the maintainer lifted the earlier "not a GUI testing framework" restriction on 2026-11-10 ([big-directions notes](../research/2026-11-10-big-directions-wip.md)). The project keeps the broader general-computer-use scope; do not narrow it into a specialized bug investigator.
 
 Working product description:
 

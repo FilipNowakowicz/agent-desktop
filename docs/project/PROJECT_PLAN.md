@@ -65,7 +65,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 
 | ID | Item | Source | Depends on |
 | --- | --- | --- | --- |
-| X1 | F1: correctness under interruption | Roadmap F1 | N9 |
+| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11 |
 | X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
 | X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5 |

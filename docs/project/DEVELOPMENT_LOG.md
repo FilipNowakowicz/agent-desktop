@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-11-11 — A killed operation helper gives back its lease (X1, first F1 patch)
+
+The status read that finds a durable job's helper dead now undoes that job's lease,
+as its own cleanup would have. A temporary lease is released, and a named caller's
+lease goes back to the duration it had, which the helper now saves when it starts.
+This happens only while the job's controller still holds the lease. The record's
+`lease_cleanup` is `complete`, `not_held` or `unknown`. Nothing is replayed, and the
+interrupted step stays `uncertain`. The existing helper-death test did not catch the
+bug, because it read the page as the dead job's own controller.
+
+Validated with a new real-session test, run with and without a named controller. The
+helper is killed during a 30 s wait, another controller is refused before the kill,
+and its input is accepted right after `status`. The named caller gets its 45 s lease
+back. All 19 operation tests pass. Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — F0 capability matrix (N9)
 
 Added docs/project/CAPABILITY_MATRIX.md. It pins the environment, lists the cases

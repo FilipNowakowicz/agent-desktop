@@ -336,6 +336,12 @@ def request(session, operation, controller=None, **arguments):
     """
     info = manifest(session)
     endpoint = info["control_socket"]
+    if operation == "take" and info.get("runtime"):
+        # A worker busy with a long wait sees this and gives way at once.
+        try:
+            (Path(info["runtime"]) / "take-requested").touch(mode=0o600)
+        except OSError:
+            pass
     budget = request_budget(operation, arguments)
     message = {
         "operation": operation,

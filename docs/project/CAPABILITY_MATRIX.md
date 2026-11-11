@@ -56,6 +56,8 @@ validation behind each feature.
 | --- | --- | --- |
 | Native Wayland and Xwayland applications: input, drag, scroll, screenshots | tested | `test_runtime` |
 | Browser through the DOM: forms, batches, rows, waits | tested | `test_browser`, `test_ui` (web form) |
+| Browser dataset edit end to end: paginated records, duplicate labels, a modal, delayed saves, helper killed before or after a save; checked against the service by ID (F2) | tested | `test_dataset_workflow` (three trials, one held out) |
+| A browser `click` or `fill` on an element under a modal or overlay is refused before input | tested | `test_browser` |
 | Accessibility actions in GTK and Qt dialogs | tested | `test_ui` |
 | Scripts in the session, bounded and supervised (R3) | tested | `test_run`, `test_script_jobs` |
 | File dialogs, clipboard between applications, poor-accessibility interfaces in complete workflows | untested | Covered piecemeal; the F2 workflows will cover them end to end |
@@ -81,7 +83,8 @@ validation behind each feature.
 | Effect reports with coverage and unknown baselines (R4) | tested | `test_effects` |
 | Scoped predicates give satisfied, violated or unknown (R5a) | tested | `test_checks` |
 | Offline evidence review keeps unknowns visible (R6) | tested | `test_review` |
-| Observations under virtualised lists, delayed saves and layout changes, as F2 varies them | untested | F2 |
+| Observations under delayed saves and a modal over the page (F2 browser dataset) | tested | `test_dataset_workflow` |
+| Observations under virtualised lists and layout changes | untested | F2 |
 | Effect reports as proof of causation | unsupported | Temporal evidence only (R4 limit) |
 
 ### Ownership and cleanup

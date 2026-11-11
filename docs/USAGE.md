@@ -230,7 +230,9 @@ one call and stops at the first failure or unmet wait. Any action connects to a
 Firefox already started in the session with `--remote-debugging-port`.
 Clicks and keys are trusted input events from Firefox itself. If several
 elements match, or the match is disabled, nothing happens and the matches are
-listed. Replies carry the page url and title and the element's value afterwards,
+listed. If something else is on top of the match where the click would land
+(a modal or overlay), `click` and `fill` are refused with `covered:` and the
+covering element, and nothing is sent. Replies carry the page url and title and the element's value afterwards,
 never a password's. A click on a checkbox, radio button or switch (`role=switch`,
 `aria-checked`, `aria-pressed`), or on a label that controls one, also returns
 `toggle` with its state `before` and `after` and whether it `changed`. A delivered

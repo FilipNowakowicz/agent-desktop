@@ -66,6 +66,37 @@ class BrowserTests(unittest.TestCase):
     def browser(self, action, **arguments):
         return core.request(self.session, "browser", action=action, **arguments)
 
+    def test_click_on_a_covered_element_is_refused_before_input(self):
+        # A modal over the target would take a pointer click; the bridge must
+        # refuse rather than report the hidden element as clicked.
+        self.page.write_text(
+            '<title>Covered</title><p id="out">none</p>'
+            '<button id="under" style="position:absolute;left:100px;top:100px;'
+            'width:120px;height:40px" onclick="out.textContent=\'under\'">Under</button>'
+            '<input id="field" style="position:absolute;left:100px;top:200px">'
+            '<div id="modal" style="position:fixed;inset:0;background:#0006">'
+            '<button id="over" style="position:absolute;left:90px;top:95px;'
+            'width:150px;height:50px" onclick="out.textContent=\'over\'">Over</button>'
+            '<button id="close" onclick="modal.remove()">Close</button></div>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(
+            self.browser("wait", selector="#under", timeout=20)["satisfied"]
+        )
+        for action, extra in (("click", {}), ("fill", {"value": "x"})):
+            target = "#under" if action == "click" else "#field"
+            with self.assertRaisesRegex(
+                core.DesktopError, "covered: .*#over|covered: .*modal"
+            ):
+                self.browser(action, selector=target, **extra)
+        self.assertEqual(self.browser("text", selector="#out")["text"], "none")
+        self.assertEqual(
+            self.browser("find", selector="#field")["items"][0].get("value", ""), ""
+        )
+        self.browser("click", selector="#close")
+        self.assertTrue(self.browser("click", selector="#under")["delivered"])
+        self.assertEqual(self.browser("text", selector="#out")["text"], "under")
+
     def test_delayed_wait_exceeds_old_socket_timeout(self):
         self.page.write_text(
             '<title>Delayed</title><p id="out">pending</p>'

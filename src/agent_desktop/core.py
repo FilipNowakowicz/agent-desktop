@@ -300,6 +300,10 @@ def request_budget(operation, arguments):
                     else 30
                     for step in steps
                 )
+        if arguments.get("action") == "send" and arguments.get("to_command"):
+            # The command may run for up to a minute (SECRET_COMMAND_SECONDS),
+            # after the element or clipboard read.
+            return 90
         if arguments.get("action") == "wait":
             timeout, seconds = arguments.get("timeout", 10), arguments.get("seconds", 0)
             if (

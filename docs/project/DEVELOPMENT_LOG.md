@@ -16,6 +16,16 @@ Also recorded: on 2026-11-11 the Ubuntu job of Checks run 43067317711 failed onc
 `test_effects.RecorderTests.test_new_directories_are_watched`, the inotify
 watch-count assertion. That code was unchanged in the stack under test, and the job
 passed on rerun. The test is timing-sensitive on CI runners.
+## 2026-11-11 — Secret sink hardening
+
+Two gaps in `send` (N1), found in review. A `send` to a command used the default 30 s
+transport budget, although the command may run for 60 s, so a slow command's reply
+could be lost and reported uncertain. It now gets 90 s. If a second match appeared
+between `send`'s count and its element lookup, the lookup's error listed the matches'
+text. That error is now replaced by one that lists nothing. Also checked: destroying a
+session during a login takeover does not go through `release`, so it never tries to
+restart Firefox. Closing the viewer still releases control and restarts it. Unit tests
+cover both fixes.
 
 ## 2026-11-11 — Events for shells and notifiers (X4, first version)
 

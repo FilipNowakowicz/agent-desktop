@@ -1,5 +1,21 @@
 # Development log
 
+## 2026-11-11 — Takeover during a running job (F1-b, #181)
+
+New `tests/test_takeover_jobs.py`: a person takes control while a durable browser job
+is in a 3 s pause. Before the fix, `take` was acknowledged after 3.1 s. The worker
+serves one request at a time, so `take` waited for the pause to end, and it could wait
+up to a minute behind a browser `wait`. Now `core.request` writes `take-requested` in
+the session's runtime directory before sending `take`, and browser waits in the worker
+check it every 0.1 s and raise `HumanControl`, which `take` clears. A durable job
+records that step as `failed` with the reason, rather than `uncertain`, because
+`HumanControl` is always raised before any input. Other worker errors after dispatch
+stay uncertain, as R2 requires. A browser batch now stops with its completed prefix on
+`HumanControl`, instead of failing as a whole. In the test, the click before the
+takeover lands, nothing after it does, and the lease is released. Full desktop suite:
+358 tests, 19 skipped. Waits in `desktop_actions` already poll from the client, so
+`take` could get in between them before.
+
 ## 2026-11-11 — Desktop subagent pilot (N10)
 
 `scripts/benchmark.py` gains a subagent arm (`AGENT_DESKTOP_BENCH_SUBAGENT=benchmarks/agents/desktop.json`).

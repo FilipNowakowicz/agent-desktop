@@ -2022,6 +2022,7 @@ class Worker:
             if remaining <= 0:
                 return
             time.sleep(min(0.1, remaining))
+
     def just_acted(self):
         """Whether the agent sent input within the last HOST_SETTLE_AFTER seconds."""
         at = getattr(self, "mutated_at", None)

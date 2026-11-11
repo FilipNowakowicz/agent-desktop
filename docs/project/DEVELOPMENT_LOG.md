@@ -44,6 +44,12 @@ screen): settling turns on only after recent input, and the fallback runs only f
 web URLs in a new tab. Not yet seen on the real screen: how long Hyprland's
 animations take to settle, and whether Firefox brings its window forward.
 
+X5, focusing a window on another workspace, needs no change. In a nested Hyprland
+0.57.1, in a GPU private session standing in for the person's screen, the runtime's
+foreign-toplevel activation of a window on workspace 1, sent from workspace 2,
+switched to workspace 1 and activated the window. The nested instance used the test
+harness's minimal configuration, not the full desktop configuration.
+
 ## 2026-11-11 — Desktop subagent pilot (N10)
 
 `scripts/benchmark.py` gains a subagent arm (`AGENT_DESKTOP_BENCH_SUBAGENT=benchmarks/agents/desktop.json`).

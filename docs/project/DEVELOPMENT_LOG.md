@@ -1,5 +1,25 @@
 # Development log
 
+## 2026-11-11 — Events for shells and notifiers (X4, first version)
+
+`agent-desktop events [--follow] [--session]` implements the contract in
+docs/project/EVENT_CONTRACT.md. Without `--follow`, it prints the current state as
+events and exits. With `--follow`, it then prints changes. It covers session
+lifecycle, `human_requested` and `human_withdrawn` with N2's take and paste commands,
+`control_taken` and `control_returned` (including a login's browser restart),
+`host_requested`, `host_answered` and `host_expired` with approve and deny commands,
+`operation_finished`, and `batch_stopped` and `step_uncertain` from new trace lines.
+It reads `session.json`, the host request file, operation records and traces. The
+worker now also persists `control.last`, so how control came back survives in the
+manifest. The first version polls twice a second; it does not use inotify.
+
+Validated with the full desktop suite on the managed runtime: 352 tests, 19 skipped.
+Unit tests derive each event from fixture state. A real-session test follows the stream
+as a separate process through create, a launched terminal titled with a planted string,
+typing that string, request and withdraw, a durable job and destroy. The planted string
+never appears in the output. The non-blocking wait for control from the 2026-10-15 list
+is covered by following `control_returned`. The Quickshell consumer (L1) is next.
+
 ## 2026-11-11 — Desktop subagent: schema cost and protocol (N10, part one)
 
 Measured the MCP tool list and server instructions. They come to 29 tools and 31,436

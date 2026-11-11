@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-11-11 — Clicks that change nothing on a toggle (N3)
+
+A browser click on a checkbox, radio, `role=switch` or other `aria-checked` or
+`aria-pressed` control, or on a label that controls one, now returns `toggle` with the
+state `before` and `after` and whether it `changed`. In the cloud report, label clicks
+on Tailscale's switches were reported delivered while the switches stayed off. The cost
+is one more page-script call per click.
+
+Validated with a real-Firefox fixture: a label click that the page cancels reports
+`changed: false`, a switch reports `false` to `true`, and a plain button has no
+`toggle`. A pre-click read that fails no longer stops the click (the optional before-state is then missing). Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — Moving secrets without reading them (N1)
 
 `desktop_browser` action `send` (CLI `browser SESSION send`) moves a value to a new 0600

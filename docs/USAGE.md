@@ -220,7 +220,11 @@ Firefox already started in the session with `--remote-debugging-port`.
 Clicks and keys are trusted input events from Firefox itself. If several
 elements match, or the match is disabled, nothing happens and the matches are
 listed. Replies carry the page url and title and the element's value afterwards,
-never a password's. The bridge is a worker operation: it needs the controller
+never a password's. A click on a checkbox, radio button or switch (`role=switch`,
+`aria-checked`, `aria-pressed`), or on a label that controls one, also returns
+`toggle` with its state `before` and `after` and whether it `changed`. A delivered
+click with `"changed": false` hit something that did not toggle the control, as a
+label without a handler can. The bridge is a worker operation: it needs the controller
 lease and is refused while a person has control.
 
 Use `context` (CLI `--context`) from `tabs` to select a stable browser target.

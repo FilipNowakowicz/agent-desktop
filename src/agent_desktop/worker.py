@@ -269,6 +269,19 @@ TRACE_BYTES = 1024 * 1024
 # Values moved by browser "send" (secrets such as generated API keys).
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
+# The checked state of a clicked toggle: a checkbox, radio or switch, or the one
+# a clicked label controls. "true", "false" or "mixed"; null for anything else.
+TOGGLE_STATE = (
+    "(e) => { let t = e; if (!(e instanceof HTMLInputElement)) { "
+    "const label = e.closest('label'); if (label && label.control) "
+    "t = label.control; } if (t instanceof HTMLInputElement && "
+    "(t.type === 'checkbox' || t.type === 'radio')) "
+    "return t.indeterminate ? 'mixed' : String(t.checked); "
+    "const toggle = t.closest('[role=switch], [role=checkbox], [role=radio], "
+    "[role=menuitemcheckbox], [role=menuitemradio], [aria-checked], "
+    "[aria-pressed]'); return toggle ? toggle.getAttribute('aria-checked') ?? "
+    "toggle.getAttribute('aria-pressed') : null; }"
+)
 
 
 def trace_arguments(request):
@@ -1131,7 +1144,15 @@ class Worker:
                 element, described = bridge.element(context, **target)
                 if described.get("disabled"):
                     raise ValueError(f"The element is disabled: {described}")
+                toggle_before = None
                 if action == "click":
+                    try:
+                        toggle_before = browser.remote_value(
+                            bridge.call(TOGGLE_STATE, [element], context)
+                        )
+                    except Exception:
+                        # Optional evidence: a failed read must not stop the click.
+                        toggle_before = None
                     mutation_started = True
                     bridge.click(context, element)
                 elif action == "fill":
@@ -1172,6 +1193,14 @@ class Worker:
                         state["now"] = {
                             k: v for k, v in json.loads(after).items() if v is not None
                         }
+                    if isinstance(toggle_before, str):
+                        # A label or switch click can be delivered and change nothing.
+                        toggle_after = browser.remote_value(
+                            bridge.call(TOGGLE_STATE, [element], context)
+                        )
+                        toggle = {"before": toggle_before, "after": toggle_after}
+                        toggle["changed"] = toggle_after != toggle_before
+                        state["toggle"] = toggle
                     return state
 
                 return self.browser_observed(result, observe)

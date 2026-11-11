@@ -249,6 +249,31 @@ class RecorderTests(unittest.TestCase):
         self.assertEqual(first["files"], again["files"])
         self.assertEqual(again["files"][0]["diff"], ["+changed"])
 
+    def test_hidden_files_report_changes_without_contents(self):
+        # Secrets written by browser "send" must never enter a report.
+        (self.root / "old-key").write_text("tskey-OLDSECRET\n")
+        ledger = self.ledger()
+        ledger.hide(self.root / "key")
+        ledger.hide(self.root / "old-key")
+        ledger.hide("/elsewhere/file")  # outside every root: ignored
+        state = ledger.begin()
+        (self.root / "key").write_text("tskey-PLANTED\n")
+        (self.root / "old-key").write_text("tskey-NEWSECRET\n")
+        report = ledger.finish(state)
+        again = ledger.since(report["effect_id"])
+        for result in (report, again):
+            self.assertEqual(
+                result["files"],
+                [
+                    {"path": "~/key", "change": "created", "content": "hidden"},
+                    {"path": "~/old-key", "change": "modified", "content": "hidden"},
+                ],
+            )
+            self.assertNotIn("SECRET", str(result))
+            self.assertNotIn("PLANTED", str(result))
+        recorder = ledger.recorders[0]
+        self.assertTrue(all(v[2] is None for v in recorder.versions.get("old-key", [])))
+
     def test_nothing_observed(self):
         ledger = self.ledger()
         report = ledger.finish(ledger.begin())

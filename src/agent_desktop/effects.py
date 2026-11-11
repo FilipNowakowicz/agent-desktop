@@ -404,6 +404,9 @@ class FileRecorder:
         # so a report can diff against the state before any given action.
         self.versions = {}
         self.text_bytes = 0
+        # Relative paths whose contents are never read (secrets written by the
+        # runtime); they are reported as changed, with no text or diff.
+        self.hidden = set()
         self.pending = {}  # relative path -> time of its latest unobserved event
         self.state_lock = threading.RLock()
         self.lock = threading.Lock()
@@ -459,6 +462,21 @@ class FileRecorder:
     def relative(self, path):
         return str(path.relative_to(self.root))
 
+    def hide(self, path):
+        """Never read or diff this file's contents; True if it is under the root."""
+        try:
+            relative = self.relative(Path(path))
+        except ValueError:
+            return False
+        with self.state_lock:
+            self.hidden.add(relative)
+            for _at, _exists, text in self.versions.get(relative, []):
+                self.text_bytes -= text_size(text)
+            self.versions[relative] = [
+                (at, exists, None) for at, exists, _ in self.versions.get(relative, [])
+            ]
+        return True
+
     def record(self, relative, at):
         """Observe a file now and keep it as a version (bounded history)."""
         with self.state_lock:
@@ -469,7 +487,9 @@ class FileRecorder:
         try:
             exists = path.is_file() and not path.is_symlink()
             text = (
-                read_document(path) if exists and not NOISE.search(relative) else None
+                read_document(path)
+                if exists and not NOISE.search(relative) and relative not in self.hidden
+                else None
             )
         except OSError as error:
             self.failure(f"file read failed: {relative}: {error}")
@@ -610,6 +630,19 @@ class FileRecorder:
             except OSError as error:
                 exists = None
                 coverage.update(complete=False, reasons=[str(error)])
+            if relative in self.hidden:
+                entry = {"path": f"{self.label}/{relative}", "content": "hidden"}
+                entry["change"] = (
+                    "created"
+                    if existed is False and exists
+                    else "deleted"
+                    if existed and exists is False
+                    else "modified"
+                    if existed and exists
+                    else "unknown"
+                )
+                files.append(entry)
+                continue
             try:
                 after = read_document(path, coverage) if exists else None
             except OSError as error:
@@ -767,6 +800,11 @@ class EffectLedger:
         self.sequence = 0
         for pid in self.processes():
             self.names(pid)
+
+    def hide(self, path):
+        """Report this file's changes without its contents (for secrets)."""
+        for recorder in self.recorders:
+            recorder.hide(path)
 
     def begin(self):
         processes = self.processes()

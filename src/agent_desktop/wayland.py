@@ -817,6 +817,87 @@ def clear_selection(display_path):
         connection.roundtrip()
 
 
+TEXT_TYPES = ("text/plain;charset=utf-8", "UTF8_STRING", "text/plain", "STRING", "TEXT")
+
+
+def read_selection(display_path, limit, timeout=5):
+    """The session clipboard's text as bytes, through data-control; None if empty.
+
+    Raises WaylandError when the clipboard holds no text, exceeds `limit` bytes,
+    or its owner does not answer within `timeout` seconds.
+    """
+    with Connection(display_path, timeout=timeout) as connection:
+        for interface in (
+            "ext_data_control_manager_v1",
+            "zwlr_data_control_manager_v1",
+        ):
+            if interface in connection.globals:
+                break
+        else:
+            raise WaylandError("Compositor provides no data-control protocol")
+        seat = connection.bind("wl_seat", 1)
+        manager = connection.bind(interface, 1)
+        device = connection.new_id()
+        offers = {}  # offer object -> mime types
+        state = {"selection": None, "seen": False}
+
+        def offer_event(offer):
+            def event(opcode, payload):
+                if opcode == 0:  # offer(mime_type)
+                    (length,) = struct.unpack_from("=I", payload)
+                    offers[offer].append(payload[4 : 4 + length - 1].decode())
+
+            return event
+
+        def device_event(opcode, payload):
+            if opcode == 0:  # data_offer(new_id)
+                (offer,) = struct.unpack_from("=I", payload)
+                offers[offer] = []
+                connection.listeners[offer] = offer_event(offer)
+            elif opcode == 1:  # selection(offer or null)
+                (offer,) = struct.unpack_from("=I", payload)
+                state["selection"] = offer or None
+                state["seen"] = True
+
+        connection.listeners[device] = device_event
+        connection.send(manager, 1, struct.pack("=II", device, seat))
+        connection.roundtrip()
+        offer = state["selection"]
+        if offer is None:
+            return None
+        mime = next((m for m in TEXT_TYPES if m in offers.get(offer, [])), None)
+        if mime is None:
+            raise WaylandError("The clipboard holds no text")
+        read, write = os.pipe()
+        try:
+            connection.send(offer, 0, string(mime), fd=write)  # receive
+            os.close(write)
+            write = None
+            connection.roundtrip()
+            data = b""
+            deadline = time.monotonic() + timeout
+            os.set_blocking(read, False)
+            while True:
+                try:
+                    chunk = os.read(read, 65536)
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise WaylandError(
+                            "The clipboard owner did not answer"
+                        ) from None
+                    time.sleep(0.01)
+                    continue
+                if not chunk:
+                    return data
+                data += chunk
+                if len(data) > limit:
+                    raise WaylandError(f"The clipboard holds more than {limit} bytes")
+        finally:
+            os.close(read)
+            if write is not None:
+                os.close(write)
+
+
 class InputActivity:
     """Notices input on a compositor's seat through ext-idle-notify.
 

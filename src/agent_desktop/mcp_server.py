@@ -23,6 +23,10 @@ desktop_actions accept screenshot=true to return the settled screen in the same
 reply: prefer that to a separate screenshot call, and batch predictable steps in
 desktop_actions.
 
+Generated secrets (API keys, tokens, client secrets shown once): never read
+them with "text" or screenshots; desktop_browser action "send" moves them to a
+0600 file or a command's stdin and returns only a digest.
+
 Logins, 2FA codes, CAPTCHAs and payment confirmations: never ask the user for
 passwords or codes in chat and never type guessed credentials. When a task needs
 a site the user is likely signed into in their own Firefox, first suggest they
@@ -546,6 +550,11 @@ def desktop_browser(
     steps: list[dict] | None = None,
     seconds: float | None = None,
     context: str | None = None,
+    source: str | None = None,
+    to_file: str | None = None,
+    to_command: list[str] | None = None,
+    reveal: int | None = None,
+    overwrite: bool = False,
 ) -> dict:
     """Use Firefox in a private session through its DOM, without screenshots.
 
@@ -572,6 +581,14 @@ def desktop_browser(
     actions per call. Faster and more exact than pixels for web pages; use
     screenshots for visual questions.
 
+    For secrets (a generated API key, token or password shown once), never use
+    "text": action "send" moves one element's text, or with source="clipboard"
+    the session clipboard (e.g. after clicking a Copy button), to to_file (a new
+    0600 file; relative paths are in the session home; overwrite to replace) or
+    to a command's stdin (to_command=["gh", "secret", "set", "NAME"]; its output
+    is discarded). The reply has only its bytes, sha256 and a prefix of reveal
+    characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
+
     On a host session it uses the person's own Firefox, if they started it with
     --remote-debugging-port ("start" only connects): read any tab, but open
     your own with new_tab (it opens in the background) and act only there, or
@@ -591,6 +608,11 @@ def desktop_browser(
         "within": within,
         "steps": steps,
         "seconds": seconds,
+        "source": source,
+        "to_file": to_file,
+        "to_command": to_command,
+        "reveal": reveal,
+        "overwrite": overwrite or None,
     }
     return call(
         session,

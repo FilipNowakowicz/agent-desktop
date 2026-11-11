@@ -582,7 +582,9 @@ def desktop_browser(
     {"action": "click", "text": "Sign in"}, {"action": "wait", "text":
     "Dashboard"}]) and stops at the first failure or unmet wait: plan several
     actions per call. Faster and more exact than pixels for web pages; use
-    screenshots for visual questions.
+    screenshots for visual questions. After "open", wait for a heading, button
+    or text you expect rather than a fixed number of seconds: it returns as soon
+    as the page is ready.
 
     For secrets (a generated API key, token or password shown once), never use
     "text": action "send" moves one element's text, or with source="clipboard"

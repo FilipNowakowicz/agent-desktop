@@ -789,6 +789,9 @@ def activity(session=None, days=None):
     operations, errors, modes = Counter(), Counter(), Counter()
     moments, screenshots = [], []
     input_calls = with_token = counted_sessions = 0
+    stops, waits = Counter(), Counter()
+    batches = uncertain = 0
+    fixed_wait_seconds = 0.0
     for path in paths:
         used = 0
         try:
@@ -813,6 +816,26 @@ def activity(session=None, days=None):
                 with_token += arguments.get("observation") is not None
             if operation == "screenshot":
                 screenshots.append(arguments)
+            outcome = record.get("outcome") or {}
+            if outcome.get("uncertain") or (
+                "delivered" in outcome and outcome["delivered"] is None
+            ):
+                uncertain += 1
+            if operation == "browser":
+                steps = arguments.get("steps")
+                for step in steps if isinstance(steps, list) else [arguments]:
+                    if not isinstance(step, dict) or step.get("action") != "wait":
+                        continue
+                    if step.get("condition"):
+                        waits["condition"] += 1
+                    else:
+                        waits["fixed"] += 1
+                        if isinstance(step.get("seconds"), (int, float)):
+                            fixed_wait_seconds += step["seconds"]
+                if isinstance(steps, list):
+                    batches += 1
+                    if outcome.get("stopped"):
+                        stops[outcome["stopped"]] += 1
             if record.get("error"):
                 kind = record["error"].partition(":")[0]
                 errors[kind if kind.isidentifier() else "other"] += 1
@@ -836,6 +859,14 @@ def activity(session=None, days=None):
         "screenshots": len(screenshots),
         "screenshots_cropped": sum(1 for a in screenshots if a.get("region")),
         "screenshots_scaled": sum(1 for a in screenshots if a.get("scale")),
+        # A stopped batch step is not a tool error, so errors_by_type misses it.
+        "uncertain_deliveries": uncertain,
+        "browser_batches": batches,
+        "browser_batches_stopped": sum(stops.values()),
+        "browser_stops_by_reason": dict(stops.most_common()),
+        "browser_waits_fixed": waits["fixed"],
+        "browser_waits_for_condition": waits["condition"],
+        "browser_fixed_wait_seconds": round(fixed_wait_seconds, 1),
     }
 
 

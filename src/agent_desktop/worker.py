@@ -306,7 +306,46 @@ def trace_arguments(request):
     if isinstance(argv, list) and argv:
         kept["program"] = Path(str(argv[0])).name
         kept["argc"] = len(argv)
+    if request.get("operation") == "browser":
+        kept.update(browser_trace(request))
+        steps = request.get("steps")
+        if isinstance(steps, list):
+            kept["steps"] = [
+                {"action": step.get("action"), **browser_trace(step)}
+                for step in steps[:30]
+                if isinstance(step, dict) and isinstance(step.get("action"), str)
+            ]
     return kept
+
+
+def browser_trace(step):
+    """For a browser wait: its pause and whether it waits for a condition."""
+    if step.get("action") != "wait":
+        return {}
+    seconds = step.get("seconds")
+    kept = {"condition": bool(step.get("selector") or step.get("text"))}
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool):
+        kept["seconds"] = seconds
+    return kept
+
+
+def stop_reason(stopped):
+    """A batch stop as a category, without page text."""
+    if stopped.get("uncertain"):
+        return "uncertain"
+    reason = str(stopped.get("reason", ""))
+    for marker, category in (
+        ("elements match", "ambiguous"),
+        ("No visible element", "missing"),
+        ("No element", "missing"),
+        ("disabled", "disabled"),
+        ("wait not satisfied", "wait_unmet"),
+        ("deadline", "deadline"),
+        ("target_lost", "target_lost"),
+    ):
+        if marker in reason:
+            return category
+    return "other"
 
 
 class StaleObservation(RuntimeError):
@@ -2711,6 +2750,13 @@ class Worker:
                 for key in ("delivered", "observation", "path", "pid")
                 if key in result
             }
+            if result.get("uncertain"):
+                trace["outcome"]["uncertain"] = True
+            if isinstance(result.get("total"), int) and "stopped" in result:
+                trace["outcome"]["completed"] = result.get("completed")
+                trace["outcome"]["total"] = result["total"]
+                if isinstance(result["stopped"], dict):
+                    trace["outcome"]["stopped"] = stop_reason(result["stopped"])
         else:
             trace["error"] = reply["error"][:300]
         path = self.root / "trace.jsonl"

@@ -468,6 +468,49 @@ class OperationDesktopTests(unittest.TestCase):
             "0",
         )
 
+    def test_dead_helper_gives_back_its_lease(self):
+        # The helper takes an hour-long lease for its run; if it is killed, the
+        # status read that finds it dead releases or restores it, as its own
+        # cleanup would. Nothing is replayed.
+        for controller in (None, "named-client"):
+            with self.subTest(controller=controller):
+                if controller:
+                    core.request(self.session, "lease", controller, seconds=45)
+                job = operations.start(
+                    self.session,
+                    [{"action": "wait", "seconds": 30}],
+                    controller=controller,
+                )
+                ident = job["operation_id"]
+                running = wait_for(
+                    lambda ident=ident: (
+                        r
+                        if (r := operations.status(self.session, ident))["state"]
+                        == "running"
+                        and r.get("lease_seconds")
+                        else None
+                    )
+                )
+                holder = running["controller"]
+                with self.assertRaisesRegex(core.DesktopError, "LeaseHeld"):
+                    core.request(self.session, "key", "other-client", key="Shift_L")
+                self.assertTrue(
+                    signal_process(
+                        running["pid"], running["process_start"], signal.SIGKILL
+                    )
+                )
+                result = self.finished(ident)
+                self.assertEqual(result["lease_cleanup"], "complete")
+                lease = core.request(self.session, "status").get("lease")
+                if controller:
+                    self.assertEqual(lease["holder"], holder)
+                    self.assertEqual(lease["seconds"], 45)
+                    core.request(self.session, "lease", controller, action="release")
+                else:
+                    self.assertIsNone(lease)
+                core.request(self.session, "key", "other-client", key="Shift_L")
+                core.request(self.session, "lease", "other-client", action="release")
+
     def test_gui_job_delivers_input_once_and_destroy_owns_helper(self):
         self.prepare_page()
         self.browser("click", selector="#value")

@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-11-11 — Activity counts stopped steps and fixed waits (N5)
+
+Browser traces now record each batch step's action, and for waits their pause and
+whether they wait for a condition. They never record selectors, text or URLs. Outcomes
+record a batch stop as a category (`ambiguous`, `missing`, `disabled`, `wait_unmet`,
+`deadline`, `target_lost`, `uncertain` or `other`). `activity` reports browser batches,
+stopped batches by reason, uncertain deliveries, fixed and condition waits, and the
+seconds spent in fixed waits. In the cloud report, the long session showed no errors
+although 11 of its 53 batches stopped. The `desktop_browser` description now prefers
+waiting for expected text after `open`. Batches of `desktop_actions` run on the client,
+so they are not counted as batches.
+
+Validated with a fixture trace and a real-Firefox batch stopped by an ambiguous click.
+Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — Clicks that change nothing on a toggle (N3)
 
 A browser click on a checkbox, radio, `role=switch` or other `aria-checked` or

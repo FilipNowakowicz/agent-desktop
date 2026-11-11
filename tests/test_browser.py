@@ -246,6 +246,24 @@ class BrowserTests(unittest.TestCase):
         )
         self.assertNotIn("toggle", self.browser("click", selector="#plain"))
 
+    def test_activity_counts_stopped_batches_and_waits(self):
+        self.browser("start", url=self.page.as_uri())
+        stopped = self.browser(
+            "steps",
+            steps=[
+                {"action": "wait", "selector": "#fullname", "timeout": 20},
+                {"action": "wait", "seconds": 0.2},
+                {"action": "click", "text": "Save"},
+            ],
+        )
+        self.assertEqual(stopped["stopped"]["step"], 2, stopped)
+        summary = core.activity(self.session)
+        self.assertEqual(summary["browser_batches"], 1)
+        self.assertEqual(summary["browser_stops_by_reason"], {"ambiguous": 1})
+        self.assertEqual(summary["browser_waits_fixed"], 1)
+        self.assertEqual(summary["browser_waits_for_condition"], 1)
+        self.assertEqual(summary["browser_fixed_wait_seconds"], 0.2)
+
     def test_start_as_a_named_controller(self):
         # MCP clients name a controller; the request takes the lease, and the
         # Firefox launch inside start (and inside steps) must run as its holder.

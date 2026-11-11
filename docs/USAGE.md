@@ -612,6 +612,14 @@ compositor its own headless output if its window stays blank.
 all of them: calls by operation, error types, sessions by mode, and how input and
 screenshots were made. It holds counts only, never arguments, text or window titles.
 
+A browser batch that stops early is not a tool error, so it is counted separately:
+`browser_batches_stopped` with `browser_stops_by_reason` (`ambiguous`, `missing`,
+`disabled`, `wait_unmet`, `deadline`, `target_lost`, `uncertain` or `other`), and
+`uncertain_deliveries` for steps whose delivery is unknown. `browser_waits_fixed`,
+`browser_waits_for_condition` and `browser_fixed_wait_seconds` show how much time
+went into fixed pauses rather than waiting for a text or selector. Traces written
+before 2026-11-11 do not record these.
+
 ## Saved logins (profiles)
 
 By default everything in a session is deleted at `destroy`. To keep a login, create

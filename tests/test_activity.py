@@ -28,6 +28,68 @@ class ActivityTests(unittest.TestCase):
         lines = [json.dumps(r) for r in records] + ["not json"]
         (path / "trace.jsonl").write_text("\n".join(lines))
 
+    def test_browser_batches_stops_waits_and_uncertain_deliveries(self):
+        from agent_desktop.worker import stop_reason, trace_arguments
+
+        now = time.time()
+        steps = [
+            {"action": "open", "url": "https://example.com/secret-path"},
+            {"action": "wait", "seconds": 6},
+            {"action": "wait", "text": "Dashboard", "timeout": 10},
+            {"action": "click", "text": "Remove", "within": "box-1"},
+        ]
+        arguments = trace_arguments(
+            {"operation": "browser", "action": "steps", "steps": steps}
+        )
+        self.assertNotIn("secret-path", json.dumps(arguments))
+        self.assertNotIn("Dashboard", json.dumps(arguments))
+        single = trace_arguments(
+            {"operation": "browser", "action": "wait", "seconds": 4.5}
+        )
+        self.assertEqual(single["condition"], False)
+        self.assertEqual(
+            stop_reason({"step": 3, "reason": "2 elements match 'Remove' ({...})"}),
+            "ambiguous",
+        )
+        self.assertEqual(stop_reason({"reason": "x", "uncertain": True}), "uncertain")
+        self.assertEqual(
+            stop_reason({"reason": "No visible element matches"}), "missing"
+        )
+        self.session(
+            "c" * 12,
+            "headless",
+            [
+                {
+                    "at": now,
+                    "operation": "browser",
+                    "arguments": arguments,
+                    "outcome": {"completed": 3, "total": 4, "stopped": "ambiguous"},
+                },
+                {
+                    "at": now,
+                    "operation": "browser",
+                    "arguments": arguments,
+                    "outcome": {"completed": 4, "total": 4},
+                },
+                {
+                    "at": now,
+                    "operation": "browser",
+                    "arguments": single,
+                    "outcome": {"delivered": None, "uncertain": True},
+                },
+                {"at": now, "operation": "click", "outcome": {"delivered": None}},
+            ],
+        )
+        result = core.activity()
+        self.assertEqual(result["errors_by_type"], {})
+        self.assertEqual(result["browser_batches"], 2)
+        self.assertEqual(result["browser_batches_stopped"], 1)
+        self.assertEqual(result["browser_stops_by_reason"], {"ambiguous": 1})
+        self.assertEqual(result["browser_waits_fixed"], 3)
+        self.assertEqual(result["browser_waits_for_condition"], 2)
+        self.assertEqual(result["browser_fixed_wait_seconds"], 16.5)
+        self.assertEqual(result["uncertain_deliveries"], 2)
+
     def test_counts_without_content(self):
         now = time.time()
         self.session(

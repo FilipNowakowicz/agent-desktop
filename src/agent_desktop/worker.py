@@ -1367,7 +1367,13 @@ class Worker:
                     f"{count} visible elements match; send needs exactly one "
                     "(matches are not listed, since they may hold the value)"
                 )
-            element, _ = bridge.element(context, **target)
+            try:
+                element, _ = bridge.element(context, **target)
+            except browser.BrowserError:
+                # The page changed after the count: never pass on the match list.
+                raise ValueError(
+                    "The match changed while it was looked up; nothing was sent"
+                ) from None
             value = browser.remote_value(
                 bridge.call(
                     "(e) => (e instanceof HTMLInputElement || e instanceof "

@@ -22,6 +22,32 @@ class DeliveryTests(unittest.TestCase):
         worker.attach_browser = mock.Mock(return_value=True)
         return worker, bridge
 
+    def test_send_to_a_command_outlasts_the_command_timeout(self):
+        from agent_desktop.worker import SECRET_COMMAND_SECONDS
+
+        send = {"action": "send", "selector": "pre", "to_command": ["cat"]}
+        self.assertGreater(core.request_budget("browser", send), SECRET_COMMAND_SECONDS)
+        steps = {"action": "steps", "steps": [send]}
+        self.assertGreater(
+            core.request_budget("browser", steps), SECRET_COMMAND_SECONDS
+        )
+
+    def test_send_never_lists_matches_that_appear_after_the_count(self):
+        from agent_desktop import browser
+
+        worker, bridge = self.worker()
+        worker.env = {"HOME": "/nonexistent"}
+        bridge.element.side_effect = browser.BrowserError(
+            '2 elements match \'pre\' ({"text": "tskey-PLANTED"})'
+        )
+        with self.assertRaises(ValueError) as refused:
+            worker.send_secret(
+                {"to_file": "/tmp/never", "selector": "pre"},
+                {"selector": "pre", "text": None, "exact": False, "within": None},
+            )
+        self.assertNotIn("PLANTED", str(refused.exception))
+        self.assertIn("nothing was sent", str(refused.exception))
+
     def test_browser_wait_and_batches_have_larger_transport_budgets(self):
         step = {"action": "wait", "timeout": 60, "seconds": 30}
         budget = core.request_budget("browser", step)

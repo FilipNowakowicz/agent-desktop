@@ -518,6 +518,11 @@ Firefox is left as it was. A request without `login=true`
 while a bridged Firefox is open carries a `hint` saying so. If a site still refuses,
 use the clean-profile `import-cookies --from` route under
 [Bring a login from your own Firefox](#bring-a-login-from-your-own-firefox).
+Taking control does not wait for a long browser wait to finish. `take` leaves a
+marker that a waiting worker checks every 0.1 s, so the wait stops and control
+passes at once. A durable job stops at that step, which is recorded as `failed`
+with the reason, since nothing was sent. Input already sent before the takeover
+is not undone.
 If you choose another way (e.g. your own screen), the agent withdraws the request
 with `desktop_request_human(session, withdraw=true)` (CLI: `request-human SESSION
 --withdraw`) and keeps the session; a takeover already under way continues until

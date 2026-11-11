@@ -616,10 +616,10 @@ def run_job(session, operation_id):
     def cancelled():
         return path.with_suffix(".cancel").exists()
 
-    def progress(index, phase, result=None):
+    def progress(index, phase, result=None, known=False):
         record["current_step"] = index
         step = record["steps"][index]
-        if phase == "failed" and step["dispatch_state"] == "dispatching":
+        if phase == "failed" and step["dispatch_state"] == "dispatching" and not known:
             # A generic worker error is not a transaction rollback: input may
             # have partially run before the error reply. Pre-dispatch target
             # resolution failures still have a pending state and remain known.
@@ -740,6 +740,11 @@ def run_browser(session, actions, controller, timeout, progress, cancelled):
             result["stopped"]["uncertain"] = True
             return result
         except core.DesktopError as error:
+            if str(error).startswith("HumanControl:"):
+                # Refused before any input: by the control check, or by a wait
+                # giving way to a person taking control. Known, not uncertain.
+                progress(index, "failed", {"reason": str(error)}, known=True)
+                return core.stopped(index, len(actions), str(error))
             progress(index, "uncertain", {"reason": str(error)})
             result = core.stopped(index, len(actions), str(error))
             result["stopped"]["uncertain"] = True

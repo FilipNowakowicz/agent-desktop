@@ -268,6 +268,9 @@ TRACE_FIELDS = (
     *("window", "node", "action", "observation", "region", "scale", "force"),
 )
 TRACE_BYTES = 1024 * 1024
+# Written by `take` before it queues behind the request in progress; waits in the
+# worker stop when they see it, so a person gets control within about 0.1 s.
+TAKE_REQUESTED = "take-requested"
 # Values moved by browser "send" (secrets such as generated API keys).
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
@@ -1195,7 +1198,7 @@ class Worker:
                     or not 0 <= seconds <= 30
                 ):
                     raise ValueError("seconds must be between 0 and 30")
-                time.sleep(seconds)
+                self.pause(seconds)
                 if not (target["selector"] or target["text"]):
                     if not seconds:
                         raise ValueError(
@@ -1210,7 +1213,7 @@ class Worker:
                         return {"satisfied": True, **found}
                     if time.monotonic() >= deadline:
                         return {"satisfied": False, **found}
-                    time.sleep(0.2)
+                    self.pause(0.2)
             if action in ("click", "fill", "select"):
                 element, described = bridge.element(context, **target)
                 if described.get("disabled"):
@@ -1467,7 +1470,7 @@ class Worker:
                 result = self.browser_request(
                     {**step, "controller": controller, "deadline": deadline}
                 )
-            except (ValueError, TimeoutError) as error:
+            except (ValueError, TimeoutError, HumanControl) as error:
                 return {
                     "completed": index,
                     "total": len(steps),
@@ -1993,6 +1996,28 @@ class Worker:
         process.wait(timeout=3)
         raise TimeoutError("Viewer socket did not appear")
 
+    def take_requested(self):
+        return (Path(self.info["runtime"]) / TAKE_REQUESTED).exists()
+
+    def pause(self, seconds):
+        """Sleep inside a request, but give way at once to a person taking control.
+
+        The worker serves one request at a time, so a long browser wait would
+        otherwise hold back `take` until it ends. Raised before any input of the
+        current step, so nothing is left half done.
+        """
+        deadline = time.monotonic() + seconds
+        while True:
+            if self.take_requested():
+                raise HumanControl(
+                    "A person is taking control; the wait was stopped and nothing "
+                    "more was sent. Wait with desktop_control until control returns."
+                )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.1, remaining))
+
     def bridged_firefox(self):
         """(application id, process) of a running Firefox with a BiDi port, found
         the way attach_browser finds it (its log), or None."""
@@ -2074,6 +2099,7 @@ class Worker:
             not isinstance(keyboard, str) or not KEYBOARD.fullmatch(keyboard)
         ):
             raise ValueError("Keyboard must look like us or us-dvorak")
+        Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
         if self.control["owner"] != "human":
             request = self.control.get("request") or {}
             self.takeover = self.start_vnc(

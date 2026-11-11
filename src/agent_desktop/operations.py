@@ -740,15 +740,12 @@ def run_browser(session, actions, controller, timeout, progress, cancelled):
             result["stopped"]["uncertain"] = True
             return result
         except core.DesktopError as error:
-            if str(error).startswith("HumanControl:"):
-                # Refused before any input: by the control check, or by a wait
-                # giving way to a person taking control. Known, not uncertain.
-                progress(index, "failed", {"reason": str(error)}, known=True)
-                return core.stopped(index, len(actions), str(error))
-            progress(index, "uncertain", {"reason": str(error)})
-            result = core.stopped(index, len(actions), str(error))
-            result["stopped"]["uncertain"] = True
-            return result
+            # The worker's browser handler turns every error after it began to
+            # act into an uncertain reply (raised above as DeliveryUnknown), so
+            # a plain error is a refusal before any input: a lost target, a
+            # missing element, a person taking control. Known, not uncertain.
+            progress(index, "failed", {"reason": str(error)}, known=True)
+            return core.stopped(index, len(actions), str(error))
         if reply.get("uncertain"):
             progress(index, "uncertain", reply)
             result = core.stopped(

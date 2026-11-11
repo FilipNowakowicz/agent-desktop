@@ -15,6 +15,18 @@ stay uncertain, as R2 requires. A browser batch now stops with its completed pre
 takeover lands, nothing after it does, and the lease is released. Full desktop suite:
 358 tests, 19 skipped. Waits in `desktop_actions` already poll from the client, so
 `take` could get in between them before.
+## 2026-11-11 — Wrong targets under interruption (F1-c, #181)
+
+New test: a durable job bound to one tab is killed mid-wait, that tab is closed, and a
+later job for the same context refuses with `target_lost`. It never acts on the tab
+that is left, whose counter stays at 0. That R1 behaviour held already. The test showed
+the refusal recorded as `uncertain`, and the job as `delivery_unknown`, although the
+target lookup fails before any input. The worker's browser handler already turns every
+error raised after it begins to act into an uncertain reply. So for browser jobs a plain
+refusal (lost target, missing or ambiguous element, a person taking control) is now
+recorded as a known `failed` step, and the job as `stopped`. GUI action jobs keep the R2
+rule that a generic error after dispatch is uncertain, because their input can partly
+run before the error.
 
 ## 2026-11-11 — Desktop subagent pilot (N10)
 

@@ -52,7 +52,7 @@ On 2026-11-11 the maintainer accepted the proposed defaults.
 | N5 | Count stopped steps, uncertain steps and fixed waits in `activity` | Cloud report #7, the fixed-sleep habit | Summary counts, plus server-instruction text that prefers waiting for text or a selector after `open` | None | Counts from a fixture trace match the trace exactly | #162, done 2026-11-11 |
 | N6 | Account-aware cookie imports and removing a site | Cloud report #3 | Warn when an import brings several signed-in accounts for one site, and add a supported command that drops one site's cookies and storage from a profile | None | The fixture profile's warning fires. Removal leaves other sites untouched and is refused while the profile is in use | #161 |
 | N7 | A login route that sites accept | Cloud report #2 | Stage a: documentation, plus an up-front warning for sites known to refuse. Stage b: the human's turn runs the profile's Firefox without the remote agent, and it restarts under BiDi after release | N2 | A fixture sees `navigator.webdriver` false during the human's turn. After release the bridge reconnects with the profile's new cookies | #161, done 2026-11-11 |
-| N8 | Nested Hyprland testing in guarded sessions | Cloud report #8, Hyprland report residual | Allow `hyprctl` against a nested instance that the guarded session started, document how to find the matching Mesa, and place letters for a nested compositor's layout | None | `hyprctl` reaches the session's own nested instance and is still refused for the host | #162 |
+| N8 | Nested Hyprland testing in guarded sessions | Cloud report #8, Hyprland report residual | Allow `hyprctl` against a nested instance that the guarded session started, document how to find the matching Mesa, and place letters for a nested compositor's layout | None | `hyprctl` reaches the session's own nested instance and is still refused for the host | #162, hyprctl and Mesa done 2026-11-11; nested layout moved to X11 |
 | N9 | F0 baseline and gap inventory | [Roadmap](FUNCTIONALITY_ROADMAP.md) F0, R1–R6 limits | A capability matrix of each contract (implemented and tested, implemented but untested, missing, or unsupported) with links to source and tests | None | The matrix exists, and the first F1 failure is named with its smallest reproducer | #163 |
 | N10 | Desktop subagent spike | Big directions B1, tool-schema cost | A Claude Code agent definition holding only the desktop tools, run against direct tools on E0 tasks and one console task. Also measure what the 29 tool schemas cost | None | Gate: main-context tokens fall 50% at equal success, with wall time no more than 10% worse. The result is recorded either way | #163 |
 
@@ -75,6 +75,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X8 | Add a profile to a running session | 2026-10-15 list | None |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None |
+| X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None |
 
 ### Later
 

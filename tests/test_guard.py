@@ -159,6 +159,48 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(any(name.startswith("AGENT_DESKTOP_") for name in removed))
         self.assertEqual(lines["pwd"], lines["home"])
 
+    def test_hyprctl_reaches_only_a_nested_instance(self):
+        # A stand-in hyprctl that only reports how it was called: the real one,
+        # and the host's Hyprland, are never used.
+        bin_directory = Path(self.temporary.name) / "fakebin"
+        bin_directory.mkdir()
+        fake = bin_directory / "hyprctl"
+        fake.write_text('#!/bin/sh\necho "real hyprctl $*"\n')
+        fake.chmod(0o755)
+        path = os.environ["PATH"]
+        os.environ["PATH"] = f"{bin_directory}:{path}"
+        try:
+            session = core.create(guard_host=True)["session"]
+        finally:
+            os.environ["PATH"] = path
+        self.sessions.append(session)
+        runtime = Path(core.manifest(session)["runtime"])
+        probe = (
+            'hyprctl version; echo "before=$?"; '
+            'mkdir -p "$XDG_RUNTIME_DIR/hypr/nested" && '
+            "python3 -c 'import socket,sys; socket.socket(socket.AF_UNIX)"
+            '.bind(sys.argv[1])\' "$XDG_RUNTIME_DIR/hypr/nested/.socket.sock"; '
+            'HYPRLAND_INSTANCE_SIGNATURE=nested hyprctl version; echo "nested=$?"; '
+            'HYPRLAND_INSTANCE_SIGNATURE=hostsig hyprctl version; echo "other=$?"; '
+            'XDG_RUNTIME_DIR=/nonexistent hyprctl version; echo "host=$?"'
+        )
+        app = core.request(session, "launch", argv=["sh", "-c", probe])
+
+        def output():
+            for entry in core.request(session, "status")["applications"]:
+                if entry["pid"] == app["pid"] and entry["exit_code"] is not None:
+                    return Path(app["logs"]).read_text()
+            return None
+
+        text = wait_for(output)
+        lines = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+        self.assertEqual(lines["before"], "1", text)
+        self.assertEqual(lines["nested"], "0", text)
+        self.assertIn("real hyprctl version", text)
+        self.assertEqual(lines["other"], "1", text)
+        self.assertEqual(lines["host"], "1", text)
+        self.assertTrue((runtime / "hypr" / "nested").is_dir())
+
     def test_launch_directory(self):
         session = core.create()["session"]
         self.sessions.append(session)

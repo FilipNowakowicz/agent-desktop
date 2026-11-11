@@ -1,5 +1,27 @@
 # Development log
 
+## 2026-11-11 — hyprctl for a guarded session's nested Hyprland, and GPU Mesa (N8)
+
+The guard's `hyprctl` shim now passes a call through when `XDG_RUNTIME_DIR` is the
+session's own runtime directory and the target instance's sockets are there. A
+Hyprland started inside the session keeps its sockets there; the host's does not.
+Calls with another `XDG_RUNTIME_DIR`, or with a signature that is not under that
+directory, are refused and logged as before. The test uses a stand-in `hyprctl` and a
+fake instance socket, so no real Hyprland is contacted.
+
+GPU sessions on NixOS: on this machine `test_renderer`'s gles2 case had been
+skipping, because no node could start a GLES2 compositor. The full session log showed
+`EGL_EXT_platform_base not supported`. The host profile sets
+`__EGL_VENDOR_LIBRARY_FILENAMES` to the system Mesa (26.2.6), and the runtime's
+libglvnd loaded it next to its own `mesa-libgbm` 26.1.3. With the variable unset, the
+NVIDIA node (renderD129) started and the Intel node (renderD128) failed with `Failed to
+create GBM device`. Pointing `__EGL_VENDOR_LIBRARY_FILENAMES` and `GBM_BACKENDS_PATH`
+at the runtime pin's `mesa` (26.2.3) started the Intel node, and its screenshot
+worked. The labwc binary also starts with gles2 when run directly under `env -i`.
+USAGE.md now gives this recipe. Moving it into the runtime flake, for example as a
+wrapper, is left for a later packaging change. Placing letters for a nested
+Hyprland's layout through the parent labwc is still open (plan row X11).
+
 ## 2026-11-11 — Desktop size and enlarged crops (N4)
 
 `create --size WIDTHxHEIGHT` and `desktop_create(size=...)` set a headless desktop's

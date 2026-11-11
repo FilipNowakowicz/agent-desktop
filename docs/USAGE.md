@@ -632,6 +632,28 @@ the Mesa matching the runtime, supplied by the server's environment on systems s
 NixOS. Testing a compositor or shell inside a session generally needs one; give the nested
 compositor its own headless output if its window stays blank.
 
+On NixOS with the Nix runtime, the compositor must load the Mesa drivers of the
+runtime's own nixpkgs pin, not the system's. Otherwise it exits with `EGL_EXT_platform_base
+not supported` or `Failed to create GBM device`. A host profile that sets
+`__EGL_VENDOR_LIBRARY_FILENAMES` to the system Mesa causes the first of these. Give the
+MCP server (or the CLI) these two variables:
+
+```sh
+rev=$(python3 -c 'import json; print(json.load(open("runtime/nix/flake.lock"))["nodes"]["nixpkgs"]["locked"]["rev"])')
+mesa=$(nix build --no-link --print-out-paths "github:NixOS/nixpkgs/$rev#mesa")
+export __EGL_VENDOR_LIBRARY_FILENAMES=$mesa/share/glvnd/egl_vendor.d/50_mesa.json
+export GBM_BACKENDS_PATH=$mesa/lib/gbm
+```
+
+The Intel node worked with these on 2026-11-11. An NVIDIA node used the proprietary
+driver once the variable was unset, and needs no Mesa. `agent-desktop doctor` names
+each node's driver.
+
+In a guarded session, `hyprctl` is allowed when it reaches a Hyprland started inside
+that session. Such an instance keeps its sockets under the session's own runtime
+directory. `hyprctl` is still refused when `XDG_RUNTIME_DIR` points elsewhere, or when
+`HYPRLAND_INSTANCE_SIGNATURE` names an instance that is not under that directory.
+
 ## Activity summary
 
 `agent-desktop activity [SESSION] [--days N]` summarises the action traces of one session or

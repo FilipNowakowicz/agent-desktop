@@ -881,11 +881,27 @@ class Worker:
         directory = self.root / "guard"
         directory.mkdir(mode=0o700, exist_ok=True)
         log = self.root / "guard.log"
+        original_path = self.env.get("PATH", "")
+        runtime = shlex.quote(self.info["runtime"])
         for name in GUARDED_COMMANDS:
             shim = directory / name
+            # hyprctl may reach a Hyprland started inside this session: its
+            # sockets live under the session's own runtime directory, and the
+            # host's do not. Anything else, or another runtime, is refused.
+            nested = (
+                f"runtime={runtime}\n"
+                'if [ "${XDG_RUNTIME_DIR:-}" = "$runtime" ] && [ -d "$runtime/hypr" ] '
+                '&& { [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ -S '
+                '"$runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" ]; }; then\n'
+                f'  PATH={shlex.quote(original_path)} exec hyprctl "$@"\n'
+                "fi\n"
+                if name == "hyprctl"
+                else ""
+            )
             shim.write_text(
                 "#!/bin/sh\n"
-                f'printf "%s blocked: {name}" "$(date +%s)" >> "{log}"\n'
+                + nested
+                + f'printf "%s blocked: {name}" "$(date +%s)" >> "{log}"\n'
                 f'for a in "$@"; do printf " %s" "$a" >> "{log}"; done\n'
                 f'echo >> "{log}"\n'
                 f'echo "agent-desktop: {name} is blocked in a guarded session" >&2\n'

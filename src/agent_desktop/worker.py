@@ -271,6 +271,10 @@ TRACE_BYTES = 1024 * 1024
 # Written by `take` before it queues behind the request in progress; waits in the
 # worker stop when they see it, so a person gets control within about 0.1 s.
 TAKE_REQUESTED = "take-requested"
+TAKE_MARKER_SECONDS = 10
+# On the person's screen, a screenshot this soon after the agent's input waits
+# (up to a second) for animations such as a workspace switch to finish.
+HOST_SETTLE_AFTER = 1.0
 # Values moved by browser "send" (secrets such as generated API keys).
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
@@ -289,6 +293,12 @@ TOGGLE_STATE = (
 )
 # Cropped screenshots may be enlarged up to this factor.
 MAX_CROP_SCALE = 2
+
+
+def lua_string(text):
+    """A double-quoted Lua string literal for `text`."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return f'"{escaped}"'
 
 
 def trace_arguments(request):
@@ -655,7 +665,19 @@ class Worker:
         result = subprocess.run(
             launcher, env=self.env, capture_output=True, text=True, timeout=10
         )
-        if result.returncode:
+        if launcher[0] == "hyprctl" and "lua" in result.stdout.lower():
+            # Hyprland with a Lua configuration (0.57) parses dispatches as Lua
+            # and refused the classic form before running anything.
+            launcher = [
+                "hyprctl",
+                "dispatch",
+                f"hl.dsp.exec_cmd({lua_string(command)})",
+            ]
+            result = subprocess.run(
+                launcher, env=self.env, capture_output=True, text=True, timeout=10
+            )
+        refused = launcher[0] == "hyprctl" and result.stdout.strip() != "ok"
+        if result.returncode or refused:
             raise RuntimeError(
                 f"{launcher[0]} failed: {result.stderr.strip() or result.stdout.strip()}"
             )
@@ -1103,6 +1125,8 @@ class Worker:
                     lambda: {"tabs": bridge.tabs()[1]},
                 )
             if not self.attach_browser():
+                if host and action == "open" and request.get("new_tab"):
+                    return self.open_in_person_firefox(request.get("url"))
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
             bridge.deadline = request.get("deadline")
@@ -1997,7 +2021,15 @@ class Worker:
         raise TimeoutError("Viewer socket did not appear")
 
     def take_requested(self):
-        return (Path(self.info["runtime"]) / TAKE_REQUESTED).exists()
+        """A `take` is waiting behind the current request. A marker older than
+        TAKE_MARKER_SECONDS was left by a client that died; it is ignored."""
+        if not self.info.get("runtime"):
+            return False
+        try:
+            written = (Path(self.info["runtime"]) / TAKE_REQUESTED).stat().st_mtime
+        except OSError:
+            return False
+        return time.time() - written < TAKE_MARKER_SECONDS
 
     def pause(self, seconds):
         """Sleep inside a request, but give way at once to a person taking control.
@@ -2017,6 +2049,25 @@ class Worker:
             if remaining <= 0:
                 return
             time.sleep(min(0.1, remaining))
+
+    def just_acted(self):
+        """Whether the agent sent input within the last HOST_SETTLE_AFTER seconds."""
+        at = getattr(self, "mutated_at", None)
+        return at is not None and time.monotonic() - at < HOST_SETTLE_AFTER
+
+    def open_in_person_firefox(self, url):
+        """Without a BiDi port, open a URL as a new tab of the person's running
+        Firefox, the way a link from another app would. The tab cannot be read
+        or driven afterwards; Firefox may bring its window forward."""
+        if not isinstance(url, str) or not re.match(r"https?://", url):
+            raise ValueError("open needs an http or https url")
+        self.launch_on_host(["firefox", "--new-tab", url], self.env["HOME"])
+        return {
+            "delivered": True,
+            "opened_in": "the person's running Firefox, without the bridge",
+            "url": url,
+            "note": "This tab cannot be read or driven: Firefox has no BiDi port.",
+        }
 
     def bridged_firefox(self):
         """(application id, process) of a running Firefox with a BiDi port, found
@@ -2203,6 +2254,7 @@ class Worker:
     def mark_mutation(self):
         """A mutation call is about to start; errors cannot establish rollback."""
         self.mutation_started = True
+        self.mutated_at = time.monotonic()
 
     def error_reply(self, error):
         reply = {"ok": False, "error": f"{type(error).__name__}: {error}"}
@@ -2354,6 +2406,8 @@ class Worker:
                     )
             return state
         if operation == "take":
+            # Cleared on receipt, so a take refused below leaves nothing behind.
+            Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
             self.release_held_keys()
             return self.take(request.get("wayvnc", "wayvnc"), request.get("keyboard"))
         if operation == "release":
@@ -2454,6 +2508,10 @@ class Worker:
                         "settle_ms to 10000"
                     )
                 settled = self.settle(quiet / 1000, limit / 1000)
+            elif host and self.just_acted():
+                # Right after the agent's own input (a workspace switch, a new
+                # window) the person's compositor is often still animating.
+                settled = self.settle(0.15, 1.0)
             if request.get("changed_only") is True:
                 capture = self.changed_screenshot(request.get("scale"))
             else:
@@ -2809,6 +2867,8 @@ class Worker:
             server.bind(endpoint)
             server.listen(16)
             server.settimeout(0.5)
+            if self.info.get("runtime"):
+                Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
             self.save("ready", worker_pid=os.getpid(), guardian_pid=os.getppid())
             while not self.stop:
                 if (

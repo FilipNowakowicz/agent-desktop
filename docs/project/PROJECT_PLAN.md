@@ -69,13 +69,14 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows | Roadmap F2, M4 | X1 |
 | X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1 |
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5; contract proposed 2026-11-11 (EVENT_CONTRACT.md); first version done 2026-11-11 (agent-desktop events) |
-| X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None |
-| X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None |
+| X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None; works already: activation switches workspace in Hyprland 0.57.1 (nested stand-in, 2026-11-11) |
+| X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None; done 2026-11-11 with stand-ins; not yet seen on the real screen |
 | X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None; done 2026-11-11 |
 | X8 | Add a profile to a running session | 2026-10-15 list | None |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None |
-| X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None |
+| X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None; done 2026-11-11 with stand-ins; not yet seen on the real screen |
 | X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None |
+| X12 | Fedora drops the first typed character in Chromium, now and then (Checks run 43089078794). Loop `test_chromium_receives_every_character` locally under load with the store's Chromium | Development log 2026-11-11 | None |
 
 ### Later
 

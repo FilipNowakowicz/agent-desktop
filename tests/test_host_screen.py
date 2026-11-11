@@ -98,3 +98,86 @@ class ScaleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HostSettleAndOpenTests(unittest.TestCase):
+    """Stand-ins for the person's screen: no host session is created."""
+
+    def test_screenshots_right_after_input_settle(self):
+        desktop = Worker.__new__(Worker)
+        self.assertFalse(desktop.just_acted())
+        desktop.mark_mutation()
+        self.assertTrue(desktop.just_acted())
+        with mock.patch("agent_desktop.worker.time.monotonic", return_value=10**9):
+            self.assertFalse(desktop.just_acted())
+
+    def test_open_without_a_bridge_uses_the_running_firefox(self):
+        desktop = Worker.__new__(Worker)
+        desktop.info = {"mode": "host"}
+        desktop.env = {"HOME": "/home/person"}
+        desktop.browser = None
+        desktop.attach_browser = mock.Mock(return_value=False)
+        desktop.launch_on_host = mock.Mock()
+        result = desktop.browser_request(
+            {"action": "open", "url": "https://example.com/a", "new_tab": True}
+        )
+        desktop.launch_on_host.assert_called_once_with(
+            ["firefox", "--new-tab", "https://example.com/a"], "/home/person"
+        )
+        self.assertTrue(result["delivered"])
+        self.assertIn("cannot be read", result["note"])
+        # Only a new tab, only web URLs, and nothing else without a bridge.
+        for request in (
+            {"action": "open", "url": "https://example.com/a"},
+            {"action": "open", "url": "file:///etc/passwd", "new_tab": True},
+            {"action": "text"},
+        ):
+            with self.subTest(request=request), self.assertRaises(ValueError):
+                desktop.browser_request(request)
+        desktop.launch_on_host.assert_called_once()
+
+    def test_host_launch_uses_lua_dispatch_when_hyprland_asks(self):
+        from agent_desktop.worker import lua_string
+
+        self.assertEqual(lua_string('a "b" \\ c'), '"a \\"b\\" \\\\ c"')
+        desktop = Worker.__new__(Worker)
+        desktop.env = {"HYPRLAND_INSTANCE_SIGNATURE": "sig", "PATH": "/bin"}
+        replies = [
+            subprocess.CompletedProcess(
+                [],
+                0,
+                "error: 3 ...: ')' expected\n Note: dispatch in lua is a shorthand",
+                "",
+            ),
+            subprocess.CompletedProcess([], 0, "ok\n", ""),
+        ]
+        with (
+            mock.patch(
+                "agent_desktop.worker.shutil.which", return_value="/bin/hyprctl"
+            ),
+            mock.patch(
+                "agent_desktop.worker.subprocess.run", side_effect=replies
+            ) as run,
+        ):
+            desktop.launch_on_host(
+                ["firefox", "--new-tab", "https://e.example/"], "/home/p"
+            )
+        second = run.call_args_list[1].args[0]
+        self.assertEqual(second[:2], ["hyprctl", "dispatch"])
+        self.assertTrue(
+            second[2].startswith('hl.dsp.exec_cmd("cd /home/p && exec firefox')
+        )
+        # An answer other than "ok" is a failure, even with exit status 0.
+        with (
+            mock.patch(
+                "agent_desktop.worker.shutil.which", return_value="/bin/hyprctl"
+            ),
+            mock.patch(
+                "agent_desktop.worker.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, "error: no such dispatcher", ""
+                ),
+            ),
+            self.assertRaisesRegex(RuntimeError, "no such dispatcher"),
+        ):
+            desktop.launch_on_host(["true"], "/")

@@ -1,8 +1,10 @@
 """F1: a person takes control while a durable job runs (real private session)."""
 
+import os
 import shutil
 import time
 import unittest
+from pathlib import Path
 
 import test_browser
 from test_runtime import wait_for
@@ -75,6 +77,20 @@ class TakeoverDuringJobTests(unittest.TestCase):
         # Only the click before the takeover reached the page.
         self.assertEqual(self.browser("text", selector="#count")["text"], "1")
         self.assertIsNone(core.request(self.session, "status")["lease"])
+
+    def test_a_refused_take_leaves_later_waits_alone(self):
+        self.page.write_text(PAGE)
+        self.browser("start", url=self.page.as_uri())
+        with self.assertRaisesRegex(core.DesktopError, "Keyboard"):
+            core.request(self.session, "take", keyboard="!!")
+        self.assertTrue(self.browser("wait", seconds=0.2)["satisfied"])
+        # A marker left by a client that died before sending take is ignored
+        # once it is old.
+        marker = Path(core.manifest(self.session)["runtime"]) / "take-requested"
+        marker.touch()
+        old = time.time() - 60
+        os.utime(marker, (old, old))
+        self.assertTrue(self.browser("wait", seconds=0.2)["satisfied"])
 
 
 if __name__ == "__main__":

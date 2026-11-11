@@ -222,6 +222,30 @@ class BrowserTests(unittest.TestCase):
             core.destroy(session)
             wait_for(lambda: not owned_processes(token))
 
+    def test_clicks_report_whether_a_toggle_changed(self):
+        self.page.write_text(
+            "<title>Toggles</title>"
+            '<label>Ephemeral <input id="locked" type="checkbox" '
+            'onclick="return false"></label>'
+            '<button id="sw" role="switch" aria-checked="false" onclick="'
+            "this.setAttribute('aria-checked', String(this.getAttribute("
+            "'aria-checked') !== 'true'))\">Reusable</button>"
+            '<button id="plain">Plain</button>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(self.browser("wait", selector="#sw", timeout=20)["satisfied"])
+        # A delivered label click that the page ignores: visibly unchanged.
+        ignored = self.browser("click", text="Ephemeral")
+        self.assertTrue(ignored["delivered"])
+        self.assertEqual(
+            ignored["toggle"], {"before": "false", "after": "false", "changed": False}
+        )
+        switched = self.browser("click", selector="#sw")
+        self.assertEqual(
+            switched["toggle"], {"before": "false", "after": "true", "changed": True}
+        )
+        self.assertNotIn("toggle", self.browser("click", selector="#plain"))
+
     def test_start_as_a_named_controller(self):
         # MCP clients name a controller; the request takes the lease, and the
         # Firefox launch inside start (and inside steps) must run as its holder.

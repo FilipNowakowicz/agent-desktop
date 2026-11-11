@@ -1,5 +1,22 @@
 # Development log
 
+## 2026-11-11 — Events report live state only
+
+Running `agent-desktop events` against the real state directory printed 16 events from
+history, 13 `session_stopped` and 3 `session_failed`. A shell would have raised a
+failure banner for each on every start, and a session destroyed with a request pending
+kept that request in its record. The first look now reports only live state: running
+sessions, their open requests and control, and a pending, unanswered host request.
+Requests and control are ignored in ended sessions. A follower reads each ended
+session once and then skips it. Following uses 0.14 s of CPU over 20 s against that
+directory, mostly startup. `control_returned` no longer carries the login page's URL,
+only whether the bridge restarted and the error's first line.
+
+Also recorded: on 2026-11-11 the Ubuntu job of Checks run 43067317711 failed once on
+`test_effects.RecorderTests.test_new_directories_are_watched`, the inotify
+watch-count assertion. That code was unchanged in the stack under test, and the job
+passed on rerun. The test is timing-sensitive on CI runners.
+
 ## 2026-11-11 — Events for shells and notifiers (X4, first version)
 
 `agent-desktop events [--follow] [--session]` implements the contract in

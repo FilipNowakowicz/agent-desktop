@@ -117,23 +117,41 @@ def run_agent(
     disallowed=None,
     call_log=None,
     effort=None,
+    subagent=None,
 ):
+    """One agent run. With `subagent` (an --agents JSON file), the main agent
+    has only the Task tool and no MCP server; the desktop agent defined there
+    holds the desktop tools and its own copy of the MCP server (N10)."""
     if disallowed is None:
         disallowed = [
             f"mcp__{server}__desktop_{name}" for name in ("create", "destroy", "launch")
+        ]
+    if subagent:
+        access = [
+            "--agents",
+            subagent_definition(subagent, mcp_config, server, disallowed, artifact),
+            "--strict-mcp-config",
+            "--tools",
+            "Task",
+            "--allowedTools",
+            f"Task,mcp__{server}",
+        ]
+    else:
+        access = [
+            "--mcp-config",
+            mcp_config,
+            "--strict-mcp-config",
+            "--tools",
+            "",
+            "--allowedTools",
+            f"mcp__{server}",
+            *(["--disallowedTools", *disallowed] if disallowed else []),
         ]
     command = [
         "claude",
         "-p",
         prompt,
-        "--mcp-config",
-        mcp_config,
-        "--strict-mcp-config",
-        "--tools",
-        "",
-        "--allowedTools",
-        f"mcp__{server}",
-        *(["--disallowedTools", *disallowed] if disallowed else []),
+        *access,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -200,6 +218,16 @@ def run_agent(
             1 for c in calls if (c.get("input") or {}).get("screenshot") is True
         ),
         "reply": (result.get("result") or "")[-500:],
+        # N10: what the main agent's own context took, excluding subagent turns.
+        "main_context_tokens": main_context_tokens(events),
+        "subagent_calls": sum(
+            1
+            for event in events
+            if event.get("type") == "assistant" and not event.get("parent_tool_use_id")
+            for block in event["message"]["content"]
+            if block.get("type") == "tool_use"
+            and block.get("name") in ("Task", "Agent")
+        ),
         "cost_usd": result.get("total_cost_usd"),
         "usage": result.get("usage", {}),
         "model_usage": result.get("modelUsage", {}),
@@ -219,6 +247,50 @@ def run_agent(
             wall_ended,
         ),
     }
+
+
+def main_context_tokens(events):
+    """Input tokens of the main agent's model calls (not a subagent's): plain,
+    cache-read and cache-created input, once per message id."""
+    seen, total = set(), 0
+    for event in events:
+        if event.get("type") != "assistant" or event.get("parent_tool_use_id"):
+            continue
+        message = event.get("message", {})
+        if message.get("id") in seen:
+            continue
+        seen.add(message.get("id"))
+        usage = message.get("usage") or {}
+        total += sum(
+            usage.get(key) or 0
+            for key in (
+                "input_tokens",
+                "cache_read_input_tokens",
+                "cache_creation_input_tokens",
+            )
+        )
+    return total
+
+
+def subagent_definition(path, mcp_config, server, disallowed, artifact):
+    """The desktop agent with its own MCP server and the profile's tool set,
+    written next to the run's transcript."""
+    import anyio
+
+    from agent_desktop import mcp_server
+
+    agents = json.loads(Path(path).read_text())
+    servers = json.loads(Path(mcp_config).read_text())["mcpServers"]
+    names = [t.name for t in anyio.run(mcp_server.mcp.list_tools)]
+    blocked = set(disallowed or [])
+    for agent in agents.values():
+        agent["mcpServers"] = [{server: servers[server]}]
+        agent["tools"] = [
+            f"mcp__{server}__{n}" for n in names if f"mcp__{server}__{n}" not in blocked
+        ]
+    target = artifact / "agents.json"
+    target.write_text(json.dumps(agents, indent=2) + "\n")
+    return str(target)
 
 
 # Variables that tie a process to the Claude Code session that started the
@@ -442,6 +514,14 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
         skills = os.environ.get("AGENT_DESKTOP_BENCH_SKILL")
         replaying = os.environ.get("AGENT_DESKTOP_BENCH_REPLAY")
         prompt = PROMPT.format(session=session, task=goal)
+        subagent = os.environ.get("AGENT_DESKTOP_BENCH_SUBAGENT")
+        if subagent:
+            prompt = prompt.replace(
+                "You control a private Linux desktop through the agent-desktop tools.",
+                "You control a private Linux desktop through the desktop agent (the "
+                "Task tool); you have no desktop tools yourself. Give it whole steps "
+                "of the task, including the session id.",
+            )
         if learn:
             prompt += LEARN_PROMPT
         skill = Path(skills or replaying or "/nonexistent") / f"{task.name}.py"
@@ -467,6 +547,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     mcp_config=context.mcp_config,
                     call_log=call_log_for(root),
                     effort=os.environ.get("AGENT_DESKTOP_BENCH_EFFORT"),
+                    subagent=subagent,
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]

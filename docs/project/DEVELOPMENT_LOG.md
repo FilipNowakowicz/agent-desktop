@@ -1,5 +1,20 @@
 # Development log
 
+## 2026-11-11 — Account-aware cookie imports and forget-site (N6)
+
+`import-cookies` now warns when it copies a site that keeps several accounts signed
+in at once (Google, YouTube, Microsoft and GitHub domains), since the default account
+in the session may be the wrong one. The warning points to the clean-profile
+`--from` route. A heuristic count of accounts from the cookies was not attempted:
+those cookie formats are not documented. The new `forget-site PROFILE --site SITE`
+removes a site's cookies and its `storage/default` directories, for subdomains too,
+and is refused while the profile is in use. History and the session store are left
+alone.
+
+Validated with fixture profiles: the warning appears only for a listed site, and
+removal leaves other sites' cookies and storage, including a look-alike domain,
+intact. Full desktop suite results are in the pull request.
+
 ## 2026-11-11 — hyprctl for a guarded session's nested Hyprland, and GPU Mesa (N8)
 
 The guard's `hyprctl` shim now passes a call through when `XDG_RUNTIME_DIR` is the

@@ -128,6 +128,66 @@ class CookieImportTests(unittest.TestCase):
             with self.assertRaisesRegex(core.DesktopError, "in use"):
                 cookies.import_firefox_cookies("shop", ["shop.example"], source)
 
+    def test_multi_account_sites_warn(self):
+        source = self.person(
+            [
+                ("SID", "private-google-a", ".google.com"),
+                ("x", "1", "login.tailscale.com"),
+            ]
+        )
+        warned = cookies.import_firefox_cookies(
+            "cloud", ["google.com", "tailscale.com"], source
+        )
+        self.assertIn("google.com", warned["warning"])
+        self.assertIn("--from", warned["warning"])
+        quiet = cookies.import_firefox_cookies("tail", ["tailscale.com"], source)
+        self.assertNotIn("warning", quiet)
+
+    def test_forget_site_removes_only_that_site(self):
+        source = self.person(
+            [
+                ("SID", "private-google-a", ".google.com"),
+                ("LSID", "private-google-b", "accounts.google.com"),
+                ("x", "1", "login.tailscale.com"),
+                ("y", "2", "notgoogle.com"),
+            ]
+        )
+        cookies.import_firefox_cookies(
+            "cloud", ["google.com", "tailscale.com", "notgoogle.com"], source
+        )
+        firefox = core.profile_path("cloud") / "home/.mozilla/agent-desktop"
+        storage = firefox / "storage/default"
+        for name in (
+            "https+++accounts.google.com",
+            "https+++mail.google.com^userContextId=1",
+            "https+++login.tailscale.com",
+            "https+++notgoogle.com+8443",
+        ):
+            (storage / name / "ls").mkdir(parents=True)
+            (storage / name / "ls" / "data.sqlite").write_text("x")
+        result = cookies.forget_site("cloud", ["google.com"])
+        self.assertEqual(result["cookies_removed"], 2)
+        self.assertEqual(
+            result["storage_removed"],
+            ["https+++accounts.google.com", "https+++mail.google.com^userContextId=1"],
+        )
+        self.assertEqual(
+            [row[:2] for row in self.imported("cloud")[1]],
+            [("login.tailscale.com", "x"), ("notgoogle.com", "y")],
+        )
+        self.assertEqual(
+            sorted(p.name for p in storage.iterdir()),
+            ["https+++login.tailscale.com", "https+++notgoogle.com+8443"],
+        )
+        import fcntl
+
+        with core.profile_lock(core.profile_path("cloud")).open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with self.assertRaisesRegex(core.DesktopError, "in use"):
+                cookies.forget_site("cloud", ["tailscale.com"])
+        with self.assertRaisesRegex(core.DesktopError, "No profile"):
+            cookies.forget_site("missing", ["google.com"])
+
     def test_default_profile_from_profiles_ini(self):
         source = self.person([("sid", "1", "shop.example")])
         (self.root / "profiles.ini").write_text(

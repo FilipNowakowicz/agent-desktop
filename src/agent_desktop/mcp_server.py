@@ -34,10 +34,11 @@ copy that login into a profile (they run `agent-desktop import-cookies PROFILE
 --site SITE`; then create the session with that profile), which keeps the work
 in the background; or offer their own screen (desktop_request_host). Otherwise
 call desktop_request_human with a short reason, tell the user that reason and the
-returned take_command, then wait with desktop_control. For a login, also give
-paste_command, which lets them paste a password from their own clipboard, and
-suggest ticking "Remember me" (on some sites a separate one for "sign in with"
-buttons) so the login survives the browser closing. While the user has control,
+returned take_command, then wait with desktop_control. For a login, pass
+login=true and also give paste_command, which lets them paste a password from
+their own clipboard, and suggest ticking "Remember me" (on some sites a
+separate one for "sign in with" buttons) so the login survives the browser
+closing. While the user has control,
 your input and screenshots are refused. When control returns, take a new screenshot
 before acting. To keep a login for later tasks, create sessions with the same
 profile name (one session per profile at a time).
@@ -868,7 +869,10 @@ def desktop_scroll(
 
 @tool()
 def desktop_request_human(
-    session: str, reason: str | None = None, withdraw: bool = False
+    session: str,
+    reason: str | None = None,
+    withdraw: bool = False,
+    login: bool = False,
 ) -> dict:
     """Ask the user to take control, e.g. to log in, enter a 2FA code or pass a CAPTCHA.
 
@@ -877,10 +881,14 @@ def desktop_request_human(
     control, input and screenshots are refused; afterwards take a new screenshot.
     withdraw=true cancels a pending request (e.g. the user chose another way),
     keeping the session; a takeover already under way lasts until they release it.
+    login=true, for a sign-in in the bridged Firefox: when they take control it
+    is reopened without the remote agent, which sites such as Google refuse,
+    and started under the bridge again when they release it (control's
+    last.browser says whether that worked). Find the tab again with "tabs".
     """
     if withdraw:
         return call(session, "request_human", withdraw=True)
-    return call(session, "request_human", reason=reason)
+    return call(session, "request_human", reason=reason, login=login or None)
 
 
 @tool()

@@ -488,6 +488,21 @@ takeover as protection from the agent's tools, not from a hostile process. Closi
 SESSION`) hands control back; the agent must then take a new screenshot before any
 input, and all earlier observation tokens are stale. The agent can wait for this
 with `desktop_control(session, wait_seconds=...)`; release is a cooperative user handoff, not an authentication check.
+Some sites refuse to sign in to a remote-controlled browser. Google answers "this
+browser or app may not be secure", because Firefox under the bridge sets
+`navigator.webdriver`. For a login, the agent asks with `desktop_request_human(...,
+login=true)`. When you take control, the bridged Firefox is closed and reopened on
+the same profile and page without the remote agent, so you sign in to an ordinary
+browser. When you release control, that Firefox is closed by its window, so that it
+saves its cookies, and started again under the bridge. `desktop_control` then reports
+`last.browser`, either `{"restarted": true, "url": ...}` or the error with a recovery
+step, and the agent finds its tab again with `tabs`. The take reply's
+`login_browser` says whether the swap happened (`"swapped": false` with a reason when
+no bridged Firefox was running). The viewer starts first, so if it fails, the bridged
+Firefox is left as it was. A request without `login=true`
+while a bridged Firefox is open carries a `hint` saying so. If a site still refuses,
+use the clean-profile `import-cookies --from` route under
+[Bring a login from your own Firefox](#bring-a-login-from-your-own-firefox).
 If you choose another way (e.g. your own screen), the agent withdraws the request
 with `desktop_request_human(session, withdraw=true)` (CLI: `request-human SESSION
 --withdraw`) and keeps the session; a takeover already under way continues until

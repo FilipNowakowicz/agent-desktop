@@ -19,7 +19,7 @@ things: a session's private home, or a named profile's home.
 | --- | --- | --- | --- |
 | **Session runtime** | `create` | `destroy`, or recovery after the session's supervisors die | Compositor, bus, worker and guardian processes, the session's applications, sockets in `RUNTIME/<session>`, the controller lease, take markers |
 | **Session record** | `create` | `prune` of a stopped or failed session | `STATE/<session>`: `session.json`, logs, `trace.jsonl`, `screenshots/`, `operations/` |
-| **Profile** | First `create --profile NAME` | `profiles delete NAME` only | `STATE/profiles/NAME/home` (a persistent home: browser logins, application settings, downloads), `last-session.json` and a lock file beside it |
+| **Profile** | First `create --profile NAME` | `delete-profile NAME` only | `STATE/profiles/NAME/home` (a persistent home: browser logins, application settings, downloads), `last-session.json` and a lock file beside it |
 
 A session without a profile gets a private home, `STATE/<session>/home`, and a
 `config` directory. Both are deleted when the session ends: anything the agent
@@ -31,14 +31,15 @@ A host session has neither, and works on the person's own screen and files.
 | Event | Session runtime | Session record | Profile | Status |
 | --- | --- | --- | --- | --- |
 | `destroy` | Stopped: the session's applications (matched by session token) and its runtime directory are removed | Kept with status `stopped`; `home` and `config` are removed | Kept, and unlocked once the guardian has stopped everything | **tested**: `test_runtime` (runtime removed), `test_profiles` (lock held until cleanup) |
-| Worker or guardian killed (supervisor loss) | Left running until recovery: the next `destroy`, or the next `create` on the same profile, stops leftover applications by token and removes the runtime | Marked `stopped` with `recovered: true` | Kept; a profile whose last session was abandoned is recovered before reuse | **tested** for profiles: `test_profiles`. Untested without a profile |
-| An application exits or crashes | The session stays up; other applications are unaffected | The exit appears in logs | Whatever the application saved is kept | untested as a stress case |
-| Firefox restarted in the session | The bridge reconnects on the next `browser start`; tab contexts from before are gone and refused as `target_lost` | Operation records keep their contexts | Logins persist only in a profile | partly tested (`test_browser`, R1 `target_lost`) |
+| The worker is killed; the guardian survives | The guardian stops every process carrying the session token and removes the runtime directory | Marked `failed` with the reason; `home` and `config` are removed | Kept; the lock is released only after the guardian has finished | **tested**: `test_runtime` (guardian cleanup), `test_profiles` (lock held) |
+| Both supervisors are killed | Left running until recovery: `destroy`, or the next `create` on the same profile, stops leftover applications by token and removes the runtime | Marked `stopped` with `recovered: true` | Kept; a profile whose last session was abandoned is recovered before reuse | **tested**: `test_runtime` (destroy recovers), `test_profiles` (next session recovers) |
+| An application exits or crashes | Intended: the session stays up and other applications are unaffected | Kept | Whatever the application saved is kept | untested |
+| Firefox restarted in the session | Intended: `browser start` connects to the new Firefox; tab contexts from before are gone, and an action naming one fails with `target_lost` rather than using another tab | Operation records keep their contexts | Logins persist only in a profile | `target_lost` for a closed tab is **tested** (`test_interruptions`); a restart is untested |
 | The viewer (`viewer`, `take`) closes | Intended: the session keeps running, and opening the viewer again starts a new one | Kept | Kept | untested |
 | Runtime upgrade (new labwc, Firefox, …) | Not supported for a running session: recreate it | Kept | Kept; applications must cope with their own profile versions | untested |
 | Machine reboot or logout | Gone with `RUNTIME`; `list` reports such sessions as `unavailable` until they are destroyed (which recovers them) | Kept | Kept | untested |
 | `prune [--older-than DAYS]` | Never touches live sessions | Removes stopped or failed records past the cutoff | Never touched | **tested**: `test_retention` |
-| `profiles delete NAME` | Refused while a session uses the profile | Not touched | Removed | **tested**: `test_profiles` |
+| `delete-profile NAME` | Refused while a session uses the profile | Not touched | Removed | **tested**: `test_profiles` |
 
 ## Bounds inside a session record
 

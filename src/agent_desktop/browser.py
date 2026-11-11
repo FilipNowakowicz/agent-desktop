@@ -115,6 +115,27 @@ class BrowserError(RuntimeError):
     pass
 
 
+# What a click at the element's centre would hit, if not the element itself:
+# null when the element, or a label for it or the control it labels, is on top.
+UNCOVERED = """(e) => {
+  e.scrollIntoView({block: "center", inline: "center"});
+  const rect = [...e.getClientRects()].find((r) => r.width && r.height);
+  if (!rect) return null;
+  const x = (Math.max(rect.left, 0) + Math.min(rect.right, innerWidth)) / 2;
+  const y = (Math.max(rect.top, 0) + Math.min(rect.bottom, innerHeight)) / 2;
+  const root = e.getRootNode();
+  const hit = (root.elementFromPoint ? root : document).elementFromPoint(x, y);
+  if (!hit || hit === e || e.contains(hit)) return null;
+  // A label and the control it is for are one target: a styled span inside
+  // the label over a hidden input, or an input stretched over its label.
+  if (hit.closest("label")?.control === e || e.control === hit) return null;
+  if (hit.shadowRoot && hit.contains(e)) return null;
+  const text = (hit.innerText || hit.textContent || "").trim().slice(0, 40);
+  return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") +
+    (text ? " (" + JSON.stringify(text) + ")" : "");
+}"""
+
+
 class Browser:
     """One BiDi session with a Firefox instance."""
 
@@ -260,6 +281,19 @@ class Browser:
         if node.get("type") != "node":
             raise BrowserError("The element changed while it was looked up")
         return {"sharedId": node["sharedId"]}, found["items"][0]
+
+    def uncovered(self, context, element):
+        """Refuse, before any input, when something else would take the click.
+
+        A pointer click lands on whatever is on top at the element's centre;
+        a modal or overlay there would receive it instead of the element.
+        """
+        cover = remote_value(self.call(UNCOVERED, [element], context))
+        if cover:
+            raise BrowserError(
+                f"covered: the element is under {cover}; nothing was sent. "
+                "Dismiss or handle what covers it, then try again"
+            )
 
     def click(self, context, element):
         self.call(

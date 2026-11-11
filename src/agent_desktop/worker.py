@@ -1243,6 +1243,8 @@ class Worker:
                 if described.get("disabled"):
                     raise ValueError(f"The element is disabled: {described}")
                 toggle_before = None
+                if action in ("click", "fill"):
+                    bridge.uncovered(context, element)
                 if action == "click":
                     try:
                         toggle_before = browser.remote_value(

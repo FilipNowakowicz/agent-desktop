@@ -1,5 +1,47 @@
 # Development log
 
+## 2026-11-11 — F2 browser dataset edit, and clicks under a modal
+
+**Clicks under a modal hit the modal.** The browser bridge clicked at the
+element's centre, so whatever lay on top took the click, and the reply still
+reported the intended element as clicked. Found in the first F2 trial: an Edit
+click behind the session-expiry modal landed on its "Sign out" button. A probe
+reproduced it (a click on `#under` ran `#over`'s handler). `click` and `fill` now
+hit-test the element's centre after scrolling it into view, and refuse with
+`covered: …` before any input when something else is there. A label for the
+element, or the control a label is for, counts as the element; both custom-control
+layouts (a styled span over a hidden checkbox, an input stretched over its label)
+are tested. Regression tests in `test_browser`.
+
+**F2 browser dataset edit (`test_dataset_workflow`).** A loopback service owns 44
+records and serves 12 per page. The page source contains no records. The driver
+reads only the page: it surveys every page from the first and edits the four
+"Norvik" records by SKU through durable browser jobs. A near-duplicate supplier
+("Norvika") and a duplicated product name are in the data. The evaluator reads
+only the service: every field of every record against the initial snapshot by
+ID, membership, and the submissions it received, so a duplicate or a bystander
+submission fails. It is itself tested against known-wrong outcomes, from a
+missed target to a sign-out.
+
+- Trial 1: start on page 3, and the modal opens as the second save returns.
+- Trial 2: a slow save, with the helper killed after the Save click was
+  acknowledged. The record says `delivery_unknown`; the driver reconciles from
+  the page and does not resubmit; the service received one submission.
+- Trial 3 was held out: it first ran after the driver was written against
+  trials 1 and 2, and passed. Its kill injection and the driver's
+  reconciliation were then refined, so it is now a regular regression trial:
+  start on page 4, the modal after the first save, delayed saves, and the helper
+  killed with the dialog filled but not saved. The driver retries once, because
+  nothing was submitted. Its second planned kill did not happen: that edit's
+  first step was refused as `covered` by the modal, which the driver dismissed
+  ("Stay signed in") before retrying.
+- A job that completes is still reconciled from the page (waiting for the
+  reload after the save) before any retry, so a slow re-render cannot cause
+  a second submission.
+
+Not covered yet: virtualised lists, viewport changes, disconnects and
+agent-driven runs. The native document and mixed workflows remain.
+
 ## 2026-11-11 — Host launches on Lua Hyprland, and a stale take marker
 
 **Host launches on Hyprland 0.57 with a Lua configuration.** `launch_on_host` sent

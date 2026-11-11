@@ -607,7 +607,9 @@ def desktop_browser(
     On a host session it uses the person's own Firefox, if they started it with
     --remote-debugging-port ("start" only connects): read any tab, but open
     your own with new_tab (it opens in the background) and act only there, or
-    in a tab they name. This does not move their pointer or keyboard.
+    in a tab they name. This does not move their pointer or keyboard. Without
+    a BiDi port, "open" with new_tab still opens an http(s) url as a new tab
+    of their running Firefox, but that tab cannot be read or driven.
     """
     arguments = {
         "url": url,

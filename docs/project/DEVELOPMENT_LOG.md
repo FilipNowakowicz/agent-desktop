@@ -27,6 +27,22 @@ refusal (lost target, missing or ambiguous element, a person taking control) is 
 recorded as a known `failed` step, and the job as `stopped`. GUI action jobs keep the R2
 rule that a generic error after dispatch is uncertain, because their input can partly
 run before the error.
+## 2026-11-11 — Host screenshots settle, and URLs open without a bridge (X6, X10)
+
+These were built without the person's screen; the maintainer was away and approved
+working on the screen items without a live host session. Two changes:
+- A host screenshot taken within 1 s of the agent's own input now waits up to 1 s for
+  the screen to go quiet, as `settle` does. In the daily-use notes, one capture
+  caught a workspace switch halfway.
+- On a host session whose Firefox has no BiDi port, `desktop_browser open` with
+  `new_tab` opens an `http(s)` URL as a new tab of the running Firefox, through
+  `firefox --new-tab`, started outside the session like other host launches. The
+  reply says the tab cannot be read or driven.
+
+Validated with stand-in workers in `test_host_screen` (no host session, no real
+screen): settling turns on only after recent input, and the fallback runs only for
+web URLs in a new tab. Not yet seen on the real screen: how long Hyprland's
+animations take to settle, and whether Firefox brings its window forward.
 
 ## 2026-11-11 — Desktop subagent pilot (N10)
 

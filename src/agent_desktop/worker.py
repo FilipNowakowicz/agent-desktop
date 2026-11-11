@@ -271,6 +271,9 @@ TRACE_BYTES = 1024 * 1024
 # Written by `take` before it queues behind the request in progress; waits in the
 # worker stop when they see it, so a person gets control within about 0.1 s.
 TAKE_REQUESTED = "take-requested"
+# On the person's screen, a screenshot this soon after the agent's input waits
+# (up to a second) for animations such as a workspace switch to finish.
+HOST_SETTLE_AFTER = 1.0
 # Values moved by browser "send" (secrets such as generated API keys).
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
@@ -1103,6 +1106,8 @@ class Worker:
                     lambda: {"tabs": bridge.tabs()[1]},
                 )
             if not self.attach_browser():
+                if host and action == "open" and request.get("new_tab"):
+                    return self.open_in_person_firefox(request.get("url"))
                 raise ValueError('No bridged Firefox; use action "start" first')
             bridge = self.browser[0]
             bridge.deadline = request.get("deadline")
@@ -2017,6 +2022,24 @@ class Worker:
             if remaining <= 0:
                 return
             time.sleep(min(0.1, remaining))
+    def just_acted(self):
+        """Whether the agent sent input within the last HOST_SETTLE_AFTER seconds."""
+        at = getattr(self, "mutated_at", None)
+        return at is not None and time.monotonic() - at < HOST_SETTLE_AFTER
+
+    def open_in_person_firefox(self, url):
+        """Without a BiDi port, open a URL as a new tab of the person's running
+        Firefox, the way a link from another app would. The tab cannot be read
+        or driven afterwards; Firefox may bring its window forward."""
+        if not isinstance(url, str) or not re.match(r"https?://", url):
+            raise ValueError("open needs an http or https url")
+        self.launch_on_host(["firefox", "--new-tab", url], self.env["HOME"])
+        return {
+            "delivered": True,
+            "opened_in": "the person's running Firefox, without the bridge",
+            "url": url,
+            "note": "This tab cannot be read or driven: Firefox has no BiDi port.",
+        }
 
     def bridged_firefox(self):
         """(application id, process) of a running Firefox with a BiDi port, found
@@ -2203,6 +2226,7 @@ class Worker:
     def mark_mutation(self):
         """A mutation call is about to start; errors cannot establish rollback."""
         self.mutation_started = True
+        self.mutated_at = time.monotonic()
 
     def error_reply(self, error):
         reply = {"ok": False, "error": f"{type(error).__name__}: {error}"}
@@ -2454,6 +2478,10 @@ class Worker:
                         "settle_ms to 10000"
                     )
                 settled = self.settle(quiet / 1000, limit / 1000)
+            elif host and self.just_acted():
+                # Right after the agent's own input (a workspace switch, a new
+                # window) the person's compositor is often still animating.
+                settled = self.settle(0.15, 1.0)
             if request.get("changed_only") is True:
                 capture = self.changed_screenshot(request.get("scale"))
             else:

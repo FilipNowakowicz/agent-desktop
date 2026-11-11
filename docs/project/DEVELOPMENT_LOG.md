@@ -1,5 +1,32 @@
 # Development log
 
+## 2026-11-11 — Host launches on Lua Hyprland, and a stale take marker
+
+**Host launches on Hyprland 0.57 with a Lua configuration.** `launch_on_host` sent
+`hyprctl dispatch exec CMD`. A Hyprland that reads its configuration from Lua parses
+dispatches as Lua and refuses that form ("')' expected near …"). Its exit status can
+still be 0, so the launch was reported as done. This was found in a nested Hyprland
+0.57.1 stand-in, the version on the maintainer's machine. The worker now retries as
+`hl.dsp.exec_cmd("…")` when Hyprland asks for Lua (nothing ran the first time), and
+treats any answer other than `ok` as a failure. Checked in the nested stand-in,
+including a path with a space, and in unit tests. Host launches, and X10's URL
+fallback, depend on this.
+
+**A stale `take-requested` marker** (from #185) made every later browser wait stop
+with `HumanControl`. A `take` refused for a bad keyboard name left it behind, and so
+would a client that died after writing it. This was reproduced. The worker now
+clears the marker as soon as it receives `take`, ignores a marker older than 10 s, and
+removes it when it starts. Regression test in `test_takeover_jobs`.
+
+**Takeover still waits for other long commands.** Only browser waits give way at once.
+An `open` (navigation up to 60 s), a `send` to a command (up to 60 s) or a long `type`
+still holds `take` back until it finishes. The capability matrix says so.
+
+**Fedora flake.** In Checks run 43089078794, Fedora's
+`test_chromium_receives_every_character` dropped the first character ("rowser café…")
+and passed on rerun. This is the first-character drop the pilot once saw on Fedora.
+Plan row X12 is to loop it locally under load with the store's Chromium.
+
 ## 2026-11-11 — Takeover during a running job (F1-b, #181)
 
 New `tests/test_takeover_jobs.py`: a person takes control while a durable browser job
@@ -29,8 +56,9 @@ rule that a generic error after dispatch is uncertain, because their input can p
 run before the error.
 ## 2026-11-11 — Host screenshots settle, and URLs open without a bridge (X6, X10)
 
-These were built without the person's screen; the maintainer was away and approved
-working on the screen items without a live host session. Two changes:
+These were built without the person's screen. The maintainer was away and said to
+use it if possible, but approving a host session on their behalf was not an option,
+so stand-ins were used. Two changes:
 - A host screenshot taken within 1 s of the agent's own input now waits up to 1 s for
   the screen to go quiet, as `settle` does. In the daily-use notes, one capture
   caught a workspace switch halfway.

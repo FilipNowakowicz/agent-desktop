@@ -47,7 +47,7 @@ validation behind each feature.
 | A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
 | Interruption during application work, after a committed effect, or before evidence collection; cancellation during application work | tested | `test_interruptions` (2026-11-11). The helper is killed or cancelled at each boundary in a real session |
 | Interruption during evidence collection itself | untested | Too short a window to hit without a fault-injection hook. The record validator refuses `satisfied` without all checks |
-| Takeover while a job is running, and how long control takes to be acknowledged | tested | `test_takeover_jobs` (2026-11-11). It took 3.1 s, the length of the job's browser pause, before the fix; afterwards the wait gives way within about 0.1 s and the job stops with a known failure |
+| Takeover while a job is running, and how long control takes to be acknowledged | tested for browser waits | `test_takeover_jobs` (2026-11-11). A browser wait now gives way within about 0.1 s; before the fix, take took 3.1 s, the pause's length. An `open`, a `send` to a command or a long `type` still holds `take` back until it finishes (up to about 60 s) |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
 
 ### Broad application control

@@ -271,6 +271,7 @@ TRACE_BYTES = 1024 * 1024
 # Written by `take` before it queues behind the request in progress; waits in the
 # worker stop when they see it, so a person gets control within about 0.1 s.
 TAKE_REQUESTED = "take-requested"
+TAKE_MARKER_SECONDS = 10
 # On the person's screen, a screenshot this soon after the agent's input waits
 # (up to a second) for animations such as a workspace switch to finish.
 HOST_SETTLE_AFTER = 1.0
@@ -292,6 +293,12 @@ TOGGLE_STATE = (
 )
 # Cropped screenshots may be enlarged up to this factor.
 MAX_CROP_SCALE = 2
+
+
+def lua_string(text):
+    """A double-quoted Lua string literal for `text`."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return f'"{escaped}"'
 
 
 def trace_arguments(request):
@@ -658,7 +665,19 @@ class Worker:
         result = subprocess.run(
             launcher, env=self.env, capture_output=True, text=True, timeout=10
         )
-        if result.returncode:
+        if launcher[0] == "hyprctl" and "lua" in result.stdout.lower():
+            # Hyprland with a Lua configuration (0.57) parses dispatches as Lua
+            # and refused the classic form before running anything.
+            launcher = [
+                "hyprctl",
+                "dispatch",
+                f"hl.dsp.exec_cmd({lua_string(command)})",
+            ]
+            result = subprocess.run(
+                launcher, env=self.env, capture_output=True, text=True, timeout=10
+            )
+        refused = launcher[0] == "hyprctl" and result.stdout.strip() != "ok"
+        if result.returncode or refused:
             raise RuntimeError(
                 f"{launcher[0]} failed: {result.stderr.strip() or result.stdout.strip()}"
             )
@@ -2002,7 +2021,13 @@ class Worker:
         raise TimeoutError("Viewer socket did not appear")
 
     def take_requested(self):
-        return (Path(self.info["runtime"]) / TAKE_REQUESTED).exists()
+        """A `take` is waiting behind the current request. A marker older than
+        TAKE_MARKER_SECONDS was left by a client that died; it is ignored."""
+        try:
+            written = (Path(self.info["runtime"]) / TAKE_REQUESTED).stat().st_mtime
+        except OSError:
+            return False
+        return time.time() - written < TAKE_MARKER_SECONDS
 
     def pause(self, seconds):
         """Sleep inside a request, but give way at once to a person taking control.
@@ -2379,6 +2404,8 @@ class Worker:
                     )
             return state
         if operation == "take":
+            # Cleared on receipt, so a take refused below leaves nothing behind.
+            Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
             self.release_held_keys()
             return self.take(request.get("wayvnc", "wayvnc"), request.get("keyboard"))
         if operation == "release":
@@ -2838,6 +2865,7 @@ class Worker:
             server.bind(endpoint)
             server.listen(16)
             server.settimeout(0.5)
+            Path(self.info["runtime"], TAKE_REQUESTED).unlink(missing_ok=True)
             self.save("ready", worker_pid=os.getpid(), guardian_pid=os.getppid())
             while not self.stop:
                 if (

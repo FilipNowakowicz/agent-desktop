@@ -135,3 +135,49 @@ class HostSettleAndOpenTests(unittest.TestCase):
             with self.subTest(request=request), self.assertRaises(ValueError):
                 desktop.browser_request(request)
         desktop.launch_on_host.assert_called_once()
+
+    def test_host_launch_uses_lua_dispatch_when_hyprland_asks(self):
+        from agent_desktop.worker import lua_string
+
+        self.assertEqual(lua_string('a "b" \\ c'), '"a \\"b\\" \\\\ c"')
+        desktop = Worker.__new__(Worker)
+        desktop.env = {"HYPRLAND_INSTANCE_SIGNATURE": "sig", "PATH": "/bin"}
+        replies = [
+            subprocess.CompletedProcess(
+                [],
+                0,
+                "error: 3 ...: ')' expected\n Note: dispatch in lua is a shorthand",
+                "",
+            ),
+            subprocess.CompletedProcess([], 0, "ok\n", ""),
+        ]
+        with (
+            mock.patch(
+                "agent_desktop.worker.shutil.which", return_value="/bin/hyprctl"
+            ),
+            mock.patch(
+                "agent_desktop.worker.subprocess.run", side_effect=replies
+            ) as run,
+        ):
+            desktop.launch_on_host(
+                ["firefox", "--new-tab", "https://e.example/"], "/home/p"
+            )
+        second = run.call_args_list[1].args[0]
+        self.assertEqual(second[:2], ["hyprctl", "dispatch"])
+        self.assertTrue(
+            second[2].startswith('hl.dsp.exec_cmd("cd /home/p && exec firefox')
+        )
+        # An answer other than "ok" is a failure, even with exit status 0.
+        with (
+            mock.patch(
+                "agent_desktop.worker.shutil.which", return_value="/bin/hyprctl"
+            ),
+            mock.patch(
+                "agent_desktop.worker.subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    [], 0, "error: no such dispatcher", ""
+                ),
+            ),
+            self.assertRaisesRegex(RuntimeError, "no such dispatcher"),
+        ):
+            desktop.launch_on_host(["true"], "/")

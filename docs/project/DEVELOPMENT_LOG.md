@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-11-11 — Desktop subagent: schema cost and protocol (N10, part one)
+
+Measured the MCP tool list and server instructions. They come to 29 tools and 31,436
+schema characters on `main` after #166–#175, against 29,290 before this batch. That is
+about 7,900 tokens of fixed prefix by a four-characters-per-token estimate.
+`desktop_browser`, `desktop_actions` and `desktop_wait` are the largest. The field
+reports used 10–11 of the 29 tools. The A/B protocol
+(docs/research/2026-11-11-desktop-subagent-protocol.md) and the subagent definition
+(`benchmarks/agents/desktop.json`) are committed before any counted run. The run itself,
+42 sessions, waits for the maintainer to agree a model budget.
+
 ## 2026-11-11 — A killed operation helper gives back its lease (X1, first F1 patch)
 
 The status read that finds a durable job's helper dead now undoes that job's lease,

@@ -23,6 +23,7 @@ from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import find_registryd, owned_processes  # noqa: E402
 from benchmarks.atlas import ATLAS_TASKS  # noqa: E402
 from benchmarks.effects import EFFECT_TASKS  # noqa: E402
+from benchmarks.f2 import F2_TASKS  # noqa: E402
 from benchmarks.hard import HARD_TASKS  # noqa: E402
 from benchmarks.office import OFFICE_TASKS  # noqa: E402
 from benchmarks.realistic import REALISTIC_TASKS  # noqa: E402
@@ -37,6 +38,7 @@ SUITES = {
     "atlas": ATLAS_TASKS,
     "realistic": REALISTIC_TASKS,
     "tiers": TIER_TASKS,
+    "f2": F2_TASKS,
 }
 
 # Tool profiles for comparisons. "basic" is the tool set before waiting, action
@@ -583,6 +585,8 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
         record["error"] = f"{type(error).__name__}: {error}"
     finally:
         context.reports.close()
+        for close in getattr(context, "closers", []):
+            close()
         try:
             record["cleanup"] = core.destroy(session)
         except core.DesktopError as error:

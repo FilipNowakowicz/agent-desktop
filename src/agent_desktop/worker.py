@@ -2060,8 +2060,8 @@ class Worker:
     def open_in_person_firefox(self, url):
         """Without a BiDi port, open a URL as a new tab of the person's running
         Firefox, the way a link from another app would. The tab cannot be read
-        or driven afterwards. On Hyprland 0.57.1 the tab opened in the last used
-        Firefox window, which stayed where it was rather than coming forward."""
+        or driven afterwards. On Hyprland 0.57.1 the window Firefox chose for the
+        tab stayed where it was rather than coming forward."""
         if not isinstance(url, str) or not re.match(r"https?://", url):
             raise ValueError("open needs an http or https url")
         self.launch_on_host(["firefox", "--new-tab", url], self.env["HOME"])
@@ -2070,10 +2070,10 @@ class Worker:
             "opened_in": "the person's running Firefox, without the bridge",
             "url": url,
             "note": (
-                "This tab cannot be read or driven: Firefox has no BiDi port. It "
-                "opens in their last used Firefox window, which may stay in the "
-                "background or on another workspace; check desktop_windows for "
-                "the window title before a screenshot."
+                "This tab cannot be read or driven: Firefox has no BiDi port. "
+                "Firefox picks the window, which may stay in the background or on "
+                "another workspace; check desktop_windows for the window title "
+                "before a screenshot."
             ),
         }
 

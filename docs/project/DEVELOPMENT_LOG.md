@@ -19,16 +19,18 @@ the person's own windows were only listed and never given input.
   left one (`desktop_windows` showed the activated state move).
 - **X10, opening a URL without a bridge:** the person's Firefox had no BiDi port.
   `open` with `new_tab` on `https://example.com/` replied `delivered` and the tab
-  became the active tab of their last used Firefox window, on workspace 1. That
-  window did not come forward; the screen stayed on workspace 4. The reply note,
+  became the active tab of one of their two Firefox windows, the one on workspace 1
+  (Firefox chose it; one observation does not show its rule). That window did not
+  come forward; the screen stayed on workspace 4. The reply note,
   tool description and USAGE now say the window may stay in the background. The
   tab was left open for the person to close.
 - **X5, focus on another workspace:** `desktop_focus` of the kitty on workspace 3
   from workspace 4 switched there and reported it activated.
 
 Not checked: the off-screen refusal on a real inactive terminal. It needs the
-person to switch virtual terminals; a 2-minute wait for that switch timed out and
-the check was skipped. Both test windows exited through `exit`, and the session
+person to switch virtual terminals. They were asked in the conversation to press
+Ctrl+Alt+F2 and come back, as an optional step; no switch happened within the
+2-minute wait, so the check was skipped and stays open. Both test windows exited through `exit`, and the session
 was destroyed.
 
 Validation: the session's tool replies and screenshots above, plus

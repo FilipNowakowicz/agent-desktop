@@ -234,7 +234,9 @@ Prefer directions that:
   [big-directions notes](../research/2026-11-10-big-directions-wip.md).
 - **B1 pilot (2026-11-11):** the main agent's context fell 93–97% and cost about 75%,
   but wall time rose 51–58%, so the gate was not met
-  ([pilot](../research/2026-11-11-desktop-subagent-pilot.md)). Worth offering as an option.
+  ([pilot](../research/2026-11-11-desktop-subagent-pilot.md)). A same-model subagent
+  (2026-11-12) was slower still (+96–111%) and cost more than direct tools, so the
+  delay is delegation, not the cheaper model. Worth offering the `haiku` one as an option.
 - **Status:** idea. Their placement in the
   [execution plan](PROJECT_PLAN.md#execution-plan-2026-11-11): B1 is in Now (N10); B3
   is in Next (X4) and Later (L1); B4, B5, C1, C2 and C3's VM route are in Later; B2

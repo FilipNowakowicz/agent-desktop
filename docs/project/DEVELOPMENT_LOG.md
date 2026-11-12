@@ -1,5 +1,16 @@
 # Development log
 
+## 2026-11-12 — Desktop subagent on the main model (N10)
+
+The arm the pilot suggested: the subagent on `opus`, the main agent's model
+(`benchmarks/agents/desktop-same-model.json`). Two runs (same tasks and seed as the
+pilot), then the direct arm again to check for drift: direct 36.1 s and 60.1 s,
+matching the pilot. The same-model subagent took 76.0 s and 117.9 s (+111% and +96%)
+and cost $0.46 and $0.59, more than direct, at equal success and with main-context
+tokens down 92–97%. The delay comes from delegation (rediscovering the setup and the
+extra verification the hand-off asked for), not from `haiku`. Details are in
+docs/research/2026-11-11-desktop-subagent-pilot.md. Today's runs cost $1.70.
+
 ## 2026-11-12 — Checks on the maintainer's screen (X5, X6, X9, X10)
 
 The maintainer approved a 20-minute host session on their own screen (Hyprland

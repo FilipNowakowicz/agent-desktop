@@ -13,11 +13,18 @@ live in the ignored `artifacts/fedora-vm/`.
 execute program org.a11y.Bus: Permission denied"); `GetAddress` returned that error,
 and the worker parsed its text as a bus address. The cause is SELinux, which CI's
 containers do not run: with `setenforce 0` the session started and the bus came up.
-With the policy's `dontaudit` rules disabled (`semodule -DB`), the denials show
-Fedora's policy running `at-spi-bus-launcher` as `gnome_atspi_t`, which may not
-create its directory, files or bus socket in the session's runtime directory
-(`user_tmp_t`). So the problem is not specific to the VM: it applies to any
-SELinux-enforcing Fedora.
+Under enforcing, with the policy's `dontaudit` rules disabled (`semodule -DB`),
+`/var/log/audit/audit.log` shows `SELINUX_ERR op=security_compute_sid
+invalid_context="unconfined_u:unconfined_r:gnome_atspi_t"` for
+`scontext=unconfined_dbusd_t` executing `gnome_atspi_exec_t`. The private
+`dbus-daemon` runs as `unconfined_dbusd_t`, the policy's transition for the
+launcher gives `gnome_atspi_t`, and that type is not valid with the user's role,
+so the exec is refused and the launcher never starts. Under permissive mode the
+launcher then also meets file denials in the session's runtime directory
+(`user_tmp_t`), which enforcing never reaches. This applies to any
+SELinux-enforcing Fedora where the bus is started this way. Started directly from
+a shell (`unconfined_t`), the launcher stayed `unconfined_t` under enforcing and
+`GetAddress` returned an address, which is the route for X13.
 
 Fix: an error reply, or an address without `=`, is an `AccessibilityError` naming the
 bus error, and a registry that fails to start no longer fails the session. The
@@ -27,12 +34,16 @@ with the same reason. New `BrokenAccessibilityBusTests` reproduces the failure o
 machine: a registry wrapper whose prefix offers an `org.a11y.Bus` service that
 runs `false`. Without the fix it fails with "Session startup failed". On the
 enforcing VM, with the fix, a session started, took a 1280-wide screenshot and
-reported the reason. Restoring accessibility under SELinux is plan row X13.
+reported the reason; `test_chromium_receives_every_character` passed 5 of 5 and
+`test_runtime` passed (one skip), so the desktop works without accessibility. Restoring accessibility under SELinux is plan row X13.
 
 **X12 does not reproduce on Fedora either.** With SELinux permissive, to match CI,
-`test_chromium_receives_every_character` passed 60 of 60 times: 10 idle, then 50
-under `stress-ng --cpu 4`. The CI drop stays a rare flake seen once (Checks run
-43089078794).
+`test_chromium_receives_every_character` passed 60 of 60 as an ordinary user with
+Chromium's sandbox (10 idle, then 50 under `stress-ng --cpu 4`), and 20 of 20 as root
+with `--no-sandbox`, as CI runs it, under the same load. Differences from CI remain:
+a VM rather than a container on a GitHub runner, and the test run alone rather than
+in the middle of the full suite. The CI drop stays a rare flake seen once (Checks
+run 43089078794).
 
 ## 2026-11-12 — A job killed during its checks keeps its outcome (F1-a, #181)
 

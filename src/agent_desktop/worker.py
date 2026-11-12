@@ -3408,8 +3408,8 @@ def accessibility_failure(reason, enforce=Path("/sys/fs/selinux/enforce")):
         enforcing = False
     if enforcing:
         reason += (
-            ". SELinux is enforcing, and its policy confines at-spi-bus-launcher so "
-            "that it cannot use the session's runtime directory"
+            ". SELinux is enforcing, and its policy refuses to let the session's "
+            "bus start at-spi-bus-launcher"
         )
     return f"Accessibility unavailable: {reason}; the semantic UI tools cannot be used"
 

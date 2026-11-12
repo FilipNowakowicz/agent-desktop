@@ -46,7 +46,7 @@ validation behind each feature.
 | A runner crash before or after dispatch is told apart | tested | `test_operations` (crash phases, from saved records) |
 | A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
 | Interruption during application work, after a committed effect, or before evidence collection; cancellation during application work | tested | `test_interruptions` (2026-11-11). The helper is killed or cancelled at each boundary in a real session |
-| Interruption during evidence collection itself | untested | Too short a window to hit without a fault-injection hook. The record validator refuses `satisfied` without all checks |
+| Interruption during evidence collection itself | tested | `test_interruptions` (2026-11-12): the helper is killed between twenty accessibility checks. The job keeps the state its steps reached, verification is `unknown`, and the checks that ran stay recorded. Before the fix it read `delivery_unknown` although every step had finished |
 | Takeover while a job is running, and how long control takes to be acknowledged | tested for browser waits | `test_takeover_jobs` (2026-11-11). A browser wait now gives way within about 0.1 s; before the fix, take took 3.1 s, the pause's length. An `open`, a `send` to a command or a long `type` still holds `take` back until it finishes (up to about 60 s) |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
 
@@ -130,7 +130,7 @@ holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
 ## Order for F1
 
 1. Release or restore the lease when a job's runner dies (done 2026-11-11).
-2. (Done 2026-11-11, apart from during evidence collection) Interrupt at each F1 boundary: before dispatch, after dispatch and before the
+2. (Done 2026-11-11; during evidence collection 2026-11-12) Interrupt at each F1 boundary: before dispatch, after dispatch and before the
    acknowledgement, during application work, after a committed effect, and during
    evidence collection. Use the existing operation fixtures and a real session.
 3. Run takeover while a job is running, and measure how long control takes to be

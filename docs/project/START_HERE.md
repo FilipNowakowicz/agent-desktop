@@ -9,13 +9,16 @@ run as the current user; a private desktop is not a security sandbox.
 Start with the [README](../../README.md) for installation and a first session. Then use
 the [desktop guide](../USAGE.md) for input, observation, profiles and human
 handoff, or the [integration guide](../INTEGRATIONS.md) for MCP clients.
-The [compatibility matrix](../COMPATIBILITY.md) describes tested configurations.
+The [compatibility matrix](../COMPATIBILITY.md) describes tested configurations. The
+[architecture overview](../ARCHITECTURE.md) shows how the code fits together.
 
 ## Continuing development
 
 1. Read [AGENTS.md](../../AGENTS.md) and [CONTRIBUTING.md](../../CONTRIBUTING.md).
 2. Read the current [project plan](PROJECT_PLAN.md) and the newest entries in the
-   [development log](DEVELOPMENT_LOG.md). Older entries describe earlier revisions.
+   [development log](DEVELOPMENT_LOG.md). Older entries describe earlier revisions;
+   October 2026 is in [log/2026-10.md](log/2026-10.md) and the plan's earlier
+   narrative in [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 3. Inspect the checkout, open pull requests and current CI results before editing.
    Use a separate worktree when another contributor is working in parallel.
 4. Choose a bounded change from the plan, validate it, and open a reviewable PR.

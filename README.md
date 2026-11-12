@@ -141,6 +141,7 @@ It is not a security boundary: applications run as your user (see above).
 
 | Guide | Contents |
 | --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | Components, how a request reaches a session, where state lives and what is experimental |
 | [Desktop user guide](docs/USAGE.md) | Input, coordinates, waits, UI access, profiles, handoff, cleanup and limits |
 | [Integrations](docs/INTEGRATIONS.md) | Local MCP configuration and the existing end-to-end client harness |
 | [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
@@ -152,7 +153,7 @@ It is not a security boundary: applications run as your user (see above).
 | [Start here](docs/project/START_HERE.md) | Contributor orientation and continuation workflow |
 | [Project plan](docs/project/PROJECT_PLAN.md) / [development log](docs/project/DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |
 
-The [research notes](docs/project/RESEARCH_FINDINGS.md) and dated reviews are historical context. The project plan records the chosen direction.
+The [research index](docs/research/README.md), [research notes](docs/project/RESEARCH_FINDINGS.md) and dated reviews are historical context. The project plan records the chosen direction.
 
 ## Project status
 

@@ -34,7 +34,12 @@ to be active again).
 
 Validation on the Fedora 44 VM (SELinux permissive, as CI runs it; LibreOffice
 from Fedora's packages): all six tests passed 8 times in a row, 3 of them under
-`stress-ng --cpu 4`. This machine has no LibreOffice, so they skip here. Not
+`stress-ng --cpu 4`. This machine has no LibreOffice, so they skip here. In the
+Checks matrix the `.docx` trial first failed on Ubuntu 24.04, whose older
+LibreOffice did not show the untitled dialog the driver waited for. The driver
+now presses any button starting "Use Word" wherever it is, or accepts a save that
+asks nothing (the evaluator still requires the `.docx` and no `.odt` beside it).
+Run 43262022719 then passed all three trials on Ubuntu, Fedora and Arch. Not
 covered yet: an agent-driven run of this task and the mixed workflow.
 
 ## 2026-11-12 — Agent-driven F2 dataset edit (X2)

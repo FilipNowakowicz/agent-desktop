@@ -20,7 +20,12 @@ import uuid
 from pathlib import Path
 
 from . import printed
-from .atspi import Accessibility, Unsupported, wait_for_registry
+from .atspi import (
+    Accessibility,
+    AccessibilityError,
+    Unsupported,
+    wait_for_registry,
+)
 from .effects import EffectLedger, ui_lines
 from .wayland import (
     BUTTONS,
@@ -996,7 +1001,19 @@ class Worker:
                 stdout=log,
                 stderr=log,
             )
-        wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
+        try:
+            wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
+        except AccessibilityError as error:
+            # The desktop works without it; say why the UI tools are unavailable.
+            self.registry.terminate()
+            try:
+                self.registry.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.registry.kill()
+                self.registry.wait()
+            self.registry = None
+            self.info["accessibility"] = False
+            self.info["accessibility_error"] = accessibility_failure(str(error))
 
     def short_id(self, node):
         """Short, stable identifiers for UI nodes, to keep listings small."""
@@ -1585,7 +1602,8 @@ class Worker:
     def accessibility(self):
         if not self.info.get("accessibility"):
             raise RuntimeError(
-                "Accessibility unavailable: install at-spi2-core or set "
+                self.info.get("accessibility_error")
+                or "Accessibility unavailable: install at-spi2-core or set "
                 "AGENT_DESKTOP_AT_SPI_REGISTRYD"
             )
         if self.atspi is None:
@@ -2359,6 +2377,11 @@ class Worker:
                 "mode": self.info["mode"],
                 "status": "ready",
                 "accessibility": self.info.get("accessibility", False),
+                **(
+                    {"accessibility_error": self.info["accessibility_error"]}
+                    if self.info.get("accessibility_error")
+                    else {}
+                ),
                 "secret_service": self.info.get("secret_service", True),
                 "guard_host": bool(self.info.get("guard_host")),
                 "renderer": self.info.get("renderer"),
@@ -3375,6 +3398,20 @@ def command_name(pid):
 
 def re_key(key):
     return re.fullmatch(r"[A-Za-z0-9_]+", key)
+
+
+def accessibility_failure(reason, enforce=Path("/sys/fs/selinux/enforce")):
+    """Why the session has no accessibility tree, with the likely cause."""
+    try:
+        enforcing = enforce.read_text().strip() == "1"
+    except OSError:
+        enforcing = False
+    if enforcing:
+        reason += (
+            ". SELinux is enforcing, and its policy confines at-spi-bus-launcher so "
+            "that it cannot use the session's runtime directory"
+        )
+    return f"Accessibility unavailable: {reason}; the semantic UI tools cannot be used"
 
 
 def run_worker(root):

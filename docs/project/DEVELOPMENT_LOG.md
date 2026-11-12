@@ -1,5 +1,39 @@
 # Development log
 
+## 2026-11-12 — Fedora with SELinux: sessions start without accessibility (X12, X13)
+
+The maintainer allowed a Fedora VM for X12. It runs the Fedora 44 Cloud image
+(1.7, checksum verified) under QEMU/KVM with 4 vCPUs and 6 GiB, the size of a GitHub
+runner, with CI's Fedora packages (Chromium 156.0.8078.79, labwc 0.9.6) and the
+private Xwayland runtime built by `scripts/build_xwayland_runtime.sh`. The VM files
+live in the ignored `artifacts/fedora-vm/`.
+
+**Every private session failed to start** with "not enough values to unpack
+(expected 2, got 1)". The private bus could not activate `org.a11y.Bus` ("Failed to
+execute program org.a11y.Bus: Permission denied"); `GetAddress` returned that error,
+and the worker parsed its text as a bus address. The cause is SELinux, which CI's
+containers do not run: with `setenforce 0` the session started and the bus came up.
+With the policy's `dontaudit` rules disabled (`semodule -DB`), the denials show
+Fedora's policy running `at-spi-bus-launcher` as `gnome_atspi_t`, which may not
+create its directory, files or bus socket in the session's runtime directory
+(`user_tmp_t`). So the problem is not specific to the VM: it applies to any
+SELinux-enforcing Fedora.
+
+Fix: an error reply, or an address without `=`, is an `AccessibilityError` naming the
+bus error, and a registry that fails to start no longer fails the session. The
+session starts with `accessibility: false` and an `accessibility_error` in `status`.
+It mentions SELinux when `/sys/fs/selinux/enforce` is 1, and the UI tools refuse
+with the same reason. New `BrokenAccessibilityBusTests` reproduces the failure on any
+machine: a registry wrapper whose prefix offers an `org.a11y.Bus` service that
+runs `false`. Without the fix it fails with "Session startup failed". On the
+enforcing VM, with the fix, a session started, took a 1280-wide screenshot and
+reported the reason. Restoring accessibility under SELinux is plan row X13.
+
+**X12 does not reproduce on Fedora either.** With SELinux permissive, to match CI,
+`test_chromium_receives_every_character` passed 60 of 60 times: 10 idle, then 50
+under `stress-ng --cpu 4`. The CI drop stays a rare flake seen once (Checks run
+43089078794).
+
 ## 2026-11-12 — A job killed during its checks keeps its outcome (F1-a, #181)
 
 The last untested F1-a boundary was an interruption while a durable job collects

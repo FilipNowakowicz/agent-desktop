@@ -633,3 +633,58 @@ class NoAccessibilityTests(UISessionTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "false"))
+    and find_registryd(),
+    "desktop tools or at-spi2-core unavailable",
+)
+class BrokenAccessibilityBusTests(unittest.TestCase):
+    """The accessibility bus launcher fails, as SELinux makes it on Fedora."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="desktop-a11y-")
+        root = Path(self.temporary.name)
+        # A registry whose prefix offers a bus launcher that exits at once.
+        (root / "libexec").mkdir()
+        registryd = root / "libexec/at-spi2-registryd"
+        registryd.write_text(f'#!/bin/sh\nexec "{find_registryd()}" "$@"\n')
+        registryd.chmod(0o700)
+        services = root / "share/dbus-1/services"
+        services.mkdir(parents=True)
+        (services / "org.a11y.Bus.service").write_text(
+            f"[D-BUS Service]\nName=org.a11y.Bus\nExec={shutil.which('false')}\n"
+        )
+        keys = ("AGENT_DESKTOP_STATE_DIR", "XDG_RUNTIME_DIR")
+        keys += ("AGENT_DESKTOP_AT_SPI_REGISTRYD",)
+        self.previous = {k: os.environ.get(k) for k in keys}
+        (root / "runtime").mkdir(mode=0o700)
+        os.environ["AGENT_DESKTOP_STATE_DIR"] = str(root / "state")
+        os.environ["XDG_RUNTIME_DIR"] = str(root / "runtime")
+        os.environ["AGENT_DESKTOP_AT_SPI_REGISTRYD"] = str(registryd)
+
+    def tearDown(self):
+        for key, value in self.previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        self.temporary.cleanup()
+
+    def test_session_starts_without_accessibility_and_says_why(self):
+        session = core.create()["session"]
+        token = core.manifest(session)["token"]
+        try:
+            status = core.request(session, "status")
+            self.assertFalse(status["accessibility"])
+            self.assertIn(
+                "accessibility bus did not start", status["accessibility_error"]
+            )
+            # The desktop itself still works.
+            self.assertGreater(core.request(session, "screenshot")["width"], 0)
+            with self.assertRaisesRegex(core.DesktopError, "bus did not start"):
+                core.request(session, "ui")
+        finally:
+            core.destroy(session)
+            wait_for(lambda: not owned_processes(token))

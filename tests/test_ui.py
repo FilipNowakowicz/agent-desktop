@@ -1,5 +1,6 @@
 """Semantic UI: read and operate a GTK dialog through the session's AT-SPI bus."""
 
+import json
 import os
 import shutil
 import tempfile
@@ -633,6 +634,22 @@ class NoAccessibilityTests(UISessionTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon"))
+    and find_registryd()
+    and (Path(find_registryd()).resolve().parent / "at-spi-bus-launcher").exists(),
+    "desktop tools or at-spi-bus-launcher unavailable",
+)
+class AccessibilityBusLauncherTests(UISessionTest):
+    def test_worker_starts_the_bus_launcher(self):
+        # Not D-Bus activation, which SELinux refuses on Fedora (X13).
+        info = json.loads(
+            (core.session_path(self.session) / "session.json").read_text()
+        )
+        self.assertEqual(info.get("accessibility_bus"), "launched")
+        self.assertTrue(core.request(self.session, "status")["accessibility"])
 
 
 @unittest.skipUnless(

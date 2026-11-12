@@ -66,6 +66,28 @@ class Unsupported(AccessibilityError):
     pass
 
 
+def name_has_owner(session_bus, name):
+    """Whether a name is owned on a bus (False when the bus cannot be reached)."""
+    try:
+        with open_dbus_connection(session_bus) as bus:
+            reply = bus.send_and_get_reply(
+                new_method_call(
+                    DBusAddress(
+                        "/org/freedesktop/DBus",
+                        "org.freedesktop.DBus",
+                        "org.freedesktop.DBus",
+                    ),
+                    "NameHasOwner",
+                    "s",
+                    (name,),
+                ),
+                timeout=1,
+            )
+        return bool(unwrap_msg(reply)[0])
+    except (OSError, DBusErrorResponse, TimeoutError):
+        return False
+
+
 def wait_for_registry(session_bus, timeout=5):
     """Wait until the AT-SPI registry owns its name on the session's a11y bus.
 

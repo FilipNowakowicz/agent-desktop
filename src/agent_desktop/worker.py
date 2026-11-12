@@ -24,6 +24,7 @@ from .atspi import (
     Accessibility,
     AccessibilityError,
     Unsupported,
+    name_has_owner,
     wait_for_registry,
 )
 from .effects import EffectLedger, ui_lines
@@ -498,6 +499,7 @@ class Worker:
         self.lease = None
         self.lease_seconds = lease_seconds_default()
         self.registry = None
+        self.bus_launcher = None
         self.atspi = None
         self.ui_ids, self.ui_names = {}, {}  # short id <-> AT-SPI bus name + path
         self.ui_counter = 0
@@ -991,7 +993,39 @@ class Worker:
                 "Exec=/nonexistent/agent-desktop-has-no-secret-service\n"
             )
 
+    def start_bus_launcher(self, registryd):
+        """Start the accessibility bus launcher from this worker, not by D-Bus
+        activation.
+
+        On SELinux-enforcing Fedora the private bus may not execute it: the
+        policy computes gnome_atspi_t for it, which the user's role does not
+        allow. Started from here it keeps the worker's own context. Without a
+        launcher beside the registry, or if it does not take its name, the bus
+        activates org.a11y.Bus as before.
+        """
+        launcher = Path(registryd).resolve().parent / "at-spi-bus-launcher"
+        if not os.access(launcher, os.X_OK):
+            return
+        with (self.root / "accessibility.log").open("ab") as log:
+            self.bus_launcher = subprocess.Popen(
+                [str(launcher), "--launch-immediately"],
+                env=self.env,
+                stdin=subprocess.DEVNULL,
+                stdout=log,
+                stderr=log,
+            )
+        address = self.env["DBUS_SESSION_BUS_ADDRESS"]
+        deadline = time.monotonic() + 5
+        while not name_has_owner(address, "org.a11y.Bus"):
+            if self.bus_launcher.poll() is not None or time.monotonic() > deadline:
+                stop_process(self.bus_launcher)
+                self.bus_launcher = None
+                return
+            time.sleep(0.05)
+        self.info["accessibility_bus"] = "launched"
+
     def start_registry(self, registryd):
+        self.start_bus_launcher(registryd)
         # D-Bus activation of the registry fails without a systemd user session.
         with (self.root / "accessibility.log").open("ab") as log:
             self.registry = subprocess.Popen(
@@ -1005,12 +1039,7 @@ class Worker:
             wait_for_registry(self.env["DBUS_SESSION_BUS_ADDRESS"])
         except AccessibilityError as error:
             # The desktop works without it; say why the UI tools are unavailable.
-            self.registry.terminate()
-            try:
-                self.registry.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self.registry.kill()
-                self.registry.wait()
+            stop_process(self.registry)
             self.registry = None
             self.info["accessibility"] = False
             self.info["accessibility_error"] = accessibility_failure(str(error))
@@ -1644,6 +1673,7 @@ class Worker:
     def tracked(self):
         processes = [
             self.bus,
+            self.bus_launcher,
             self.registry,
             self.compositor,
             self.viewer,
@@ -3398,6 +3428,16 @@ def command_name(pid):
 
 def re_key(key):
     return re.fullmatch(r"[A-Za-z0-9_]+", key)
+
+
+def stop_process(process):
+    """Terminate a child, then kill it if it has not exited within 2 s."""
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
 
 
 def accessibility_failure(reason, enforce=Path("/sys/fs/selinux/enforce")):

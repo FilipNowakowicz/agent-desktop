@@ -5,6 +5,30 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-12 — Zero-touch delegation design proposed
+
+The maintainer set a north star: delegation on their own Linux desktop where they
+are needed for nothing but stating the task, measured by touches per task.
+[DELEGATION.md](DELEGATION.md) proposes the design: a task record above sessions, a
+`delegate` entry point for the shell hotkey, task events on top of
+EVENT_CONTRACT.md, a touch ledger, delegated identity, one approval path, and a
+roadmap of stages Z0–Z11 that starts with a measured baseline on 3–5 real tasks. It
+also reviews the repository against the goal, including the MCP tool surface (15 of
+29 tools were called in the two field reports), and recommends leaving #196
+unmerged. [DELEGATION_BEYOND.md](DELEGATION_BEYOND.md) lists further ideas, each
+labelled checked or unchecked against prior art.
+
+The same day's market and prior-art scan is added as
+docs/research/2026-11-12-ambitious-directions-scan.md. It recommended a different
+flagship (the desktop pull request), which the proposal keeps as a candidate
+feature.
+
+No code changed and nothing was run: this is a documentation-only proposal. Facts
+about Claude Code (headless mode, background sessions, Remote Control, plan
+limits) come from its documentation as read on 2026-11-12 and were not tested
+here. PROJECT_PLAN.md gains one note pointing to the proposal and is otherwise
+unchanged.
+
 ## 2026-11-12 — Documentation reorganised, architecture overview added
 
 Docs only; no source, test or benchmark file changed, so the desktop suite was not

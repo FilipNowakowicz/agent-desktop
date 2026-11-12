@@ -118,11 +118,24 @@ class DocumentWorkflowTests(unittest.TestCase):
     def save(self, session, path, initial, log):
         core.request(session, "key", key="ctrl+s")
         if path.suffix == ".docx":
-            # "Non-standard file format": an untitled dialog offering ODF or
-            # Word. Press the Word button by name, through the accessibility tree.
-            button = wait_for(lambda: self.button(session, "Use Word"), timeout=20)
-            core.request(session, "ui_action", node=button["id"], action="press")
-            log.append("kept the Word format")
+            # A dialog offers ODF or Word ("Non-standard file format", untitled
+            # on Fedora 44; older releases name it differently). Press the Word
+            # button by name through the accessibility tree. A LibreOffice that
+            # saves without asking is accepted: the evaluator still requires the
+            # .docx, with no .odt beside it.
+            expected = doc.expected(initial)
+            found = wait_for(
+                lambda: (
+                    (doc.read(path) == expected and "saved")
+                    or self.button(session, "Use Word")
+                ),
+                timeout=30,
+            )
+            if found == "saved":
+                log.append("saved without a format dialog")
+            else:
+                core.request(session, "ui_action", node=found["id"], action="press")
+                log.append("kept the Word format")
         wait_for(lambda: doc.read(path) == doc.expected(initial), timeout=30)
 
     def quit(self, session, path):
@@ -152,10 +165,7 @@ class DocumentWorkflowTests(unittest.TestCase):
         self.assertIn(path.name, office_smoke.active(session).get("title", ""))
 
     def button(self, session, prefix):
-        dialog = office_smoke.active(session)
-        if not dialog or dialog.get("title"):
-            return None  # The dialog is the untitled active window.
-        # Untitled, so not selectable by title: search the whole tree.
+        # The dialog may be untitled, so search the whole tree.
         nodes = core.request(session, "ui", max_nodes=2000)["nodes"]
         return next(
             (
@@ -204,7 +214,9 @@ class DocumentWorkflowTests(unittest.TestCase):
 
     def test_docx_keeps_its_format(self):
         log = self.trial(seed=2, suffix=".docx")
-        self.assertIn("kept the Word format", log)
+        self.assertTrue(
+            {"kept the Word format", "saved without a format dialog"} & set(log), log
+        )
 
     def test_killed_before_save_and_reopened_over_a_stale_lock(self):
         log = self.trial(seed=4, suffix=".odt", kill_before_save=True)

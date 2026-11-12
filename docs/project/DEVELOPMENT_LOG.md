@@ -1,5 +1,23 @@
 # Development log
 
+## 2026-11-12 — Accessibility on SELinux-enforcing Fedora (X13)
+
+The worker now starts `at-spi-bus-launcher --launch-immediately` itself, from the
+registry's directory, and waits up to 5 s for it to own `org.a11y.Bus` before it
+starts the registry. Started by the worker, the launcher keeps the worker's
+context instead of the `gnome_atspi_t` transition that the policy refuses when the
+private bus executes it. If there is no launcher beside the registry, or it does
+not take the name, the private bus activates `org.a11y.Bus` as before, and if that
+fails the session starts without accessibility and says why. The launcher is
+tracked with the session's processes and stopped at cleanup; `session.json`
+records `accessibility_bus: launched`.
+
+On the Fedora 44 VM with SELinux enforcing, a session reported accessibility on,
+and `test_ui` passed (15 tests, 2 skipped). On NixOS, `test_ui` passed and the new
+`AccessibilityBusLauncherTests` confirms the launcher is started directly.
+`BrokenAccessibilityBusTests` still covers the fallback: its registry wrapper has no
+launcher beside it.
+
 ## 2026-11-12 — Fedora with SELinux: sessions start without accessibility (X12, X13)
 
 The maintainer allowed a Fedora VM for X12. It runs the Fedora 44 Cloud image

@@ -1,5 +1,25 @@
 # Development log
 
+## 2026-11-12 — Host requests the client has already asked
+
+`desktop_request_host` can now rely on the MCP client's own prompt. With
+`AGENT_DESKTOP_HOST_APPROVAL=client` in the server's environment, the call starts
+the host session at once: no notification, no request file, no wait. The intended
+client is Claude Code with a `PreToolUse` hook that answers `ask` for that one
+tool, which it honours even with permission prompts bypassed, so the question can
+be answered wherever the session is followed. Without the variable nothing changes.
+The CLI ignores it (`host start` already allows directly).
+
+The variable is only as safe as the client's prompt: set without one, an agent gets
+the screen without asking. INTEGRATIONS.md keeps the hook and the variable
+together and suggests a matching hook on `agent-desktop host start` for shells.
+
+Validation: `test_host.test_client_approval_starts_without_a_request` starts a host
+session on a private stand-in desktop with no request file; the full `test_host`
+suite passed in a `nix shell` with labwc, foot, grim, wtype, wlrctl, wayvnc,
+tigervnc and dbus (11 tests). `ruff check`, `ruff format --check` and the unit
+suite (376 tests, desktop tests skipped) pass.
+
 ## 2026-11-11 — F2 browser dataset edit, and clicks under a modal
 
 **Clicks under a modal hit the modal.** The browser bridge clicked at the

@@ -912,8 +912,11 @@ def desktop_request_host(reason: str, minutes: float = 15) -> dict:
     Applications you launch there stay open afterwards. Your input pauses while
     the user is typing or moving the mouse. "browser" says whether
     desktop_browser can use their own Firefox (it needs a WebDriver BiDi port).
+    If your client asked the user before this call, the session starts at once.
     """
-    return core.request_host(reason, minutes)
+    return core.request_host(
+        reason, minutes, client_approved=core.client_approves_host()
+    )
 
 
 @tool()

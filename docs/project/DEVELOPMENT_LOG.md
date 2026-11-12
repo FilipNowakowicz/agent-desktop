@@ -1,5 +1,47 @@
 # Development log
 
+## 2026-11-12 — F2 native document edit, deterministic driver (X2)
+
+The second F2 workflow. `benchmarks/f2_document.py` writes a short agreement as
+`.odt` or `.docx` (title and six numbered clauses, their order after the first
+following a seed) and evaluates the result. The task changes the payment term in
+the payment clause from 30 to 14 days; the delivery and notice clauses also say
+"30 days". The evaluator reads only the saved file and its folder: every
+paragraph against the expected text (a wrong target or bystander is named), the
+paragraph count, and no other file beside the document, so a save in another
+format or name, or a lock left by an unclosed LibreOffice, fails. Its own tests
+check known-wrong outcomes (untouched, every "30 days" changed, a lost paragraph,
+a stray copy, a lock file, a missing file).
+
+`tests/test_document_workflow.py` drives LibreOffice Writer through the session:
+Find selects the payment sentence, typing replaces it, Ctrl+S saves, Ctrl+Q
+quits, and the file is opened again in a fresh LibreOffice. Three trials:
+
+- `.odt`, a clean run.
+- `.docx`: saving brings up "Non-standard file format", an untitled dialog. The
+  driver presses "Use Word 2007 Format" by name through the accessibility tree
+  (its role is `button`), so the Word format is kept.
+- LibreOffice is killed after the edit and before saving. The file is unchanged;
+  the reopen finds a stale `.~lock` file. LibreOffice 26 on Fedora 44 reopened
+  over its own stale lock (same user and host) without a "Document in Use"
+  dialog; the driver repeats the edit once and saves.
+
+Two driver timing faults were found and fixed while writing it: typing into a
+reopened document before LibreOffice was ready (the reopen now uses
+`office_smoke.launch`, which waits for a focused document), and Ctrl+Q sent while
+the format dialog was still the active window (quit now waits for the document
+to be active again).
+
+Validation on the Fedora 44 VM (SELinux permissive, as CI runs it; LibreOffice
+from Fedora's packages): all six tests passed 8 times in a row, 3 of them under
+`stress-ng --cpu 4`. This machine has no LibreOffice, so they skip here. In the
+Checks matrix the `.docx` trial first failed on Ubuntu 24.04, whose older
+LibreOffice did not show the untitled dialog the driver waited for. The driver
+now presses any button starting "Use Word" wherever it is, or accepts a save that
+asks nothing (the evaluator still requires the `.docx` and no `.odt` beside it).
+Run 43262022719 then passed all three trials on Ubuntu, Fedora and Arch. Not
+covered yet: an agent-driven run of this task and the mixed workflow.
+
 ## 2026-11-12 — Agent-driven F2 dataset edit (X2)
 
 The inventory service, its page and the evaluator moved from

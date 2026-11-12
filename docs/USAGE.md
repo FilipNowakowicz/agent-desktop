@@ -311,8 +311,9 @@ like any other process of that user can control the session.
 
 Without a BiDi port, `open` with `new_tab` still opens an `http` or `https` URL as a
 new tab of your running Firefox (`firefox --new-tab`, as a link from another app
-would). The reply says the tab cannot be read or driven, and Firefox may bring its
-window forward. A host screenshot taken within a second of the agent's own input
+would). The reply says the tab cannot be read or driven. The tab opens in your last
+used Firefox window, which may stay in the background or on another workspace: on
+Hyprland 0.57.1 it did not come forward. A host screenshot taken within a second of the agent's own input
 waits up to a second for the screen to settle, so a workspace switch is not caught
 halfway.
 

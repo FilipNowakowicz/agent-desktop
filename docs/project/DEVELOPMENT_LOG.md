@@ -1,5 +1,39 @@
 # Development log
 
+## 2026-11-12 — Checks on the maintainer's screen (X5, X6, X9, X10)
+
+The maintainer approved a 20-minute host session on their own screen (Hyprland
+0.57.1 with a Lua configuration, US Dvorak, one 1920x1080 output). All agent input
+went to an empty workspace (4) and two kitty windows the session launched there;
+the person's own windows were only listed and never given input.
+
+- **Launches (Lua `exec_cmd` retry, 2026-11-11):** both `desktop_launch` calls
+  reported `launched_via: hyprctl` and the windows appeared on workspace 4.
+- **X6, settling after input:** `logo+4` with `screenshot=true` returned a complete
+  frame of the new workspace (`settled: quiet`, 737 ms), not a frame mid-animation.
+  Later captures settled in 467–1012 ms.
+- **X9, layout-aware placement on a real host:** typing `echo 'The quick brown fox
+  jumps over the lazy dog; [x]-=/?,.<>'` in kitty echoed exactly. `ctrl+l` cleared
+  the screen; a US-position placement would have sent Dvorak `ctrl+p` and recalled
+  the line. The compositor bind `logo+h` moved focus from the right kitty to the
+  left one (`desktop_windows` showed the activated state move).
+- **X10, opening a URL without a bridge:** the person's Firefox had no BiDi port.
+  `open` with `new_tab` on `https://example.com/` replied `delivered` and the tab
+  became the active tab of their last used Firefox window, on workspace 1. That
+  window did not come forward; the screen stayed on workspace 4. The reply note,
+  tool description and USAGE now say the window may stay in the background. The
+  tab was left open for the person to close.
+- **X5, focus on another workspace:** `desktop_focus` of the kitty on workspace 3
+  from workspace 4 switched there and reported it activated.
+
+Not checked: the off-screen refusal on a real inactive terminal. It needs the
+person to switch virtual terminals; a 2-minute wait for that switch timed out and
+the check was skipped. Both test windows exited through `exit`, and the session
+was destroyed.
+
+Validation: the session's tool replies and screenshots above, plus
+`uv run python -m unittest tests.test_host_screen` for the note change.
+
 ## 2026-11-11 — F2 browser dataset edit, and clicks under a modal
 
 **Clicks under a modal hit the modal.** The browser bridge clicked at the

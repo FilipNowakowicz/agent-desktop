@@ -7,6 +7,9 @@ implemented features are not a claim of universal compatibility.
 
 ## Execution plan (2026-11-11)
 
+**Proposed new direction (2026-11-12, not yet adopted):** zero-touch delegation, in
+[DELEGATION.md](DELEGATION.md). Until the maintainer decides, the plan below stands.
+
 This is the single ordered list of work that is planned or proposed. It collects the
 field-report follow-ups, the functionality roadmap, the open items from daily use,
 the [directions board](DIRECTIONS.md) and the

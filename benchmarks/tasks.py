@@ -22,8 +22,13 @@ def chromium(context, page):
     BiDi port when the harness runs with --firefox."""
     path = context.directory / "page.html"
     path.write_text(page.replace(REPORT_URL, getattr(context, "report_url", "")))
+    return browser_command(context, path.as_uri())
+
+
+def browser_command(context, url):
+    """The browser command for a URL, as chromium() chooses it."""
     if os.environ.get("AGENT_DESKTOP_BENCH_BROWSER") == "firefox":
-        return ["firefox", "--remote-debugging-port=0", path.as_uri()]
+        return ["firefox", "--remote-debugging-port=0", url]
     return [
         "chromium",
         f"--user-data-dir={context.directory / 'profile'}",
@@ -38,7 +43,7 @@ def chromium(context, page):
         # As root (cloud containers) Chromium runs only without its sandbox;
         # --test-type hides the warning bar that flag adds.
         *(["--no-sandbox", "--test-type"] if os.geteuid() == 0 else []),
-        path.as_uri(),
+        url,
     ]
 
 

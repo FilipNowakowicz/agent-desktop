@@ -239,6 +239,19 @@ and four of the six tasks still saturate. See the
 benchmark, so every tool profile disables `desktop_request_host`,
 `desktop_request_human` and `desktop_control`.
 
+## F2 acceptance workflows (2026-11-12)
+
+`--suite f2` (`benchmarks/f2.py`) holds `f2-dataset-edit`, the agent-driven form of
+the F2 browser dataset edit. A loopback service owns 44 records across four pages;
+the agent retires one supplier's products (stock 0, Discontinued) while a
+near-duplicate supplier, a duplicated product name and a session-expiry modal are
+in the way. The start page and when the modal opens follow `--seed`. The check
+reads only the service: every field of every record against the initial snapshot,
+membership, the submissions received and whether the agent signed out. The
+deterministic driver for the same service is `tests/test_dataset_workflow.py`.
+First runs (seed 1, one each): Firefox with `--firefox --bridge` passed in 41 s for
+$0.29 with 6 tool calls; Chromium passed in 76 s for $0.41 with 24 tool calls.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

@@ -1,5 +1,33 @@
 # Development log
 
+## 2026-11-12 — Agent-driven F2 dataset edit (X2)
+
+The inventory service, its page and the evaluator moved from
+`tests/test_dataset_workflow.py` to `benchmarks/f2.py`, shared by the deterministic
+driver and a new benchmark task, `f2-dataset-edit` (`--suite f2`). The agent gets
+only the goal: retire supplier Norvik's products, change nothing else. The start
+page (1–4) and the save after which the session-expiry modal opens (1–3) follow
+`--seed`. The check is the same service-side evaluator as the driver's: the agent's
+replies and the page are not consulted. The harness gains `context.closers`, so a
+task's service stops when the run ends, and `browser_command` launches the
+benchmark browser on a URL rather than a page file. `AgentTaskTests` checks the
+task's setup and judge without a model: no edits fail, the right edits pass, and a
+changed bystander fails.
+
+The maintainer set a low model budget, to be raised only if the first runs went
+wrong. Two runs, seed 1 (seed 948735, start page 2, modal after the first save):
+
+| Browser | Passed | Wall s | Cost USD | Tool calls | Saves |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Firefox, `--firefox --bridge` | yes | 41.2 | 0.29 | 6 | 4 |
+| Chromium | yes | 75.9 | 0.41 | 24 | 4 |
+
+Both edited exactly the four targets once each and left "Norvika" alone. The
+Chromium agent reported dismissing the modal with "Stay signed in". The runs went
+as planned, so no more were spent ($0.70). Not covered by these runs: helper kills
+and disconnects (the agent does not have to use durable jobs), virtualised lists
+and viewport changes.
+
 ## 2026-11-12 — Accessibility on SELinux-enforcing Fedora (X13)
 
 The worker now starts `at-spi-bus-launcher --launch-immediately` itself, from the

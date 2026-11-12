@@ -7,7 +7,7 @@ Wayland gives AT-SPI no global coordinates, so actions use AT-SPI itself
 import re
 import time
 
-from jeepney import DBusAddress, new_method_call
+from jeepney import DBusAddress, MessageType, new_method_call
 from jeepney.io.blocking import open_dbus_connection
 from jeepney.wrappers import DBusErrorResponse, unwrap_msg
 
@@ -112,7 +112,13 @@ class Accessibility:
                 ),
                 timeout=timeout,
             )
-        self.connection = open_dbus_connection(reply.body[0])
+        address = reply.body[0] if reply.body else ""
+        if reply.header.message_type == MessageType.error or "=" not in str(address):
+            # The bus launcher failed (e.g. confined by SELinux): an error, not an address.
+            raise AccessibilityError(
+                f"The accessibility bus did not start ({str(address)[:200]})"
+            )
+        self.connection = open_dbus_connection(address)
 
     def close(self):
         self.connection.close()

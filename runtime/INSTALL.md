@@ -4,7 +4,10 @@ The Python package and the desktop runtime are installed separately. Python alwa
 comes from the repository: `uv sync`, then `uv run agent-desktop ...`. The desktop
 runtime is the compositor and session tools, and comes from one of the two supported paths
 below. Fedora and Arch also run in CI (see `.github/workflows/checks.yml`), but they
-are not documented installation targets yet.
+are not documented installation targets yet. CI runs them in containers without
+SELinux. On a Fedora machine with SELinux enforcing, sessions start without the
+accessibility tree: the policy refuses to let the session's private bus start
+Fedora's `at-spi-bus-launcher`, and `status` reports this as `accessibility_error`.
 
 ## Before you start
 

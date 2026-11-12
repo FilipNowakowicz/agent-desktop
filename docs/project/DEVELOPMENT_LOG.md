@@ -1,5 +1,24 @@
 # Development log
 
+## 2026-11-12 — A job killed during its checks keeps its outcome (F1-a, #181)
+
+The last untested F1-a boundary was an interruption while a durable job collects
+its evidence, after its steps. New `test_during_evidence_collection` gives a
+one-click browser job twenty checks (a browser context and nineteen
+accessibility-tree queries, which take long enough to land between) and kills the
+helper once at least one check is recorded.
+
+It found a wrong state. The helper sets the record back to `running` while it
+checks, so the lease cannot be raced, and a reader that found the helper dead
+treated it like any job that died mid-step: `delivery_unknown`, "reconcile its
+recorded delivery before retrying". Every step had finished, so that sent a caller
+to reconcile a delivery that was known. The helper now saves the steps' terminal
+state as `outcome` before the first check. A reader that finds the helper dead with
+an `outcome` restores that state, keeps verification `unknown` and the checks that
+did run, says how many were recorded, and gives back the lease as before. A job
+with no checks saves nothing extra. Without the fix the test fails with
+`'delivery_unknown' != 'completed'`.
+
 ## 2026-11-12 — Desktop subagent on the main model (N10)
 
 The arm the pilot suggested: the subagent on `opus`, the main agent's model

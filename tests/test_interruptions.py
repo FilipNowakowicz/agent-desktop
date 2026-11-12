@@ -129,6 +129,32 @@ class InterruptionTests(unittest.TestCase):
         self.assertEqual(result["checks"], [])
         self.assertEqual(self.count(), "1")
 
+    def test_during_evidence_collection(self):
+        self.start_page()
+        context = self.browser("tabs")["tabs"][0]["context"]
+        # Accessibility-tree checks take long enough to interrupt between them.
+        predicates = [{"kind": "browser_context", "context": context}] + [
+            {"kind": "ui", "query": {"element": "Add"}} for _ in range(19)
+        ]
+        job = operations.start(
+            self.session,
+            [{"action": "click", "selector": "#add"}],
+            kind="browser",
+            predicates=predicates,
+        )
+        result = self.kill_when(
+            job["operation_id"],
+            lambda r: r["state"] == "running" and 1 <= len(r["checks"]) < 20,
+        )
+        # Every step finished before the checks began, so delivery is known;
+        # only the verification is left unknown, with the checks that did run.
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["verification"], "unknown")
+        self.assertLess(len(result["checks"]), 20)
+        self.assertIn("checks", result["reason"])
+        self.assertEqual(self.count(), "1")
+
     def test_cancel_during_application_work(self):
         # Cancellation is checked between steps: the pause in flight finishes,
         # the step after it never runs, and the page's own work still lands.

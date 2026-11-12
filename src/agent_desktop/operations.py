@@ -279,7 +279,18 @@ def status(session, operation_id):
         alive = process_alive(record.get("pid"), record.get("process_start"))
         # A submitter killed between spawn and the start gate cannot dispatch.
         # Keep a brief publication grace so readers do not race that handshake.
-        if not alive and time.time() - record["created_at"] > 3:
+        if not alive and record.get("outcome") in TERMINAL:
+            # Killed while checking: every step had already reached its state.
+            record["state"] = record.pop("outcome")
+            record["verification"] = "unknown"
+            record["reason"] = (
+                "Operation process exited during its checks "
+                f"({len(record['checks'])} of {len(record['predicates'])} recorded); "
+                "verification is unknown, delivery is as recorded"
+            )
+            record["lease_cleanup"] = abandoned_lease(session, record)
+            save(path, record)
+        elif not alive and time.time() - record["created_at"] > 3:
             dispatched = any(s["dispatch_state"] != "pending" for s in record["steps"])
             record["state"] = "delivery_unknown" if dispatched else "stopped"
             record["reason"] = (
@@ -704,6 +715,11 @@ def run_job(session, operation_id):
         terminal_state = record["state"]
         if acquired:
             record["state"] = "running"
+            # Delivery is settled before the checks run. If this process dies
+            # during them, a reader restores this state, with verification unknown.
+            record["outcome"] = terminal_state
+            if record.get("predicates"):
+                save(path, record)
             evaluate_checks(session, record, controller, path)
             try:
                 if record["release_lease"]:
@@ -715,6 +731,7 @@ def run_job(session, operation_id):
                 record["lease_cleanup"] = "unknown"
                 record["lease_error"] = str(error)[:1000]
         record["state"] = terminal_state
+        record.pop("outcome", None)
         save(path, record)
 
 

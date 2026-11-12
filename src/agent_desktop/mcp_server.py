@@ -611,7 +611,8 @@ def desktop_browser(
     your own with new_tab (it opens in the background) and act only there, or
     in a tab they name. This does not move their pointer or keyboard. Without
     a BiDi port, "open" with new_tab still opens an http(s) url as a new tab
-    of their running Firefox, but that tab cannot be read or driven.
+    of their running Firefox, but that tab cannot be read or driven, and its
+    window may stay in the background.
     """
     arguments = {
         "url": url,

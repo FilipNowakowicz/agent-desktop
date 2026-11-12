@@ -30,6 +30,10 @@ exists in the runtime, but today it is scattered across tool replies,
 | A step's delivery was uncertain, or a batch stopped | `trace.jsonl` outcomes (with N5) | None; information only |
 | A session is created, becomes ready, stops or fails | `session.json` `status` | `destroy`, or `view` to watch |
 
+With `AGENT_DESKTOP_HOST_APPROVAL=client`, the MCP client asks the person before a
+host request, so there is no request to answer and no `host_requested` event; the
+host session's own events still appear.
+
 The contract adds no second approval path. A consumer answers by running the same
 CLI verbs a person would type. Those verbs keep their checks: approval is per
 request, and takeover is cooperative routing, not a confidentiality boundary.

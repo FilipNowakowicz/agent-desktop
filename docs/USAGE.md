@@ -576,6 +576,15 @@ minutes, at most 240) or is destroyed. Every reply to the request, including
 `pending`, has `browser.dom`: whether your Firefox runs with a BiDi port, so the
 agent knows before approval whether it can use your browser through the DOM.
 
+If your MCP client already asks you before each `desktop_request_host` call,
+you can make that question the only one: set `AGENT_DESKTOP_HOST_APPROVAL=client`
+in the MCP server's environment. The session then starts as soon as the call runs,
+with no notification, no `host-request.json` and so no `host_requested` event. Set
+it only when the client really asks for that tool, even in modes that skip its
+other prompts (see [Integrations](INTEGRATIONS.md#asking-in-claude-code)): with it
+and no such prompt, an agent gets your screen without asking. The CLI ignores it,
+and `agent-desktop host start` still allows directly.
+
 ```sh
 agent-desktop host start --minutes 10   # allow without a request
 agent-desktop host status               # session, expires_at, seconds_left

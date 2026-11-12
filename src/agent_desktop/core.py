@@ -685,7 +685,19 @@ def person_browser():
     }
 
 
-def request_host(reason, minutes=15, wait=50):
+def client_approves_host(environ=None):
+    """Whether the MCP client asks the person before each desktop_request_host.
+
+    Set AGENT_DESKTOP_HOST_APPROVAL=client in the MCP server's environment only
+    when the client itself prompts the person for that tool call, for example a
+    Claude Code PreToolUse hook that answers "ask". The CLI ignores it.
+    """
+    return (environ if environ is not None else os.environ).get(
+        "AGENT_DESKTOP_HOST_APPROVAL"
+    ) == "client"
+
+
+def request_host(reason, minutes=15, wait=50, client_approved=False):
     """Ask the person to let the agent use their own screen.
 
     A notification shows the reason: clicking it allows, dismissing it declines
@@ -693,6 +705,10 @@ def request_host(reason, minutes=15, wait=50):
     `wait` seconds and returns {"status": "pending"} if there is no answer yet;
     call again with the same reason to keep waiting. The request lapses after
     two minutes. Returns the host session on approval.
+
+    With `client_approved`, the MCP client has already asked the person to allow
+    this call (see `client_approves_host`), so the session starts at once with no
+    notification of its own.
     """
     if not isinstance(reason, str) or not 0 < len(reason.strip()) <= 300:
         raise DesktopError("Reason must be a nonempty string of at most 300 characters")
@@ -705,6 +721,12 @@ def request_host(reason, minutes=15, wait=50):
             "session": running,
             "status": "ready",
             "approved": "already running",
+            "browser": person_browser(),
+        }
+    if client_approved:
+        return {
+            **create("host", _host_minutes=minutes),
+            "approved": "by the client",
             "browser": person_browser(),
         }
     base = state_root()

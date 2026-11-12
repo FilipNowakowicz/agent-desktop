@@ -63,6 +63,38 @@ The server's instructions (sessions, host requests, login handoff) reach the
 client with the tools, so no separate skill or prompt is needed. The server runs
 whatever is checked out at that path.
 
+#### Asking in Claude Code
+
+A host request can be asked as a Claude Code permission prompt instead of a desktop
+notification, so it can be answered wherever the session is followed. A
+`PreToolUse` hook answers `ask` for that one tool, which Claude Code honours even
+when permission prompts are otherwise bypassed:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__agent-desktop__desktop_request_host",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"An agent asks to use your screen\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Then add `"env": {"AGENT_DESKTOP_HOST_APPROVAL": "client"}` to the server's entry,
+so that answer is the only one (see [host sessions](USAGE.md#your-own-screen-host-session-experimental)).
+Keep the hook and the variable together: the variable without the hook lets an
+agent use the screen without asking. In bypass mode an agent can still run
+`agent-desktop host start` through its shell, so a matching hook on that command
+is worth adding too.
+
 `scripts/claude_code_task.py` runs a real end-to-end check. It starts Claude Code
 non-interactively, with no built-in tools and only this MCP server. The agent must
 create a session, launch Chromium on a local page, read a code that exists only

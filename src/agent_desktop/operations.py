@@ -277,19 +277,22 @@ def status(session, operation_id):
     record = load(path, session, operation_id)
     if record["state"] not in TERMINAL:
         alive = process_alive(record.get("pid"), record.get("process_start"))
-        # A submitter killed between spawn and the start gate cannot dispatch.
-        # Keep a brief publication grace so readers do not race that handshake.
         if not alive and record.get("outcome") in TERMINAL:
             # Killed while checking: every step had already reached its state.
             record["state"] = record.pop("outcome")
             record["verification"] = "unknown"
-            record["reason"] = (
+            note = (
                 "Operation process exited during its checks "
                 f"({len(record['checks'])} of {len(record['predicates'])} recorded); "
                 "verification is unknown, delivery is as recorded"
             )
+            # Keep why the steps ended (an error or a stop) ahead of the note.
+            earlier = record.get("reason")
+            record["reason"] = f"{earlier}. {note}" if earlier else note
             record["lease_cleanup"] = abandoned_lease(session, record)
             save(path, record)
+        # A submitter killed between spawn and the start gate cannot dispatch.
+        # Keep a brief publication grace so readers do not race that handshake.
         elif not alive and time.time() - record["created_at"] > 3:
             dispatched = any(s["dispatch_state"] != "pending" for s in record["steps"])
             record["state"] = "delivery_unknown" if dispatched else "stopped"

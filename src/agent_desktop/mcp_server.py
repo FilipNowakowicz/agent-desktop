@@ -287,8 +287,9 @@ def desktop_create(
 
     A named profile keeps the session's home directory (browser logins, app
     settings) for later sessions; one session can use a profile at a time.
-    Without a profile, everything is deleted at destroy, and a profile cannot be
-    added later: name one from the start when a site may need a login. guard_host blocks the
+    Without a profile, everything is deleted at destroy; name one from the start
+    when a site may need a login, or add one later with desktop_profiles
+    (session, attach) before any application runs. guard_host blocks the
     system bus and common host-affecting commands (power, network, Bluetooth,
     brightness, pkill) for applications in the session; use it when testing
     panels, widgets or scripts that could change the real machine. renderer is
@@ -312,9 +313,22 @@ def desktop_create(
 
 
 @tool()
-def desktop_profiles() -> list[dict]:
-    """List saved profiles and whether a session is using them."""
-    return core.profiles()
+def desktop_profiles(
+    session: str | None = None, attach: str | None = None
+) -> list[dict] | dict:
+    """List saved profiles and whether a session is using them.
+
+    With session and attach (a profile name), instead give that running private
+    session the profile as its home, for a site that turns out to need a saved
+    login. Applications started afterwards use it; the session must have no
+    application running (close Firefox first, since it keeps the old home) and
+    no profile yet, and the profile no other session (the refusal names it).
+    """
+    if session is None and attach is None:
+        return core.profiles()
+    if session is None or attach is None:
+        raise core.DesktopError("Attaching a profile needs both session and attach")
+    return core.attach_profile(session, attach, CONTROLLER)
 
 
 @tool()

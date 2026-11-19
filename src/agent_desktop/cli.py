@@ -7,6 +7,7 @@ from .core import (
     DesktopError,
     activity,
     answer_host,
+    attach_profile,
     create,
     delete_profile,
     destroy,
@@ -102,6 +103,12 @@ def main():
     pruning = sub.add_parser("prune", help="delete stopped/failed sessions' state")
     pruning.add_argument("--older-than", type=float, default=0, metavar="DAYS")
     pruning.add_argument("--dry-run", action="store_true")
+    attaching = sub.add_parser(
+        "attach-profile",
+        help="give a running private session a saved profile (no applications running)",
+    )
+    attaching.add_argument("session")
+    attaching.add_argument("profile")
     removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
     removal.add_argument("profile")
     cookies = sub.add_parser(
@@ -394,6 +401,8 @@ def main():
             result = usage()
         elif command == "prune":
             result = prune(args["older_than"], args["dry_run"])
+        elif command == "attach-profile":
+            result = attach_profile(args["session"], args["profile"], controller)
         elif command == "delete-profile":
             result = delete_profile(args["profile"])
         elif command == "import-cookies":

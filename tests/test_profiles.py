@@ -346,6 +346,115 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(previous["status"], "failed")
         self.assertIn("Supervisor exited unexpectedly", previous["error"])
 
+    def test_attach_to_a_running_session(self):
+        output = self.root / "output"
+        session = self.create()
+        self.run_shell(session, 'echo before > "$HOME/old-marker"')
+        result = core.attach_profile(session, "late")
+        self.assertEqual(result["profile"], "late")
+        self.assertIsNone(result["previous_session"])
+        self.assertEqual(core.request(session, "status")["profile"], "late")
+        self.assertEqual(core.manifest(session)["profile"], "late")
+        self.assertEqual(
+            core.profiles()[0]["last_session"], {"session": session, "status": "ready"}
+        )
+        self.assertTrue(core.profiles()[0]["in_use"])
+        # Applications started afterwards use the profile, not the old home.
+        self.run_shell(
+            session, 'echo after > "$HOME/marker"; echo "$HOME" > ' + str(output)
+        )
+        home = core.profile_path("late") / "home"
+        self.assertEqual(output.read_text().strip(), str(home))
+        self.assertEqual((home / "marker").read_text(), "after\n")
+        self.assertFalse((home / "old-marker").exists())
+        # The profile is exclusive from now on, and release works as at create.
+        with self.assertRaisesRegex(core.DesktopError, "in use"):
+            core.create(profile="late")
+        with self.assertRaisesRegex(core.DesktopError, "in use"):
+            core.delete_profile("late")
+        core.destroy(session)
+        self.assertFalse(core.profiles()[0]["in_use"])
+        second = self.create("late")
+        self.run_shell(second, f'cat "$HOME/marker" > {output}')
+        self.assertEqual(output.read_text(), "after\n")
+
+    def test_attach_is_refused_without_changing_the_session(self):
+        session = self.create()
+        for name in ("", "UPPER", "../x", "a" * 33, None):
+            with self.assertRaisesRegex(core.DesktopError, "Profile names"):
+                core.attach_profile(session, name)
+        self.assertEqual(core.profiles(), [])
+        # An application of the session is running: it would keep the old home.
+        app = core.request(session, "launch", argv=["sleep", "300"])
+        with self.assertRaisesRegex(
+            core.DesktopError, "Applications are still running"
+        ):
+            core.attach_profile(session, "late")
+        self.assertEqual(core.profiles(), [])  # a refusal leaves no profile behind
+        self.assertIsNone(core.manifest(session).get("profile"))
+        os.kill(app["pid"], signal.SIGKILL)
+        wait_for(
+            lambda: core.request(session, "status")["applications"][0]["exit_code"]
+        )
+        # Held by another session, which the refusal names.
+        other = self.create("busy")
+        with self.assertRaisesRegex(core.DesktopError, f"in use by session {other}"):
+            core.attach_profile(session, "busy")
+        self.assertIsNone(core.manifest(session).get("profile"))
+        # A session keeps one profile.
+        core.attach_profile(session, "late")
+        with self.assertRaisesRegex(core.DesktopError, "already uses profile late"):
+            core.attach_profile(session, "other")
+        with self.assertRaisesRegex(core.DesktopError, "already uses profile busy"):
+            core.attach_profile(other, "late")
+        self.assertEqual(core.request(session, "status")["profile"], "late")
+
+    def test_attached_profile_stays_locked_until_the_guardian_has_cleaned_up(self):
+        session = self.create()
+        core.attach_profile(session, "late")
+        info = core.manifest(session)
+        guardian, worker = info["guardian_pid"], info["worker_pid"]
+        os.kill(guardian, signal.SIGSTOP)
+        try:
+            os.kill(worker, signal.SIGKILL)
+            wait_for(lambda: process_state(worker) in (None, "Z"))
+            self.assertTrue(core.profiles()[0]["in_use"])
+            with self.assertRaisesRegex(core.DesktopError, "in use"):
+                core.create(profile="late")
+        finally:
+            os.kill(guardian, signal.SIGCONT)
+        wait_for(lambda: core.manifest(session)["status"] == "failed", timeout=15)
+        wait_for(lambda: not core.profiles()[0]["in_use"], timeout=15)
+
+    @unittest.skipUnless(shutil.which("firefox"), "Firefox unavailable")
+    def test_firefox_started_after_attach_uses_the_profile(self):
+        CookieServer.seen = []
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CookieServer)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            first = self.create()
+            core.attach_profile(first, "login")
+            core.request(first, "browser", action="start", url=base + "/login")
+            wait_for(
+                lambda: any(path == "/login" for path, _ in CookieServer.seen),
+                timeout=30,
+            )
+            core.destroy(first)
+            self.assertTrue(
+                (core.profile_path("login") / "home/.mozilla/agent-desktop").is_dir()
+            )
+            second = self.create("login")
+            core.request(second, "browser", action="start", url=base + "/check")
+            wait_for(
+                lambda: any(path == "/check" for path, _ in CookieServer.seen),
+                timeout=30,
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(dict(CookieServer.seen)["/check"], "login=yes")
+
     @unittest.skipUnless(CHROMIUM, "chromium unavailable")
     def test_browser_cookie_survives_sessions(self):
         CookieServer.seen = []

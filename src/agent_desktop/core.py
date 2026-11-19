@@ -443,6 +443,50 @@ def request(session, operation, controller=None, **arguments):
     return reply["result"]
 
 
+def attach_profile(session, profile, controller=None):
+    """Give a running private session a named profile as its home.
+
+    Applications started afterwards use the profile; the session must have no
+    running application and no profile, and the profile no other session.
+    """
+    info = manifest(session)
+    if info.get("mode") == "host":
+        raise DesktopError("Host sessions take no profile")
+    if info.get("profile"):
+        raise DesktopError(
+            f"Session {session} already uses profile {info['profile']}; "
+            "a session keeps one profile"
+        )
+    path = profile_path(profile)
+    home = path / "home"
+    created = not home.exists()
+    home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if path.is_symlink() or home.is_symlink():
+        raise DesktopError("Unsafe profile directory")
+    if profile_in_use(path):
+        holder = profile_last_session(path)
+        raise DesktopError(
+            f"Profile {profile} is in use by "
+            + (f"session {holder}" if holder else "another session")
+        )
+    previous = profile_state(path)
+    if previous and previous["status"] == "abandoned":
+        recover(previous["session"], manifest(previous["session"]))
+        previous = profile_state(path)
+    try:
+        request(session, "attach_profile", controller, profile=profile)
+    except Exception:
+        if created and not profile_in_use(path):
+            shutil.rmtree(path, ignore_errors=True)  # a refusal leaves no profile
+        raise
+    return {
+        "session": session,
+        "profile": profile,
+        "home": str(home),
+        "previous_session": previous,
+    }
+
+
 def create(
     mode="headless",
     tools=None,

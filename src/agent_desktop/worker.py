@@ -1208,6 +1208,12 @@ class Worker:
                 url = request.get("url")
                 if not isinstance(url, str) or not url:
                     raise ValueError("open needs a url")
+                if url.lower().startswith("view-source:"):
+                    raise ValueError(
+                        "Firefox refuses view-source: URLs over the bridge; open "
+                        "the URL itself and read it with text (for JSON, click "
+                        "Raw Data first)"
+                    )
                 mutation_started = True
                 if request.get("new_tab"):
                     created = {"type": "tab"}
@@ -1414,7 +1420,21 @@ class Worker:
             elif not path.is_absolute():
                 path = home / path
             if not path.parent.is_dir():
-                raise ValueError(f"No such directory: {path.parent}")
+                inside = home.resolve() in path.parent.resolve().parents or (
+                    path.parent.resolve() == home.resolve()
+                )
+                if not inside:
+                    raise ValueError(f"No such directory: {path.parent}")
+                # Folders inside the session home are made private, like the
+                # file; mkdir(parents=True) would give the upper ones the umask.
+                missing = []
+                folder = path.parent
+                while not folder.is_dir():
+                    missing.append(folder)
+                    folder = folder.parent
+                for folder in reversed(missing):
+                    folder.mkdir(mode=0o700, exist_ok=True)
+                    os.chmod(folder, 0o700)
         source = request.get("source", "element")
         if source == "clipboard":
             if host:
@@ -1529,8 +1549,13 @@ class Worker:
 
     def browser_steps(self, steps, controller=None, deadline=None):
         """Several browser actions in one request, stopping at the first error."""
-        if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+        if not isinstance(steps, list) or not steps:
             raise ValueError("steps must be a list of 1 to 30 browser actions")
+        if len(steps) > 30:
+            raise ValueError(
+                f"steps has {len(steps)} actions, more than 30; nothing was run. "
+                "Split it into batches of up to 30"
+            )
         for index, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("action") in (None, "steps"):
                 raise ValueError(f"Step {index} needs an action other than steps")

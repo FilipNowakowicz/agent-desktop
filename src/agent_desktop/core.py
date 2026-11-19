@@ -182,6 +182,54 @@ def profile_lock(path):
     return path.parent / f".{path.name}.lock"
 
 
+GPU_STARTUP_ERRORS = (
+    "EGL_EXT_platform_base not supported",
+    "Failed to create GBM device",
+    "Failed to create renderer",
+)
+
+
+def renderer_hint(detail):
+    """What to do when a GPU renderer cannot start (Mesa from another pin)."""
+    if not any(error in detail for error in GPU_STARTUP_ERRORS):
+        return ""
+    return (
+        ". The GPU renderer could not start: the server needs the runtime's Mesa "
+        "(USAGE.md, GPU rendering). Retry without renderer for a software session"
+    )
+
+
+def profile_holder(path):
+    """The session holding an in-use profile, and how long since it last acted."""
+    session = profile_last_session(path)
+    if session is None:
+        return None
+    holder = {"session": session}
+    root = session_path(session)
+    for name in ("trace.jsonl", "session.json"):
+        try:
+            idle = time.time() - (root / name).stat().st_mtime
+        except OSError:
+            continue
+        holder["idle_seconds"] = max(0, int(idle))
+        break
+    return holder
+
+
+def profile_busy(name, path):
+    """The in-use refusal, naming the holder so an idle one can be found."""
+    holder = profile_holder(path)
+    if holder is None:
+        return DesktopError(f"Profile {name} is in use by another session")
+    idle = holder.get("idle_seconds")
+    since = f", idle for {idle // 60} min" if idle is not None else ""
+    return DesktopError(
+        f"Profile {name} is in use by session {holder['session']}{since}. "
+        "If that session is yours and finished, destroy it; otherwise use "
+        "another profile"
+    )
+
+
 def profile_in_use(path):
     import fcntl
 
@@ -239,15 +287,16 @@ def profiles():
             for f in path.rglob("*")
             if f.is_file() and not f.is_symlink()
         )
-        results.append(
-            {
-                "profile": profile.name,
-                "in_use": profile_in_use(profile),
-                "last_session": profile_state(profile),
-                "bytes": size,
-                "path": str(path),
-            }
-        )
+        entry = {
+            "profile": profile.name,
+            "in_use": profile_in_use(profile),
+            "last_session": profile_state(profile),
+            "bytes": size,
+            "path": str(path),
+        }
+        if entry["in_use"]:
+            entry["held_by"] = profile_holder(profile)
+        results.append(entry)
     return results
 
 
@@ -420,7 +469,7 @@ def create(
         if home.parent.is_symlink() or home.is_symlink():
             raise DesktopError("Unsafe profile directory")
         if profile_in_use(home.parent):
-            raise DesktopError(f"Profile {profile} is in use by another session")
+            raise profile_busy(profile, home.parent)
         previous = profile_state(home.parent)
         if previous and previous["status"] == "abandoned":
             # Both supervisors died, releasing the lock while the old session's
@@ -529,7 +578,8 @@ def create(
         if process.poll() is not None or latest["status"] == "failed":
             detail = logs(session).get("session.log", "")[-4096:]
             raise DesktopError(
-                f"Session startup failed; see {root / 'session.log'}\n{detail}"
+                f"Session startup failed; see {root / 'session.log'}"
+                f"{renderer_hint(detail)}\n{detail}"
             )
         time.sleep(0.1)
     # The process group is created exclusively for this new session.

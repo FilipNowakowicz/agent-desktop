@@ -284,7 +284,8 @@ The source is the one visible element matching `selector` or `text` (a field's
 value, otherwise its text), or with `source="clipboard"` the session clipboard,
 for example after clicking the page's Copy button. Surrounding whitespace is
 removed. `to_file` creates a new 0600 file (relative paths are in the session
-home; `overwrite` replaces an existing one). `to_command` runs in the session
+home, and missing folders inside it are created 0700; `overwrite` replaces an
+existing one). `to_command` runs in the session
 with the value on stdin, and its output is discarded, since a command could print
 its input. The reply carries only `bytes`, `sha256`, the `exit_status` for a
 command, and a `prefix` of `reveal` characters (default 4, 0 for none) to check
@@ -641,6 +642,8 @@ which `logs` returns. This prevents accidents; it is not a
 security boundary, since absolute paths and other mechanisms still reach the
 host.
 
+### GPU rendering
+
 GTK 4 applications render in software in every session (`GSK_RENDERER=cairo`,
 override with `AGENT_DESKTOP_GSK_RENDERER`); without it, layer-shell panels came
 up blank.
@@ -662,7 +665,8 @@ compositor its own headless output if its window stays blank.
 
 On NixOS with the Nix runtime, the compositor must load the Mesa drivers of the
 runtime's own nixpkgs pin, not the system's. Otherwise it exits with `EGL_EXT_platform_base
-not supported` or `Failed to create GBM device`. A host profile that sets
+not supported` or `Failed to create GBM device`, and `create` says so and suggests
+retrying without a renderer. A host profile that sets
 `__EGL_VENDOR_LIBRARY_FILENAMES` to the system Mesa causes the first of these. Give the
 MCP server (or the CLI) these two variables:
 
@@ -722,12 +726,20 @@ uv run agent-desktop delete-profile github       # permanently remove saved logi
 
 The profile becomes the session's `HOME` (and so its XDG config, cache and data),
 stored under `$XDG_STATE_HOME/agent-desktop/profiles/NAME/home` with mode 0700.
-Only one session can use a profile at a time. Teardown first closes every window
+Only one session can use a profile at a time. `profiles` shows the holding session
+and how long it has been idle (`held_by`), and a refused `create` names it, so a
+session that an agent forgot to destroy can be found. Teardown first closes every window
 as a person would and waits briefly, so browsers write cookies before the
 compositor stops; applications still open after that are terminated. Profiles
 hold login cookies and tokens on disk, readable by any process running as your
 user and by any agent given that profile; they are never your personal browser
 profile. Deleting a profile is CLI-only.
+
+A private session protects your screen, not an application's data. An application
+launched with its own data folder (for example `anki -b ~/.local/share/Anki2`, or a
+program reading your home directory) changes that data for real. Do this only when
+the task asks for it. Close the application properly before `destroy` so it saves,
+and prefer a copy of the data folder for experiments.
 
 ### Bring a login from your own Firefox
 

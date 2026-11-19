@@ -72,6 +72,30 @@ session on a private stand-in desktop with no request file; the full `test_host`
 suite passed in a `nix shell` with labwc, foot, grim, wtype, wlrctl, wayvnc,
 tigervnc and dbus (11 tests). `ruff check`, `ruff format --check` and the unit
 suite (376 tests, desktop tests skipped) pass.
+## 2026-11-19 — Small fixes from the coursework field report
+
+Fixes for problems agents hit between 11-10 and 11-18 (see the coursework field
+report):
+
+- `desktop_create` no longer says a shell under test "usually needs gles2" without the
+  Mesa condition. A startup failure with `EGL_EXT_platform_base`, GBM or renderer
+  errors now says the server needs the runtime's Mesa and to retry without a renderer.
+  Three agents had tried gles2 first and failed.
+- A refused `create` on a busy profile names the holding session and how long it has
+  been idle. `profiles` adds `held_by`. One session had held a profile for two hours
+  after its last call.
+- `send to_file` creates missing folders inside the session home (0700). Paths outside
+  it are still refused.
+- More than 30 browser steps: the error says how many were sent and that nothing ran.
+- `open` refuses `view-source:` URLs before navigating, instead of an uncertain
+  delivery, and suggests `text` (or Raw Data for JSON).
+- USAGE.md: a GPU rendering heading, and a note that a private session protects the
+  screen but not an application's own data folder.
+
+Validation: `tests/test_field_findings.py` (6 tests). The unit suite ran 391 tests with
+144 desktop tests skipped. With the runtime on `PATH`, the desktop tests `test_browser`
+(15) and `test_profiles`/`test_release_profiles` (15) passed. `ruff check` and
+`ruff format --check` pass. Not run: the Checks matrix (no runtime or packaging change).
 
 ## 2026-11-12 — Zero-touch delegation design proposed
 

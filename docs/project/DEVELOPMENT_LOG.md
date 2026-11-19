@@ -24,6 +24,39 @@ session on a private stand-in desktop with no request file; the full `test_host`
 suite passed in a `nix shell` with labwc, foot, grim, wtype, wlrctl, wayvnc,
 tigervnc and dbus (11 tests). `ruff check`, `ruff format --check` and the unit
 suite (376 tests, desktop tests skipped) pass.
+## 2026-11-19 — Coursework and shell-testing field report
+
+Reconstructed unrequested MCP use from 2026-11-10 to 2026-11-18 in
+[the coursework field report](../trials/2026-11-19-coursework-and-shell-tests.md):
+149 deduplicated Claude Code calls in 10 transcripts across four repositories,
+cross-checked against `agent-desktop activity --days 8` (293 calls, 25 sessions,
+including the Codex crawl's 173). The main findings are that an agent hand-exported profile
+cookies to a 0600 scratch file for `yt-dlp`, that downloads were found by polling the
+profile's `Downloads`, and that three GPU creates failed with the documented EGL error
+after the create tool's text recommended gles2. No runtime code changed. No tests were
+run, since this is a documentation record.
+
+Added [USE_CASES.md](../USE_CASES.md), a public list of real use cases with the
+period each report covers, and replaced the README's per-report rows with one link
+to it. Revised the Canvas report: the session Codex reused had been left running by
+a Claude Code agent whose context ran out.
+
+## 2026-11-12 — Canvas collection field report
+
+Recorded a real authenticated read-only browser task in
+[the Canvas MCP field report](../trials/2026-11-12-canvas-materials-crawl.md).
+The scoped result was 66 verified PDFs (52,200,194 bytes), using 173 MCP calls
+across five tools in one existing headless session; no host input or login
+handoff. The session was closed and the profile's release verified. Private
+materials, account identifiers and raw traces remain outside this public repo.
+
+Two 64 KiB export-limit stops were recovered with smaller pagination. Nine API
+permission-denial bodies and disabled indexes required following published links
+rather than assuming a complete file index. The report proposes download receipts,
+a bounded data-export operation and scoped task metrics; no runtime code or
+product-direction change was made. Validation was the real task's ID/size/hash,
+PDF-page and source-coverage audit, not the desktop test suite. Hidden/unlinked
+files, optional recordings, crash/login recovery and physical input remain untested.
 
 ## 2026-11-12 — Zero-touch delegation design proposed
 

@@ -5,25 +5,6 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
-## 2026-11-12 — Host requests the client has already asked
-
-`desktop_request_host` can now rely on the MCP client's own prompt. With
-`AGENT_DESKTOP_HOST_APPROVAL=client` in the server's environment, the call starts
-the host session at once: no notification, no request file, no wait. The intended
-client is Claude Code with a `PreToolUse` hook that answers `ask` for that one
-tool, which it honours even with permission prompts bypassed, so the question can
-be answered wherever the session is followed. Without the variable nothing changes.
-The CLI ignores it (`host start` already allows directly).
-
-The variable is only as safe as the client's prompt: set without one, an agent gets
-the screen without asking. INTEGRATIONS.md keeps the hook and the variable
-together and suggests a matching hook on `agent-desktop host start` for shells.
-
-Validation: `test_host.test_client_approval_starts_without_a_request` starts a host
-session on a private stand-in desktop with no request file; the full `test_host`
-suite passed in a `nix shell` with labwc, foot, grim, wtype, wlrctl, wayvnc,
-tigervnc and dbus (11 tests). `ruff check`, `ruff format --check` and the unit
-suite (376 tests, desktop tests skipped) pass.
 ## 2026-11-19 — Coursework and shell-testing field report
 
 Reconstructed unrequested MCP use from 2026-11-10 to 2026-11-18 in
@@ -57,6 +38,26 @@ a bounded data-export operation and scoped task metrics; no runtime code or
 product-direction change was made. Validation was the real task's ID/size/hash,
 PDF-page and source-coverage audit, not the desktop test suite. Hidden/unlinked
 files, optional recordings, crash/login recovery and physical input remain untested.
+
+## 2026-11-12 — Host requests the client has already asked
+
+`desktop_request_host` can now rely on the MCP client's own prompt. With
+`AGENT_DESKTOP_HOST_APPROVAL=client` in the server's environment, the call starts
+the host session at once: no notification, no request file, no wait. The intended
+client is Claude Code with a `PreToolUse` hook that answers `ask` for that one
+tool, which it honours even with permission prompts bypassed, so the question can
+be answered wherever the session is followed. Without the variable nothing changes.
+The CLI ignores it (`host start` already allows directly).
+
+The variable is only as safe as the client's prompt: set without one, an agent gets
+the screen without asking. INTEGRATIONS.md keeps the hook and the variable
+together and suggests a matching hook on `agent-desktop host start` for shells.
+
+Validation: `test_host.test_client_approval_starts_without_a_request` starts a host
+session on a private stand-in desktop with no request file; the full `test_host`
+suite passed in a `nix shell` with labwc, foot, grim, wtype, wlrctl, wayvnc,
+tigervnc and dbus (11 tests). `ruff check`, `ruff format --check` and the unit
+suite (376 tests, desktop tests skipped) pass.
 
 ## 2026-11-12 — Zero-touch delegation design proposed
 
@@ -380,6 +381,7 @@ stay uncertain, as R2 requires. A browser batch now stops with its completed pre
 takeover lands, nothing after it does, and the lease is released. Full desktop suite:
 358 tests, 19 skipped. Waits in `desktop_actions` already poll from the client, so
 `take` could get in between them before.
+
 ## 2026-11-11 — Wrong targets under interruption (F1-c, #181)
 
 New test: a durable job bound to one tab is killed mid-wait, that tab is closed, and a
@@ -392,6 +394,7 @@ refusal (lost target, missing or ambiguous element, a person taking control) is 
 recorded as a known `failed` step, and the job as `stopped`. GUI action jobs keep the R2
 rule that a generic error after dispatch is uncertain, because their input can partly
 run before the error.
+
 ## 2026-11-11 — Host screenshots settle, and URLs open without a bridge (X6, X10)
 
 These were built without the person's screen. The maintainer was away and said to
@@ -426,6 +429,7 @@ seed 1, cut main-context tokens 93–97% and cost about 75% at equal success, bu
 wall time rose 51–58%, so the gate was not met. Results and deviations are in
 docs/research/2026-11-11-desktop-subagent-pilot.md. The full 42-run protocol was not
 run.
+
 ## 2026-11-11 — F1 interruption boundaries (F1-a, #181)
 
 New `tests/test_interruptions.py` kills a durable browser job's helper at each
@@ -461,6 +465,7 @@ Also recorded: on 2026-11-11 the Ubuntu job of Checks run 43067317711 failed onc
 `test_effects.RecorderTests.test_new_directories_are_watched`, the inotify
 watch-count assertion. That code was unchanged in the stack under test, and the job
 passed on rerun. The test is timing-sensitive on CI runners.
+
 ## 2026-11-11 — Secret sink hardening
 
 Two gaps in `send` (N1), found in review. A `send` to a command used the default 30 s
@@ -502,6 +507,7 @@ reports used 10–11 of the 29 tools. The A/B protocol
 (docs/research/2026-11-11-desktop-subagent-protocol.md) and the subagent definition
 (`benchmarks/agents/desktop.json`) are committed before any counted run. The run itself,
 42 sessions, waits for the maintainer to agree a model budget.
+
 ## 2026-11-11 — Event and approval contract (X4, design)
 
 Added docs/project/EVENT_CONTRACT.md. It lists the human moments that both field

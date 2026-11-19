@@ -47,7 +47,7 @@ validation behind each feature.
 | A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
 | Interruption during application work, after a committed effect, or before evidence collection; cancellation during application work | tested | `test_interruptions` (2026-11-11). The helper is killed or cancelled at each boundary in a real session |
 | Interruption during evidence collection itself | tested | `test_interruptions` (2026-11-12): the helper is killed between twenty accessibility checks. The job keeps the state its steps reached, verification is `unknown`, and the checks that ran stay recorded. Before the fix it read `delivery_unknown` although every step had finished |
-| Takeover while a job is running, and how long control takes to be acknowledged | tested for browser waits | `test_takeover_jobs` (2026-11-11). A browser wait now gives way within about 0.1 s; before the fix, take took 3.1 s, the pause's length. An `open`, a `send` to a command or a long `type` still holds `take` back until it finishes (up to about 60 s) |
+| Takeover while a job is running, and how long control takes to be acknowledged | tested | `test_takeover_jobs` (2026-11-11): a browser wait gives way within about 0.1 s (3.1 s before). `test_takeover_long_steps` (2026-11-19): during a slow `open`, a `send` to a command and a long `type`, take is acknowledged in 0.10–0.66 s (6.2, 6.2 and 10.8 s before; the test bound is 1 s). The interrupted step is reported as uncertain, and nothing reaches the page or runs afterwards |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
 
 ### Broad application control

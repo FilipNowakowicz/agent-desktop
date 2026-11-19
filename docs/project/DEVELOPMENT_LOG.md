@@ -5,6 +5,56 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Take during a long open, send or type
+
+Remaining F1-b gap in #181. The worker serves one request at a time, so `take`
+queued behind the request in progress. #185 made browser waits give way; a slow
+`open` (waiting for the page to load, up to 60 s), a `send` to a command (up to
+60 s) and a long `type` (about 8.5 ms per character, so up to about 85 s for
+10,000 characters) still held it back.
+
+Each now checks the `take-requested` marker about every 0.1 s:
+
+- `open`: the BiDi navigate reply is awaited in 0.1 s slices. On a take the step
+  returns `uncertain` and `interrupted`; the navigation was sent and may still
+  finish loading. A durable job records it as `uncertain`, ends
+  `delivery_unknown` and sends no later step.
+- `send` to a command: the command runs in its own process group and is polled.
+  On a take its group is killed; the reply keeps `sent`, `bytes` and the digest,
+  with `exit_status: null`, `uncertain` and `interrupted`, since it may have
+  partly run. The timeout path also kills the group now.
+- `type`: sent in chunks of 10 characters with a check before each, and the
+  screen settle between Tab/Return runs stops early on a take. A take before the
+  first chunk is a known `HumanControl` refusal; afterwards the reply is an
+  uncertain `TakenOver` error saying how many characters were sent.
+
+Bound: 1 s in the test. It allows one 0.1 s check interval, one chunk (about
+0.1 s) and the take itself, which starts the takeover VNC server (about 0.1 s),
+with room for a loaded machine. Measured on NixOS, take acknowledgement:
+
+| Step in progress | Before | After (range over the runs) |
+| --- | --- | --- |
+| `open` of a page that answers after 6 s | 6.24 s | 0.14–0.24 s |
+| `open` as a step of a durable browser job | not measured | 0.21–0.64 s |
+| `send` to `sh -c 'cat >got; sleep 6; touch finished'` | 6.19 s | 0.19–0.66 s |
+| `type` of 1,500 characters, taken 2 s in | 10.82 s | 0.10–0.46 s |
+
+Validation: new `tests/test_takeover_long_steps.py` (4 tests) checks each bound,
+that the page received exactly the reported characters and nothing more, that the
+command's later work never ran, and that the job's later click never landed. Run
+in `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype
+nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox
+--command uv run python -m unittest discover -s tests -p 'PATTERN' -v`:
+`test_takeover_long_steps` 4 tests OK (three runs; the slowest was the last,
+in the sequence below), `test_takeover_jobs` 2 OK, `test_takeover` 6 OK,
+`test_operations` 19 OK, `test_interruptions` 6 OK, `test_browser` 15 OK,
+`test_delivery` 17 OK, `test_runtime` 28 OK (11 skipped). `ruff check`,
+`ruff format --check` and the unit suite (390 tests, 149 skipped) pass.
+
+Not covered: a take while `send` is still writing a value larger than the pipe
+buffer (the reply cannot tell how much was written), and the Checks matrix was
+not run.
+
 ## 2026-11-19 — Save large page text to a file
 
 Added `desktop_browser` action `save` (CLI `browser SESSION save`). The Canvas

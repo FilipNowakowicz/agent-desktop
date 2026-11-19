@@ -567,7 +567,11 @@ Taking control does not wait for a long browser wait to finish. `take` leaves a
 marker that a waiting worker checks every 0.1 s, so the wait stops and control
 passes at once. A durable job stops at that step, which is recorded as `failed`
 with the reason, since nothing was sent. Input already sent before the takeover
-is not undone.
+is not undone. A slow `open`, a `send` to a command and a long `type` also give
+way within about 0.1 s, but they had already begun, so they are reported as
+uncertain with `interrupted`: the page may still finish loading, the command is
+killed after it was given the value, and typing says how many characters were
+sent before it stopped.
 If you choose another way (e.g. your own screen), the agent withdraws the request
 with `desktop_request_human(session, withdraw=true)` (CLI: `request-human SESSION
 --withdraw`) and keeps the session; a takeover already under way continues until

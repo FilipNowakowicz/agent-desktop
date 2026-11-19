@@ -5,6 +5,45 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Partial accessibility coverage under interruption (F1-c, #181)
+
+The last F1-c case: the R1 partial-coverage regressions (`test_completion_targets`,
+`test_tree_bounds`, unit level) rerun in a real session alongside the F1-a kills.
+The page has an "Add" button, 2,500 more buttons and a second "Add" past them, so
+every tree read is partial (the 2,000-node limit, or the 3 s budget; on this host
+it was the budget) and a unique match in a read is not unique. Two new tests in
+`tests/test_interruptions.py`:
+
+- `test_partial_coverage_checks_interrupted`: a one-click browser job with twelve
+  checks (`unique` and plain `exists` on "Add", `absent` on a missing name) is
+  killed after two to eleven are recorded. The job keeps `completed` with
+  verification `unknown`. Every recorded `unique` and `absent` check is `unknown`,
+  an `exists` check is `satisfied` or `unknown` and never `violated`, and every
+  recorded tree coverage is partial. The click landed once and the second button
+  was not touched.
+- `test_partial_coverage_target_after_an_interrupted_job`: an actions job that
+  pauses before an accessibility `press` on "Add" (exact) is killed during the
+  pause (`delivery_unknown`, the press still `pending`). The press submitted again
+  stops before any input (`failed`, "The UI listing was incomplete; uniqueness is
+  unknown"), and neither button is pressed: no silent retargeting.
+
+Both already behaved correctly; no source change.
+
+Validation (worktree on the F1-a branch, same nix shell and managed runtime as
+that entry, host at load average 90–110 from unrelated processes):
+
+- `uv run ruff check src scripts tests` and `ruff format --check`: pass.
+- `-p 'test_interruptions.py' -k partial_coverage`: 2 OK (73 s).
+- Full desktop suite on this branch (F1-a and F1-c together): 426 tests in
+  52 min, 22 skipped, 4 failures and 6 errors, all in `test_run` (2),
+  `test_runtime` (3) and `test_script_jobs` (5), none of which drives durable jobs:
+  timing bounds and cleanup timeouts under the host load ("3.33 not less than 2",
+  "Session cleanup timed out"). Rerun alone once the load fell to about 16,
+  `-p 'test_run*.py'` (`test_run` and `test_runtime`): 33 OK, 11 skipped.
+  `test_script_jobs` is known to be load-sensitive on `main` and is being fixed
+  separately; it was not rerun.
+- Not run: the Checks matrix.
+
 ## 2026-11-19 — Interruptions during evidence collection (F1-a, #181)
 
 The last F1-a gap: a durable job interrupted after its effect, while its evidence

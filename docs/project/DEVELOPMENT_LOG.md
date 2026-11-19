@@ -5,6 +5,46 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Add a profile to a running session (X8)
+
+A session created without a profile can now be given one: `agent-desktop
+attach-profile SESSION PROFILE`, MCP `desktop_profiles(session, attach)` (a field
+on the existing tool, so the schema count stays 29).
+
+Design:
+
+- The worker takes the profile lock (`flock`, as at create), switches `HOME` and the
+  XDG variables of its environment, records `profile`, `home` and `profile_lock` in
+  the manifest and writes the profile's `last-session.json`. Applications started
+  afterwards, Firefox included (its shim reads `$HOME` at start), use the profile.
+- The lock is also sent to the guardian over a socketpair (`SCM_RIGHTS`), so a worker
+  that dies abnormally cannot free the profile while the guardian is still stopping
+  the session's applications, the same guarantee as at create.
+- Refused with nothing changed: invalid name (before any directory is made), host
+  session, a session that already has a profile, a profile held by another session
+  (named), and any application of the session still running. A running browser is
+  not restarted: it keeps the old home, so the caller closes it first. A refusal
+  does not leave a new empty profile behind. An abandoned profile is recovered as at
+  create. `destroy` releases the profile as before.
+- Not done: files in the old home are not copied; the session's private bus keeps
+  the old home for services it starts on demand; the experimental effect ledger keeps
+  watching the old home; the `create` refusal text is unchanged (#203 adds the holder
+  and idle time there; the attach refusal names the holder session only).
+  `core.attach_profile` repeats a few lines of `create`'s profile preparation rather
+  than refactoring them, to keep the later rebase onto #203 small.
+
+Validation (worktree on `0b99793`, nix shell with labwc, foot, grim, wtype, wlrctl,
+wayvnc, tigervnc, dbus, firefox):
+
+- `uv run ruff check src scripts tests` and `ruff format --check`: pass.
+- `... unittest discover -s tests -p 'test_profiles.py'`: 16 tests OK (four new:
+  attach to a running session, refusals, lock held by the guardian after the worker
+  is killed, Firefox started after attach sends the cookie to the next session).
+- `-p 'test_browser.py'`: 15 OK. `-p 'test_release_profiles.py'`: 3 OK.
+- Full unit suite (no desktop tools on PATH): 390 tests, 149 skipped, 3 timing failures in `test_script_jobs` (two runs, same three). They pass alone (13 OK), and a full run on unmodified `main` also fails three other `test_script_jobs` tests (386 tests, 145 skipped), so the suite is load-sensitive there; unrelated to profiles.
+Not run: the Checks matrix (a worker change, but no packaging or CI change; a manual
+run is optional).
+
 ## 2026-11-19 — Take during a long open, send or type
 
 Remaining F1-b gap in #181. The worker serves one request at a time, so `take`
@@ -163,45 +203,6 @@ a bounded data-export operation and scoped task metrics; no runtime code or
 product-direction change was made. Validation was the real task's ID/size/hash,
 PDF-page and source-coverage audit, not the desktop test suite. Hidden/unlinked
 files, optional recordings, crash/login recovery and physical input remain untested.
-## 2026-11-19 — Add a profile to a running session (X8)
-
-A session created without a profile can now be given one: `agent-desktop
-attach-profile SESSION PROFILE`, MCP `desktop_profiles(session, attach)` (a field
-on the existing tool, so the schema count stays 29).
-
-Design:
-
-- The worker takes the profile lock (`flock`, as at create), switches `HOME` and the
-  XDG variables of its environment, records `profile`, `home` and `profile_lock` in
-  the manifest and writes the profile's `last-session.json`. Applications started
-  afterwards, Firefox included (its shim reads `$HOME` at start), use the profile.
-- The lock is also sent to the guardian over a socketpair (`SCM_RIGHTS`), so a worker
-  that dies abnormally cannot free the profile while the guardian is still stopping
-  the session's applications, the same guarantee as at create.
-- Refused with nothing changed: invalid name (before any directory is made), host
-  session, a session that already has a profile, a profile held by another session
-  (named), and any application of the session still running. A running browser is
-  not restarted: it keeps the old home, so the caller closes it first. A refusal
-  does not leave a new empty profile behind. An abandoned profile is recovered as at
-  create. `destroy` releases the profile as before.
-- Not done: files in the old home are not copied; the session's private bus keeps
-  the old home for services it starts on demand; the experimental effect ledger keeps
-  watching the old home; the `create` refusal text is unchanged (#203 adds the holder
-  and idle time there; the attach refusal names the holder session only).
-  `core.attach_profile` repeats a few lines of `create`'s profile preparation rather
-  than refactoring them, to keep the later rebase onto #203 small.
-
-Validation (worktree on `0b99793`, nix shell with labwc, foot, grim, wtype, wlrctl,
-wayvnc, tigervnc, dbus, firefox):
-
-- `uv run ruff check src scripts tests` and `ruff format --check`: pass.
-- `... unittest discover -s tests -p 'test_profiles.py'`: 16 tests OK (four new:
-  attach to a running session, refusals, lock held by the guardian after the worker
-  is killed, Firefox started after attach sends the cookie to the next session).
-- `-p 'test_browser.py'`: 15 OK. `-p 'test_release_profiles.py'`: 3 OK.
-- Full unit suite (no desktop tools on PATH): 390 tests, 149 skipped, 3 timing failures in `test_script_jobs` (two runs, same three). They pass alone (13 OK), and a full run on unmodified `main` also fails three other `test_script_jobs` tests (386 tests, 145 skipped), so the suite is load-sensitive there; unrelated to profiles.
-Not run: the Checks matrix (a worker change, but no packaging or CI change; a manual
-run is optional).
 
 ## 2026-11-12 — Host requests the client has already asked
 

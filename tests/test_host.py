@@ -116,6 +116,25 @@ class HostTests(unittest.TestCase):
             with self.assertRaisesRegex(core.DesktopError, "No answer"):
                 core.request_host("Expire", 1, wait=1)
 
+    def test_client_approval_starts_without_a_request(self):
+        # The client asked the person before the call: no request file, no wait.
+        self.assertFalse(core.client_approves_host({}))
+        self.assertFalse(
+            core.client_approves_host({"AGENT_DESKTOP_HOST_APPROVAL": "1"})
+        )
+        self.assertTrue(
+            core.client_approves_host({"AGENT_DESKTOP_HOST_APPROVAL": "client"})
+        )
+        started = time.monotonic()
+        result = core.request_host("Open the report", 1, client_approved=True)
+        self.sessions.append(result["session"])
+        self.assertLess(time.monotonic() - started, 20)
+        self.assertEqual(result["approved"], "by the client")
+        self.assertEqual(core.active_host_session(), result["session"])
+        self.assertFalse((core.state_root() / core.HOST_REQUEST).exists())
+        with self.assertRaisesRegex(core.DesktopError, "Minutes"):
+            core.request_host("Too long", 999, client_approved=True)
+
     def test_acts_on_the_desktop_and_leaves_it_open(self):
         fixture = self.person_terminal()
         host = self.approved()

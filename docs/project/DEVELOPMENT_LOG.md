@@ -5,6 +5,40 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Coursework and shell-testing field report
+
+Reconstructed unrequested MCP use from 2026-11-10 to 2026-11-18 in
+[the coursework field report](../trials/2026-11-19-coursework-and-shell-tests.md):
+149 deduplicated Claude Code calls in 10 transcripts across four repositories,
+cross-checked against `agent-desktop activity --days 8` (293 calls, 25 sessions,
+including the Codex crawl's 173). The main findings are that an agent hand-exported profile
+cookies to a 0600 scratch file for `yt-dlp`, that downloads were found by polling the
+profile's `Downloads`, and that three GPU creates failed with the documented EGL error
+after the create tool's text recommended gles2. No runtime code changed. No tests were
+run, since this is a documentation record.
+
+Added [USE_CASES.md](../USE_CASES.md), a public list of real use cases with the
+period each report covers, and replaced the README's per-report rows with one link
+to it. Revised the Canvas report: the session Codex reused had been left running by
+a Claude Code agent whose context ran out.
+
+## 2026-11-12 — Canvas collection field report
+
+Recorded a real authenticated read-only browser task in
+[the Canvas MCP field report](../trials/2026-11-12-canvas-materials-crawl.md).
+The scoped result was 66 verified PDFs (52,200,194 bytes), using 173 MCP calls
+across five tools in one existing headless session; no host input or login
+handoff. The session was closed and the profile's release verified. Private
+materials, account identifiers and raw traces remain outside this public repo.
+
+Two 64 KiB export-limit stops were recovered with smaller pagination. Nine API
+permission-denial bodies and disabled indexes required following published links
+rather than assuming a complete file index. The report proposes download receipts,
+a bounded data-export operation and scoped task metrics; no runtime code or
+product-direction change was made. Validation was the real task's ID/size/hash,
+PDF-page and source-coverage audit, not the desktop test suite. Hidden/unlinked
+files, optional recordings, crash/login recovery and physical input remain untested.
+
 ## 2026-11-12 — Host requests the client has already asked
 
 `desktop_request_host` can now rely on the MCP client's own prompt. With
@@ -347,6 +381,7 @@ stay uncertain, as R2 requires. A browser batch now stops with its completed pre
 takeover lands, nothing after it does, and the lease is released. Full desktop suite:
 358 tests, 19 skipped. Waits in `desktop_actions` already poll from the client, so
 `take` could get in between them before.
+
 ## 2026-11-11 — Wrong targets under interruption (F1-c, #181)
 
 New test: a durable job bound to one tab is killed mid-wait, that tab is closed, and a
@@ -359,6 +394,7 @@ refusal (lost target, missing or ambiguous element, a person taking control) is 
 recorded as a known `failed` step, and the job as `stopped`. GUI action jobs keep the R2
 rule that a generic error after dispatch is uncertain, because their input can partly
 run before the error.
+
 ## 2026-11-11 — Host screenshots settle, and URLs open without a bridge (X6, X10)
 
 These were built without the person's screen. The maintainer was away and said to
@@ -393,6 +429,7 @@ seed 1, cut main-context tokens 93–97% and cost about 75% at equal success, bu
 wall time rose 51–58%, so the gate was not met. Results and deviations are in
 docs/research/2026-11-11-desktop-subagent-pilot.md. The full 42-run protocol was not
 run.
+
 ## 2026-11-11 — F1 interruption boundaries (F1-a, #181)
 
 New `tests/test_interruptions.py` kills a durable browser job's helper at each
@@ -428,6 +465,7 @@ Also recorded: on 2026-11-11 the Ubuntu job of Checks run 43067317711 failed onc
 `test_effects.RecorderTests.test_new_directories_are_watched`, the inotify
 watch-count assertion. That code was unchanged in the stack under test, and the job
 passed on rerun. The test is timing-sensitive on CI runners.
+
 ## 2026-11-11 — Secret sink hardening
 
 Two gaps in `send` (N1), found in review. A `send` to a command used the default 30 s
@@ -469,6 +507,7 @@ reports used 10–11 of the 29 tools. The A/B protocol
 (docs/research/2026-11-11-desktop-subagent-protocol.md) and the subagent definition
 (`benchmarks/agents/desktop.json`) are committed before any counted run. The run itself,
 42 sessions, waits for the maintainer to agree a model budget.
+
 ## 2026-11-11 — Event and approval contract (X4, design)
 
 Added docs/project/EVENT_CONTRACT.md. It lists the human moments that both field

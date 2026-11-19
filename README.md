@@ -147,8 +147,7 @@ It is not a security boundary: applications run as your user (see above).
 | [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
 | [Validation](docs/VALIDATION.md) | Checks, lifecycle experiments and application smoke tests |
 | [Benchmarks](docs/BENCHMARK.md) | Task definitions, recorded results and comparison limits |
-| [Hyprland field report](docs/trials/2026-11-07-hyprland-overhaul.md) | How agents used the MCP to rebuild and demo a real desktop, with usage statistics and the problems found |
-| [Cloud setup field report](docs/trials/2026-11-08-gcp-tailscale-setup.md) | Background web-console work with the maintainer's logins (Google Cloud, Tailscale): statistics, credential handling, login failures and development priorities |
+| [Use cases](docs/USE_CASES.md) | How agents actually use Agent Desktop, from dated field reports: shell testing, background web work with the person's logins, file collection, native apps, the real screen |
 | [Contributing](CONTRIBUTING.md) / [security](SECURITY.md) | Development workflow, testing boundaries and reporting vulnerabilities |
 | [Start here](docs/project/START_HERE.md) | Contributor orientation and continuation workflow |
 | [Project plan](docs/project/PROJECT_PLAN.md) / [development log](docs/project/DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |

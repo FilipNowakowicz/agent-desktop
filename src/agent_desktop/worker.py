@@ -315,6 +315,7 @@ def private_path(home, to_file):
 
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
+SAVE_BYTES = 8 * 1024 * 1024  # under the 16 MiB BiDi message limit
 DOWNLOAD_SECONDS = 120  # default wait for a download to finish
 DOWNLOAD_MAX_SECONDS = 600
 DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a download
@@ -1238,6 +1239,8 @@ class Worker:
                     "with new_tab, in the background) or name a tab explicitly "
                     "with tab or context; their current tab is left alone."
                 )
+            if action == "save":
+                return self.browser_save(request, bridge, context, target)
             if action == "download":
                 if host:
                     raise ValueError(
@@ -1399,7 +1402,7 @@ class Worker:
                 return self.browser_observed(result, observe)
             raise ValueError(
                 "action must be start, tabs, open, close, find, text, wait, click, "
-                "fill, select, send, download or steps"
+                "fill, select, send, save, download or steps"
             )
         except Exception as error:
             if isinstance(error, ConnectionClosed):
@@ -1553,6 +1556,70 @@ class Worker:
                 "note": "The command was killed after the value was sent to it.",
             }
         return {**result, "exit_status": finished.returncode}
+
+    def browser_save(self, request, bridge, context, target):
+        """Write a page's or element's text to a file instead of the reply.
+
+        For data too large to read in the conversation (an API listing in
+        Firefox's JSON viewer, a long table). Unlike send, it is not for
+        secrets: the reply gives the size and digest, and the file is the
+        whole text or nothing (up to SAVE_BYTES).
+        """
+        from . import browser
+
+        if request.get("to_file") is None:
+            raise ValueError("save needs to_file")
+        path = private_path(Path(self.env["HOME"]), request["to_file"])
+        if path.exists() and request.get("overwrite") is not True:
+            raise ValueError(f"{path} exists; pass overwrite to replace it")
+        if target["selector"] or target["text"]:
+            count = bridge.find(context, **target)["count"]
+            if count != 1:
+                raise ValueError(f"{count} visible elements match; save needs one")
+            element, _ = bridge.element(context, **target)
+            value = browser.remote_value(
+                bridge.call(
+                    "(e) => (e instanceof HTMLInputElement || e instanceof "
+                    "HTMLTextAreaElement) ? e.value : e.innerText",
+                    [element],
+                    context,
+                )
+            )
+        else:
+            # The whole page's visible text (a text/plain response is its body).
+            value = browser.remote_value(
+                bridge.call("() => document.body?.innerText ?? null", [], context)
+            )
+        if not isinstance(value, str):
+            raise ValueError("Nothing to save: the target has no text")
+        data = value.encode()
+        if len(data) > SAVE_BYTES:
+            raise ValueError(
+                f"The text is {len(data)} bytes, over {SAVE_BYTES}; nothing was "
+                "saved. Save a smaller part (a page of results, or one element)"
+            )
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
+        temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.part")
+        try:
+            descriptor = os.open(temporary, flags, 0o600)
+        except OSError as error:
+            raise ValueError(f"Not written: {error}") from None
+        try:
+            with os.fdopen(descriptor, "wb") as file:
+                file.write(data)
+            if path.exists() and request.get("overwrite") is not True:
+                raise ValueError(f"{path} exists; pass overwrite to replace it")
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return {
+            "saved": True,
+            "to_file": str(path),
+            "bytes": len(data),
+            "characters": len(value),
+            "sha256": hashlib.sha256(data).hexdigest(),
+            **self.page_state(bridge, context),
+        }
 
     def browser_download(self, request, bridge, context):
         """Download a URL with the browser's login and return a receipt.

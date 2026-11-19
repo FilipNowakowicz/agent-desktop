@@ -194,6 +194,7 @@ def main():
             "fill",
             "select",
             "send",
+            "save",
             "download",
             "steps",
         ),

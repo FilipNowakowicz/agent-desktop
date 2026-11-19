@@ -224,6 +224,7 @@ session. Then:
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
 | `download` | fetch `url` with the browser's login and wait for the file; see below |
+| `save` | write the page's text, or one element's, to `to_file` (up to 8 MiB) and return only its size and digest |
 
 `within` narrows a target to the row, list item, form or dialog containing a
 text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
@@ -268,6 +269,17 @@ start of mutation: a prefix may have executed. Validation failures before any
 mutation remain ordinary errors. Reconcile the actual state before retrying;
 there is no automatic rollback. These deadlines do not provide application
 transactions or guarantee that an external effect happened at most once.
+
+### Saving large text
+
+`text` returns at most 8000 characters. For an API listing, a long table or any
+text to be processed locally, `save` writes the page's visible text, or one
+element's (`selector` or `text`), to `to_file` (relative paths are in the session
+home, and the file is created 0600). The reply has `bytes`, `characters`, `sha256`
+and the page's url and title. The file is the whole text or nothing, up to 8 MiB.
+For JSON, Firefox shows a viewer: click `Raw Data` and save `pre`. `save` is not
+for secrets (use `send`): its 64 KiB limit and minimal reply exist to protect a
+value, not to bound data.
 
 ### Downloading files
 

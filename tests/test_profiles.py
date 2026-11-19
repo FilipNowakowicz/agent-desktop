@@ -414,6 +414,18 @@ class ProfileTests(unittest.TestCase):
         core.attach_profile(session, "late")
         info = core.manifest(session)
         guardian, worker = info["guardian_pid"], info["worker_pid"]
+        # The guardian holds its own descriptor of the lock file, received
+        # from the worker, rather than leaving it queued in a socket.
+        lock = str(core.profile_lock(core.profile_path("late")))
+        wait_for(
+            lambda: any(
+                os.path.realpath(path) == os.path.realpath(lock)
+                for path in (
+                    os.readlink(f"/proc/{guardian}/fd/{fd}")
+                    for fd in os.listdir(f"/proc/{guardian}/fd")
+                )
+            )
+        )
         os.kill(guardian, signal.SIGSTOP)
         try:
             os.kill(worker, signal.SIGKILL)

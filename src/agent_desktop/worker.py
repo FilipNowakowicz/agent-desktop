@@ -15,6 +15,7 @@ import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -1001,7 +1002,9 @@ class Worker:
         except BlockingIOError:
             lock.close()
             raise ValueError(f"Profile {name} is in use by another session") from None
-        # The guardian keeps the lock after this process dies, as at create.
+        # The guardian receives and holds its own descriptor for the same open
+        # file description (see receive_profile_locks), so the lock survives
+        # this process dying, as at create.
         if GUARDIAN_HANDOFF is not None:
             socket.send_fds(GUARDIAN_HANDOFF, [b"l"], [lock.fileno()])
         self.profile_lock = lock
@@ -3902,8 +3905,13 @@ def run_worker(root):
     return 1 if failure else 0
 
 
-def guard(root, worker):
+def guard(root, worker, handoff=None):
     """Wait for the worker; if it dies abnormally, stop everything it left behind."""
+    held = []  # profile locks attached to the session after it started
+    if handoff is not None:
+        threading.Thread(
+            target=receive_profile_locks, args=(handoff, held), daemon=True
+        ).start()
 
     def forward(signum, _frame):
         try:
@@ -3936,9 +3944,27 @@ def guard(root, worker):
 # worker that dies abnormally cannot free the profile while the guardian is
 # still stopping the session's applications.
 GUARDIAN_PROFILE_LOCK = None
-# In the worker: a socket to the guardian, which holds a profile lock attached
-# later (a descriptor sent over it stays open while the guardian lives).
+# In the worker: a socket to the guardian, which receives and holds a profile
+# lock attached later.
 GUARDIAN_HANDOFF = None
+
+
+def receive_profile_locks(sock, held):
+    """Guardian thread: keep every lock descriptor the worker sends.
+
+    A received descriptor shares the sender's open file description, and so its
+    flock, until every copy is closed. Holding it here keeps the profile locked
+    after the worker dies, until this process has stopped the session's
+    applications and exited. It ends when the worker's end closes.
+    """
+    while True:
+        try:
+            data, fds, _, _ = socket.recv_fds(sock, 16, 4)
+        except OSError:
+            return
+        if not data and not fds:
+            return  # end of stream: the worker has exited
+        held.extend(os.fdopen(fd, "a") for fd in fds)
 
 
 def take_profile_lock(root):
@@ -3973,7 +3999,7 @@ def main():
         finally:
             os._exit(code)
     worker_end.close()
-    raise SystemExit(guard(root, worker))
+    raise SystemExit(guard(root, worker, guardian_end))
 
 
 if __name__ == "__main__":

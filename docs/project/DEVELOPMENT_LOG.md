@@ -5,6 +5,24 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — A site's cookies for shell tools
+
+Added `send` source `cookies` (with `site`). In the coursework field report, an agent
+needed `yt-dlp` for hour-long lecture videos. It wrote its own exporter that copied a
+profile's `cookies.sqlite` and decoded Firefox's session-restore file (a session cookie
+lived only there), with `sleep` loops until that file was written. The new source reads
+live cookies with BiDi `storage.getCookies`, keeps those for the site, its subdomains
+and its parent domains, and writes a Netscape `cookies.txt` (HttpOnly marked as curl and
+yt-dlp expect) to a 0600 `to_file` or a command's stdin. The reply has only the count,
+bytes and digest. It is refused on host sessions, so the person's own cookies are never
+exported. This is a credential-handling change for the maintainer to accept: it makes
+supported something agents already did by hand.
+
+Validation: `tests/test_send_cookies.py`. Four unit tests cover site matching
+(including a lookalike domain), the format, refusals, the private file and no values in
+the reply. A desktop test with real Firefox 160 and a local server exported an HttpOnly
+session cookie that the server had set.
+
 ## 2026-11-19 — Add a profile to a running session (X8)
 
 A session created without a profile can now be given one: `agent-desktop
@@ -109,23 +127,6 @@ secrets.
 Validation: `tests/test_save.py`. Two unit tests cover a listing larger than 64 KiB,
 the overwrite rule, ambiguous targets, the size limit with no partial file, and the
 missing `to_file`. A desktop test saved a 193 KB `<pre>` from real Firefox 160 whole.
-## 2026-11-19 — A site's cookies for shell tools
-
-Added `send` source `cookies` (with `site`). In the coursework field report, an agent
-needed `yt-dlp` for hour-long lecture videos. It wrote its own exporter that copied a
-profile's `cookies.sqlite` and decoded Firefox's session-restore file (a session cookie
-lived only there), with `sleep` loops until that file was written. The new source reads
-live cookies with BiDi `storage.getCookies`, keeps those for the site, its subdomains
-and its parent domains, and writes a Netscape `cookies.txt` (HttpOnly marked as curl and
-yt-dlp expect) to a 0600 `to_file` or a command's stdin. The reply has only the count,
-bytes and digest. It is refused on host sessions, so the person's own cookies are never
-exported. This is a credential-handling change for the maintainer to accept: it makes
-supported something agents already did by hand.
-
-Validation: `tests/test_send_cookies.py`. Four unit tests cover site matching
-(including a lookalike domain), the format, refusals, the private file and no values in
-the reply. A desktop test with real Firefox 160 and a local server exported an HttpOnly
-session cookie that the server had set.
 
 ## 2026-11-19 — Browser downloads with a receipt
 

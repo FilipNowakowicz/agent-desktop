@@ -464,11 +464,7 @@ def attach_profile(session, profile, controller=None):
     if path.is_symlink() or home.is_symlink():
         raise DesktopError("Unsafe profile directory")
     if profile_in_use(path):
-        holder = profile_last_session(path)
-        raise DesktopError(
-            f"Profile {profile} is in use by "
-            + (f"session {holder}" if holder else "another session")
-        )
+        raise profile_busy(profile, path)
     previous = profile_state(path)
     if previous and previous["status"] == "abandoned":
         recover(previous["session"], manifest(previous["session"]))

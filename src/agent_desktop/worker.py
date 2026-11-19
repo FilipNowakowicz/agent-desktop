@@ -278,6 +278,13 @@ TRACE_BYTES = 1024 * 1024
 # worker stop when they see it, so a person gets control within about 0.1 s.
 TAKE_REQUESTED = "take-requested"
 TAKE_MARKER_SECONDS = 10
+# Long typing checks for a take between chunks of this many characters (about
+# 0.1 s each at the default key interval).
+TYPE_CHUNK = 10
+TAKEN_OVER = (
+    "A person is taking control; nothing more was sent. "
+    "Wait with desktop_control until control returns, then take a new screenshot."
+)
 # On the person's screen, a screenshot this soon after the agent's input waits
 # (up to a second) for animations such as a workspace switch to finish.
 HOST_SETTLE_AFTER = 1.0
@@ -412,6 +419,10 @@ class StaleObservation(RuntimeError):
 
 class HumanControl(RuntimeError):
     pass
+
+
+class TakenOver(RuntimeError):
+    """A person took control after the current step had begun to act."""
 
 
 class LeaseHeld(RuntimeError):
@@ -1274,6 +1285,7 @@ class Worker:
                     "browsingContext.navigate",
                     {"context": context, "url": url, "wait": "complete"},
                     timeout=60,
+                    interrupt=self.take_requested,
                 )
                 return self.browser_observed(
                     {"delivered": True, "context": context},
@@ -1407,6 +1419,18 @@ class Worker:
         except Exception as error:
             if isinstance(error, ConnectionClosed):
                 self.browser = None
+            if isinstance(error, browser.Interrupted):
+                # The navigation was sent; Firefox may still finish loading it.
+                return {
+                    "delivered": None,
+                    "uncertain": True,
+                    "interrupted": True,
+                    "context": context,
+                    "error": "A person is taking control; the page was still "
+                    "loading and may finish. " + TAKEN_OVER,
+                    "recovery": "When control returns, check the tab before "
+                    "opening it again.",
+                }
             if mutation_started:
                 return {
                     "delivered": None,
@@ -1537,25 +1561,53 @@ class Worker:
                 os.close(descriptor)
             return {**result, "to_file": str(path)}
         try:
-            finished = subprocess.run(
+            # Its own process group, so stopping it also stops its children.
+            process = subprocess.Popen(
                 to_command,
-                input=value,
+                stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 env=self.env,
                 cwd=home,
-                timeout=SECRET_COMMAND_SECONDS,
+                start_new_session=True,
             )
         except FileNotFoundError:
             raise ValueError(f"No such program: {to_command[0]}") from None
-        except subprocess.TimeoutExpired:
+        deadline = time.monotonic() + SECRET_COMMAND_SECONDS
+        stopped, pending = None, value
+        while stopped is None:
+            try:
+                # Polled, so a person taking control does not wait for it. The
+                # input is given once; a retry continues writing it.
+                process.communicate(pending, timeout=0.1)
+                return {**result, "exit_status": process.returncode}
+            except subprocess.TimeoutExpired:
+                pending = None
+                if self.take_requested():
+                    stopped = "taken"
+                elif time.monotonic() >= deadline:
+                    stopped = "timeout"
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.communicate()
+        if stopped == "timeout":
             return {
                 **result,
                 "exit_status": None,
                 "timed_out": True,
                 "note": "The command was killed after the value was sent to it.",
             }
-        return {**result, "exit_status": finished.returncode}
+        return {
+            **result,
+            "exit_status": None,
+            "uncertain": True,
+            "interrupted": True,
+            "error": "A person is taking control; the command was killed while "
+            "it ran, after the value was sent to it, and may have partly run. "
+            + TAKEN_OVER,
+        }
 
     def browser_save(self, request, bridge, context, target):
         """Write a page's or element's text to a file instead of the reply.
@@ -2095,6 +2147,8 @@ class Worker:
         token = self.frame(None)["frame"]
         quiet_since = time.monotonic()
         while time.monotonic() - quiet_since < quiet and time.monotonic() < deadline:
+            if self.take_requested():
+                break  # the caller checks again and gives way
             time.sleep(0.03)
             latest = self.frame(token)
             token, box = latest["frame"], latest["changed"]
@@ -2963,12 +3017,24 @@ class Worker:
             self.settle_after("key", host)
             # Characters and Tab/Return runs are sent separately, each after the
             # screen settles, so a Tab cannot overtake the text before or after it.
+            typed = 0
             for index, part in enumerate(re.findall(r"[\t\n]+|[^\t\n]+", text)):
                 if index and not host:
                     self.settle()
                 keyboard = self.keyboard()
-                self.mark_mutation()
-                keyboard.type(part)
+                # Sent in chunks, so a person taking control waits for one
+                # chunk rather than the whole text.
+                for start in range(0, len(part), TYPE_CHUNK):
+                    if self.take_requested():
+                        if not typed:
+                            raise HumanControl(TAKEN_OVER)
+                        raise TakenOver(
+                            f"Typing stopped after {typed} of {len(text)} "
+                            "characters; the rest was not sent. " + TAKEN_OVER
+                        )
+                    self.mark_mutation()
+                    keyboard.type(part[start : start + TYPE_CHUNK])
+                    typed += len(part[start : start + TYPE_CHUNK])
             self.last_keys = ("type", time.monotonic())
         elif operation == "key":
             key = request.get("key")

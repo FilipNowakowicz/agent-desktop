@@ -115,6 +115,10 @@ class BrowserError(RuntimeError):
     pass
 
 
+class Interrupted(RuntimeError):
+    """A command was sent, then its wait for a reply was given up."""
+
+
 # What a click at the element's centre would hit, if not the element itself:
 # null when the element, or a label for it or the control it labels, is on top.
 UNCOVERED = """(e) => {
@@ -165,7 +169,12 @@ class Browser:
             pass
         self.socket.close()
 
-    def command(self, method, params, timeout=30):
+    def command(self, method, params, timeout=30, interrupt=None):
+        """Send one BiDi command and wait for its reply.
+
+        With `interrupt`, the wait checks it every 0.1 s and raises Interrupted
+        when it returns true. The command has then been sent and may still run.
+        """
         deadline = time.monotonic() + timeout
         if getattr(self, "deadline", None) is not None:
             deadline = min(deadline, self.deadline)
@@ -178,7 +187,15 @@ class Browser:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError(f"Firefox did not answer {method}")
-            message = json.loads(self.socket.recv(timeout=remaining))
+            if interrupt is not None:
+                if interrupt():
+                    raise Interrupted(method)
+                try:
+                    message = json.loads(self.socket.recv(timeout=min(0.1, remaining)))
+                except TimeoutError:
+                    continue
+            else:
+                message = json.loads(self.socket.recv(timeout=remaining))
             if message.get("id") != ident:
                 continue  # an event
             if message.get("type") == "error":

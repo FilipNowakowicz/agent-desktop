@@ -242,6 +242,7 @@ MUTATING_OPERATIONS = (
     "request_human",
     "set",
     "browser",
+    "attach_profile",
 )
 CHORD_MODIFIERS = {
     "control": "ctrl",
@@ -447,6 +448,7 @@ HOST_UNSUPPORTED = (
     "ui",
     "ui_action",
     "set",
+    "attach_profile",
 )
 # Processes that mean the person's screen is locked (host sessions).
 SCREEN_LOCKERS = {"hyprlock", "swaylock", "gtklock", "waylock", "i3lock"}
@@ -918,6 +920,61 @@ class Worker:
         if value:
             self.env["DISPLAY"] = value
         self.info["x_display"] = value or None
+
+    def attach_profile(self, request):
+        """Give a running session a named profile as its home.
+
+        Applications started afterwards (Firefox included) use the profile.
+        Refused while any application of this session is running, since its
+        files and environment stay in the old home.
+        """
+        from . import core
+
+        if self.info.get("profile"):
+            raise ValueError(f"Session already uses profile {self.info['profile']}")
+        running = [p.pid for p in self.apps.values() if p.poll() is None]
+        if running:
+            raise ValueError(
+                f"Applications are still running (pid {running[0]}"
+                f"{', ...' if len(running) > 1 else ''}): close them first, since "
+                "they keep the session's old home. Nothing was changed"
+            )
+        name = request.get("profile")
+        path = core.profile_path(name)
+        home = path / "home"
+        if path.is_symlink() or home.is_symlink() or not home.is_dir():
+            raise ValueError("Unsafe or missing profile directory")
+        lock = core.profile_lock(path).open("a")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock.close()
+            raise ValueError(f"Profile {name} is in use by another session") from None
+        # The guardian keeps the lock after this process dies, as at create.
+        if GUARDIAN_HANDOFF is not None:
+            socket.send_fds(GUARDIAN_HANDOFF, [b"l"], [lock.fileno()])
+        self.profile_lock = lock
+        if not any(
+            (home / n).exists() for n in (".zshenv", ".zprofile", ".zshrc", ".zlogin")
+        ):
+            (home / ".zshrc").write_text("# Created by agent-desktop\n")
+        self.env.update(
+            {
+                "HOME": str(home),
+                "XDG_CONFIG_HOME": str(home / ".config"),
+                "XDG_CACHE_HOME": str(home / ".cache"),
+                "XDG_DATA_HOME": str(home / ".local/share"),
+                "XDG_STATE_HOME": str(home / ".local/state"),
+            }
+        )
+        (path / "last-session.json").write_text(
+            json.dumps({"session": self.info["id"]}) + "\n"
+        )
+        self.info.update(
+            profile=name, home=str(home), profile_lock=str(core.profile_lock(path))
+        )
+        write_manifest(self.root, self.info)
+        return {"session": self.info["id"], "profile": name, "home": str(home)}
 
     def pin_browser_profiles(self):
         """Start Firefox with a profile in the session home.
@@ -2690,6 +2747,7 @@ class Worker:
                 "session": self.info["id"],
                 "mode": self.info["mode"],
                 "status": "ready",
+                "profile": self.info.get("profile"),
                 "accessibility": self.info.get("accessibility", False),
                 **(
                     {"accessibility_error": self.info["accessibility_error"]}
@@ -2715,6 +2773,8 @@ class Worker:
                     for pid in session_processes(self.info["token"])
                 ],
             }
+        if operation == "attach_profile":
+            return self.attach_profile(request)
         if operation == "viewer_start":
             endpoint = Path(self.info["runtime"]) / "vnc.sock"
             if not (self.viewer and self.viewer.poll() is None):
@@ -3809,6 +3869,9 @@ def guard(root, worker):
 # worker that dies abnormally cannot free the profile while the guardian is
 # still stopping the session's applications.
 GUARDIAN_PROFILE_LOCK = None
+# In the worker: a socket to the guardian, which holds a profile lock attached
+# later (a descriptor sent over it stays open while the guardian lives).
+GUARDIAN_HANDOFF = None
 
 
 def take_profile_lock(root):
@@ -3825,20 +3888,24 @@ def take_profile_lock(root):
 
 
 def main():
-    global GUARDIAN_PROFILE_LOCK
+    global GUARDIAN_PROFILE_LOCK, GUARDIAN_HANDOFF
     root = Path(sys.argv[1])
     # Both processes are subreapers: orphans stay with the worker while it lives,
     # then fall to the guardian, never to init or a host service manager.
     become_subreaper()
     GUARDIAN_PROFILE_LOCK = take_profile_lock(root)
+    guardian_end, worker_end = socket.socketpair()
     worker = os.fork()
     if worker == 0:
         code = 1
         try:
+            guardian_end.close()
+            GUARDIAN_HANDOFF = worker_end
             become_subreaper()  # not inherited across fork
             code = run_worker(root)
         finally:
             os._exit(code)
+    worker_end.close()
     raise SystemExit(guard(root, worker))
 
 

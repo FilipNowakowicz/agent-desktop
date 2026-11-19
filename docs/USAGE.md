@@ -759,6 +759,7 @@ the session with a named profile:
 ```sh
 uv run agent-desktop create --profile github     # MCP: desktop_create(profile="github")
 uv run agent-desktop profiles                    # list, size, whether in use
+uv run agent-desktop attach-profile SESSION github  # MCP: desktop_profiles(session=..., attach="github")
 uv run agent-desktop delete-profile github       # permanently remove saved logins
 ```
 
@@ -778,6 +779,26 @@ launched with its own data folder (for example `anki -b ~/.local/share/Anki2`, o
 program reading your home directory) changes that data for real. Do this only when
 the task asks for it. Close the application properly before `destroy` so it saves,
 and prefer a copy of the data folder for experiments.
+
+### Add a profile to a running session
+
+A session created without a profile can be given one later, when a site turns out
+to need a saved login. `attach-profile` (MCP: `desktop_profiles` with `session`
+and `attach`) makes the profile the session's home for applications started
+afterwards, so a Firefox started next uses the profile's cookies and settings, and
+`destroy` releases the profile as usual. It is refused, with nothing changed, when:
+
+- the name is invalid, or the session is a host session or already has a profile
+  (a session keeps one profile for its life);
+- another session holds the profile (the refusal names it);
+- any application of the session is still running. A running browser keeps the old
+  home and its files, so it is not restarted for you: close it (or let it exit),
+  then attach and start it again.
+
+Files already written to the session's old home are not copied to the profile, and
+it is deleted at `destroy` as before. The session's own background services (its
+private bus) keep the old home, so a service they start on demand may still write
+there. If a login was done before attaching, it is lost: attach first, then log in.
 
 ### Bring a login from your own Firefox
 

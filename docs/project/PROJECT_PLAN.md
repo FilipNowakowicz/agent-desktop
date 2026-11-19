@@ -75,7 +75,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None; works: activation switches workspace in Hyprland 0.57.1 (nested stand-in 2026-11-11, the maintainer's screen 2026-11-12) |
 | X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None; done 2026-11-11; seen on the maintainer's screen 2026-11-12 (a workspace switch captured whole after 737 ms) |
 | X7 | Richer `find` items for buttons, with a class and a usable selector | 2026-10-15 list | None; done 2026-11-11 |
-| X8 | Add a profile to a running session | 2026-10-15 list | None |
+| X8 | Add a profile to a running session | 2026-10-15 list | None; done 2026-11-19 (`agent-desktop attach-profile`, MCP `desktop_profiles(session, attach)`): refused while an application runs, a session keeps one profile; see USAGE.md |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None; layout placement confirmed on the maintainer's screen 2026-11-12 (text, `ctrl+l`, `logo+h` under US Dvorak). The off-screen refusal still needs the person to switch terminals |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None; done 2026-11-11; seen on the maintainer's screen 2026-11-12: the tab opened in an existing Firefox window, which stayed in the background |
 | X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None |

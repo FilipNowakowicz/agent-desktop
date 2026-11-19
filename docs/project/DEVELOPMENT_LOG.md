@@ -5,28 +5,6 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
-## 2026-11-19 — Attach-profile follow-ups: shared refusal, guardian holds the lock
-
-Two follow-ups to the attach-profile change.
-
-- The "profile held by another session" refusal in `core.attach_profile` now raises
-  `profile_busy(name, path)`, the same message as `create` (holder session and idle
-  time, with the advice to destroy a finished session or use another profile).
-- The guardian now receives the lock descriptor the worker sends over the socketpair.
-  Before, nothing read it: the lock survived a killed worker only because Linux keeps
-  an in-flight `SCM_RIGHTS` descriptor open while it sits unread in the receiving
-  socket's queue, an accident of the kernel. A daemon thread in the guardian
-  (`receive_profile_locks`) now calls `recv_fds` and keeps each descriptor, which shares
-  the worker's open file description and so its `flock`, until the guardian exits.
-  Decision: a thread rather than polling in `guard`, because `guard` blocks in
-  `waitpid` and the thread leaves that and its signal forwarding untouched. The lock
-  is still released only when both processes have exited, as at create.
-
-Validation (nix shell with the desktop tools): `tests/test_profiles.py` 16 OK. The
-guardian-lock test now also waits until the guardian's `/proc/PID/fd` lists the lock
-file, which fails (timeout) on the previous worker.py and passes now; it then stops the
-guardian, kills the worker and checks the profile stays in use. `test_field_findings.py`
-6 OK. `ruff check` and `ruff format --check` pass. The Checks matrix was not run.
 ## 2026-11-19 — Flaky script job tests: the timeout counted interpreter startup
 
 `tests/test_script_jobs.py` passed alone (13 OK) but, under the load of the full unit
@@ -76,6 +54,29 @@ the nix desktop shell: `test_script_jobs.py` 14 OK, `test_run.py` 5 OK. `ruff ch
 same load, from a 0.5 s timeout in the new test and a child that needed more than the
 timeout to start under load 90; both were removed by the changes above. The Checks matrix
 was not run.
+
+## 2026-11-19 — Attach-profile follow-ups: shared refusal, guardian holds the lock
+
+Two follow-ups to the attach-profile change.
+
+- The "profile held by another session" refusal in `core.attach_profile` now raises
+  `profile_busy(name, path)`, the same message as `create` (holder session and idle
+  time, with the advice to destroy a finished session or use another profile).
+- The guardian now receives the lock descriptor the worker sends over the socketpair.
+  Before, nothing read it: the lock survived a killed worker only because Linux keeps
+  an in-flight `SCM_RIGHTS` descriptor open while it sits unread in the receiving
+  socket's queue, an accident of the kernel. A daemon thread in the guardian
+  (`receive_profile_locks`) now calls `recv_fds` and keeps each descriptor, which shares
+  the worker's open file description and so its `flock`, until the guardian exits.
+  Decision: a thread rather than polling in `guard`, because `guard` blocks in
+  `waitpid` and the thread leaves that and its signal forwarding untouched. The lock
+  is still released only when both processes have exited, as at create.
+
+Validation (nix shell with the desktop tools): `tests/test_profiles.py` 16 OK. The
+guardian-lock test now also waits until the guardian's `/proc/PID/fd` lists the lock
+file, which fails (timeout) on the previous worker.py and passes now; it then stops the
+guardian, kills the worker and checks the profile stays in use. `test_field_findings.py`
+6 OK. `ruff check` and `ruff format --check` pass. The Checks matrix was not run.
 
 ## 2026-11-19 — A site's cookies for shell tools
 

@@ -194,6 +194,7 @@ def main():
             "fill",
             "select",
             "send",
+            "download",
             "steps",
         ),
     )
@@ -213,12 +214,16 @@ def main():
     bridge.add_argument(
         "--source", choices=("element", "clipboard"), help="send: what to move"
     )
-    bridge.add_argument("--to-file", help="send: a new 0600 file (relative: home)")
+    bridge.add_argument(
+        "--to-file", help="send, download: a new 0600 file (relative: home)"
+    )
     bridge.add_argument(
         "--to-command", type=shlex.split, help="send: a command reading stdin"
     )
     bridge.add_argument("--reveal", type=int, help="send: prefix characters (0-8)")
-    bridge.add_argument("--overwrite", action="store_true", help="send: replace")
+    bridge.add_argument(
+        "--overwrite", action="store_true", help="send, download: replace"
+    )
     steps = sub.add_parser(
         "actions", help="run a JSON list of steps, stopping on surprises"
     )

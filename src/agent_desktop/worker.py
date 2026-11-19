@@ -281,9 +281,43 @@ TAKE_MARKER_SECONDS = 10
 # On the person's screen, a screenshot this soon after the agent's input waits
 # (up to a second) for animations such as a workspace switch to finish.
 HOST_SETTLE_AFTER = 1.0
+
+
 # Values moved by browser "send" (secrets such as generated API keys).
+def private_path(home, to_file):
+    """A file path for send or download: relative paths are in the session home.
+
+    Missing folders inside the home are created 0700 (each level, since
+    mkdir(parents=True) would give the upper ones the umask); a missing folder
+    elsewhere is refused.
+    """
+    if not isinstance(to_file, str) or not to_file:
+        raise ValueError("to_file must be a path")
+    path = Path(to_file)
+    if to_file == "~" or to_file.startswith("~/"):
+        path = home / to_file[2:]
+    elif not path.is_absolute():
+        path = home / path
+    if not path.parent.is_dir():
+        parent, root = path.parent.resolve(), home.resolve()
+        if parent != root and root not in parent.parents:
+            raise ValueError(f"No such directory: {path.parent}")
+        missing = []
+        folder = path.parent
+        while not folder.is_dir():
+            missing.append(folder)
+            folder = folder.parent
+        for folder in reversed(missing):
+            folder.mkdir(mode=0o700, exist_ok=True)
+            os.chmod(folder, 0o700)
+    return path
+
+
 SECRET_BYTES = 64 * 1024
 SECRET_COMMAND_SECONDS = 60
+DOWNLOAD_SECONDS = 120  # default wait for a download to finish
+DOWNLOAD_MAX_SECONDS = 600
+DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a download
 # The checked state of a clicked toggle: a checkbox, radio or switch, or the one
 # a clicked label controls. "true", "false" or "mixed"; null for anything else.
 TOGGLE_STATE = (
@@ -1204,6 +1238,13 @@ class Worker:
                     "with new_tab, in the background) or name a tab explicitly "
                     "with tab or context; their current tab is left alone."
                 )
+            if action == "download":
+                if host:
+                    raise ValueError(
+                        "download is for private sessions: the person's Downloads "
+                        "folder is not the agent's"
+                    )
+                return self.browser_download(request, bridge, context)
             if action == "open":
                 url = request.get("url")
                 if not isinstance(url, str) or not url:
@@ -1358,7 +1399,7 @@ class Worker:
                 return self.browser_observed(result, observe)
             raise ValueError(
                 "action must be start, tabs, open, close, find, text, wait, click, "
-                "fill, select, send or steps"
+                "fill, select, send, download or steps"
             )
         except Exception as error:
             if isinstance(error, ConnectionClosed):
@@ -1412,29 +1453,7 @@ class Worker:
             raise ValueError("reveal must be between 0 and 8 characters")
         home = Path(self.env["HOME"])
         if to_file is not None:
-            if not isinstance(to_file, str) or not to_file:
-                raise ValueError("to_file must be a path")
-            path = Path(to_file)
-            if to_file == "~" or to_file.startswith("~/"):
-                path = home / to_file[2:]
-            elif not path.is_absolute():
-                path = home / path
-            if not path.parent.is_dir():
-                inside = home.resolve() in path.parent.resolve().parents or (
-                    path.parent.resolve() == home.resolve()
-                )
-                if not inside:
-                    raise ValueError(f"No such directory: {path.parent}")
-                # Folders inside the session home are made private, like the
-                # file; mkdir(parents=True) would give the upper ones the umask.
-                missing = []
-                folder = path.parent
-                while not folder.is_dir():
-                    missing.append(folder)
-                    folder = folder.parent
-                for folder in reversed(missing):
-                    folder.mkdir(mode=0o700, exist_ok=True)
-                    os.chmod(folder, 0o700)
+            path = private_path(home, to_file)
         source = request.get("source", "element")
         if source == "clipboard":
             if host:
@@ -1534,6 +1553,125 @@ class Worker:
                 "note": "The command was killed after the value was sent to it.",
             }
         return {**result, "exit_status": finished.returncode}
+
+    def browser_download(self, request, bridge, context):
+        """Download a URL with the browser's login and return a receipt.
+
+        Firefox saves into the session's ~/Downloads, writing NAME.part and
+        renaming it when the transfer ends. The download is the one new file
+        there without a .part beside it, once its size is stable. A URL that
+        loads a page instead (a login redirect, an inline PDF viewer) is reported
+        as such. The reply names the file, its size and SHA-256, never the URL,
+        which may carry a signed query.
+        """
+        from . import browser
+
+        url = request.get("url")
+        if not isinstance(url, str) or not re.match(r"https?://", url, re.I):
+            raise ValueError("download needs an http(s) url")
+        timeout = request.get("timeout", DOWNLOAD_SECONDS)
+        if (
+            not isinstance(timeout, (int, float))
+            or isinstance(timeout, bool)
+            or not 1 <= timeout <= DOWNLOAD_MAX_SECONDS
+        ):
+            raise ValueError(
+                f"timeout must be between 1 and {DOWNLOAD_MAX_SECONDS} seconds"
+            )
+        home = Path(self.env["HOME"])
+        destination = None
+        if request.get("to_file") is not None:
+            destination = private_path(home, request["to_file"])
+            if destination.exists() and request.get("overwrite") is not True:
+                raise ValueError(f"{destination} exists; pass overwrite to replace it")
+        folder = home / "Downloads"
+        folder.mkdir(mode=0o700, exist_ok=True)
+
+        def entries():
+            found = {}
+            for entry in os.scandir(folder):
+                if entry.is_file(follow_symlinks=False):
+                    stat = entry.stat(follow_symlinks=False)
+                    found[entry.name] = (stat.st_size, stat.st_mtime_ns)
+            return found
+
+        before = entries()
+        page = self.page_state(bridge, context).get("url")
+        started = time.monotonic()
+        try:
+            bridge.command(
+                "browsingContext.navigate",
+                {"context": context, "url": url, "wait": "none"},
+                timeout=30,
+            )
+        except browser.BrowserError as error:
+            # A navigation that becomes a download can be reported as aborted.
+            if "abort" not in str(error).lower():
+                raise ValueError(f"The download did not start: {error}") from None
+        last = {}
+        while True:
+            time.sleep(0.25)
+            now = entries()
+            partial = {n: v for n, v in now.items() if n.endswith(".part")}
+            new = {
+                n: v
+                for n, v in now.items()
+                if not n.endswith(".part")
+                and before.get(n) != v
+                and f"{n}.part" not in now
+            }
+            settled = {n: v for n, v in new.items() if last.get(n) == v[0]}
+            last = {n: v[0] for n, v in new.items()}
+            if settled and len(settled) == len(new) and not partial:
+                if len(settled) > 1:
+                    raise ValueError(
+                        f"{len(settled)} downloads finished at once "
+                        f"({', '.join(sorted(settled))}); start one at a time"
+                    )
+                name = next(iter(settled))
+                break
+            elapsed = time.monotonic() - started
+            if not new and not partial and elapsed >= DOWNLOAD_PAGE_SECONDS:
+                state = self.page_state(bridge, context)
+                ready = browser.remote_value(
+                    bridge.call("() => document.readyState", [], context)
+                )
+                if ready == "complete" and state.get("url") != page:
+                    where = re.sub(r"[?#].*", "", state.get("url") or "")
+                    raise ValueError(
+                        "The URL opened a page instead of a download "
+                        f"({state.get('title')!r} at {where}). It may need a "
+                        "login, or the browser shows this file type itself; "
+                        "nothing was saved"
+                    )
+            if elapsed >= timeout:
+                if partial or new:
+                    size = sum(v[0] for v in {**partial, **new}.values())
+                    raise ValueError(
+                        f"Still downloading after {timeout:g} s ({size} bytes so "
+                        "far in ~/Downloads); it continues in the background. "
+                        "Do not start it again"
+                    )
+                raise ValueError(f"No download started within {timeout:g} s")
+        path = folder / name
+        digest = hashlib.sha256()
+        with open(path, "rb") as file:
+            for block in iter(lambda: file.read(1 << 20), b""):
+                digest.update(block)
+        size = path.stat().st_size
+        if destination is not None:
+            shutil.move(path, destination)
+            os.chmod(destination, 0o600)
+            path = destination
+        return {
+            "downloaded": True,
+            "name": name,
+            "file": str(path),
+            "bytes": size,
+            "sha256": digest.hexdigest(),
+            "seconds": round(time.monotonic() - started, 1),
+            "context": context,
+        }
 
     @staticmethod
     def browser_observed(result, observe):

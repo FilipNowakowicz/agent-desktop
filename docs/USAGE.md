@@ -223,6 +223,7 @@ session. Then:
 | `wait` | until an element is found, or `gone` (up to 60 s); `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
+| `download` | fetch `url` with the browser's login and wait for the file; see below |
 
 `within` narrows a target to the row, list item, form or dialog containing a
 text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
@@ -267,6 +268,27 @@ start of mutation: a prefix may have executed. Validation failures before any
 mutation remain ordinary errors. Reconcile the actual state before retrying;
 there is no automatic rollback. These deadlines do not provide application
 transactions or guarantee that an external effect happened at most once.
+
+### Downloading files
+
+`download` navigates the current tab to `url` the way a click on a download link
+would, and waits until Firefox has finished writing the file (`timeout`, default
+120 s, up to 600). The tab keeps its page. The reply is a receipt: the file's `name`,
+its path (`file`, in the session's `~/Downloads`), `bytes`, `sha256` and `seconds`.
+With `to_file`, the file is moved there as 0600 (relative paths are in the session
+home; `overwrite` replaces an existing file). The URL is not repeated in the reply,
+since download links often carry a signed query.
+
+The download is recognised as the one new file in `~/Downloads` with no `.part`
+file beside it and a stable size, so start downloads one at a time. If the URL loads a
+page instead (a login redirect, or a type Firefox shows itself, such as a PDF without
+`Content-Disposition: attachment`), `download` says so and nothing is saved. If the
+timeout passes mid-transfer, it says so: the transfer continues in the background,
+and the download should not be started again. Private sessions only.
+
+```sh
+uv run agent-desktop browser SESSION download --url 'https://site.example/files/1/download' --to-file course/notes.pdf
+```
 
 ### Moving secrets without reading them
 

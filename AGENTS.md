@@ -6,6 +6,8 @@
   decisions, exact validation and remaining failures in
   `docs/project/DEVELOPMENT_LOG.md`.
 - Keep current product direction and deferred ideas in `docs/project/PROJECT_PLAN.md`.
+- To review how agents actually used the MCP, follow
+  `docs/project/USAGE_REVIEW.md` (the `usage-review` skill).
 - CI minutes are limited: PRs run only the Lint workflow. Run the desktop suite
   locally; trigger the full Checks matrix manually only for runtime, packaging or
   CI changes and milestones (see docs/VALIDATION.md).

@@ -6,7 +6,8 @@ from transcripts. Nobody asked the agents to report, so the list shows what peop
 in practice and how agents chose to do it. Benchmarks and scripted experiments are listed
 in [BENCHMARK.md](BENCHMARK.md) instead.
 
-Each new field report updates the table and the coverage below. Private details
+The list is kept with the [usage review workflow](project/USAGE_REVIEW.md); each new
+field report updates the table and the coverage below. Private details
 (accounts, course names, file names, cookie values) are never recorded here.
 
 ## Use cases

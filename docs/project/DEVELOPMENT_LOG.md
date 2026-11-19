@@ -5,6 +5,27 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Browser downloads with a receipt
+
+Added `desktop_browser` action `download` (CLI `browser SESSION download`). Both the
+Canvas and coursework field reports found agents opening download links, then
+polling the profile's `Downloads` with `ls -t`, `find -newer` and size checks to see
+whether a file had arrived. `download` navigates the tab (which keeps its page),
+waits for the one new file without a `.part` beside it to reach a stable size, and
+returns its name, path, bytes and SHA-256. It can move the file to a private
+`to_file`. It reports a page loaded instead (login redirect, inline viewer) without
+saving anything, and a timeout mid-transfer as still running, not failed. The URL is
+not echoed. `desktop_browser`'s `timeout` now defaults per action (wait 10 s,
+download 120 s). `private_path` is now shared by `send` and `download`.
+
+Validation: `tests/test_download.py`. Six unit tests use a fake Firefox that writes
+`NAME` and `NAME.part` like the real one. A desktop test uses real Firefox 160 and a
+local HTTP server: an attachment download whose receipt matched the served bytes,
+the tab staying on its page, and an HTML URL refused as a page. With the runtime on
+`PATH`, `test_browser` (15) passed after the default-timeout change. Not tested:
+redirects through a real login, duplicate filenames from Firefox's `name(1).ext`
+renaming, and downloads over 600 s.
+
 ## 2026-11-19 — Small fixes from the coursework field report
 
 Fixes for problems agents hit between 11-10 and 11-18 (see the coursework field

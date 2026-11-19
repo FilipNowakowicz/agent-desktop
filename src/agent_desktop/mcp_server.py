@@ -558,7 +558,7 @@ def desktop_browser(
     tab: int | None = None,
     new_tab: bool = False,
     gone: bool = False,
-    timeout: float = 10,
+    timeout: float | None = None,
     within: str | None = None,
     steps: list[dict] | None = None,
     seconds: float | None = None,
@@ -608,6 +608,13 @@ def desktop_browser(
     to a command's stdin (to_command=["gh", "secret", "set", "NAME"]; its output
     is discarded). The reply has only its bytes, sha256 and a prefix of reveal
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
+
+    action "download" fetches url with the browser's login and waits until the
+    file is complete (timeout, default 120 s, up to 600). It returns the file's
+    path in the session's ~/Downloads (or to_file, moved there as 0600), name,
+    bytes and sha256: don't poll the folder or repeat it. If the url opens a page
+    instead (a login, or a type the browser displays), it says so and saves
+    nothing.
 
     On a host session it uses the person's own Firefox, if they started it with
     --remote-debugging-port ("start" only connects): read any tab, but open

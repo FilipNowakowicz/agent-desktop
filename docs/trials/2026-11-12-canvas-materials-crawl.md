@@ -207,7 +207,11 @@ direction were made as part of this report.
 ## Follow-up status (2026-11-19)
 
 The [coursework report](2026-11-19-coursework-and-shell-tests.md) saw the same
-download and export friction in two more projects. Download receipts (1), a
-separate data export (2) and a supported cookie route for shell downloads were
-taken up as follow-up pull requests. The authenticated GET (3) is still a
+download and export friction in two more projects. Follow-up pull requests:
+download receipts (1) in
+[#204](https://github.com/FilipNowakowicz/agent-desktop/pull/204), a separate
+data export (2) in [#206](https://github.com/FilipNowakowicz/agent-desktop/pull/206),
+and a cookie route for shell downloads in
+[#205](https://github.com/FilipNowakowicz/agent-desktop/pull/205). The authenticated
+GET (3) and task-scoped metrics (4) are still open; the authenticated GET needs a
 maintainer decision.

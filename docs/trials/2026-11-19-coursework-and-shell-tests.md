@@ -205,3 +205,21 @@ summarised within about 30 days is lost.
 Across the three reports the pattern is stable: the browser bridge and private sessions
 are reliable enough for daily use. The open problems are about moving data and
 credentials between the browser and the shell.
+
+## Follow-up (2026-11-19)
+
+Pull requests opened for the suggestions above (all unmerged when this was written):
+
+| Suggestion | Pull request |
+| --- | --- |
+| 1. Cookies for shell tools | [#205](https://github.com/FilipNowakowicz/agent-desktop/pull/205) `send` source `cookies` (needs a maintainer decision) |
+| 2. Download receipts | [#204](https://github.com/FilipNowakowicz/agent-desktop/pull/204) `desktop_browser download` |
+| 3. GPU failures | [#203](https://github.com/FilipNowakowicz/agent-desktop/pull/203) tool text and a startup hint |
+| 4. Idle profile holders | [#203](https://github.com/FilipNowakowicz/agent-desktop/pull/203) the holder and its idle time in `profiles` and the refusal; no automatic release |
+| 5. Smaller fixes | [#203](https://github.com/FilipNowakowicz/agent-desktop/pull/203) folders for `to_file`, the 30-step message, `view-source:`. The host-prompt result belongs to [#196](https://github.com/FilipNowakowicz/agent-desktop/pull/196) |
+| 6. Tool surface | not started: a maintainer decision |
+| 7. Native apps on real data | [#203](https://github.com/FilipNowakowicz/agent-desktop/pull/203) a USAGE.md note |
+| Canvas report: large data export | [#206](https://github.com/FilipNowakowicz/agent-desktop/pull/206) `desktop_browser save` |
+
+The search itself became [#202](https://github.com/FilipNowakowicz/agent-desktop/pull/202),
+a review script and workflow.

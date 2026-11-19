@@ -27,6 +27,55 @@ guardian-lock test now also waits until the guardian's `/proc/PID/fd` lists the 
 file, which fails (timeout) on the previous worker.py and passes now; it then stops the
 guardian, kills the worker and checks the profile stays in use. `test_field_findings.py`
 6 OK. `ruff check` and `ruff format --check` pass. The Checks matrix was not run.
+## 2026-11-19 — Flaky script job tests: the timeout counted interpreter startup
+
+`tests/test_script_jobs.py` passed alone (13 OK) but, under the load of the full unit
+suite, a changing three or so of its timing tests failed. Reproduced by running the file
+repeatedly beside 24 busy-loop processes on 12 cores (the pattern of
+`scripts/lifecycle_stress.py --load`): on unmodified `main`, 10 of 10 runs failed, 3 to 6
+tests each, a different set every run.
+
+Root cause. `script_jobs.run` started its timeout clock at `Popen` of the supervisor, so
+the deadline also paid for the supervisor's interpreter, the script interpreter and
+`from agent_desktop.script import *`. A trivial job takes about 0.45 s idle and more
+under load. The tests used a 0.5 s timeout and then needed the script to have written a
+pid file, printed, journalled a call or had a child interpreter running, so under load
+the job was timed out before the script had run. Two further races sat in the tests:
+the pid file was read while the child might still be writing it, and a script that returned
+immediately was still reported `timed_out` when the supervisor's own cleanup (a fixed 0.3 s
+plus a reaping wait) overlapped the deadline. The latter is a small real defect:
+`timed_out` with `exit_code` null for a script that had already exited.
+
+Changes.
+
+- `src/agent_desktop/script_jobs.py`: the script's bootstrap imports the helpers and then
+  creates a `ready` marker; the timeout counts from that marker (from launch plus
+  `START_ALLOWANCE` of 10 s if it never appears). The supervisor creates an `exited`
+  marker when the script returns, and after that only a cleanup stalled for
+  `SUPERVISOR_GRACE` is timed out. The prefix import line left `code.py`, so traceback
+  line numbers of the user's code are now exact instead of one too high. The cancel
+  path is unchanged. `docs/USAGE.md` says the timeout counts from the script start.
+- Tests wait on conditions. Tests that need a child process to be running no longer race
+  a deadline: they wait for its (atomically written) pid file, then stop the job through
+  the same cleanup path (`run_until_child`; these were `timeout_*` tests and are now
+  `stopping_*`, with the real `timed_out` path still covered by the stopped-supervisor
+  and output tests). Children sleep 60 s so survival is judged only through `/proc`, and
+  the dead late-marker file check is gone. Scripts that return wait for their child first.
+  Whole-job bounds are 20 s rather than 2 to 7 s: they distinguish returning from
+  blocking (the scripts would run 30 s). Tests that only use the timeout as a stop use 1 s,
+  which is measured from the script start.
+- New `test_timeout_does_not_count_slow_startup` delays the supervisor 3 s with a 2 s
+  timeout and checks that a script finishing at once is not timed out. It fails on the
+  previous `script_jobs.py` (checked).
+
+Validation. Before and after: `test_script_jobs` run 10 times in a row beside 24 busy
+processes (the shared machine also had a load average of 85 to 113 from other work).
+`main`: 10 failing runs of 10. This change: 0 failing runs of 10. Alone: 14 OK. Under
+the nix desktop shell: `test_script_jobs.py` 14 OK, `test_run.py` 5 OK. `ruff check` and
+`ruff format --check` pass. Earlier iterations of this change failed 2 of 10 under the
+same load, from a 0.5 s timeout in the new test and a child that needed more than the
+timeout to start under load 90; both were removed by the changes above. The Checks matrix
+was not run.
 
 ## 2026-11-19 — A site's cookies for shell tools
 

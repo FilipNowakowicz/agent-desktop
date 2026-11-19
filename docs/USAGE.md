@@ -979,8 +979,9 @@ wait(title="Task terminal")
 print([window["title"] for window in windows()])
 ```
 
-A job ends when the script returns, fails, reaches its timeout (1–300 seconds),
-or its MCP call is cancelled. An independent Linux supervisor terminates its
+A job ends when the script returns, fails, reaches its timeout (1–300 seconds,
+counted from when the script starts running, so a loaded machine's interpreter
+startup does not use it up), or its MCP call is cancelled. An independent Linux supervisor terminates its
 ordinary process group, escalates to SIGKILL after a short grace period, and
 reaps its children. Inherited output handles do not extend the call indefinitely.
 Ordinary cleanup can add about 1.5 seconds beyond the script deadline;

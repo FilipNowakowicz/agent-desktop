@@ -64,9 +64,9 @@ whose 173 calls were made through the Python SDK and are not in any Claude Code 
 | Habit | Observed |
 | --- | --- |
 | Browser calls that were `steps` batches | 32 of 46, averaging 6.7 steps; one hit the 30-step limit and was refused |
-| Batches stopped early | 6: 4 unmet waits, 1 missing element, 1 `send` into a folder that did not exist |
+| Batches stopped early | 5: 2 unmet waits, 1 missing element, 1 `send` into a folder that did not exist, 1 refused `view-source:` URL |
 | Waits in batches | 74 fixed, 16 for text or a selector. The cloud report found 81 and 17 |
-| Coordinate input | 9 calls (6 clicks, 3 scrolls), all in Anki, 2 with an observation token, 9 with `screenshot=true` |
+| Coordinate input | 9 calls (6 clicks, 3 scrolls), all in Anki, 3 with an observation token, 9 with `screenshot=true` |
 | Screenshots | 11, of which 8 were scaled to 0.5–0.6 |
 | Session reuse across agents | Codex picked up the Canvas session Claude left running when its context ran out, and used it for two hours |
 | Longest idle session | 2 h 5 min with the `canvas` profile held, while a video download in the shell failed on a DNS outage |

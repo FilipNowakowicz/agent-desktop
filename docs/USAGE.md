@@ -321,7 +321,8 @@ removed. `to_file` creates a new 0600 file (relative paths are in the session
 home, and missing folders inside it are created 0700; `overwrite` replaces an
 existing one). `to_command` runs in the session
 with the value on stdin, and its output is discarded, since a command could print
-its input. The reply carries only `bytes`, `sha256`, the `exit_status` for a
+its input. The reply carries only `bytes`, `sha256`, the `exit_status` and
+`bytes_written` (how much of the value went to its stdin) for a
 command, and a `prefix` of `reveal` characters (default 4, 0 for none) to check
 that the right value was moved. If several elements match, nothing is sent and
 the matches are not listed. With the effect ledger on, the file is reported as
@@ -597,8 +598,14 @@ with the reason, since nothing was sent. Input already sent before the takeover
 is not undone. A slow `open`, a `send` to a command and a long `type` also give
 way within about 0.1 s, but they had already begun, so they are reported as
 uncertain with `interrupted`: the page may still finish loading, the command is
-killed after it was given the value, and typing says how many characters were
-sent before it stopped.
+killed while it runs and may have partly run (`bytes_written` and the error say
+how much of the value was written to its stdin, which can be part of a value
+over the 64 KiB pipe buffer), and typing says how many characters were
+sent before it stopped. An accessibility read (`desktop_ui`, a `ui` check or
+target lookup) stops between elements and is refused with `HumanControl`; a job's
+check that was stopped this way is `unknown` with the reason
+`human_control: observation interrupted`, never `violated`, since a partial tree
+is not evidence.
 If you choose another way (e.g. your own screen), the agent withdraws the request
 with `desktop_request_human(session, withdraw=true)` (CLI: `request-human SESSION
 --withdraw`) and keeps the session; a takeover already under way continues until

@@ -1,8 +1,11 @@
 """Deadline and post-delivery failures retain evidence without repeating input."""
 
 import json
+import os
+import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from agent_desktop import core, mcp_server
@@ -47,6 +50,68 @@ class DeliveryTests(unittest.TestCase):
             )
         self.assertNotIn("PLANTED", str(refused.exception))
         self.assertIn("nothing was sent", str(refused.exception))
+
+    def send_cookies_to(self, command, take_after=None):
+        """send source=cookies with a 200 KB value, over the pipe buffer."""
+        worker, _ = self.worker()
+        home = tempfile.TemporaryDirectory()
+        self.addCleanup(home.cleanup)
+        worker.env = {"HOME": home.name, "PATH": os.environ["PATH"]}
+        value = b"x" * 200_000
+        began = time.monotonic()
+        taken = mock.Mock(
+            side_effect=lambda: (
+                take_after is not None and time.monotonic() - began > take_after
+            )
+        )
+        with (
+            mock.patch(
+                "agent_desktop.worker.netscape_cookies", return_value=(value, 1)
+            ),
+            mock.patch.object(worker, "take_requested", taken, create=True),
+        ):
+            result = worker.send_secret(
+                {"source": "cookies", "site": "uni.example", "to_command": command},
+                {"selector": None, "text": None, "exact": False, "within": None},
+            )
+        return result, time.monotonic() - began, Path(home.name)
+
+    def test_send_to_a_command_counts_the_bytes_written(self):
+        result, _, home = self.send_cookies_to(["sh", "-c", 'cat > "$HOME/got"'])
+        self.assertEqual(result["exit_status"], 0, result)
+        self.assertEqual(result["bytes_written"], 200_000)
+        self.assertEqual((home / "got").stat().st_size, 200_000)
+
+    def test_take_while_the_value_is_written_says_how_much(self):
+        # The command never reads: the pipe fills and send is left writing.
+        result, seconds, _ = self.send_cookies_to(["sleep", "30"], take_after=0.3)
+        self.assertLess(seconds, 1.0)
+        written = result["bytes_written"]
+        self.assertTrue(0 < written < 200_000, result)
+        self.assertTrue(result["uncertain"] and result["interrupted"], result)
+        self.assertIsNone(result["exit_status"])
+        self.assertIn(f"after {written} of 200000 bytes", result["error"])
+        self.assertIn("may have partly run", result["error"])
+
+    def test_a_command_that_closes_its_input_early_reports_what_it_got(self):
+        result, _, _ = self.send_cookies_to(["true"])
+        self.assertEqual(result["exit_status"], 0, result)
+        self.assertLess(result["bytes_written"], 200_000)
+
+    def test_an_accessibility_read_stops_for_a_take(self):
+        from agent_desktop import atspi
+
+        reader = atspi.Accessibility.__new__(atspi.Accessibility)
+        children = {atspi.REGISTRY: [("app", "/a")], ("app", "/a"): [("w", "/w")]}
+        reader.children = lambda node: children.get(node, [])
+        reader.get = mock.Mock(return_value="App")
+        reader.describe = mock.Mock(
+            return_value=({"role": "frame", "name": "W", "states": []}, True)
+        )
+        self.assertEqual(len(reader.tree(interrupt=lambda: False)["nodes"]), 2)
+        # A partial tree is never returned: its absences are not evidence.
+        with self.assertRaises(atspi.Interrupted):
+            reader.tree(interrupt=lambda: True)
 
     def test_browser_wait_and_batches_have_larger_transport_budgets(self):
         step = {"action": "wait", "timeout": 60, "seconds": 30}

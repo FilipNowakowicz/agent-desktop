@@ -151,8 +151,14 @@ def evaluate(session, predicate, controller=None):
             evidence=evidence,
         )
     except (core.DesktopError, OSError, UnicodeError, ValueError) as error:
-        # Do not include file contents or exception paths in evidence errors.
-        result["reason"] = f"observation unavailable ({type(error).__name__})"
+        if isinstance(error, core.DesktopError) and str(error).startswith(
+            "HumanControl:"
+        ):
+            # A take stopped the read part way: nothing of it is evidence.
+            result["reason"] = "human_control: observation interrupted"
+        else:
+            # Do not include file contents or exception paths in evidence errors.
+            result["reason"] = f"observation unavailable ({type(error).__name__})"
     finally:
         result["observed_at"] = time.time()
     return result

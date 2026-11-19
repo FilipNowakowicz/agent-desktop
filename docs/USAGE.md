@@ -440,7 +440,15 @@ helper using the session process token. If the helper is killed, the next status
 read that finds it gone gives back its lease, as its own cleanup would: a temporary
 lease is released, and a named caller's goes back to its own duration. The record
 shows this as `lease_cleanup` (`complete`, `not_held` or `unknown`). Nothing is
-replayed, so reconcile recorded input before acting again. If `lease_cleanup` is
+replayed, so reconcile recorded input before acting again. A helper killed with a
+step in flight ends `delivery_unknown` and that step `uncertain`. Killed with no
+step in flight (between steps, or while a delivered step's expectation or
+observation was read) it ends `stopped`, with delivery as recorded; a job that
+holds keys stays `delivery_unknown`, since its keys are released after the last
+step. Killed during its checks or its lease cleanup, it keeps the state its steps
+reached, with `verification: unknown` if checks were requested. A cancel or a
+takeover that arrives during the checks leaves the steps' state alone: the checks
+still run, and those the person's control refuses are `unknown`. If `lease_cleanup` is
 `unknown`, release that recorded controller explicitly with `--controller
 CONTROLLER lease SESSION --release`.
 

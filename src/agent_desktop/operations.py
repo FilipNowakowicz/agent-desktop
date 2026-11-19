@@ -278,14 +278,21 @@ def status(session, operation_id):
     if record["state"] not in TERMINAL:
         alive = process_alive(record.get("pid"), record.get("process_start"))
         if not alive and record.get("outcome") in TERMINAL:
-            # Killed while checking: every step had already reached its state.
+            # Killed while checking or cleaning up: every step had already
+            # reached its state.
             record["state"] = record.pop("outcome")
-            record["verification"] = "unknown"
-            note = (
-                "Operation process exited during its checks "
-                f"({len(record['checks'])} of {len(record['predicates'])} recorded); "
-                "verification is unknown, delivery is as recorded"
-            )
+            if record["predicates"]:
+                record["verification"] = "unknown"
+                note = (
+                    "Operation process exited during its checks "
+                    f"({len(record['checks'])} of {len(record['predicates'])} "
+                    "recorded); verification is unknown, delivery is as recorded"
+                )
+            else:
+                note = (
+                    "Operation process exited after its steps ended; "
+                    "delivery is as recorded"
+                )
             # Keep why the steps ended (an error or a stop) ahead of the note.
             earlier = record.get("reason")
             record["reason"] = f"{earlier}. {note}" if earlier else note
@@ -294,10 +301,28 @@ def status(session, operation_id):
         # A submitter killed between spawn and the start gate cannot dispatch.
         # Keep a brief publication grace so readers do not race that handshake.
         elif not alive and time.time() - record["created_at"] > 3:
-            dispatched = any(s["dispatch_state"] != "pending" for s in record["steps"])
-            record["state"] = "delivery_unknown" if dispatched else "stopped"
+            states = [s["dispatch_state"] for s in record["steps"]]
+            dispatched = any(state != "pending" for state in states)
+            # Killed between steps, or while a delivered step's expectation or
+            # observation was read: no input was in flight, so every step's
+            # delivery is as recorded. Held keys are released after the last
+            # step without a step of their own, so such jobs stay unknown.
+            between = (
+                dispatched
+                and not {"dispatching", "uncertain"} & set(states)
+                and not any(
+                    s["request"].get("action") == "key_down" for s in record["steps"]
+                )
+            )
+            record["state"] = (
+                "delivery_unknown" if dispatched and not between else "stopped"
+            )
             record["reason"] = (
-                "Operation process exited; reconcile its recorded delivery before retrying"
+                "Operation process exited with no step in flight; delivery is as "
+                "recorded, and the last delivered step's expectation and "
+                "observation are unknown"
+                if between
+                else "Operation process exited; reconcile its recorded delivery before retrying"
                 if dispatched
                 else "Operation process exited before any recorded dispatch"
             )
@@ -718,11 +743,11 @@ def run_job(session, operation_id):
         terminal_state = record["state"]
         if acquired:
             record["state"] = "running"
-            # Delivery is settled before the checks run. If this process dies
-            # during them, a reader restores this state, with verification unknown.
+            # Delivery is settled before the checks and the lease cleanup. If
+            # this process dies during them, a reader restores this state (with
+            # verification unknown if there were checks).
             record["outcome"] = terminal_state
-            if record.get("predicates"):
-                save(path, record)
+            save(path, record)
             evaluate_checks(session, record, controller, path)
             try:
                 if record["release_lease"]:

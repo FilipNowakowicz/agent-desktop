@@ -46,7 +46,7 @@ validation behind each feature.
 | A runner crash before or after dispatch is told apart | tested | `test_operations` (crash phases, from saved records) |
 | A killed runner releases its controller lease | tested | Fixed 2026-11-11: `test_operations` (dead helper gives back its lease), reproduced below |
 | Interruption during application work, after a committed effect, or before evidence collection; cancellation during application work | tested | `test_interruptions` (2026-11-11). The helper is killed or cancelled at each boundary in a real session |
-| Interruption during evidence collection itself | tested | `test_interruptions` (2026-11-12): the helper is killed between twenty accessibility checks. The job keeps the state its steps reached, verification is `unknown`, and the checks that ran stay recorded. Before the fix it read `delivery_unknown` although every step had finished |
+| Interruption during evidence collection itself | tested | `test_interruptions` (2026-11-12): the helper is killed between twenty accessibility checks. The job keeps the state its steps reached, verification is `unknown`, and the checks that ran stay recorded. Before the fix it read `delivery_unknown` although every step had finished. 2026-11-19: killed while a delivered step's expectation is read, the job is `stopped` with delivery as recorded (it read `delivery_unknown` before the fix); a cancel during the checks leaves it `completed`, never `cancelled`; a takeover during the checks leaves it `completed` with verification `unknown`. Each types or clicks once |
 | Takeover while a job is running, and how long control takes to be acknowledged | tested | `test_takeover_jobs` (2026-11-11): a browser wait gives way within about 0.1 s (3.1 s before). `test_takeover_long_steps` (2026-11-19): during a slow `open`, a `send` to a command and a long `type`, take is acknowledged in 0.10–0.66 s (6.2, 6.2 and 10.8 s before; the test bound is 1 s). The interrupted step is reported as uncertain, and nothing reaches the page or runs afterwards |
 | Automatic retry, resume or rollback | unsupported | Never implemented; reconcile first instead (R2, R5b) |
 
@@ -130,7 +130,7 @@ holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
 ## Order for F1
 
 1. Release or restore the lease when a job's runner dies (done 2026-11-11).
-2. (Done 2026-11-11; during evidence collection 2026-11-12) Interrupt at each F1 boundary: before dispatch, after dispatch and before the
+2. (Done 2026-11-11; during evidence collection 2026-11-12 and 2026-11-19) Interrupt at each F1 boundary: before dispatch, after dispatch and before the
    acknowledgement, during application work, after a committed effect, and during
    evidence collection. Use the existing operation fixtures and a real session.
 3. Run takeover while a job is running, and measure how long control takes to be

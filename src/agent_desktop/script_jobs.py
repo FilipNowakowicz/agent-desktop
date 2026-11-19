@@ -20,6 +20,8 @@ CANCELLATION = contextvars.ContextVar("script_cancellation", default=None)
 OUTPUT_LIMIT = 8000
 JOURNAL_LIMIT = 1024 * 1024
 SUPERVISOR_GRACE = 3
+# A script that never reports that it started is timed from launch plus this.
+START_ALLOWANCE = 10
 
 
 def identity(pid):
@@ -150,7 +152,7 @@ def run(code, environment, timeout):
     cancelled = CANCELLATION.get()
     with tempfile.TemporaryDirectory(prefix="desktop-script-") as directory:
         root = Path(directory)
-        (root / "code.py").write_text("from agent_desktop.script import *\n" + code)
+        (root / "code.py").write_text(code)
         environment = {
             **environment,
             "AGENT_DESKTOP_SCRIPT_JOURNAL": str(root / "operations.jsonl"),
@@ -166,11 +168,26 @@ def run(code, environment, timeout):
         reason = None
         stopping_at = None
         recovered = False
+        # The timeout bounds the script's own run. Interpreter and helper
+        # import time, which load can stretch past a short timeout, is not
+        # charged; a script that never starts is bounded by START_ALLOWANCE.
+        clock = None
+        finished = None
         while supervisor.poll() is None:
             if reason is None:
+                if clock is None and (root / "ready").exists():
+                    clock = time.monotonic()
+                if finished is None and (root / "exited").exists():
+                    finished = time.monotonic()
+                due = (clock or started + START_ALLOWANCE) + timeout
+                if finished is not None:
+                    # The script has returned: only a supervisor cleanup that
+                    # stalls is timed out, not one that merely overlaps the
+                    # deadline.
+                    due = max(due, finished + SUPERVISOR_GRACE)
                 if cancelled is not None and cancelled.is_set():
                     reason = "cancelled"
-                elif time.monotonic() - started >= timeout:
+                elif time.monotonic() >= due:
                     reason = "timed_out"
                 if reason:
                     stopping_at = time.monotonic()
@@ -266,9 +283,11 @@ def supervise(root):
     # leaves a child that exits without executing user code.
     bootstrap = (
         "import sys,time\nfrom pathlib import Path\n"
-        "gate,code = map(Path,sys.argv[1:])\nend=time.monotonic()+5\n"
+        "gate,code,ready = map(Path,sys.argv[1:])\nend=time.monotonic()+5\n"
         "while not gate.exists():\n"
         " if time.monotonic()>=end: sys.exit(1)\n time.sleep(.01)\n"
+        "exec('from agent_desktop.script import *')\n"
+        "ready.touch()\n"
         "exec(compile(code.read_text(),'<desktop_run>','exec'))\n"
     )
     process = subprocess.Popen(
@@ -279,6 +298,7 @@ def supervise(root):
             bootstrap,
             str(root / "start"),
             str(root / "code.py"),
+            str(root / "ready"),
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -331,6 +351,7 @@ def supervise(root):
             if completed is not None
             else None
         )
+        (root / "exited").touch()
         # Keep the leader unreaped until the signal is sent: its PID cannot be
         # reused as an unrelated process group's ID during cleanup.
         # A script job ends when its parent returns as well as when cancelled.

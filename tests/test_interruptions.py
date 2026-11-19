@@ -26,6 +26,17 @@ PAGE = (
     '<button id="slow" onclick="setTimeout(() => '
     'count.textContent = +count.textContent + 1, 1500)">Slow</button>'
 )
+# More accessible nodes than any check or target lookup reads (2000), with a
+# second "Add" button past them: every read of this page is partial, by the node
+# limit or the 3 s time budget, and a unique match in it is not unique.
+CROWDED_PAGE = (
+    '<title>Crowded</title><p id="count">0</p>'
+    '<button id="add" onclick="count.textContent = +count.textContent + 1">Add</button>'
+    + "".join(f"<button>Row {i}</button>" for i in range(2500))
+    + '<p id="late">0</p>'
+    '<button id="late-add" onclick="late.textContent = +late.textContent + 1">'
+    "Add</button>"
+)
 TYPE_PAGE = (
     "<title>Typing</title><textarea id='box' autofocus></textarea>"
     "<p id='n'>0</p><script>box.oninput = () => n.textContent = box.value.length"
@@ -268,6 +279,84 @@ class InterruptionTests(unittest.TestCase):
         self.assertEqual(
             self.browser("find", selector="#box")["items"][0]["value"], "once"
         )
+
+    def start_crowded_page(self):
+        self.page.write_text(CROWDED_PAGE)
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(
+            self.browser("wait", selector="#late-add", timeout=30)["satisfied"]
+        )
+
+    def crowded_counts(self):
+        return (
+            self.browser("text", selector="#count")["text"],
+            self.browser("text", selector="#late")["text"],
+        )
+
+    def test_partial_coverage_checks_interrupted(self):
+        # R1 partial coverage under F1-a: checks over a partial tree are killed
+        # partway. What was recorded never claims absence or uniqueness, and
+        # the one click is not repeated.
+        self.start_crowded_page()
+        claims = [
+            {
+                "kind": "ui",
+                "query": {"element": "Add", "exact": True},
+                "claim": "unique",
+            },
+            {"kind": "ui", "query": {"element": "Missing"}, "claim": "absent"},
+            {"kind": "ui", "query": {"element": "Add", "exact": True}},
+        ]
+        job = operations.start(
+            self.session,
+            [{"action": "click", "selector": "#add"}],
+            kind="browser",
+            predicates=claims * 4,
+        )
+        result = self.kill_when(
+            job["operation_id"],
+            lambda r: r["state"] == "running" and 2 <= len(r["checks"]) < 12,
+        )
+        self.assertEqual(result["state"], "completed", result)
+        self.assertEqual(result["verification"], "unknown")
+        self.assertLess(len(result["checks"]), 12)
+        for index, check in enumerate(result["checks"]):
+            claim = claims[index % 3].get("claim", "exists")
+            if claim == "exists":
+                # A witness may be found in a partial read; it is never refuted.
+                self.assertIn(check["status"], ("satisfied", "unknown"), check)
+            else:
+                self.assertEqual(check["status"], "unknown", check)
+            if "coverage" in check["evidence"]:
+                # Every tree read of this page is partial.
+                coverage = check["evidence"]["coverage"]
+                self.assertTrue(coverage["truncated"] or coverage["unreadable"], check)
+        self.assertEqual(self.crowded_counts(), ("1", "0"))
+
+    def test_partial_coverage_target_after_an_interrupted_job(self):
+        # R1 partial coverage under F1-a: the job is killed before its
+        # accessibility action, and the action submitted again must refuse
+        # rather than press whichever "Add" a partial read happens to show.
+        self.start_crowded_page()
+        target = {"action": "ui_action", "element": "Add", "exact": True}
+        job = operations.start(
+            self.session,
+            [{"action": "wait", "seconds": 5}, {**target, "name": "press"}],
+        )
+        killed = self.kill_when(
+            job["operation_id"],
+            lambda r: r["steps"][0]["dispatch_state"] == "dispatching",
+        )
+        self.assertEqual(killed["state"], "delivery_unknown")
+        self.assertEqual(killed["steps"][1]["dispatch_state"], "pending")
+        retry = operations.start(self.session, [{**target, "name": "press"}])
+        result = self.finished(retry["operation_id"])
+        # Refused before any input: a known stop, not an uncertain one.
+        self.assertEqual(result["state"], "stopped", result)
+        self.assertEqual(result["steps"][0]["dispatch_state"], "failed")
+        self.assertIn("incomplete", result["steps"][0]["result"]["reason"])
+        time.sleep(1)
+        self.assertEqual(self.crowded_counts(), ("0", "0"))
 
     def test_cancel_during_application_work(self):
         # Cancellation is checked between steps: the pause in flight finishes,

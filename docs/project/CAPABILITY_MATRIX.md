@@ -33,6 +33,7 @@ validation behind each feature.
 | Stale observation tokens refuse input | tested | `test_capture`, `test_correctness`, `test_actions` |
 | Ambiguous, missing or disabled browser targets refuse without acting | tested | `test_browser`, `test_completion_targets` |
 | Partial accessibility reads never establish absence or uniqueness (R1) | tested | `test_completion_targets`, `test_tree_bounds` |
+| Partial accessibility reads under interruption: checks killed partway and a target submitted again after a killed job (R1 with F1) | tested | `test_interruptions` (2026-11-19): on a page whose every read is partial, recorded `unique` and `absent` checks stay `unknown` and the resubmitted accessibility action is refused before input; nothing is retargeted to the second match |
 | Browser target loss requires explicit reselection (R1) | tested | `test_browser`, `test_completion_targets` |
 | Delivered clicks that change nothing on a toggle are visible | missing | N3 in the execution plan |
 | Tab identity distinguishes document versions | unsupported | Context IDs track tabs, not documents (R1 limit) |
@@ -136,5 +137,5 @@ holds the lease. This is the first X1 (F1) patch, done on 2026-11-11.
 3. Run takeover while a job is running, and measure how long control takes to be
    acknowledged.
 4. Rerun the wrong-target and partial-coverage cases alongside interruptions. The
-   browser target-loss case was done on 2026-11-11 (`test_interruptions`); the partial
-   accessibility coverage case is still open.
+   browser target-loss case was done on 2026-11-11 and the partial accessibility
+   coverage case on 2026-11-19 (both `test_interruptions`).

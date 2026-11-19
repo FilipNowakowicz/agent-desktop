@@ -220,8 +220,11 @@ def main():
     bridge.add_argument("--within", help="text of the row, item or form holding it")
     bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
     bridge.add_argument(
-        "--source", choices=("element", "clipboard"), help="send: what to move"
+        "--source",
+        choices=("element", "clipboard", "cookies"),
+        help="send: what to move",
     )
+    bridge.add_argument("--site", help="send --source cookies: the domain")
     bridge.add_argument(
         "--to-file", help="send, download: a new 0600 file (relative: home)"
     )

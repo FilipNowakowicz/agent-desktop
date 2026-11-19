@@ -352,6 +352,25 @@ Hyprland 0.57.1 it did not come forward. A host screenshot taken within a second
 waits up to a second for the screen to settle, so a workspace switch is not caught
 halfway.
 
+
+#### A site's cookies for a shell tool
+
+Some downloads are better done outside the browser, such as a long video with
+`yt-dlp` or many files with `curl`. `send` with `source="cookies"` and
+`site="example.com"` writes the browser's live cookies for that site, its subdomains
+and the parent domains it would send cookies to, as a Netscape `cookies.txt`.
+Session-only cookies are included, which Firefox keeps in memory rather than in
+`cookies.sqlite`. The reply has only the count, bytes and digest:
+
+```sh
+uv run agent-desktop browser SESSION send --source cookies --site video.example --to-file cookies.txt
+yt-dlp --cookies ~/.local/state/agent-desktop/profiles/NAME/home/cookies.txt URL
+```
+
+Delete the file when done: it is a login. This replaces copying a profile's
+`cookies.sqlite` or session-restore files by hand, which an agent did in a field
+report. Private sessions only. The person's own Firefox is never exported.
+
 ## Action sequences
 
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)

@@ -578,6 +578,7 @@ def desktop_browser(
     seconds: float | None = None,
     context: str | None = None,
     source: str | None = None,
+    site: str | None = None,
     to_file: str | None = None,
     to_command: list[str] | None = None,
     reveal: int | None = None,
@@ -622,6 +623,10 @@ def desktop_browser(
     to a command's stdin (to_command=["gh", "secret", "set", "NAME"]; its output
     is discarded). The reply has only its bytes, sha256 and a prefix of reveal
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
+    When a shell tool (curl, yt-dlp) needs the browser's login, use
+    source="cookies" with site="example.com": it writes the live cookies for
+    that site as a Netscape cookies.txt and returns only their count; never
+    copy a profile's cookie files by hand. Delete the file when done.
 
     For data too large or too long to read here (an API listing, a long
     table), action "save" writes the page's text, or one element's
@@ -658,6 +663,7 @@ def desktop_browser(
         "steps": steps,
         "seconds": seconds,
         "source": source,
+        "site": site,
         "to_file": to_file,
         "to_command": to_command,
         "reveal": reveal,

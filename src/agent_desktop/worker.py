@@ -292,6 +292,57 @@ HOST_SETTLE_AFTER = 1.0
 
 
 # Values moved by browser "send" (secrets such as generated API keys).
+COOKIE_BYTES = 1024 * 1024
+
+
+def netscape_cookies(bridge, site):
+    """The browser's live cookies for one site, as a Netscape cookies.txt.
+
+    Read with BiDi storage.getCookies, so session-only cookies that Firefox
+    keeps in memory are included. site matches the domain and its subdomains
+    (and the parent domains' cookies the site would also receive). Returns
+    (bytes, count); the values never reach the reply.
+    """
+    if not isinstance(site, str) or not re.fullmatch(
+        r"[a-z0-9.-]+\.[a-z]{2,}|localhost|\d{1,3}(\.\d{1,3}){3}", site.lower()
+    ):
+        raise ValueError("The cookies source needs site, a domain such as example.com")
+    site = site.lower().strip(".")
+    cookies = bridge.command("storage.getCookies", {})["cookies"]
+    lines = ["# Netscape HTTP Cookie File"]
+    count = 0
+    for cookie in cookies:
+        domain = (cookie.get("domain") or "").lower()
+        bare = domain.lstrip(".")
+        if not (bare == site or bare.endswith("." + site) or site.endswith("." + bare)):
+            continue
+        value = cookie.get("value") or {}
+        if value.get("type") != "string":
+            continue  # base64 values are binary; tools expect text
+        expiry = cookie.get("expiry") or 0
+        flag = "TRUE" if domain.startswith(".") else "FALSE"
+        prefix = "#HttpOnly_" if cookie.get("httpOnly") else ""
+        fields = (
+            prefix + domain,
+            flag,
+            cookie.get("path") or "/",
+            "TRUE" if cookie.get("secure") else "FALSE",
+            str(int(expiry)),
+            cookie.get("name") or "",
+            value.get("value") or "",
+        )
+        if any("\t" in f or "\n" in f for f in fields):
+            continue
+        lines.append("\t".join(fields))
+        count += 1
+    if not count:
+        raise ValueError(f"The browser has no cookies for {site}; sign in first")
+    data = ("\n".join(lines) + "\n").encode()
+    if len(data) > COOKIE_BYTES:
+        raise ValueError(f"The cookies for {site} exceed {COOKIE_BYTES} bytes")
+    return data, count
+
+
 def private_path(home, to_file):
     """A file path for send or download: relative paths are in the session home.
 
@@ -1508,8 +1559,9 @@ class Worker:
     def send_secret(self, request, target):
         """Move a value to a file or a command's stdin without returning it.
 
-        The source is one page element's text (or a field's value) or the
-        session clipboard. The reply gives only its length, an optional short
+        The source is one page element's text (or a field's value), the
+        session clipboard, or the browser's cookies for one site (Netscape
+        format, for tools such as curl or yt-dlp). The reply gives only its length, an optional short
         prefix and a SHA-256 digest; command output is discarded, since a
         command could print its input. This keeps the value out of the agent's
         transcript and the runtime's records; it is not confinement.
@@ -1539,7 +1591,20 @@ class Worker:
         if to_file is not None:
             path = private_path(home, to_file)
         source = request.get("source", "element")
-        if source == "clipboard":
+        cookie_count = None
+        if source == "cookies":
+            if host:
+                raise ValueError(
+                    "The cookies source is for private sessions only: the "
+                    "person's own cookies are never exported"
+                )
+            if not self.attach_browser():
+                raise ValueError('No bridged Firefox; use action "start" first')
+            bridge = self.browser[0]
+            bridge.deadline = request.get("deadline")
+            value, cookie_count = netscape_cookies(bridge, request.get("site"))
+            reveal = 0
+        elif source == "clipboard":
             if host:
                 raise ValueError("The clipboard source is for private sessions only")
             try:
@@ -1586,8 +1651,8 @@ class Worker:
             if len(value) > SECRET_BYTES:
                 raise ValueError(f"The value is longer than {SECRET_BYTES} bytes")
         else:
-            raise ValueError('source must be "element" or "clipboard"')
-        if request.get("strip", True):
+            raise ValueError('source must be "element", "clipboard" or "cookies"')
+        if request.get("strip", True) and cookie_count is None:
             value = value.strip()
         if not value:
             raise ValueError("The value is empty")
@@ -1598,6 +1663,8 @@ class Worker:
         }
         if reveal:
             result["prefix"] = value.decode(errors="replace")[:reveal]
+        if cookie_count is not None:
+            result["cookies"] = cookie_count
         if to_file is not None:
             if self.effects:
                 self.effects.hide(path)

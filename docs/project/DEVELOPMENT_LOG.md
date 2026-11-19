@@ -5,6 +5,21 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Save large page text to a file
+
+Added `desktop_browser` action `save` (CLI `browser SESSION save`). The Canvas
+report's export stopped twice on `send`'s 64 KiB secret limit and was worked around
+with smaller pages. Agents used `send`, a secret transport, as a data export.
+`save` writes the page's visible text, or one element's, to a 0600 `to_file`, up to
+8 MiB (under the 16 MiB BiDi message limit). It is the whole text or nothing,
+written to a temporary file and renamed, and the reply has only bytes, characters,
+SHA-256 and the page's url and title. `send` keeps its limit and minimal reply for
+secrets.
+
+Validation: `tests/test_save.py`. Two unit tests cover a listing larger than 64 KiB,
+the overwrite rule, ambiguous targets, the size limit with no partial file, and the
+missing `to_file`. A desktop test saved a 193 KB `<pre>` from real Firefox 160 whole.
+
 ## 2026-11-19 — Browser downloads with a receipt
 
 Added `desktop_browser` action `download` (CLI `browser SESSION download`). Both the

@@ -609,6 +609,11 @@ def desktop_browser(
     is discarded). The reply has only its bytes, sha256 and a prefix of reveal
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
 
+    For data too large or too long to read here (an API listing, a long
+    table), action "save" writes the page's text, or one element's
+    (selector/text; for JSON click "Raw Data" and save "pre"), to to_file and
+    returns bytes and sha256 only, up to 8 MiB. Then read the file locally.
+
     action "download" fetches url with the browser's login and waits until the
     file is complete (timeout, default 120 s, up to 600). It returns the file's
     path in the session's ~/Downloads (or to_file, moved there as 0600), name,

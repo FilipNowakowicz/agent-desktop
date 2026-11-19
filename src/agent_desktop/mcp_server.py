@@ -292,8 +292,11 @@ def desktop_create(
     system bus and common host-affecting commands (power, network, Bluetooth,
     brightness, pkill) for applications in the session; use it when testing
     panels, widgets or scripts that could change the real machine. renderer is
-    pixman (software, the default), gles2 or vulkan; a compositor or shell under
-    test usually needs gles2, with render_device such as /dev/dri/renderD128.
+    pixman (software, the default), gles2 or vulkan. A compositor or shell under
+    test may need gles2, with render_device such as /dev/dri/renderD128, but a
+    GPU renderer starts only if the server was given the runtime's Mesa (see
+    "GPU rendering" in USAGE.md); if create fails with EGL_EXT_platform_base or
+    GBM, retry without renderer.
     size is WIDTHxHEIGHT for a headless desktop (default 1280x720); admin
     consoles and wide pages fit better at 1920x1080, at the cost of larger
     screenshots (scale them down).

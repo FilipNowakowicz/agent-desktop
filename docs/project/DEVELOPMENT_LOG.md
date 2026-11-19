@@ -5,6 +5,20 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Usage review workflow
+
+Added `scripts/usage_review.py`, [USAGE_REVIEW.md](USAGE_REVIEW.md) and a
+`usage-review` skill, so a field report no longer starts with ad-hoc transcript
+searches. The script reads Claude Code and Codex transcripts, counts each Agent
+Desktop call once, and flags shell workarounds, errors, batch stops, session leaks and
+idle sessions, the person's remarks near calls and tools nobody called. It writes a
+private 0700 folder outside the repository. On 2026-11-10 to 11-18 it reproduced the
+coursework report's 149 calls in 10 transcripts and corrected two of its hand counts
+(5 batch stops, not 6; 3 coordinate calls with an observation, not 2). Validation:
+`tests/test_usage_review.py` (4 tests) with synthetic transcripts in both formats, plus
+`ruff`. Transcripts expire after about 30 days, so the workflow asks for a review
+every two to three weeks.
+
 ## 2026-11-19 — Coursework and shell-testing field report
 
 Reconstructed unrequested MCP use from 2026-11-10 to 2026-11-18 in

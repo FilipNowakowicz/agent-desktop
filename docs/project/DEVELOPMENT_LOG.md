@@ -77,6 +77,63 @@ guardian-lock test now also waits until the guardian's `/proc/PID/fd` lists the 
 file, which fails (timeout) on the previous worker.py and passes now; it then stops the
 guardian, kills the worker and checks the profile stays in use. `test_field_findings.py`
 6 OK. `ruff check` and `ruff format --check` pass. The Checks matrix was not run.
+## 2026-11-19 — Interruptions during evidence collection (F1-a, #181)
+
+The last F1-a gap: a durable job interrupted after its effect, while its evidence
+is read. #193 covered a kill between the job's checks. Three more interruptions
+now have tests in `tests/test_interruptions.py`:
+
+- **Killed while a step's expectation is read.** An actions job types `once`
+  into a page, then waits up to 10 s for an `expect` title that never appears; the
+  helper is killed once the step is `acknowledged`. This found a wrong state: the
+  reader that found the helper dead reported `delivery_unknown`, "reconcile its
+  recorded delivery before retrying", although no input was in flight and the step
+  was acknowledged. Now a helper killed with no step `dispatching` or `uncertain`
+  ends `stopped`, delivery as recorded, with a reason that says the last delivered
+  step's expectation and observation are unknown. The step after it stays
+  `pending`, and the page holds `once`, typed once. A job with a `key_down` step
+  stays `delivery_unknown`, because its keys are released after the last step
+  without a step record of their own. Without the fix the test fails with
+  `'delivery_unknown' != 'stopped'`.
+- **Cancel during the checks.** A one-click browser job with twenty checks is
+  cancelled after the first check is recorded. It stays `completed` with
+  `cancel_requested: true`; the click is not reported as cancelled, all twenty
+  read-only checks still run, and the page count is 1. Already correct.
+- **Takeover during the checks.** The same job, with `take` sent after the first
+  check. It stays `completed` with verification `unknown`; later checks are
+  `human_control: observation refused`, the lease is released and the count stays
+  1 after the person hands back. Already correct. Take was acknowledged in 0.11 s
+  and 0.27 s in two unloaded probe runs and in 2.79 s on a host at load average
+  about 100 (see below): an accessibility read does not check for a take, so a
+  take waits for the read in progress, which stops at its 3 s budget. The test
+  bound is 5 s.
+
+A smaller window had the same wrong state: a helper killed during its lease
+cleanup after its steps, in a job without checks, read as `delivery_unknown`
+because `outcome` was only saved for jobs with checks. It is now saved for every
+job, and the restored record keeps `verification: not_requested`. Two unit tests
+in `test_operations` cover both readings from saved records.
+
+The kill during a check still lands by timing (twenty checks of about 0.1–3 s
+each), not through a fault-injection hook; the record cannot tell a kill inside a
+check from one between two checks, and both read the same.
+
+Validation (worktree on `12fe69b`, nix shell with labwc, foot, grim, wtype,
+wlrctl, wayvnc, tigervnc, dbus, firefox, plus the managed runtime's `bin` first on
+PATH for accessibility):
+
+- `uv run ruff check src scripts tests` and `ruff format --check`: pass.
+- `-p 'test_operations.py' -k OperationTests`: 15 OK (two new; both fail without
+  the fix).
+- `-p 'test_interruptions.py'`: 9 OK (three new). `-p 'test_operations.py'`:
+  21 OK (desktop and unit).
+- The host ran at load average 90–110 throughout, from unrelated processes
+  outside this project. A first run of `test_interruptions` under it had two
+  errors from Firefox refusing a new BiDi session ("Maximum number of active
+  sessions") in `setUp`-started browsers and the 2.79 s take above against a 1 s
+  bound; the rerun after the bound change passed.
+- The full desktop suite was run on the stacked F1-c branch, which contains this
+  change; its result is in that entry.
 
 ## 2026-11-19 — A site's cookies for shell tools
 

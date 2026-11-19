@@ -137,6 +137,44 @@ class OperationTests(unittest.TestCase):
                 if phase == "dispatching":
                     self.assertEqual(result["steps"][0]["dispatch_state"], "uncertain")
 
+    def test_crash_with_no_step_in_flight_keeps_recorded_delivery(self):
+        # Killed while a delivered step's expectation or observation was read,
+        # or between steps: nothing was in flight, so this is a known stop.
+        self.record.update(state="running", completed=1)
+        self.record["steps"][0].update(
+            dispatch_state="acknowledged", result={"delivered": True}
+        )
+        operations.save(self.path, self.record)
+        result = operations.status(self.session, self.ident)
+        self.assertEqual(result["state"], "stopped")
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["steps"][0]["dispatch_state"], "acknowledged")
+        self.assertEqual(result["steps"][1]["dispatch_state"], "pending")
+        self.assertIn("no step in flight", result["reason"])
+        # Held keys are released after the last step without a step of their
+        # own, so a job that held keys stays unknown.
+        self.record.update(kind="actions")
+        self.record["steps"][0]["request"] = {"action": "key_down", "key": "Shift_L"}
+        operations.save(self.path, self.record)
+        result = operations.status(self.session, self.ident)
+        self.assertEqual(result["state"], "delivery_unknown")
+
+    def test_crash_during_lease_cleanup_restores_the_outcome(self):
+        self.record.update(
+            state="running",
+            outcome="completed",
+            completed=2,
+            result={"completed": 2, "total": 2, "stopped": None},
+        )
+        for step in self.record["steps"]:
+            step.update(dispatch_state="acknowledged", result={"delivered": True})
+        operations.save(self.path, self.record)
+        result = operations.status(self.session, self.ident)
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(result["verification"], "not_requested")
+        self.assertNotIn("outcome", result)
+        self.assertIn("after its steps ended", result["reason"])
+
     def test_missing_illtyped_and_oversized_evidence_is_unknown(self):
         for mutation in (
             lambda r: r.pop("steps"),

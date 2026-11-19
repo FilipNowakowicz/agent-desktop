@@ -1,9 +1,10 @@
 """F1: durable jobs interrupted at each boundary (real private sessions).
 
-Each test kills the job's helper at one boundary and checks what the record
-says against what the page actually shows: delivered steps stay delivered,
-work the application finishes later is not repeated, and verification is
-never claimed without its checks.
+Each test kills, cancels or takes over the job at one boundary and checks what
+the record says against what the page actually shows: delivered steps stay
+delivered, work the application finishes later is not repeated, cancellation
+is never claimed for work already issued, and verification is never claimed
+without its checks.
 """
 
 import json
@@ -25,6 +26,11 @@ PAGE = (
     '<button id="slow" onclick="setTimeout(() => '
     'count.textContent = +count.textContent + 1, 1500)">Slow</button>'
 )
+TYPE_PAGE = (
+    "<title>Typing</title><textarea id='box' autofocus></textarea>"
+    "<p id='n'>0</p><script>box.oninput = () => n.textContent = box.value.length"
+    "</script>"
+)
 
 
 @unittest.skipUnless(
@@ -43,6 +49,17 @@ class InterruptionTests(unittest.TestCase):
 
     def count(self):
         return self.browser("text", selector="#count")["text"]
+
+    def finished(self, ident):
+        return wait_for(
+            lambda: (
+                r
+                if (r := operations.status(self.session, ident))["state"]
+                in operations.TERMINAL
+                else None
+            ),
+            timeout=30,
+        )
 
     def kill_when(self, ident, ready):
         running = wait_for(
@@ -154,6 +171,103 @@ class InterruptionTests(unittest.TestCase):
         self.assertLess(len(result["checks"]), 20)
         self.assertIn("checks", result["reason"])
         self.assertEqual(self.count(), "1")
+
+    def checking_job(self):
+        """A one-click job whose twenty checks take long enough to interrupt."""
+        self.start_page()
+        context = self.browser("tabs")["tabs"][0]["context"]
+        predicates = [{"kind": "browser_context", "context": context}] + [
+            {"kind": "ui", "query": {"element": "Add"}} for _ in range(19)
+        ]
+        job = operations.start(
+            self.session,
+            [{"action": "click", "selector": "#add"}],
+            kind="browser",
+            predicates=predicates,
+        )
+        ident = job["operation_id"]
+        wait_for(
+            lambda: (
+                (r := operations.status(self.session, ident))["state"] == "running"
+                and 1 <= len(r["checks"]) < 20
+            ),
+            timeout=20,
+        )
+        return ident
+
+    def test_cancel_during_evidence_collection(self):
+        # The click was issued and acknowledged before the checks began: a
+        # cancel that arrives during them must not turn it into "cancelled".
+        ident = self.checking_job()
+        operations.cancel(self.session, ident)
+        result = self.finished(ident)
+        self.assertEqual(result["state"], "completed", result)
+        self.assertTrue(result["cancel_requested"])
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["steps"][0]["dispatch_state"], "acknowledged")
+        # The checks are read-only, so they still run to the end.
+        self.assertEqual(len(result["checks"]), 20)
+        self.assertEqual(self.count(), "1")
+        self.assertIsNone(core.request(self.session, "status")["lease"])
+
+    @unittest.skipUnless(shutil.which("wayvnc"), "wayvnc unavailable")
+    def test_takeover_during_evidence_collection(self):
+        ident = self.checking_job()
+        started = time.monotonic()
+        self.assertEqual(core.request(self.session, "take")["owner"], "human")
+        # The worker serves one request at a time, and an accessibility read
+        # does not give way to a take: it waits for the read in progress,
+        # which stops at its 3 s budget.
+        self.assertLess(time.monotonic() - started, 5.0)
+        result = self.finished(ident)
+        # Delivery stays known; the checks the person's control refused leave
+        # the verification unknown, never satisfied.
+        self.assertEqual(result["state"], "completed", result)
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["verification"], "unknown")
+        self.assertEqual(len(result["checks"]), 20)
+        self.assertIn(
+            "human_control: observation refused",
+            [c["reason"] for c in result["checks"]],
+        )
+        self.assertIsNone(core.request(self.session, "status")["lease"])
+        core.request(self.session, "release")
+        time.sleep(1)
+        self.assertEqual(self.count(), "1")
+
+    def test_during_a_steps_expectation(self):
+        # The text was typed and acknowledged; the helper is killed while the
+        # step's expectation is read. No input was in flight, so the record is
+        # a known stop, and the text is typed once.
+        self.page.write_text(TYPE_PAGE)
+        self.browser("start", url=self.page.as_uri())
+        self.assertTrue(self.browser("wait", selector="#box", timeout=20)["satisfied"])
+        self.browser("click", selector="#box")
+        job = operations.start(
+            self.session,
+            [
+                {
+                    "action": "type",
+                    "text": "once",
+                    "expect": {"title": "Never shown", "timeout": 10},
+                },
+                {"action": "type", "text": "twice"},
+            ],
+        )
+        result = self.kill_when(
+            job["operation_id"],
+            lambda r: r["steps"][0]["dispatch_state"] == "acknowledged",
+        )
+        self.assertEqual(result["state"], "stopped", result)
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["steps"][0]["dispatch_state"], "acknowledged")
+        self.assertEqual(result["steps"][1]["dispatch_state"], "pending")
+        self.assertIn("no step in flight", result["reason"])
+        self.assertEqual(result["lease_cleanup"], "complete")
+        time.sleep(1)
+        self.assertEqual(
+            self.browser("find", selector="#box")["items"][0]["value"], "once"
+        )
 
     def test_cancel_during_application_work(self):
         # Cancellation is checked between steps: the pause in flight finishes,

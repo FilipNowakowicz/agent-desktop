@@ -5,6 +5,20 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — Usage review: VPN token and quota check
+
+Ran `scripts/usage_review.py --since 2026-11-18` (83 calls, 6 transcripts, 24 flags)
+and `agent-desktop activity --days 3` (9 sessions, 56 operations). 28 calls were already
+in the 11-19 report. The rest is one NixOS-repo use (53 calls) and two scripted hook
+checks. Report: docs/trials/2026-11-20-vpn-token-and-quota-check.md.
+
+Main findings: a `desktop_browser` `find` step returned a generated API token in its
+element text before `send` moved it to a file. The agent deleted a site's rows from a
+profile's `cookies.sqlite` by hand, because it didn't know about `forget-site`.
+Session-only logins can't be imported. A `covered:` refusal named only `div`. The
+cookies `send` source (#205) was used successfully a day after it landed. No idle
+profile holds or GPU failures were seen. No tests were run.
+
 ## 2026-11-20 — F3 first stage: lifecycle events checked against LIFETIMES.md
 
 Roadmap F3 / plan X3. Before this, `test_runtime`, `test_profiles`,

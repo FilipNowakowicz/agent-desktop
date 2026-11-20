@@ -5,6 +5,34 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — hyprctl for a nested Hyprland with a short runtime (N8 follow-up)
+
+The 2026-11-11 shim only passed `hyprctl` through when `XDG_RUNTIME_DIR` was the
+session's own runtime directory. A real Hyprland cannot live there: with a 12-character
+session id and a 62-character instance signature, `<runtime>/hypr/<sig>/.socket2.sock`
+is about 123 bytes, past the Unix socket limit, so harnesses such as the nix repo's
+`tests/quiet-shell/nested.sh` use a short `/run/user/<uid>/q.XXXX` and were refused.
+The shim now accepts any `XDG_RUNTIME_DIR` whose `hypr` directory, with symlinks
+resolved, is not the host's and holds the named instance's socket. Signatures with `/`
+are refused, since they could walk back into the host's directory. The guard test adds
+a short runtime (allowed), the host runtime with and without a signature, a runtime
+whose `hypr` links to the host's, and a `../` signature (all refused); it fails on the
+old shim.
+
+Review found two more ways out. `hyprctl --instance`/`-i` joins its value to the socket
+path unchecked, so `-i ../…/hypr/<host sig>` reached the host while the shim only
+looked at the environment (the 11-11 shim had this too). And when the server runs
+without `XDG_RUNTIME_DIR`, sessions live under `/tmp/agent-desktop-<uid>`, so the shim's
+idea of the host's `hypr` was wrong and `XDG_RUNTIME_DIR=/run/user/<uid>` passed. The
+shim now takes the instance from `-i`/`--instance` as well as the environment, refuses
+the login runtime's `hypr` too, and refuses an instance directory or socket that is a
+link out of the private runtime (numeric `-i` indexes check every instance there).
+The test adds `-i` and `--instance` traversals, a linked instance with and without a
+signature, and an allowed `-i 0`; it fails on the first version of this change. The
+`/run/user/<uid>` case is not tested, since it would aim at the real host. Validated
+with `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#dbus --command uv run
+python -m unittest discover -s tests -p test_guard.py`: 10 passed.
+
 ## 2026-11-20 — Usage review: VPN token and quota check
 
 Ran `scripts/usage_review.py --since 2026-11-18` (83 calls, 6 transcripts, 24 flags)

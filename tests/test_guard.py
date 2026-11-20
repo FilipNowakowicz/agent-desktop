@@ -5,6 +5,7 @@ Only harmless commands are used, so a broken guard cannot change the host.
 
 import os
 import shutil
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -87,6 +88,13 @@ class HomeVariableTests(unittest.TestCase):
         self.assertEqual(
             home_variables(env, {"/home/ada"}), ["CARGO_HOME", "MOZ_APP_DATA", "PWD"]
         )
+
+
+def bind(path):
+    """Leave a Unix socket at path, standing in for a Hyprland instance's."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with socket.socket(socket.AF_UNIX) as s:
+        s.bind(str(path))
 
 
 @unittest.skipUnless(
@@ -175,6 +183,19 @@ class GuardTests(unittest.TestCase):
             os.environ["PATH"] = path
         self.sessions.append(session)
         runtime = Path(core.manifest(session)["runtime"])
+        # The host's Hyprland, as the shim sees it: sockets in the host runtime.
+        host = Path(self.temporary.name) / "runtime"
+        bind(host / "hypr" / "hostsig" / ".socket.sock")
+        # A harness's short private runtime, like tests/quiet-shell/nested.sh's.
+        short = Path(tempfile.mkdtemp(prefix="q.", dir=self.temporary.name))
+        bind(short / "hypr" / "short" / ".socket.sock")
+        linked = Path(tempfile.mkdtemp(prefix="l.", dir=self.temporary.name))
+        (linked / "hypr").symlink_to(host / "hypr")
+        # A private runtime whose instance directory links to the host's.
+        inner = Path(tempfile.mkdtemp(prefix="n.", dir=self.temporary.name))
+        (inner / "hypr").mkdir()
+        (inner / "hypr" / "evil").symlink_to(host / "hypr" / "hostsig")
+        up = f"../../{host.name}/hypr/hostsig"
         probe = (
             'hyprctl version; echo "before=$?"; '
             'mkdir -p "$XDG_RUNTIME_DIR/hypr/nested" && '
@@ -182,7 +203,24 @@ class GuardTests(unittest.TestCase):
             '.bind(sys.argv[1])\' "$XDG_RUNTIME_DIR/hypr/nested/.socket.sock"; '
             'HYPRLAND_INSTANCE_SIGNATURE=nested hyprctl version; echo "nested=$?"; '
             'HYPRLAND_INSTANCE_SIGNATURE=hostsig hyprctl version; echo "other=$?"; '
-            'XDG_RUNTIME_DIR=/nonexistent hyprctl version; echo "host=$?"'
+            'XDG_RUNTIME_DIR=/nonexistent hyprctl version; echo "missing=$?"; '
+            f"XDG_RUNTIME_DIR={short} HYPRLAND_INSTANCE_SIGNATURE=short "
+            'hyprctl version; echo "short=$?"; '
+            f"XDG_RUNTIME_DIR={host} HYPRLAND_INSTANCE_SIGNATURE=hostsig "
+            'hyprctl version; echo "host=$?"; '
+            f'XDG_RUNTIME_DIR={host} hyprctl version; echo "hostany=$?"; '
+            f"XDG_RUNTIME_DIR={linked} HYPRLAND_INSTANCE_SIGNATURE=hostsig "
+            'hyprctl version; echo "linked=$?"; '
+            f"XDG_RUNTIME_DIR={short} "
+            f"HYPRLAND_INSTANCE_SIGNATURE=../../{host.name}/hypr/hostsig "
+            'hyprctl version; echo "escape=$?"; '
+            f'XDG_RUNTIME_DIR={short} hyprctl -i {up} version; echo "flag=$?"; '
+            f"XDG_RUNTIME_DIR={short} HYPRLAND_INSTANCE_SIGNATURE=short "
+            f'hyprctl --instance {up} version; echo "longflag=$?"; '
+            f"XDG_RUNTIME_DIR={inner} HYPRLAND_INSTANCE_SIGNATURE=evil "
+            'hyprctl version; echo "inner=$?"; '
+            f'XDG_RUNTIME_DIR={inner} hyprctl version; echo "innerany=$?"; '
+            f'XDG_RUNTIME_DIR={short} hyprctl -i 0 version; echo "index=$?"'
         )
         app = core.request(session, "launch", argv=["sh", "-c", probe])
 
@@ -198,7 +236,13 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(lines["nested"], "0", text)
         self.assertIn("real hyprctl version", text)
         self.assertEqual(lines["other"], "1", text)
-        self.assertEqual(lines["host"], "1", text)
+        self.assertEqual(lines["missing"], "1", text)
+        self.assertEqual(lines["short"], "0", text)
+        self.assertEqual(lines["index"], "0", text)
+        refused = ("host", "hostany", "linked", "escape", "flag", "longflag")
+        for name in refused + ("inner", "innerany"):
+            self.assertEqual(lines[name], "1", f"{name}: {text}")
+        self.assertEqual(text.count("real hyprctl"), 3, text)
         self.assertTrue((runtime / "hypr" / "nested").is_dir())
 
     def test_launch_directory(self):

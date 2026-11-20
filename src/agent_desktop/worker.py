@@ -1073,17 +1073,52 @@ class Worker:
         directory.mkdir(mode=0o700, exist_ok=True)
         log = self.root / "guard.log"
         original_path = self.env.get("PATH", "")
-        runtime = shlex.quote(self.info["runtime"])
+        # The host's Hyprland sockets: under the runtime sessions are made in
+        # (<host runtime>/agent-desktop/<session>), and under the login
+        # runtime, which differs when the server runs without XDG_RUNTIME_DIR.
+        hosts = sorted(
+            {
+                os.path.realpath(Path(self.info["runtime"]).parent.parent / "hypr"),
+                os.path.realpath(f"/run/user/{os.getuid()}/hypr"),
+            }
+        )
         for name in GUARDED_COMMANDS:
             shim = directory / name
-            # hyprctl may reach a Hyprland started inside this session: its
-            # sockets live under the session's own runtime directory, and the
-            # host's do not. Anything else, or another runtime, is refused.
+            # hyprctl may reach a Hyprland started inside this session. That
+            # instance cannot keep its sockets under the session's own runtime
+            # directory, whose socket paths exceed the 108-byte limit, so a
+            # harness gives it a short private XDG_RUNTIME_DIR. A runtime is
+            # accepted when its hypr directory (symlinks resolved) is not the
+            # host's and every instance hyprctl could pick in it is a real
+            # directory there, not a link out. The instance comes from
+            # HYPRLAND_INSTANCE_SIGNATURE or --instance/-i; hyprctl joins it to
+            # the path unchecked, so one containing "/" is refused.
             nested = (
-                f"runtime={runtime}\n"
-                'if [ "${XDG_RUNTIME_DIR:-}" = "$runtime" ] && [ -d "$runtime/hypr" ] '
-                '&& { [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ -S '
-                '"$runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" ]; }; then\n'
+                f"hosts={shlex.quote(chr(10).join(hosts))}\n"
+                'sig="${HYPRLAND_INSTANCE_SIGNATURE:-}"; next=\n'
+                'for a in "$@"; do\n'
+                '  [ -n "$next" ] && sig="$a"; next=\n'
+                '  case "$a" in -i|--instance) next=1 ;; esac\n'
+                "done\n"
+                "nested_ok() {\n"
+                '  case "$sig" in */*|.|..) return 1 ;; esac\n'
+                '  hypr=$(cd -P "${XDG_RUNTIME_DIR:-/nonexistent}/hypr" 2>/dev/null '
+                "&& pwd -P) || return 1\n"
+                '  printf "%s\\n" "$hosts" | grep -qxF "$hypr" && return 1\n'
+                '  case "$sig" in\n'
+                '  ""|*[!0-9]*) ;;\n'
+                "  *) sig= ;;\n"  # an index into the instances listed below
+                "  esac\n"
+                '  if [ -n "$sig" ]; then set -- "$hypr/$sig"; '
+                'else set -- "$hypr"/*; fi\n'
+                '  for d in "$@"; do\n'
+                '    [ -e "$d" ] || continue\n'
+                '    [ "$(cd -P "$d" 2>/dev/null && pwd -P)" = "$d" ] || return 1\n'
+                '    [ ! -L "$d/.socket.sock" ] || return 1\n'
+                "  done\n"
+                '  [ -z "$sig" ] || [ -S "$hypr/$sig/.socket.sock" ]\n'
+                "}\n"
+                "if nested_ok; then\n"
                 f'  PATH={shlex.quote(original_path)} exec hyprctl "$@"\n'
                 "fi\n"
                 if name == "hyprctl"

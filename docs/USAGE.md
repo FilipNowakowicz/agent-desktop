@@ -754,9 +754,13 @@ driver once the variable was unset, and needs no Mesa. `agent-desktop doctor` na
 each node's driver.
 
 In a guarded session, `hyprctl` is allowed when it reaches a Hyprland started inside
-that session. Such an instance keeps its sockets under the session's own runtime
-directory. `hyprctl` is still refused when `XDG_RUNTIME_DIR` points elsewhere, or when
-`HYPRLAND_INSTANCE_SIGNATURE` names an instance that is not under that directory.
+that session. The session's own runtime directory is too deep for Hyprland's socket
+paths (Unix sockets allow about 108 bytes), so start the nested instance with a short
+private `XDG_RUNTIME_DIR`, for example `mktemp -d "/run/user/$(id -u)/q.XXXX"`, and
+call `hyprctl` with the same one. `hyprctl` is refused when that directory's `hypr`
+resolves to the host's (the runtime sessions are made in, or `/run/user/<uid>`), when
+the instance it would use (`HYPRLAND_INSTANCE_SIGNATURE`, or `--instance`/`-i`) has no
+socket there or contains `/`, or when an instance directory there links elsewhere.
 
 ## Activity summary
 

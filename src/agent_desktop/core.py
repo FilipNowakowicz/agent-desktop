@@ -172,6 +172,43 @@ def profile_path(name):
     return state_root() / "profiles" / name
 
 
+NOTE_LIMIT = 200
+
+
+def profile_note(path):
+    """The free-text note saved beside a profile's home, or None."""
+    try:
+        text = (path / "note").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return text or None
+
+
+def set_profile_note(name, text=None):
+    """Set (or, with no text, clear) a profile's one-line note, e.g. which account."""
+    path = profile_path(name)
+    if not (path / "home").is_dir() or path.is_symlink():
+        raise DesktopError(f"Unknown profile: {name}")
+    if text is not None and not isinstance(text, str):
+        raise DesktopError("A profile note is text")
+    note = " ".join(text.split()) if text else ""
+    if len(note) > NOTE_LIMIT:
+        raise DesktopError(
+            f"A profile note is at most {NOTE_LIMIT} characters on one line; "
+            f"this one has {len(note)}"
+        )
+    target = path / "note"
+    if not note:
+        target.unlink(missing_ok=True)
+        return {"profile": name, "note": None}
+    temporary = path / "note.tmp"
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(note + "\n")
+    temporary.replace(target)
+    return {"profile": name, "note": note}
+
+
 def profile_lock(path):
     """Lock file beside (not inside) a profile, so deletion cannot remove it.
 
@@ -296,6 +333,9 @@ def profiles():
         }
         if entry["in_use"]:
             entry["held_by"] = profile_holder(profile)
+        note = profile_note(profile)
+        if note:
+            entry["note"] = note
         results.append(entry)
     return results
 

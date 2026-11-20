@@ -20,6 +20,7 @@ from .core import (
     request_host,
     run_actions,
     sessions,
+    set_profile_note,
     stop_host,
     trace,
     usage,
@@ -111,6 +112,13 @@ def main():
     attaching.add_argument("profile")
     removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
     removal.add_argument("profile")
+    noting = sub.add_parser(
+        "profile-note",
+        help="set or clear a profile's one-line note (e.g. which account it signs in as)",
+    )
+    noting.add_argument("profile")
+    noting.add_argument("text", nargs="?", help="note text; omit to clear")
+    noting.add_argument("--clear", action="store_true", help="remove the note")
     cookies = sub.add_parser(
         "import-cookies",
         help="copy chosen sites' cookies from your Firefox into a profile",
@@ -408,6 +416,12 @@ def main():
             result = attach_profile(args["session"], args["profile"], controller)
         elif command == "delete-profile":
             result = delete_profile(args["profile"])
+        elif command == "profile-note":
+            if args["clear"] and args["text"] is not None:
+                raise DesktopError("Give either TEXT or --clear, not both")
+            result = set_profile_note(
+                args["profile"], None if args["clear"] else args["text"]
+            )
         elif command == "import-cookies":
             from .cookies import import_firefox_cookies
 

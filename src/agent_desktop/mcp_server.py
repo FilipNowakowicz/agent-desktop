@@ -319,9 +319,19 @@ def desktop_create(
 
 @tool()
 def desktop_profiles(
-    session: str | None = None, attach: str | None = None
+    session: str | None = None,
+    attach: str | None = None,
+    profile: str | None = None,
+    note: str | None = None,
 ) -> list[dict] | dict:
     """List saved profiles and whether a session is using them.
+
+    A profile may carry a note (shown as "note") saying what it is for, such as
+    which account it signs in as. Read it before choosing an account in a site's
+    chooser. If a site offers several accounts and no note says which, ask the
+    person instead of guessing, then record the answer with profile and note
+    (one line, up to 200 characters; an empty note clears it). Notes are not
+    secrets: never put passwords or codes in them.
 
     With session and attach (a profile name), instead give that running private
     session the profile as its home, for a site that turns out to need a saved
@@ -329,6 +339,13 @@ def desktop_profiles(
     application running (close Firefox first, since it keeps the old home) and
     no profile yet, and the profile no other session (the refusal names it).
     """
+    if profile is not None or note is not None:
+        if profile is None or note is None or session is not None or attach is not None:
+            raise core.DesktopError(
+                "Setting a note takes profile and note (empty to clear), "
+                "and no session or attach"
+            )
+        return core.set_profile_note(profile, note)
     if session is None and attach is None:
         return core.profiles()
     if session is None or attach is None:

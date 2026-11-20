@@ -5,21 +5,6 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
-## 2026-11-20 — The crowded test page is partial on an idle machine too
-
-The two partial-coverage interruption tests from #212 failed on the Ubuntu and Nix
-Checks jobs (run 44620522297, on #214's branch) and locally on `main` at load 1–2:
-a `unique` check was `satisfied` and a retried accessibility press found no match
-instead of refusing as incomplete. The page's 2,500 extra buttons are off-screen, so
-they do not count towards the 2,000 listed nodes, and an idle machine visits all of
-them within the 3 s budget: the read was complete, not partial. The tests had passed
-only under a load average of 90–110, where the time budget ran out.
-
-The page now has 21,000 off-screen rows, past the 20,000-node visit limit of a
-2,000-node read, so every read is partial by construction. Validation: the two
-tests passed four times in a row at load 1–2 with the managed runtime, and
-`test_interruptions.py` passed in full (11 OK) with stock nixpkgs labwc, Firefox and
-`at-spi2-core`. `ruff check` and `ruff format --check` pass.
 ## 2026-11-19 — Take while send writes a large value, and during an accessibility read (#213)
 
 The two limits left from #181 (F1), both reported honestly before but loose:
@@ -90,6 +75,22 @@ managed runtime first on `PATH`; host load average 8–11 from unrelated work):
 - Without the desktop: `test_delivery` 21 OK, `test_checks` 10 OK (1 skipped),
   `test_operations` 21 OK (6 skipped).
 - Not run: the full desktop suite and the Checks matrix.
+
+## 2026-11-20 — The crowded test page is partial on an idle machine too
+
+The two partial-coverage interruption tests from #212 failed on the Ubuntu and Nix
+Checks jobs (run 44620522297, on #214's branch) and locally on `main` at load 1–2:
+a `unique` check was `satisfied` and a retried accessibility press found no match
+instead of refusing as incomplete. The page's 2,500 extra buttons are off-screen, so
+they do not count towards the 2,000 listed nodes, and an idle machine visits all of
+them within the 3 s budget: the read was complete, not partial. The tests had passed
+only under a load average of 90–110, where the time budget ran out.
+
+The page now has 21,000 off-screen rows, past the 20,000-node visit limit of a
+2,000-node read, so every read is partial by construction. Validation: the two
+tests passed four times in a row at load 1–2 with the managed runtime, and
+`test_interruptions.py` passed in full (11 OK) with stock nixpkgs labwc, Firefox and
+`at-spi2-core`. `ruff check` and `ruff format --check` pass.
 
 ## 2026-11-19 — Partial accessibility coverage under interruption (F1-c, #181)
 

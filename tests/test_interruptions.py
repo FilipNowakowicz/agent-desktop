@@ -26,13 +26,15 @@ PAGE = (
     '<button id="slow" onclick="setTimeout(() => '
     'count.textContent = +count.textContent + 1, 1500)">Slow</button>'
 )
-# More accessible nodes than any check or target lookup reads (2000), with a
-# second "Add" button past them: every read of this page is partial, by the node
-# limit or the 3 s time budget, and a unique match in it is not unique.
+# More accessible nodes than any check or target lookup visits (20,000 for a
+# 2,000-node read), with a second "Add" button past them: every read of this page
+# is partial, by the visit limit or the 3 s time budget, and a unique match in it
+# is not unique. The rows are off-screen, so they do not count towards the listed
+# node limit: fewer of them read in full within the budget on an idle machine.
 CROWDED_PAGE = (
     '<title>Crowded</title><p id="count">0</p>'
     '<button id="add" onclick="count.textContent = +count.textContent + 1">Add</button>'
-    + "".join(f"<button>Row {i}</button>" for i in range(2500))
+    + "".join(f"<button>Row {i}</button>" for i in range(21000))
     + '<p id="late">0</p>'
     '<button id="late-add" onclick="late.textContent = +late.textContent + 1">'
     "Add</button>"

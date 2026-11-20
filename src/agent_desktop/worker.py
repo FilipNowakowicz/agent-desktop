@@ -31,6 +31,7 @@ from .atspi import (
     wait_for_registry,
 )
 from .effects import EffectLedger, ui_lines
+from .secret_text import hide_fields
 from .wayland import (
     BUTTONS,
     BindLayout,
@@ -381,6 +382,27 @@ SAVE_BYTES = 8 * 1024 * 1024  # under the 16 MiB BiDi message limit
 DOWNLOAD_SECONDS = 120  # default wait for a download to finish
 DOWNLOAD_MAX_SECONDS = 600
 DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a download
+BROWSER_ACTIONS = (
+    "start tabs open close find text wait click fill select send save download steps"
+).split()
+# Browser actions agents try for keyboard input, which desktop_browser lacks.
+KEY_ACTIONS = {"key", "keys", "press", "keypress", "hotkey", "shortcut", "type"}
+
+
+def unknown_browser_action(action):
+    message = (
+        "action must be start, tabs, open, close, find, text, wait, click, "
+        "fill, select, send, save, download or steps"
+    )
+    if action in KEY_ACTIONS:
+        message += (
+            ". Keys go through desktop_key (e.g. Escape, ctrl+a) and text "
+            "through fill, or desktop_type for the focused field; in "
+            "desktop_actions they are key and type steps"
+        )
+    return message
+
+
 # The checked state of a clicked toggle: a checkbox, radio or switch, or the one
 # a clicked label controls. "true", "false" or "mixed"; null for anything else.
 TOGGLE_STATE = (
@@ -1336,6 +1358,8 @@ class Worker:
             "within": request.get("within"),
         }
         try:
+            if action not in BROWSER_ACTIONS:
+                raise ValueError(unknown_browser_action(action))
             if action == "steps":
                 return self.browser_steps(
                     request.get("steps"),
@@ -1546,9 +1570,14 @@ class Worker:
                     state = self.page_state(bridge, context)
                     after = browser.remote_value(after)
                     if isinstance(after, str):
-                        state["now"] = {
-                            k: v for k, v in json.loads(after).items() if v is not None
-                        }
+                        state["now"] = hide_fields(
+                            {
+                                k: v
+                                for k, v in json.loads(after).items()
+                                if v is not None
+                            },
+                            ("value",),
+                        )
                     if isinstance(toggle_before, str):
                         # A label or switch click can be delivered and change nothing.
                         toggle_after = browser.remote_value(
@@ -1560,10 +1589,7 @@ class Worker:
                     return state
 
                 return self.browser_observed(result, observe)
-            raise ValueError(
-                "action must be start, tabs, open, close, find, text, wait, click, "
-                "fill, select, send, save, download or steps"
-            )
+            raise ValueError(unknown_browser_action(action))
         except Exception as error:
             if isinstance(error, ConnectionClosed):
                 self.browser = None
@@ -2011,6 +2037,11 @@ class Worker:
         for index, step in enumerate(steps):
             if not isinstance(step, dict) or step.get("action") in (None, "steps"):
                 raise ValueError(f"Step {index} needs an action other than steps")
+            if step["action"] not in BROWSER_ACTIONS:
+                raise ValueError(
+                    f"Step {index}: {unknown_browser_action(step['action'])}; "
+                    "nothing was run"
+                )
         results = []
         for index, step in enumerate(steps):
             try:

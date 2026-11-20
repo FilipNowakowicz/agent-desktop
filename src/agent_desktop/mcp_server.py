@@ -269,6 +269,11 @@ def tool(*, cancellable=False, **options):
             finally:
                 log_call(function.__name__, started, ok)
 
+        # Commands in a description must run as printed, as in INSTRUCTIONS.
+        if threaded.__doc__:
+            threaded.__doc__ = threaded.__doc__.replace(
+                "`agent-desktop ", f"`{printed.prefix()} "
+            )
         return mcp.tool(**options)(threaded)
 
     return register
@@ -592,12 +597,14 @@ def desktop_browser(
     started without it must be closed first. Then: "open" a url
     (new_tab for a new tab), "close" (the current tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
-    placeholder; exact for the whole text; each item has a unique selector), "wait" (until found, or gone; up to
+    placeholder; exact for the whole text; each item has its text, label, value
+    and a unique selector), "wait" (until found, or gone, with the same items; up to
     60 s; seconds pauses first, up to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
     keys) and "select" (an option of a <select> by text or value). click, fill
     and select need exactly one visible, enabled match, otherwise nothing is
     done and the matches are listed. If a modal or overlay is on top of the
-    match, click and fill fail with covered: and send nothing; deal with it first.
+    match, click and fill fail with covered: naming it (role, label, start of
+    its text) and send nothing; deal with it first.
     Replies include the page url and title,
     and the element's value afterwards (never a password's). A click on a
     checkbox, radio or switch, or on its label, also returns toggle (before,
@@ -617,7 +624,10 @@ def desktop_browser(
     as the page is ready.
 
     For secrets (a generated API key, token or password shown once), never use
-    "text": action "send" moves one element's text, or with source="clipboard"
+    "text", and don't find it first: give "send" its selector directly (e.g.
+    selector="[role=dialog] code"). find and wait replace text that looks like
+    a credential with "<hidden: looks like a secret, N chars; use send>" and
+    list the field in hidden, but not every secret looks like one. "send" moves one element's text, or with source="clipboard"
     the session clipboard (e.g. after clicking a Copy button), to to_file (a new
     0600 file; relative paths are in the session home; overwrite to replace) or
     to a command's stdin (to_command=["gh", "secret", "set", "NAME"]; its output
@@ -625,8 +635,10 @@ def desktop_browser(
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
     When a shell tool (curl, yt-dlp) needs the browser's login, use
     source="cookies" with site="example.com": it writes the live cookies for
-    that site as a Netscape cookies.txt and returns only their count; never
-    copy a profile's cookie files by hand. Delete the file when done.
+    that site as a Netscape cookies.txt and returns only their count. Delete
+    the file when done. Never copy or edit a profile's cookie files by hand: to
+    remove a site's login from a profile no session is using, run
+    `agent-desktop forget-site PROFILE --site SITE`.
 
     For data too large or too long to read here (an API listing, a long
     table), action "save" writes the page's text, or one element's

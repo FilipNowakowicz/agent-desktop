@@ -11,14 +11,20 @@ import time
 
 from websockets.sync.client import connect
 
-# Text found by `find` is bounded so a page cannot flood the reply.
+from .secret_text import hide, hide_fields, shorten
+
+# Text found by `find` is bounded so a page cannot flood the reply. The page
+# returns more (READ) than an item keeps, so a secret the cut would split is
+# recognised whole before it is hidden.
 MAX_ITEMS = 30
 MAX_TEXT = 8000
+READ = 400
 CTRL = ""
 
 # Runs in the page: elements matching a CSS selector or a visible text, label,
 # placeholder or value. With pick, the one match itself (or null); otherwise
-# up to MAX_ITEMS described as JSON, without password values.
+# up to MAX_ITEMS described as JSON, without password values. Browser.find
+# then hides text, labels and values that look like credentials.
 FIND = """
 (selector, text, exact, pick, within) => {
   const visible = (e) => {
@@ -95,10 +101,10 @@ FIND = """
     const classes = [...e.classList].slice(0, 4).join(" ");
     if (classes) d.class = classes.slice(0, 120);
     const q = css(e); if (q) d.selector = q;
-    const t = own(e); if (t) d.text = t.slice(0, 120);
-    const l = label(e); if (l) d.label = l.slice(0, 120);
+    const t = own(e); if (t) d.text = t.slice(0, READ);
+    const l = label(e); if (l) d.label = l.slice(0, READ);
     if ("value" in e && e.type !== "password" && e.tagName !== "BUTTON")
-      d.value = String(e.value).slice(0, 200);
+      d.value = String(e.value).slice(0, READ);
     if (e.disabled) d.disabled = true;
     if (e.checked) d.checked = true;
     if (e.tagName === "SELECT")
@@ -108,7 +114,7 @@ FIND = """
   return JSON.stringify({count: found.length,
     items: found.slice(0, MAX_ITEMS).map(describe)});
 }
-""".replace("MAX_ITEMS", str(MAX_ITEMS))
+""".replace("MAX_ITEMS", str(MAX_ITEMS)).replace("READ", str(READ))
 
 
 class BrowserError(RuntimeError):
@@ -121,6 +127,9 @@ class Interrupted(RuntimeError):
 
 # What a click at the element's centre would hit, if not the element itself:
 # null when the element, or a label for it or the control it labels, is on top.
+# Otherwise a JSON description of the cover (the dialog that holds what was
+# hit, else the hit element) with its role, label and the start of its text,
+# and of another open dialog on the page (an overlay is often its backdrop).
 UNCOVERED = """(e) => {
   e.scrollIntoView({block: "center", inline: "center"});
   const rect = [...e.getClientRects()].find((r) => r.width && r.height);
@@ -134,10 +143,46 @@ UNCOVERED = """(e) => {
   // the label over a hidden input, or an input stretched over its label.
   if (hit.closest("label")?.control === e || e.control === hit) return null;
   if (hit.shadowRoot && hit.contains(e)) return null;
-  const text = (hit.innerText || hit.textContent || "").trim().slice(0, 40);
-  return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") +
-    (text ? " (" + JSON.stringify(text) + ")" : "");
-}"""
+  const DIALOG = "dialog,[role=dialog],[role=alertdialog],[aria-modal=true]";
+  const describe = (n) => ({
+    tag: n.tagName.toLowerCase(), id: n.id || null,
+    role: n.getAttribute("role"),
+    label: n.getAttribute("aria-label") || n.getAttribute("title"),
+    class: [...n.classList].slice(0, 2).join(".") || null,
+    text: (n.innerText || n.textContent || "").replace(/\\s+/g, " ").trim()
+      .slice(0, READ),
+  });
+  const box = hit.closest(DIALOG) || hit;
+  const cover = describe(box);
+  if (box === hit) {
+    const open = [...document.querySelectorAll(DIALOG)].find((d) =>
+      d.getClientRects().length && getComputedStyle(d).visibility !== "hidden" &&
+      !d.contains(e) && !d.contains(hit));
+    if (open) cover.dialog = describe(open);
+  }
+  return JSON.stringify(cover);
+}""".replace("READ", str(READ))
+
+
+def cover_text(cover):
+    """A cover for a covered: refusal, e.g. div[role=dialog] "Remind me later …".
+
+    Its label and text pass through the same secret hiding as find items.
+    """
+    name = cover.get("tag") or "element"
+    if cover.get("id"):
+        name += "#" + cover["id"]
+    elif cover.get("class"):
+        name += "." + cover["class"]
+    if cover.get("role"):
+        name += f"[role={cover['role']}]"
+    label = hide(cover.get("label") or "")[0]
+    if label:
+        name += f" ({json.dumps(shorten(label, 40), ensure_ascii=False)})"
+    text = hide(cover.get("text") or "")[0]
+    if text:
+        name += " " + json.dumps(shorten(text, 40), ensure_ascii=False)
+    return name
 
 
 class Browser:
@@ -279,7 +324,12 @@ class Browser:
         if not (selector or text):
             raise ValueError("Give a CSS selector or a text")
         value = self.call(FIND, [selector, text, exact, False, within], context)
-        return json.loads(remote_value(value))
+        found = json.loads(remote_value(value))
+        for item in found["items"]:
+            hide_fields(item, ("text", "label"), 120)
+            hide_fields(item, ("value",), 200)
+            hide_fields(item, ("options",))
+        return found
 
     def element(self, context, selector=None, text=None, exact=False, within=None):
         """A reference to the one visible element that matches."""
@@ -307,8 +357,12 @@ class Browser:
         """
         cover = remote_value(self.call(UNCOVERED, [element], context))
         if cover:
+            cover = json.loads(cover)
+            under = cover_text(cover)
+            if cover.get("dialog"):
+                under += f"; a dialog is open: {cover_text(cover['dialog'])}"
             raise BrowserError(
-                f"covered: the element is under {cover}; nothing was sent. "
+                f"covered: the element is under {under}; nothing was sent. "
                 "Dismiss or handle what covers it, then try again"
             )
 

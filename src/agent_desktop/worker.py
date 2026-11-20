@@ -1073,19 +1073,27 @@ class Worker:
         directory.mkdir(mode=0o700, exist_ok=True)
         log = self.root / "guard.log"
         original_path = self.env.get("PATH", "")
-        runtime = shlex.quote(self.info["runtime"])
+        # The session runtime is <host runtime>/agent-desktop/<session>.
+        host_hypr = os.path.realpath(Path(self.info["runtime"]).parent.parent / "hypr")
         for name in GUARDED_COMMANDS:
             shim = directory / name
-            # hyprctl may reach a Hyprland started inside this session: its
-            # sockets live under the session's own runtime directory, and the
-            # host's do not. Anything else, or another runtime, is refused.
+            # hyprctl may reach a Hyprland started inside this session. That
+            # instance cannot keep its sockets under the session's own runtime
+            # directory, whose socket paths exceed the 108-byte limit, so a
+            # harness gives it a short private XDG_RUNTIME_DIR. Any runtime is
+            # accepted whose hypr directory is not the host's (symlinks
+            # resolved) and holds the named instance's socket; a signature
+            # containing "/" could walk out of it and is refused.
             nested = (
-                f"runtime={runtime}\n"
-                'if [ "${XDG_RUNTIME_DIR:-}" = "$runtime" ] && [ -d "$runtime/hypr" ] '
+                f"host_hypr={shlex.quote(host_hypr)}\n"
+                'case "${HYPRLAND_INSTANCE_SIGNATURE:-}" in */*|.|..) ;; *)\n'
+                '  hypr=$(cd -P "${XDG_RUNTIME_DIR:-/nonexistent}/hypr" 2>/dev/null && pwd -P)\n'
+                '  if [ -n "$hypr" ] && [ "$hypr" != "$host_hypr" ] '
                 '&& { [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ -S '
-                '"$runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" ]; }; then\n'
-                f'  PATH={shlex.quote(original_path)} exec hyprctl "$@"\n'
-                "fi\n"
+                '"$hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock" ]; }; then\n'
+                f'    PATH={shlex.quote(original_path)} exec hyprctl "$@"\n'
+                "  fi ;;\n"
+                "esac\n"
                 if name == "hyprctl"
                 else ""
             )

@@ -5,6 +5,21 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — hyprctl for a nested Hyprland with a short runtime (N8 follow-up)
+
+The 2026-11-11 shim only passed `hyprctl` through when `XDG_RUNTIME_DIR` was the
+session's own runtime directory. A real Hyprland cannot live there: with a 12-character
+session id and a 62-character instance signature, `<runtime>/hypr/<sig>/.socket2.sock`
+is about 123 bytes, past the Unix socket limit, so harnesses such as the nix repo's
+`tests/quiet-shell/nested.sh` use a short `/run/user/<uid>/q.XXXX` and were refused.
+The shim now accepts any `XDG_RUNTIME_DIR` whose `hypr` directory, with symlinks
+resolved, is not the host's and holds the named instance's socket. Signatures with `/`
+are refused, since they could walk back into the host's directory. The guard test adds
+a short runtime (allowed), the host runtime with and without a signature, a runtime
+whose `hypr` links to the host's, and a `../` signature (all refused); it fails on the
+old shim. Validated with `uv run python -m unittest discover -s tests -p test_guard.py`
+on the managed runtime: 10 passed.
+
 ## 2026-11-20 — Usage review: VPN token and quota check
 
 Ran `scripts/usage_review.py --since 2026-11-18` (83 calls, 6 transcripts, 24 flags)

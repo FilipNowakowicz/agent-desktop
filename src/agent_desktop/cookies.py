@@ -428,7 +428,8 @@ def import_firefox_cookies(profile, sites, source=None):
             "be the one you want. To bring a single account, sign only that one in "
             "to a fresh Firefox profile (MOZ_NO_REMOTE=1 firefox --new-instance "
             "--profile DIR), then import with --from DIR. forget-site removes a "
-            "site from this profile again."
+            "site from this profile again. Record which account the profile "
+            "uses with profile-note."
         )
     return result
 

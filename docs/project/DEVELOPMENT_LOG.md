@@ -5,6 +5,27 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — Profile notes: record which account a profile signs in as
+
+Follows the field report in PR #217 ("The agent signed in to the wrong Google
+account", suggestion 6; the maintainer approved it). An agent clicked the only
+account in a Google chooser without knowing which account the profile was for.
+
+- Interface: `profiles/NAME/note` (0600, one line, at most 200 characters,
+  beside `home` so sessions cannot read it and `delete-profile` removes it).
+  `agent-desktop profile-note PROFILE [TEXT]` (no TEXT or `--clear` clears);
+  `desktop_profiles(profile=..., note=...)` sets it (empty note clears), and the
+  listing gains `note` when set. A note combined with `session` or `attach`, or
+  `profile` without `note`, is refused. Session and attach behavior is unchanged.
+- The `desktop_profiles` description tells agents to check the note before
+  choosing an account, and to ask the person and record the answer when several
+  accounts are offered and no note says which. The `import-cookies` multi-account
+  warning points at `profile-note`.
+- Tests: `ProfileNoteTests` in `tests/test_profiles.py` (set, show, replace, clear,
+  mode 0600, single line, length limit, unknown profile, delete removes the note,
+  MCP tool validation) on a temporary `AGENT_DESKTOP_STATE_DIR`.
+- Validation: `uv run python -m unittest discover -s tests -p test_profiles.py` ran 21 tests, OK (skipped=10: the desktop-session `ProfileTests` need labwc/grim/dbus-daemon, absent here; the 5 new `ProfileNoteTests` run). `-p test_release_profiles.py` 3 tests OK; `-p test_mcp.py` 2 skipped (no desktop tools). `uv run ruff check src tests` and `uv run ruff format --check src tests` pass. CLI smoke on a temporary `AGENT_DESKTOP_STATE_DIR`: set, list, `--clear`, TEXT with `--clear` refused, 201 characters refused. The full suite was not run on this machine; the session-based profile tests are unchanged and were not exercised, so a real-desktop run of `test_profiles.py` is still open.
+
 ## 2026-11-20 — import-cookies copies session-only cookies
 
 Follows the [VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)

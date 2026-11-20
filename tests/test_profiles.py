@@ -1,5 +1,6 @@
 """Named profiles keep a session home (e.g. logins) for later sessions only."""
 
+import asyncio
 import http.server
 import json
 import os
@@ -559,6 +560,93 @@ class CookieServer(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *_):
         pass
+
+
+class ProfileNoteTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="desktop-note-")
+        self.addCleanup(self.temporary.cleanup)
+        self.previous = os.environ.get("AGENT_DESKTOP_STATE_DIR")
+        os.environ["AGENT_DESKTOP_STATE_DIR"] = str(Path(self.temporary.name) / "state")
+        self.addCleanup(self.restore)
+        (core.profile_path("work") / "home").mkdir(parents=True)
+
+    def restore(self):
+        if self.previous is None:
+            os.environ.pop("AGENT_DESKTOP_STATE_DIR", None)
+        else:
+            os.environ["AGENT_DESKTOP_STATE_DIR"] = self.previous
+
+    def test_set_show_replace_and_clear(self):
+        self.assertNotIn("note", core.profiles()[0])
+        core.set_profile_note("work", "signs in to Google as the project account")
+        self.assertEqual(
+            core.profiles()[0]["note"], "signs in to Google as the project account"
+        )
+        core.set_profile_note("work", "second")
+        self.assertEqual(core.profiles()[0]["note"], "second")
+        self.assertEqual(
+            core.set_profile_note("work", None), {"profile": "work", "note": None}
+        )
+        self.assertNotIn("note", core.profiles()[0])
+        core.set_profile_note("work", "again")
+        core.set_profile_note("work", "")  # empty text clears too
+        self.assertNotIn("note", core.profiles()[0])
+
+    def test_note_file_is_private_single_line_and_outside_home(self):
+        core.set_profile_note("work", "line one\n  line   two\t")
+        path = core.profile_path("work") / "note"
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(path.read_text(), "line one line two\n")
+        self.assertEqual(core.profiles()[0]["note"], "line one line two")
+        self.assertFalse((core.profile_path("work") / "home" / "note").exists())
+        self.assertFalse((core.profile_path("work") / "note.tmp").exists())
+
+    def test_length_limit_and_unknown_profile(self):
+        core.set_profile_note("work", "x" * core.NOTE_LIMIT)
+        with self.assertRaisesRegex(core.DesktopError, "at most 200"):
+            core.set_profile_note("work", "x" * (core.NOTE_LIMIT + 1))
+        self.assertEqual(len(core.profiles()[0]["note"]), core.NOTE_LIMIT)
+        with self.assertRaisesRegex(core.DesktopError, "Unknown profile"):
+            core.set_profile_note("nobody", "x")
+        with self.assertRaises(core.DesktopError):
+            core.set_profile_note("../x", "x")
+        with self.assertRaises(core.DesktopError):
+            core.set_profile_note("work", 5)
+
+    def test_delete_removes_note(self):
+        core.set_profile_note("work", "kept until deletion")
+        core.delete_profile("work")
+        self.assertFalse(core.profile_path("work").exists())
+        (core.profile_path("work") / "home").mkdir(parents=True)
+        self.assertNotIn("note", core.profiles()[0])
+
+    def test_mcp_tool_sets_lists_and_validates(self):
+        from agent_desktop import mcp_server
+
+        def call(**arguments):
+            return asyncio.run(mcp_server.desktop_profiles(**arguments))
+
+        self.assertEqual(
+            call(profile="work", note="personal account"),
+            {"profile": "work", "note": "personal account"},
+        )
+        self.assertEqual(call()[0]["note"], "personal account")
+        self.assertEqual(
+            call(profile="work", note=""), {"profile": "work", "note": None}
+        )
+        for arguments in (
+            {"profile": "work"},
+            {"note": "x"},
+            {"profile": "work", "note": "x", "session": "s"},
+            {"profile": "work", "note": "x", "attach": "work"},
+        ):
+            with (
+                self.subTest(arguments=arguments),
+                self.assertRaises(core.DesktopError),
+            ):
+                call(**arguments)
+        self.assertNotIn("note", call()[0])
 
 
 @unittest.skipUnless(

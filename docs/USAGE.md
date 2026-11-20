@@ -833,6 +833,8 @@ the session with a named profile:
 uv run agent-desktop create --profile github     # MCP: desktop_create(profile="github")
 uv run agent-desktop profiles                    # list, size, whether in use
 uv run agent-desktop attach-profile SESSION github  # MCP: desktop_profiles(session=..., attach="github")
+uv run agent-desktop profile-note github "signs in to Google as the project account"
+                                                 # MCP: desktop_profiles(profile="github", note=...)
 uv run agent-desktop delete-profile github       # permanently remove saved logins
 ```
 
@@ -852,6 +854,21 @@ launched with its own data folder (for example `anki -b ~/.local/share/Anki2`, o
 program reading your home directory) changes that data for real. Do this only when
 the task asks for it. Close the application properly before `destroy` so it saves,
 and prefer a copy of the data folder for experiments.
+
+### Profile notes
+
+A profile can carry a one-line note, up to 200 characters, saying what it is for,
+for example which account a site signs in as. `profiles` and `desktop_profiles`
+list it as `note`. `profile-note PROFILE TEXT` sets it, and `profile-note PROFILE`
+(or `--clear`) removes it. MCP: `desktop_profiles(profile=..., note=...)` sets it
+and an empty `note` clears it; it cannot be combined with `session` or `attach`.
+Whitespace is collapsed to one line.
+
+The note is stored as `profiles/NAME/note` (mode 0600) beside the profile's `home`,
+so applications in a session cannot see it, and deleting the profile removes it.
+It is not a secret store: do not put passwords or codes in it. Agents check the
+note before picking an account in a site's chooser. If a site offers several
+accounts and no note says which, they ask the person, then record the answer.
 
 ### Add a profile to a running session
 

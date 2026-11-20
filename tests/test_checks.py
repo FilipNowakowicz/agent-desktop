@@ -194,6 +194,19 @@ class PredicateTests(unittest.TestCase):
         self.request.side_effect = core.DesktopError("unavailable")
         self.assertEqual(checks.evaluate("session", predicate)["status"], "unknown")
 
+    def test_a_read_stopped_by_a_take_is_unknown_never_violated(self):
+        # The worker refuses to return the partial tree of an interrupted read,
+        # which could hold a counterexample to an absence claim.
+        self.request.side_effect = [
+            {"owner": "agent"},
+            core.DesktopError("HumanControl: A person is taking control"),
+        ]
+        result = checks.evaluate(
+            "session", {"kind": "ui", "query": {"element": "Save"}, "claim": "absent"}
+        )
+        self.assertEqual(result["status"], "unknown")
+        self.assertEqual(result["reason"], "human_control: observation interrupted")
+
     def test_invalid_predicates_raise_before_observation(self):
         for predicate in (
             {"kind": "file", "path": "relative"},

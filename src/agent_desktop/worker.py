@@ -8,6 +8,7 @@ import math
 import os
 import pwd
 import re
+import select
 import shlex
 import shutil
 import signal
@@ -24,6 +25,7 @@ from . import printed
 from .atspi import (
     Accessibility,
     AccessibilityError,
+    Interrupted,
     Unsupported,
     name_has_owner,
     wait_for_registry,
@@ -1701,39 +1703,70 @@ class Worker:
         except FileNotFoundError:
             raise ValueError(f"No such program: {to_command[0]}") from None
         deadline = time.monotonic() + SECRET_COMMAND_SECONDS
-        stopped, pending = None, value
+        # Written here rather than by communicate, so the reply can say how
+        # much of the value reached the command's stdin when it is stopped.
+        # Each wait is at most 0.1 s, so a person taking control does not wait
+        # for a command that reads slowly or not at all.
+        descriptor = process.stdin.fileno()
+        os.set_blocking(descriptor, False)
+        written, stopped = 0, None
         while stopped is None:
-            try:
-                # Polled, so a person taking control does not wait for it. The
-                # input is given once; a retry continues writing it.
-                process.communicate(pending, timeout=0.1)
-                return {**result, "exit_status": process.returncode}
-            except subprocess.TimeoutExpired:
-                pending = None
-                if self.take_requested():
-                    stopped = "taken"
-                elif time.monotonic() >= deadline:
-                    stopped = "timeout"
+            if not process.stdin.closed:
+                select.select([], [descriptor], [], 0.1)
+                try:
+                    written += os.write(descriptor, value[written:])
+                except BlockingIOError:
+                    pass
+                except BrokenPipeError:
+                    process.stdin.close()  # it closed its input early
+                if written == len(value) and not process.stdin.closed:
+                    process.stdin.close()
+            else:
+                try:
+                    process.wait(timeout=0.1)
+                    return {
+                        **result,
+                        "exit_status": process.returncode,
+                        "bytes_written": written,
+                    }
+                except subprocess.TimeoutExpired:
+                    pass
+            if self.take_requested():
+                stopped = "taken"
+            elif time.monotonic() >= deadline:
+                stopped = "timeout"
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.communicate()
+        if not process.stdin.closed:
+            process.stdin.close()
+        process.wait()
+        if written == len(value):
+            given = f"after the whole value ({written} bytes) was written to its stdin"
+        else:
+            given = (
+                f"after {written} of {len(value)} bytes of the value were written "
+                "to its stdin (the rest was not sent)"
+            )
         if stopped == "timeout":
             return {
                 **result,
                 "exit_status": None,
+                "bytes_written": written,
                 "timed_out": True,
-                "note": "The command was killed after the value was sent to it.",
+                "note": f"The command was killed {given}.",
             }
+        # The command was started, so it never counts as not run: it may have
+        # read and acted on what was written before it was killed.
         return {
             **result,
             "exit_status": None,
+            "bytes_written": written,
             "uncertain": True,
             "interrupted": True,
             "error": "A person is taking control; the command was killed while "
-            "it ran, after the value was sent to it, and may have partly run. "
-            + TAKEN_OVER,
+            f"it ran, {given}, and may have partly run. " + TAKEN_OVER,
         }
 
     def browser_save(self, request, bridge, context, target):
@@ -3009,9 +3042,21 @@ class Worker:
             max_nodes = request.get("max_nodes", 300)
             if not isinstance(max_nodes, int) or not 1 <= max_nodes <= 2000:
                 raise ValueError("max_nodes must be an integer from 1 to 2000")
-            tree = self.accessibility().tree(
-                request.get("app"), request.get("window"), max_nodes
-            )
+            try:
+                # Checked before each element, so a person taking control
+                # waits for one element's read, not the whole tree.
+                tree = self.accessibility().tree(
+                    request.get("app"),
+                    request.get("window"),
+                    max_nodes,
+                    interrupt=self.take_requested,
+                )
+            except Interrupted:
+                raise HumanControl(
+                    "A person is taking control; the accessibility read was "
+                    "stopped and nothing was sent. Wait with desktop_control "
+                    "until control returns."
+                ) from None
             for node in tree["nodes"]:
                 node["id"] = self.short_id(node["id"])
             # Stay well under the protocol's response limit.

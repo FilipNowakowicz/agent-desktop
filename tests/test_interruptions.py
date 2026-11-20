@@ -10,6 +10,7 @@ without its checks.
 import json
 import shutil
 import signal
+import sys
 import time
 import unittest
 
@@ -228,10 +229,11 @@ class InterruptionTests(unittest.TestCase):
         ident = self.checking_job()
         started = time.monotonic()
         self.assertEqual(core.request(self.session, "take")["owner"], "human")
-        # The worker serves one request at a time, and an accessibility read
-        # does not give way to a take: it waits for the read in progress,
-        # which stops at its 3 s budget.
-        self.assertLess(time.monotonic() - started, 5.0)
+        # An accessibility read in progress gives way to a take between
+        # elements, so take keeps the 1 s bound of the other long steps.
+        acknowledged = time.monotonic() - started
+        print(f"\nchecks: take acknowledged in {acknowledged:.2f} s", file=sys.stderr)
+        self.assertLess(acknowledged, 1.0)
         result = self.finished(ident)
         # Delivery stays known; the checks the person's control refused leave
         # the verification unknown, never satisfied.

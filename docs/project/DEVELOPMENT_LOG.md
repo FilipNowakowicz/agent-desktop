@@ -5,6 +5,77 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-19 — Take while send writes a large value, and during an accessibility read (#213)
+
+The two limits left from #181 (F1), both reported honestly before but loose:
+
+- **`send` to a command, value over the pipe buffer.** Since #207 a take kills
+  the command's process group, but `communicate` wrote stdin, so the reply could
+  not say how much of a value larger than the 64 KiB pipe buffer had been
+  written. The worker now writes stdin itself (non-blocking, waiting at most
+  0.1 s for room) and counts the bytes. Every `to_command` reply carries
+  `bytes_written`; when a take (or the 60 s timeout) stops the command, the
+  message says "after N of M bytes of the value were written to its stdin (the
+  rest was not sent)" or "after the whole value (M bytes)", and always "may have
+  partly run": the command was started, so it is never reported as not run.
+  `bytes_written` counts bytes accepted by the pipe, not bytes the command read.
+  A command that closes its input early also shows fewer bytes than `bytes`.
+- **Take during an accessibility read.** The worker serves one request at a
+  time, and a `ui` read ran to its node limit or 3 s budget before `take` was
+  served (#211 measured 0.11–2.79 s). `Accessibility.tree` now takes an
+  `interrupt` callable, checked before each element (the take marker is a
+  `stat`); the `ui` operation passes `take_requested` and turns the stop into
+  `HumanControl`. A partial tree is never returned: an `absent` or `unique`
+  claim over it could read as `violated`. `checks.evaluate` maps that refusal to
+  `unknown` with "human_control: observation interrupted". The read is
+  observation only, so nothing sent before it is affected; the job keeps
+  `completed`. One D-Bus call can still block up to its 2 s timeout on an
+  unresponsive application; the check is between calls, not inside one.
+
+Decisions: one PR, since both are small and share the docs rows. No bound was
+added to a single D-Bus call; checking between elements met the 1 s bound on
+the crowded page. Target lookups and `wait` element reads now also give way to a
+take with a `HumanControl` refusal, as any request after the take would be.
+
+Tests:
+
+- `tests/test_takeover_long_steps.py`:
+  `test_take_while_send_writes_a_value_over_the_pipe_buffer` (40 cookies of
+  3,000 characters from a local page, `send source="cookies"` to
+  `sh -c 'head -c 1000 > got; touch started; sleep 6; touch finished'`; take once
+  `started` exists; asserts 1000 <= `bytes_written` < `bytes`, the counts in the
+  error, "may have partly run", that `finished` never appears and the value is not
+  in the reply) and `test_take_during_a_jobs_accessibility_check` (a one-click job
+  on the `CROWDED_PAGE` of `test_interruptions` with an `absent` check on "Row"
+  and nine `exists` checks; take 0.3 s into the first read; asserts the 1 s
+  bound, `completed`, the click `acknowledged`, verification `unknown`, the first
+  check "observation interrupted", no `violated` check, count 1).
+  `test_take_during_a_send_to_a_slow_command` also checks `bytes_written`.
+- `tests/test_interruptions.py`: `test_takeover_during_evidence_collection` bound
+  tightened from 5 s to 1 s, and it prints the latency.
+- Unit: `test_delivery` (whole 200 KB value counted; a command that never reads
+  stopped by a take within 1 s with 0 < `bytes_written` < 200,000; a command that
+  exits at once; `tree(interrupt=...)` raises rather than returning a partial
+  tree) and `test_checks` (an interrupted read is `unknown`, never `violated`).
+
+Validation (worktree from `main` at 7519069, same nix shell as #207 with the
+managed runtime first on `PATH`; host load average 8–11 from unrelated work):
+
+- `uv run ruff check src scripts tests` and `ruff format --check`: pass.
+- `-p 'test_takeover_long_steps.py'`: 6 OK (77 s). Take acknowledged in 0.21 s
+  (open in a job), 0.26 s (accessibility check), 0.22 s (send to a slow command),
+  0.25 s (open), 0.19 s (long type), 0.25 s (send over the pipe buffer, stopped
+  after 65,536 of 121,258 bytes). An earlier run: 0.23 s for the accessibility
+  check, 0.24 s for the pipe-buffer send (also 65,536 of 121,258).
+- The two new tests with `src` from `main`: both fail, the accessibility check
+  with "2.95 not less than 1.0" and the send with `KeyError: 'bytes_written'`.
+- `-p 'test_interruptions.py' -k evidence -k partial`: 6 OK (82 s);
+  `-k takeover` again after the latency print: 1 OK, take in 0.18 s.
+- `-p 'test_browser.py' -k test_send`: 2 OK.
+- Without the desktop: `test_delivery` 21 OK, `test_checks` 10 OK (1 skipped),
+  `test_operations` 21 OK (6 skipped).
+- Not run: the full desktop suite and the Checks matrix.
+
 ## 2026-11-20 — The crowded test page is partial on an idle machine too
 
 The two partial-coverage interruption tests from #212 failed on the Ubuntu and Nix

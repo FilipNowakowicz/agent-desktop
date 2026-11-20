@@ -66,6 +66,10 @@ class Unsupported(AccessibilityError):
     pass
 
 
+class Interrupted(RuntimeError):
+    """A tree read was stopped part way because `interrupt` returned true."""
+
+
 def name_has_owner(session_bus, name):
     """Whether a name is owned on a bus (False when the bus cannot be reached)."""
     try:
@@ -268,11 +272,22 @@ class Accessibility:
                     return found[0]
         return None
 
-    def tree(self, app=None, window=None, max_nodes=300, budget=3.0, actions=True):
+    def tree(
+        self,
+        app=None,
+        window=None,
+        max_nodes=300,
+        budget=3.0,
+        actions=True,
+        interrupt=None,
+    ):
         """Visible UI nodes as a flat list with depth, filtered by app or window.
 
         Bounded by listed nodes, visited nodes and elapsed time, so a slow or
-        enormous application cannot monopolize the session worker.
+        enormous application cannot monopolize the session worker. With
+        `interrupt`, it is checked before each element is read and the read
+        raises Interrupted when it returns true: a partial tree is not returned,
+        since its absences would not be evidence.
         """
         nodes, truncated = [], None
         deadline = time.monotonic() + budget
@@ -281,6 +296,8 @@ class Accessibility:
 
         def exhausted():
             nonlocal truncated
+            if interrupt is not None and interrupt():
+                raise Interrupted("The accessibility read was stopped")
             if len(nodes) >= max_nodes:
                 truncated = truncated or "node limit"
             elif visited >= max_visited:

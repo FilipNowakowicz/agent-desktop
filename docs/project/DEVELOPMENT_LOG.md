@@ -5,6 +5,82 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — import-cookies copies session-only cookies
+
+Follows the [VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)
+(#217), "Session-only logins can't be imported" and suggestion 5, which the
+maintainer approved. The person's Firefox was signed in to a console with only
+a session cookie, `import-cookies` reported success, and the private browser
+was still signed out.
+
+`import-cookies` now also reads Firefox's session store,
+`sessionstore-backups/recovery.jsonlz4` (written while Firefox runs) or
+`sessionstore.jsonlz4` (after a clean shutdown). It uses the newer file and
+falls back to the other one. Each file is copied to the same private temporary
+directory as `cookies.sqlite` and decoded there. Cookies whose host is a named
+site or a subdomain, using the same matching as before, are written into the
+profile's `cookies.sqlite`, and a session cookie replaces a persistent row with
+the same name, host, path and origin attributes. Private-browsing cookies are
+skipped. Container and partition attributes are turned into Firefox's
+`originAttributes` text. The reply now gives `persistent_cookies`,
+`session_cookies` and `session_cookies_expire`, and `cookies` stays the total.
+`detail` names the store it used and any file it skipped and why (not mozLz4,
+truncated, decoded size too large, not JSON), never what the file contained. If
+no store can be read, the persistent cookies are still copied. The
+multi-account warning is unchanged.
+
+Decisions:
+
+- **Pure-Python LZ4 block decoder, no dependency.** The decoder (`lz4_block`)
+  is about 50 lines. The `lz4` package is a C extension, so every platform
+  needs a wheel, and on NixOS that is the kind of native-wheel loading problem
+  the project instructions ask us to avoid. Only decoding is needed, and only
+  once per import. On a synthetic 9.6 MB store with mostly random data it took
+  0.58 s on the laptop. A decoded size over 256 MB is treated as corrupt.
+- **24-hour expiry.** Firefox reads only persistent rows from `cookies.sqlite`,
+  so each session cookie is given an expiry 24 hours after the import. That is
+  long enough for a task and survives the private Firefox restarting. It is
+  short enough that a login the person did not ask to remember does not stay
+  in the profile for weeks. The import cannot use the session's lifetime,
+  because it runs before the session exists.
+- **Expiry units.** Firefox 160 (cookie schema 17) stores `expiry` in
+  milliseconds. This was seen in a headless Firefox 160 run with a temporary
+  profile and a local page, `expiry` 1795204456379 for `Max-Age=3600`. The
+  unit is taken from the source database's stored values (any value over 10^11
+  is milliseconds). With no rows it is taken from `user_version >= 17`.
+
+Validation (worktree `import-session-cookies`):
+
+- A headless Firefox 160 with a temporary profile, not the person's profile,
+  loaded a local page that set a session-only and a persistent cookie. Its
+  `recovery.jsonlz4` decoded to the declared size and listed the session
+  cookie. `AGENT_DESKTOP_STATE_DIR=<temporary> uv run agent-desktop
+  import-cookies exp --site 127.0.0.1 --from <that profile>` reported
+  `persistent_cookies: 1, session_cookies: 1`. A second headless Firefox on the
+  imported profile then sent both cookies to the local server.
+- `uv run ruff check src scripts tests` and `uv run ruff format --check src scripts tests`: clean.
+- Laptop: `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p 'test_profiles.py' -v`:
+  21 tests OK in 36.8 s. The new tests are:
+  - `test_lz4_block_decoder`: round trips through a small LZ4 compressor in
+    the test, a block assembled by hand, and corrupt blocks.
+  - `test_session_cookies_are_imported`: through the CLI. Only the matching
+    session cookies are copied (a container cookie is kept, and a
+    private-browsing cookie, another host and a malformed entry are not). No
+    value appears in stdout or stderr, and the expiry is 24 hours.
+  - `test_millisecond_expiry_and_origin_attributes`.
+  - `test_newest_session_store_and_corrupt_ones`.
+  - `test_imported_session_cookie_is_sent`: a real Firefox in a private
+    session gets a session cookie, the store is imported, and a second session
+    on the profile sends it.
+- `uv run python -m unittest discover -s tests`: 449 tests OK (174 skipped,
+  desktop tests without the runtime on PATH).
+
+Remaining: the session store is saved every 15 seconds by default, so a login
+made just before the import may be missing. Origin-attribute encoding is checked
+against Firefox's format for containers and partition keys in unit tests only,
+not with a real partitioned cookie. The expiry is fixed at 24 hours. There is no
+option to change it or to skip session cookies.
+
 ## 2026-11-20 — Secret-looking text hidden in browser replies; named covers; key hint
 
 Follows suggestions 1 to 4 of the

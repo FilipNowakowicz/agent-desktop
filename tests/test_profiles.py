@@ -1,12 +1,17 @@
 """Named profiles keep a session home (e.g. logins) for later sessions only."""
 
 import http.server
+import json
 import os
+import random
 import shutil
 import signal
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -31,6 +36,72 @@ isSecure INTEGER, isHttpOnly INTEGER, inBrowserElement INTEGER DEFAULT 0,
 sameSite INTEGER DEFAULT 0, schemeMap INTEGER DEFAULT 0,
 isPartitionedAttributeSet INTEGER DEFAULT 0,
 CONSTRAINT moz_uniqueid UNIQUE (name, host, path, originAttributes))"""
+
+
+def lz4_compress(data):
+    """A small greedy LZ4 block compressor, so fixtures contain real matches."""
+    out, literals, table, i = bytearray(), bytearray(), {}, 0
+
+    def lengths(value):
+        while value >= 255:
+            out.append(255)
+            value -= 255
+        out.append(value)
+
+    def sequence(match_length=None, offset=0):
+        token_literal = min(len(literals), 15)
+        token_match = 0 if match_length is None else min(match_length - 4, 15)
+        out.append(token_literal << 4 | token_match)
+        if len(literals) >= 15:
+            lengths(len(literals) - 15)
+        out.extend(literals)
+        literals.clear()
+        if match_length is not None:
+            out.extend(offset.to_bytes(2, "little"))
+            if match_length - 4 >= 15:
+                lengths(match_length - 19)
+
+    # The format keeps the last 5 bytes as literals and starts no match in the
+    # last 12.
+    while i < len(data) - 12:
+        key = data[i : i + 4]
+        candidate = table.get(key)
+        table[key] = i
+        if candidate is not None and i - candidate <= 0xFFFF:
+            length = 4
+            while (
+                i + length < len(data) - 5
+                and data[candidate + length] == data[i + length]
+            ):
+                length += 1
+            sequence(length, i - candidate)
+            i += length
+            continue
+        literals.append(data[i])
+        i += 1
+    literals.extend(data[i:])
+    sequence()
+    return bytes(out)
+
+
+def mozlz4(document):
+    data = json.dumps(document).encode()
+    return b"mozLz40\0" + len(data).to_bytes(4, "little") + lz4_compress(data)
+
+
+def session_cookie(host, name, value, **extra):
+    attributes = {
+        "firstPartyDomain": "",
+        "geckoViewSessionContextId": "",
+        "partitionKey": "",
+        "privateBrowsingId": 0,
+        "userContextId": 0,
+    }
+    attributes.update(extra.pop("attributes", {}))
+    cookie = {"host": host, "value": value, "path": "/", "name": name}
+    cookie.update(extra)
+    cookie["originAttributes"] = attributes
+    return cookie
 
 
 class CookieImportTests(unittest.TestCase):
@@ -111,6 +182,278 @@ class CookieImportTests(unittest.TestCase):
                 (".shop.example", "sid", "new"),
                 ("login.shop.example", "sso", "private-cookie-sso-fixture"),
             ],
+        )
+
+    def session_store(
+        self, profile, cookies_, name="sessionstore-backups/recovery.jsonlz4"
+    ):
+        path = profile / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Other keys of a session store, as Firefox writes them.
+        windows = [{"tabs": [{"entries": [{"url": "https://other.example/"}]}]}]
+        path.write_bytes(
+            mozlz4(
+                {
+                    "version": ["sessionrestore", 1],
+                    "windows": windows,
+                    "cookies": cookies_,
+                }
+            )
+        )
+        return path
+
+    def test_lz4_block_decoder(self):
+        generator = random.Random(7)
+        samples = [
+            b"",
+            b"a" * 1000,  # matches that overlap themselves (offset 1)
+            b"abc" * 400 + b"tail-literals",
+            bytes(generator.randrange(256) for _ in range(5000)),  # literals over 270
+            json.dumps([{"n": i, "v": "x" * (i % 40)} for i in range(3000)]).encode(),
+        ]
+        for data in samples:
+            with self.subTest(size=len(data)):
+                block = lz4_compress(data)
+                self.assertEqual(cookies.lz4_block(block, len(data)), data)
+        block = lz4_compress(samples[2])
+        for corrupt, size in (
+            (block[:-3], len(samples[2])),  # truncated
+            (block, len(samples[2]) + 1),  # wrong size in the header
+            (bytes([0x0F, 0x10, 0x00]), 19),  # match before any output
+        ):
+            with self.assertRaises(ValueError):
+                cookies.lz4_block(corrupt, size)
+        # Assembled by hand from the format description: the literals "ab",
+        # a 6-byte match at offset 2 (overlapping itself) and a final literal.
+        block = bytes([0x22]) + b"ab" + bytes([2, 0, 0x10]) + b"!"
+        self.assertEqual(cookies.lz4_block(block, 9), b"abababab!")
+
+    def test_session_cookies_are_imported(self):
+        source = self.person(
+            [
+                ("sid", "private-stale-sid-fixture", ".shop.example"),
+                ("keep", "private-keep-fixture", "shop.example"),
+            ]
+        )
+        self.session_store(
+            source,
+            [
+                session_cookie(
+                    ".shop.example",
+                    "sid",
+                    "private-session-sid-fixture",
+                    secure=True,
+                    httponly=True,
+                    sameSite=1,
+                    schemeMap=2,
+                ),
+                session_cookie(
+                    "login.shop.example",
+                    "box",
+                    "private-container-fixture",
+                    attributes={"userContextId": 2},
+                ),
+                session_cookie(
+                    "login.shop.example",
+                    "pb",
+                    "private-browsing-fixture",
+                    attributes={"privateBrowsingId": 1},
+                ),
+                session_cookie("other.example", "x", "private-other-fixture"),
+                {"host": 5, "value": "private-malformed-fixture"},
+            ],
+        )
+        before = time.time()
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from agent_desktop.cli import main; main()",
+                "import-cookies",
+                "shop",
+                "--site",
+                "shop.example",
+                "--from",
+                str(source),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        result = json.loads(process.stdout)
+        for value in (
+            "sid",
+            "keep",
+            "session-sid",
+            "container",
+            "browsing",
+            "other",
+            "malformed",
+        ):
+            self.assertNotIn(
+                f"private-{value}-fixture", process.stdout + process.stderr
+            )
+        self.assertEqual(
+            (
+                result["cookies"],
+                result["persistent_cookies"],
+                result["session_cookies"],
+            ),
+            (3, 1, 2),
+        )
+        self.assertEqual(
+            result["hosts"], [".shop.example", "login.shop.example", "shop.example"]
+        )
+        self.assertIn("recovery.jsonlz4", result["detail"])
+        self.assertIn("24-hour", result["detail"])
+        self.assertNotIn("warning", result)
+        database = (
+            core.profile_path("shop") / "home/.mozilla/agent-desktop/cookies.sqlite"
+        )
+        connection = sqlite3.connect(database)
+        try:
+            rows = connection.execute(
+                "SELECT host, name, value, originAttributes, expiry, isSecure, "
+                "isHttpOnly, sameSite, schemeMap FROM moz_cookies ORDER BY host, name"
+            ).fetchall()
+        finally:
+            connection.close()
+        expiry = rows[0][4]
+        # The fixture stores seconds, so the copied session cookies do too.
+        self.assertAlmostEqual(expiry, before + 24 * 3600, delta=60)
+        self.assertEqual(
+            rows,
+            [
+                (
+                    ".shop.example",
+                    "sid",
+                    "private-session-sid-fixture",
+                    "",
+                    expiry,
+                    1,
+                    1,
+                    1,
+                    2,
+                ),
+                (
+                    "login.shop.example",
+                    "box",
+                    "private-container-fixture",
+                    "^userContextId=2",
+                    expiry,
+                    0,
+                    0,
+                    0,
+                    0,
+                ),
+                (
+                    "shop.example",
+                    "keep",
+                    "private-keep-fixture",
+                    "",
+                    4102444800,
+                    None,
+                    None,
+                    0,
+                    0,
+                ),
+            ],
+        )
+        self.assertEqual(
+            result["session_cookies_expire"],
+            time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(expiry)),
+        )
+
+    def test_millisecond_expiry_and_origin_attributes(self):
+        source = self.person([])
+        with sqlite3.connect(source / "cookies.sqlite") as connection:
+            connection.execute("PRAGMA user_version = 17")
+        connection.close()
+        self.session_store(
+            source,
+            [
+                session_cookie(
+                    "shop.example",
+                    "p",
+                    "1",
+                    attributes={
+                        "partitionKey": "(https,shop.example)",
+                        "firstPartyDomain": "a b",
+                    },
+                )
+            ],
+        )
+        before = time.time()
+        cookies.import_firefox_cookies("shop", ["shop.example"], source)
+        connection = sqlite3.connect(
+            core.profile_path("shop") / "home/.mozilla/agent-desktop/cookies.sqlite"
+        )
+        try:
+            ((attributes, expiry),) = connection.execute(
+                "SELECT originAttributes, expiry FROM moz_cookies"
+            ).fetchall()
+        finally:
+            connection.close()
+        self.assertEqual(
+            attributes,
+            "^firstPartyDomain=a%20b&partitionKey=%28https%2Cshop.example%29",
+        )
+        self.assertAlmostEqual(expiry / 1000, before + 24 * 3600, delta=60)
+
+    def test_newest_session_store_and_corrupt_ones(self):
+        source = self.person([("keep", "1", "shop.example")])
+        older = self.session_store(
+            source,
+            [session_cookie("shop.example", "old", "private-old-fixture")],
+            "sessionstore.jsonlz4",
+        )
+        newer = self.session_store(
+            source, [session_cookie("shop.example", "new", "private-new-fixture")]
+        )
+        os.utime(older, (1_000_000, 1_000_000))
+        result = cookies.import_firefox_cookies("shop", ["shop.example"], source)
+        self.assertEqual(result["session_cookies"], 1)
+        self.assertIn("recovery.jsonlz4", result["detail"])
+        self.assertEqual([r[1] for r in self.imported("shop")[1]], ["keep", "new"])
+        # A corrupt newest store: the older one is used and the problem named.
+        for damage, reason in (
+            (b"not mozlz4 at all", "not a mozLz4 file"),
+            (newer.read_bytes()[:-20], "truncated"),
+            (
+                b"mozLz40\0" + (5).to_bytes(4, "little") + bytes([0x50]) + b"{oops",
+                "not JSON",
+            ),
+            (b"mozLz40\0" + (2**31).to_bytes(4, "little"), "decoded size too large"),
+        ):
+            with self.subTest(reason=reason):
+                newer.write_bytes(damage)
+                os.utime(newer, None)
+                result = cookies.import_firefox_cookies(
+                    "fall", ["shop.example"], source
+                )
+                self.assertEqual(result["session_cookies"], 1)
+                self.assertIn("sessionstore.jsonlz4 and copied", result["detail"])
+                self.assertIn(
+                    f"recovery.jsonlz4 is unreadable ({reason}", result["detail"]
+                )
+                self.assertNotIn("private-", str(result))
+        # Every store corrupt: persistent cookies are still copied.
+        older.write_bytes(b"mozLz40\0garbage")
+        result = cookies.import_firefox_cookies("bad", ["shop.example"], source)
+        self.assertEqual(
+            (result["persistent_cookies"], result["session_cookies"]), (1, 0)
+        )
+        self.assertNotIn("session_cookies_expire", result)
+        self.assertIn("No session store was found", result["detail"])
+        self.assertIn("sessionstore.jsonlz4 is unreadable", result["detail"])
+        # None at all.
+        older.unlink()
+        newer.unlink()
+        result = cookies.import_firefox_cookies("none", ["shop.example"], source)
+        self.assertEqual(
+            result["detail"],
+            "No session store was found, so no "
+            "session-only cookies were copied. Values are never shown.",
         )
 
     def test_refusals(self):
@@ -208,6 +551,8 @@ class CookieServer(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         if self.path == "/login":
             self.send_header("Set-Cookie", "login=yes; Max-Age=3600; Path=/")
+        elif self.path == "/session-login":  # no expiry: a session-only cookie
+            self.send_header("Set-Cookie", "session=yes; Path=/; HttpOnly")
         self.send_header("Content-Type", "text/html")
         self.end_headers()
         self.wfile.write(b"<title>page</title>ok")
@@ -554,3 +899,44 @@ class ProfileTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
         self.assertEqual(dict(CookieServer.seen)["/check"], "login=yes")
+
+    @unittest.skipUnless(shutil.which("firefox"), "Firefox unavailable")
+    def test_imported_session_cookie_is_sent(self):
+        CookieServer.seen = []
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CookieServer)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        person = self.root / "person-firefox"
+        person.mkdir()
+        # Save the session store every second instead of every 15.
+        (person / "user.js").write_text(
+            'user_pref("browser.sessionstore.interval", 1000);\n'
+        )
+        try:
+            session = self.create()
+            core.request(
+                session,
+                "launch",
+                argv=["firefox", "--profile", str(person), base + "/session-login"],
+            )
+
+            def saved():
+                try:
+                    return cookies.read_session_cookies(person, ["127.0.0.1"])[0]
+                except core.DesktopError:
+                    return False
+
+            wait_for(lambda: (person / "cookies.sqlite").is_file(), timeout=30)
+            wait_for(saved, timeout=30)
+            result = cookies.import_firefox_cookies("imported", ["127.0.0.1"], person)
+            self.assertEqual(result["session_cookies"], 1, result)
+            agent = self.create("imported")
+            core.request(agent, "browser", action="start", url=base + "/check")
+            wait_for(
+                lambda: any(path == "/check" for path, _ in CookieServer.seen),
+                timeout=30,
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(dict(CookieServer.seen)["/check"], "session=yes")

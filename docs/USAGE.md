@@ -891,12 +891,29 @@ or one of its subdomains are copied, into the profile's Firefox
 lists the count and hosts, never values. The profile must not be in use. It is
 CLI-only on purpose: you choose what leaves your browser, not the agent.
 
-Limits: session-only cookies (sites without "Remember me") are kept in
-Firefox's session store and are not copied; logins held in page storage
-(`localStorage`) are not copied; the copy does not follow later logins or
-logouts in your Firefox (run it again), and a site that binds a login to its
-device may still ask again. Cookies of a site are its credentials: anyone with
-the profile can act as you there.
+Session-only cookies (a login without "Remember me") are not in
+`cookies.sqlite`: Firefox saves them in its session store,
+`sessionstore-backups/recovery.jsonlz4` while it runs and `sessionstore.jsonlz4`
+after a clean shutdown. The import copies the newer of the two to the same
+private temporary directory, decodes it and copies the named sites' session
+cookies too. Firefox reads only persistent cookies from `cookies.sqlite`, so
+each one is written as a persistent cookie that expires 24 hours after the
+import. Until then it survives the private browser restarting; after that the
+browser drops it, even in a session that is still running. The site may end the
+login sooner. The reply
+counts `persistent_cookies` and `session_cookies` (the total is `cookies`) and
+gives `session_cookies_expire` (UTC). If neither session store exists, or one
+cannot be read (for example a truncated file), the reply's `detail` says so and
+the persistent cookies are still copied. A session cookie replaces a persistent
+one with the same name, host and path. Private-window cookies are never saved by
+Firefox, so they cannot be copied.
+
+Limits: logins held in page storage (`localStorage`) are not copied; the copy
+does not follow later logins or logouts in your Firefox (run it again), and a
+site that binds a login to its device may still ask again. The session store is
+saved every 15 seconds, so a login made just before the import may not be in it
+yet. Cookies of a site are its credentials: anyone with the profile can act as
+you there.
 
 Some sites keep several accounts signed in at once in one browser (Google,
 Microsoft and GitHub, for example). An import copies all of them, and the site's

@@ -401,6 +401,52 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(started["tabs"][0]["url"], self.page.as_uri())
         self.assertEqual(len(core.request(self.session, "status")["applications"]), 1)
 
+    def test_find_and_wait_hide_a_generated_token(self):
+        # The 2026-11-20 field report: a find over a token dialog returned the
+        # token. Its text is hidden, the dialog names the cover of a refused
+        # click, and send still takes the selector directly. A fake token.
+        planted = "tskey-" + "api-kFAKE0CNTRL-FAKE0123456789abcdefFAKE0123456789xy"
+        self.page.write_text(
+            '<!doctype html><meta charset="utf-8"><title>Keys</title>'
+            '<button id="behind" style="position:absolute;left:100px;top:100px;'
+            'width:200px;height:200px">Behind</button>'
+            '<div id="key" role="dialog" aria-label="New API key" '
+            'style="position:fixed;inset:0;background:#fff">'
+            f"<p>Your key, shown once: <code>{planted}</code></p>"
+            f'<input id="field" readonly value="{planted}">'
+            '<button id="later">Remind me later</button></div>'
+        )
+        self.browser("start", url=self.page.as_uri())
+        replies = [self.browser("wait", selector="[role=dialog] code", timeout=20)]
+        self.assertTrue(replies[0]["satisfied"])
+        replies.append(
+            self.browser("find", selector="[role=dialog] code, [role=dialog] input, p")
+        )
+        items = replies[1]["items"]
+        self.assertEqual(replies[1]["count"], 3)
+        self.assertEqual(
+            items[0]["text"],
+            f"Your key, shown once: <hidden: looks "
+            f"like a secret, {len(planted)} chars; use send>",
+        )
+        self.assertEqual([i["hidden"] for i in items], [["text"], ["text"], ["value"]])
+        self.assertEqual(self.browser("find", text="Remind me later")["count"], 1)
+        with self.assertRaises(core.DesktopError) as refused:
+            self.browser("click", selector="#behind")
+        replies.append(str(refused.exception))
+        self.assertIn(
+            'under div#key[role=dialog] ("New API key") "Your key, shown once:',
+            replies[-1],
+        )
+        replies.append(
+            self.browser("steps", steps=[{"action": "find", "selector": "code"}])
+        )
+        sent = self.browser("send", selector="[role=dialog] code", to_file="key.txt")
+        replies.append(sent)
+        self.assertEqual(sent["bytes"], len(planted))
+        for reply in replies:
+            self.assertNotIn(planted[10:30], json.dumps(reply))
+
     def test_find_items_carry_classes_and_a_unique_selector(self):
         rows = "".join(
             f'<tr><td>{n}</td><td><button class="btn btn-small edit">Edit</button>'

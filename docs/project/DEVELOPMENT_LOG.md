@@ -5,6 +5,75 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — Secret-looking text hidden in browser replies; named covers; key hint
+
+Follows suggestions 1 to 4 of the
+[VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)
+(#217). In that use, a `find` over a token dialog returned a freshly generated
+API token in an item's `text` before the agent moved it with `send`.
+
+- **Hidden text** (`src/agent_desktop/secret_text.py`). `Browser.find` passes
+  every item's `text`, `label`, `value` and `options` through `hide()`, so
+  `find`, `wait`, the `element` of click/fill/select, the matches listed for an
+  ambiguous target and `steps` results all carry it. The page script now returns
+  up to 400 characters per field; hiding runs first and the 120/200-character
+  cut after it, so a cut never leaves an unrecognised part of a token, and never
+  splits a marker. The `now` value after click/fill/select is hidden too. A run
+  of token characters (`[A-Za-z0-9+/=_.~-]`) is replaced in place by
+  `<hidden: looks like a secret, N chars; use send>` and the field is listed in
+  `hidden`. Rules: a known prefix (Tailscale, GitHub, GitLab, OpenAI/Anthropic
+  `sk-`, Stripe, Slack, AWS key ids, Google API key/OAuth tokens, npm, PyPI,
+  Hugging Face, DigitalOcean, SendGrid, JWT), a `PRIVATE KEY` block, or a part
+  between `-_.~` of 20+ characters with 3+ letter/digit switches and 3.5+ bits
+  per character of Shannon entropy.
+- **Threshold decision.** Measured on 2000 random strings each: base62 misses
+  17% at 20 chars, 10% at 24, 3% at 32, 0.6% at 40; base36 5%, 0.8%, 0.1%, 0%.
+  A sample of names (camel case, CSS classes, Debian package names, cloud
+  resource paths, dates, version strings, long words) stays visible. Pure hex,
+  UUIDs and absolute paths are shown on purpose: commit ids, checksums, request
+  ids and `/nix/store` hashes are far more common on pages than hex or UUID
+  secrets, and hiding them would break reading checksums. IPFS-style random
+  content ids are hidden. `text` and `save` are left unchanged: they read pages
+  and are documented as never for secrets; the tool text now says to give `send`
+  the selector directly instead of finding the element first.
+- **Named covers.** `uncovered()` returns a JSON description: the dialog
+  (`dialog`, `role=dialog/alertdialog`, `aria-modal`) holding the hit element, or
+  the hit element, with tag, id or two classes, role, label and the first 40
+  characters of its text (hidden first); for a backdrop, also another open
+  dialog on the page. Real Firefox: `covered: the element is under div.backdrop;
+  a dialog is open: div[role=dialog] ("Security check") "Turn on two-step
+  verification? Your key …"`.
+- **Key attempts.** Unknown browser actions are refused before any bridge is
+  attached; `key`, `keys`, `press`, `keypress`, `hotkey`, `shortcut` and `type`
+  add that keys go through `desktop_key`, text through `fill` or `desktop_type`.
+  An unknown action in `steps` is now refused before any step runs.
+- **`forget-site` named.** The `desktop_browser` cookies hint says never to
+  copy or edit a profile's cookie files and names
+  `agent-desktop forget-site PROFILE --site SITE`. Tool descriptions now get the
+  same printed CLI prefix as the server instructions.
+- Skipped: a read-only cookie listing in `desktop_profiles` (suggestion 2's
+  optional part). Other work is changing `desktop_profiles` and `cookies.py`, so
+  it is left for a separate change.
+
+Validation (worktree `browser-secret-hints`):
+
+- `uv run ruff check src scripts tests`, `uv run ruff format --check src scripts tests`: clean.
+- `uv run python -m unittest discover -s tests` (laptop, desktop tools not on PATH): 459 tests OK, 174 skipped.
+- `uv run python -m unittest discover -s tests -p test_secret_text.py`: 14 tests OK.
+- Laptop, real Firefox: `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#dbus nixpkgs#firefox --command uv run python -m unittest discover -s tests -p test_browser.py -v`:
+  16 tests OK in 83 s, including `test_find_and_wait_hide_a_generated_token`.
+- gcp-worker, full suite: not run. `on-worker run -n browser-secret-hints -- nix shell <packages> --command uv run python -m unittest discover -s tests -p 'test*.py'`
+  could not start the VM (`Quota 'CPUS_ALL_REGIONS' exceeded. Limit: 16.0`, another
+  VM held the CPUs). Instead, on the laptop, the browser-facing desktop files one at a
+  time with `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p test_NAME.py`:
+  dataset_workflow 7, web_fixtures 4, completion_targets 8, delivery 21,
+  send_cookies 5, save 3, download 7, interruptions 11, login_handoff 1,
+  takeover_jobs 2, all OK with none skipped. The full desktop suite remains to be run.
+
+Limits: this is a heuristic. A secret that is short, hex-only, UUID-shaped or
+split by separators into short parts is shown. URLs with a random query value
+lose that value to the marker. `send` remains the route for any value shown once.
+
 ## 2026-11-20 — hyprctl for a nested Hyprland with a short runtime (N8 follow-up)
 
 The 2026-11-11 shim only passed `hyprctl` through when `XDG_RUNTIME_DIR` was the

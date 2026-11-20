@@ -219,8 +219,8 @@ session. Then:
 | `tabs` | list tabs with stable `context` IDs, url and title; `tab` or `context` picks one for later calls |
 | `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
-| `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text); each item has its tag, attributes, classes and a `selector` that matches only that element at the moment |
-| `wait` | until an element is found, or `gone` (up to 60 s); `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
+| `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text); each item has its tag, attributes, classes, text, label, value and a `selector` that matches only that element at the moment; text that looks like a credential is hidden (see below) |
+| `wait` | until an element is found, or `gone` (up to 60 s), with the same items as `find`; `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
 | `download` | fetch `url` with the browser's login and wait for the file; see below |
@@ -234,7 +234,15 @@ Clicks and keys are trusted input events from Firefox itself. If several
 elements match, or the match is disabled, nothing happens and the matches are
 listed. If something else is on top of the match where the click would land
 (a modal or overlay), `click` and `fill` are refused with `covered:` and the
-covering element, and nothing is sent. Replies carry the page url and title and the element's value afterwards,
+covering element, and nothing is sent. The cover is named by its tag, id or
+classes, role and label, with the first 40 characters of its text. When what is
+hit lies inside a dialog (`dialog`, `role=dialog` or `alertdialog`,
+`aria-modal`), the dialog is named; when it is a backdrop, an open dialog
+elsewhere on the page is named after it, for example
+`covered: the element is under div.backdrop; a dialog is open: div[role=dialog]
+("Security check") "Remind me later"`. `desktop_browser` has no key action: an
+attempt with `key`, `press` or `type` is refused with a pointer to `desktop_key`,
+`fill` and `desktop_type`, and in `steps` it is refused before any step runs. Replies carry the page url and title and the element's value afterwards,
 never a password's. A click on a checkbox, radio button or switch (`role=switch`,
 `aria-checked`, `aria-pressed`), or on a label that controls one, also returns
 `toggle` with its state `before` and `after` and whether it `changed`. A delivered
@@ -327,6 +335,33 @@ command, and a `prefix` of `reveal` characters (default 4, 0 for none) to check
 that the right value was moved. If several elements match, nothing is sent and
 the matches are not listed. With the effect ledger on, the file is reported as
 changed with `"content": "hidden"`.
+
+To find the element, don't run `find` or `wait` over the dialog first: give
+`send` the selector directly (`--selector '[role=dialog] code'`). `send` refuses
+anything but exactly one match without listing the matches.
+
+As a second line of defence, `find` and `wait` items (and the element in
+`click`, `fill` and `select` replies, the `now` value after them, the matches
+listed for an ambiguous target and the text of a `covered:` cover) hide text
+that looks like a generated credential. The run of token characters is replaced
+in place by `<hidden: looks like a secret, N chars; use send>`, and the item
+lists the changed fields under `hidden` (`"hidden": ["text"]`). A run is hidden
+when it starts with a known credential prefix (`tskey-`, `ghp_`, `gho_`, `ghu_`,
+`ghs_`, `ghr_`, `github_pat_`, `glpat-`, `sk-` including `sk-ant-`,
+`sk_live_`/`sk_test_`, `xoxb-` and the other Slack forms, `AKIA`/`ASIA`, `AIza`,
+`ya29.`, `1//0`, `npm_`, `pypi-`, `hf_`, `dop_v1_`, `SG.`, and JWTs starting `eyJ`), when
+the text holds a `PRIVATE KEY` block, or when a part of it between `-`, `_`, `.`
+or `~` is at least 20 characters long, switches between letters and digits at
+least 3 times and has at least 3.5 bits of entropy per character, as random
+base62 or base64 does. Words, camel-case names, CSS classes and selectors,
+relative paths, version strings and dates are kept. Pure hexadecimal (commit
+ids, checksums, digests), UUIDs and absolute paths (a `/nix/store` hash) are
+kept on purpose, since pages show them far more often than secrets and agents
+need to read them, so a secret written only in hex or as a UUID is not hidden.
+Random content ids (an IPFS CID) are hidden. Short random strings are missed
+more often: about 1 in 6 random 20-character base62 strings and 1 in 35 of 32
+characters pass. `text` and `save` are unchanged, since they are for reading
+pages and are documented as never for secrets.
 
 This keeps the value out of the agent's replies, the action trace, operation
 records and effect reports. It is not confinement: the file belongs to the same

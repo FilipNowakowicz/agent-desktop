@@ -17,8 +17,21 @@ resolved, is not the host's and holds the named instance's socket. Signatures wi
 are refused, since they could walk back into the host's directory. The guard test adds
 a short runtime (allowed), the host runtime with and without a signature, a runtime
 whose `hypr` links to the host's, and a `../` signature (all refused); it fails on the
-old shim. Validated with `uv run python -m unittest discover -s tests -p test_guard.py`
-on the managed runtime: 10 passed.
+old shim.
+
+Review found two more ways out. `hyprctl --instance`/`-i` joins its value to the socket
+path unchecked, so `-i ../…/hypr/<host sig>` reached the host while the shim only
+looked at the environment (the 11-11 shim had this too). And when the server runs
+without `XDG_RUNTIME_DIR`, sessions live under `/tmp/agent-desktop-<uid>`, so the shim's
+idea of the host's `hypr` was wrong and `XDG_RUNTIME_DIR=/run/user/<uid>` passed. The
+shim now takes the instance from `-i`/`--instance` as well as the environment, refuses
+the login runtime's `hypr` too, and refuses an instance directory or socket that is a
+link out of the private runtime (numeric `-i` indexes check every instance there).
+The test adds `-i` and `--instance` traversals, a linked instance with and without a
+signature, and an allowed `-i 0`; it fails on the first version of this change. The
+`/run/user/<uid>` case is not tested, since it would aim at the real host. Validated
+with `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#dbus --command uv run
+python -m unittest discover -s tests -p test_guard.py`: 10 passed.
 
 ## 2026-11-20 — Usage review: VPN token and quota check
 

@@ -758,8 +758,9 @@ that session. The session's own runtime directory is too deep for Hyprland's soc
 paths (Unix sockets allow about 108 bytes), so start the nested instance with a short
 private `XDG_RUNTIME_DIR`, for example `mktemp -d "/run/user/$(id -u)/q.XXXX"`, and
 call `hyprctl` with the same one. `hyprctl` is refused when that directory's `hypr`
-resolves to the host's, when `HYPRLAND_INSTANCE_SIGNATURE` names an instance that has
-no socket there, or when the signature contains `/`.
+resolves to the host's (the runtime sessions are made in, or `/run/user/<uid>`), when
+the instance it would use (`HYPRLAND_INSTANCE_SIGNATURE`, or `--instance`/`-i`) has no
+socket there or contains `/`, or when an instance directory there links elsewhere.
 
 ## Activity summary
 

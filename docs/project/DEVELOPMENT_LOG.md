@@ -5,6 +5,96 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-20 — F3 first stage: lifecycle events checked against LIFETIMES.md
+
+Roadmap F3 / plan X3. Before this, `test_runtime`, `test_profiles`,
+`test_viewer` and `test_takeover` covered the core of supervisor loss,
+compositor loss and viewer disconnect (processes, runtime directory, profile
+lock, control handback). Nothing checked what each event leaves in the session
+record, profile, downloads, operation records and lease. Nothing covered an
+application or Firefox restart inside a session, or repeated viewer closures.
+`tests/test_lifecycle.py` adds one test per event. Each test keeps a process
+outside the session running `sleep D`, the same command line as a process
+inside it, and asserts it still runs afterwards. That checks cleanup goes by
+session ownership, not by name.
+
+- **Application restart** (`test_application_killed_and_restarted_in_its_session`):
+  SIGKILL a foot terminal fixture, which takes its child too. The session stays
+  `ready`, a named controller's lease and a sibling daemon are untouched, a file
+  saved in the home is kept, and a new terminal receives typed text and reads
+  the file. After `destroy`: no token processes, no runtime directory, home and
+  config removed, both terminals' logs, trace and screenshot kept.
+- **Firefox restart** (`test_firefox_restart_keeps_profile_files_and_drops_old_tabs`,
+  profile session): a cookie set by a local page, a `download` receipt and a
+  completed browser job naming the tab context. SIGTERM Firefox, then wait for
+  its whole process tree to exit. Until `start`, actions fail with "No bridged
+  Firefox". After `start`, the context is new, the old one fails with
+  `target_lost`, the cookie is still sent, the download is byte-identical and
+  the job record keeps the old context. After `destroy`, the download stays in
+  the profile and the profile is unlocked.
+- **Runtime (compositor) loss**
+  (`test_compositor_loss_then_a_new_session_on_the_profile`): SIGKILL labwc
+  while a job's 5 s wait runs, with an env-cleared daemon. The session is marked
+  `failed` 0.66–0.76 s later, and everything it owned is gone (daemon included,
+  since the guardian lives). The record keeps manifest, log, trace, screenshot,
+  a completed job and the interrupted one (`delivery_unknown` or `stopped`,
+  never `observed`). The profile keeps its file and reports `failed`. A new
+  session on it gets `previous_session: failed`, no lease, no operation records,
+  and reads the file. `test_compositor_loss_during_typing_is_uncertain`: a
+  3,000-character `type` in progress replies `DeliveryUnknown` within 0.01 s.
+- **Supervisor loss**: `test_worker_killed_and_the_guardian_cleans_up`
+  (profile; the job reads `delivery_unknown`, step `uncertain`, `lease_cleanup:
+  unknown`; a stale `take-requested` marker goes with the runtime; the next
+  session on the profile has no lease and agent control).
+  `test_both_supervisors_killed_until_destroy_recovers`: until recovery, the app
+  and the private home stay. The job ends on its own as `stopped`, with the
+  reason "step 0 was delivered, then observation failed: Session unavailable".
+  `destroy` recovers: app stopped, home and config removed, `recovered: true`,
+  record and job state kept. `test_worker_killed_during_a_takeover`: the
+  takeover server and its socket go with the session, and the profile is
+  released.
+- **Viewer closure** (`test_repeated_viewer_closure_keeps_the_session`): 5
+  read-only connect/close cycles, the CLI `viewer.view` path once, and 5
+  `viewer.take` cycles, all through a stand-in viewer that does the RFB
+  handshake and closes. One read-only wayvnc stays and is reused. Each takeover
+  server exits and `takeover.sock` is removed. The epoch rises by 2 per take,
+  and a screenshot is needed afterwards. A 300 s lease held by `f3-client`
+  survives every closure, and typed text reaches the terminal afterwards.
+- **Repeated cycles**: `scripts/lifecycle_stress.py` now checks every destroy
+  against LIFETIMES.md. Every second cycle uses the profile `stress` and appends
+  to `$HOME/cycles.log`, so the profile must hold one line per profile cycle.
+  Each cycle has a lease taken by a named launch, a screenshot and a completed
+  job. The session's `sleep D` daemon matches an outside sentinel's command
+  line. The check also covers the client's open descriptors, and at the end
+  `prune` must remove every record and no profile. `test_repeated_create_use_destroy_cycles`
+  runs 4 cycles; the CI invocation (`--cycles 5 --load 2`) is unchanged.
+
+Bugs: none found in the tested paths. Known gap, confirmed and recorded as an
+`expectedFailure` (`test_env_cleared_daemon_is_stopped_by_recovery`): after
+*both* supervisors die, a `setsid env -i` child carries no token and recovery
+leaves it running. While a supervisor lives, it is stopped (subtree). This is
+the accepted "detached descendants that clear their environment" limit in
+CAPABILITY_MATRIX. A fix needs cgroups, or a persisted descendant list with
+start times, so it is left for a follow-up.
+
+Decisions: Firefox is restarted with SIGTERM, not SIGKILL, because Firefox
+itself may lose cookies on SIGKILL. That would test Firefox, not this project.
+Lease survival across a person's take is asserted as the current behavior.
+Runtime upgrade and reboot rows remain untested.
+
+Validation (worktree `f3-lifecycle-stress` at 138f453 plus docs):
+
+- Laptop, single file: `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p 'test_lifecycle.py' -v`:
+  10 tests OK (1 expected failure) in 36 s.
+- gcp-worker, full suite: `on-worker run -n f3-suite -- nix shell <same packages> --command uv run python -m unittest discover -s tests -p 'test*.py'`:
+  444 tests OK in 600 s (35 skipped, 1 expected failure).
+- gcp-worker, stress: `uv run scripts/lifecycle_stress.py --cycles 50` passed 50/50
+  (25 on the profile) in 76.9 s, 1.521–1.530 s per cycle, descriptors 4 → 4,
+  50 pruned. `--cycles 50 --load 8` passed 50/50 in 83.8 s, 1.523–1.812 s
+  (median 1.66 s), descriptors 20 → 20, 50 pruned.
+- `ps -eo pid,ppid,args` on the laptop and the worker afterwards: no session,
+  fixture, stress or load processes left.
+
 ## 2026-11-19 — Take while send writes a large value, and during an accessibility read (#213)
 
 The two limits left from #181 (F1), both reported honestly before but loose:

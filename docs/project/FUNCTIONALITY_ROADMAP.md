@@ -105,11 +105,14 @@ sessions alone cannot protect judge files from same-user arbitrary scripts.
 
 - [x] Specify workspace versus session versus profile lifetimes. Document which
   state persists and which processes must be recreated ([LIFETIMES.md](LIFETIMES.md)).
-- [ ] Test application restart, runtime restart, supervisor loss, viewer closure
-  and repeated create/use/destroy cycles independently.
-- [ ] Check files, profiles, downloads and operation records after each event.
-- [ ] Check owned processes/sockets/input leases and retained artifacts against
-  declared retention rules; do not kill unrelated applications.
+- [x] Test application restart, runtime restart, supervisor loss, viewer closure
+  and repeated create/use/destroy cycles independently (`tests/test_lifecycle.py`,
+  2026-11-20).
+- [x] Check files, profiles, downloads and operation records after each event.
+- [x] Check owned processes/sockets/input leases and retained artifacts against
+  declared retention rules; do not kill unrelated applications. Known gap: a
+  child that clears its environment survives recovery after both supervisors
+  die.
 - [ ] Test supported distributions and applications using the repository's
   validation policy; quantify duration/repetition counts and remaining gaps.
 

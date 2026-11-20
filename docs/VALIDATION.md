@@ -13,7 +13,9 @@ uv run ruff format --check src scripts tests
 uv run python -m unittest discover -s tests -v
 # Optional: opens and tears down a visible test desktop.
 DESKTOP_TEST_VISIBLE=1 uv run python -m unittest discover -s tests -v
-# Repeated lifecycle cycles, optionally with busy CPU processes.
+# Repeated lifecycle cycles, optionally with busy CPU processes; every second
+# cycle uses the profile "stress" (--profile-every N, 0 for never). Each destroy
+# is checked against docs/project/LIFETIMES.md.
 uv run scripts/lifecycle_stress.py --cycles 20 --load 4
 # Soak: typing receipt, screenshots and short sessions; --load adds busy CPU
 # processes, --interval idles between iterations.

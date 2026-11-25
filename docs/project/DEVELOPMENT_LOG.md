@@ -40,6 +40,13 @@ Not covered by an automated test: the live nested run above (needs a GPU rendere
 Hyprland, as in the log of 2026-11-11). All sessions I started were destroyed and no
 Hyprland process remained.
 
+Full desktop suite on gcp-worker (`on-worker run -n nested2 -- nix shell ... --command uv run
+python -m unittest discover -s tests -p 'test*.py'`): 471 tests, OK, 35 skipped, 1 expected
+failure. The first run (`nested`) had one failure, `test_partial_typing_preserves_uncertainty`,
+because `type` was now called with an extra argument; fixed by keeping the one-argument call
+when no nested layout applies. `ruff check` passes; `ruff format --check` flags only
+docs/project/CAPABILITY_MATRIX.md, which this change does not touch.
+
 ## 2026-11-25 — download saves a PDF that Firefox's viewer shows
 
 Follows the field report in PR #222 ("PDFs that Firefox displays can't be

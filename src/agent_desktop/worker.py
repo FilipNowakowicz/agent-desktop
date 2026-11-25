@@ -1,5 +1,6 @@
 """One supervisor, private D-Bus and compositor per session."""
 
+import base64
 import ctypes
 import fcntl
 import hashlib
@@ -379,6 +380,27 @@ def netscape_cookies(bridge, site):
     return data, count
 
 
+def pdf_name(name, url):
+    """A file name for a PDF taken from the viewer: the server's, else the URL's."""
+    from urllib.parse import unquote, urlsplit
+
+    path = urlsplit(url or "").path if re.match(r"https?://", url or "", re.I) else ""
+    for candidate in (name, unquote(path.rsplit("/", 1)[-1])):
+        if isinstance(candidate, str):
+            candidate = re.sub(r"[/\\\x00-\x1f]", "_", candidate).strip().lstrip(".")
+            if candidate:
+                break
+    else:
+        candidate = "document"
+    suffix = ".pdf"
+    if candidate.lower().endswith(".pdf"):
+        candidate, suffix = candidate[:-4], candidate[-4:]
+    # At most PDF_NAME_BYTES in UTF-8 with the suffix, so the hidden .part file
+    # beside it and a "(N)" for a second copy stay under the 255-byte limit.
+    stem = candidate.encode()[: PDF_NAME_BYTES - 4].decode(errors="ignore")
+    return (stem.rstrip() or "document") + suffix
+
+
 def private_path(home, to_file):
     """A file path for send or download: relative paths are in the session home.
 
@@ -416,6 +438,16 @@ DOWNLOAD_MAX_SECONDS = 600
 DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a download
 # How long open (or start with a url) waits, at most, for the page to settle.
 OPEN_SETTLE_SECONDS = 10
+
+PDF_BYTES = 256 * 1024 * 1024  # largest PDF copied out of Firefox's viewer
+PDF_NAME_BYTES = 200  # a viewer PDF's file name, with .pdf
+PDF_CHUNK = 6 * 1024 * 1024  # 8 MiB as base64, under the 16 MiB BiDi message limit
+# Firefox's own PDF viewer (pdf.js) shows an application/pdf document; a site's
+# copy of pdf.js runs in an HTML page and is not taken for it.
+PDF_VIEWER = (
+    "document.contentType === 'application/pdf' && "
+    "typeof PDFViewerApplication === 'object'"
+)
 BROWSER_ACTIONS = (
     "start tabs open close find text wait click fill select send save download steps"
 ).split()
@@ -2028,16 +2060,23 @@ class Worker:
 
         Firefox saves into the session's ~/Downloads, writing NAME.part and
         renaming it when the transfer ends. The download is the one new file
-        there without a .part beside it, once its size is stable. A URL that
-        loads a page instead (a login redirect, an inline PDF viewer) is reported
-        as such. The reply names the file, its size and SHA-256, never the URL,
-        which may carry a signed query.
+        there without a .part beside it, once its size is stable. A PDF that
+        Firefox shows in its own viewer instead is saved from the viewer's copy
+        of the original bytes (browser_pdf); without a url, the PDF the tab
+        shows now is saved, which covers PDFs from a form post or a blob. Any
+        other page (a login redirect) is reported as such. The reply names the
+        file, its size and SHA-256, never the URL, which may carry a signed
+        query.
         """
         from . import browser
 
         url = request.get("url")
-        if not isinstance(url, str) or not re.match(r"https?://", url, re.I):
-            raise ValueError("download needs an http(s) url")
+        if url is not None and (
+            not isinstance(url, str) or not re.match(r"https?://", url, re.I)
+        ):
+            raise ValueError(
+                "download needs an http(s) url, or no url to save the PDF the tab shows"
+            )
         timeout = request.get("timeout", DOWNLOAD_SECONDS)
         if (
             not isinstance(timeout, (int, float))
@@ -2055,6 +2094,23 @@ class Worker:
                 raise ValueError(f"{destination} exists; pass overwrite to replace it")
         folder = home / "Downloads"
         folder.mkdir(mode=0o700, exist_ok=True)
+        started = time.monotonic()
+        if url is None:
+            if self.pdf_viewer(bridge, context) is None:
+                raise ValueError(
+                    "download without a url saves the PDF that the tab shows in "
+                    "Firefox's PDF viewer, and this tab shows no PDF. Give the "
+                    "file's url (a PDF inside a frame of a page: its own url)"
+                )
+            return self.browser_pdf(
+                bridge,
+                context,
+                destination,
+                folder,
+                started,
+                timeout,
+                request.get("overwrite"),
+            )
 
         def entries():
             found = {}
@@ -2066,7 +2122,9 @@ class Worker:
 
         before = entries()
         page = self.page_state(bridge, context).get("url")
-        started = time.monotonic()
+        # The page's realm: a PDF viewer only counts once a new document has
+        # replaced it, never the one showing before the navigation.
+        old_realm = self.pdf_viewer(bridge, context, realm=True)
         try:
             bridge.command(
                 "browsingContext.navigate",
@@ -2100,6 +2158,18 @@ class Worker:
                 name = next(iter(settled))
                 break
             elapsed = time.monotonic() - started
+            if not new and not partial:
+                realm = self.pdf_viewer(bridge, context)
+                if realm is not None and realm != old_realm:
+                    return self.browser_pdf(
+                        bridge,
+                        context,
+                        destination,
+                        folder,
+                        started,
+                        timeout,
+                        request.get("overwrite"),
+                    )
             if not new and not partial and elapsed >= DOWNLOAD_PAGE_SECONDS:
                 state = self.page_state(bridge, context)
                 ready = browser.remote_value(
@@ -2110,7 +2180,8 @@ class Worker:
                     raise ValueError(
                         "The URL opened a page instead of a download "
                         f"({state.get('title')!r} at {where}). It may need a "
-                        "login, or the browser shows this file type itself; "
+                        "login, or the browser shows this file type itself "
+                        '(send source="cookies" gives curl the login for it); '
                         "nothing was saved"
                     )
             if elapsed >= timeout:
@@ -2138,6 +2209,184 @@ class Worker:
             "file": str(path),
             "bytes": size,
             "sha256": digest.hexdigest(),
+            "seconds": round(time.monotonic() - started, 1),
+            "context": context,
+        }
+
+    @staticmethod
+    def pdf_viewer(bridge, context, realm=False):
+        """The realm of the tab's document if Firefox's PDF viewer shows it.
+
+        With realm, the document's realm whatever it shows. None when the tab
+        shows something else, or no script can run in it yet (a navigation
+        in progress, a privileged page).
+        """
+        from . import browser
+
+        try:
+            result = bridge.command(
+                "script.evaluate",
+                {
+                    "expression": "true" if realm else PDF_VIEWER,
+                    "target": {"context": context},
+                    "awaitPromise": False,
+                },
+                timeout=5,
+            )
+        except (browser.BrowserError, TimeoutError):
+            return None
+        if result.get("type") != "success":
+            return None
+        if browser.remote_value(result) is not True:
+            return None
+        return result.get("realm")
+
+    def browser_pdf(
+        self, bridge, context, destination, folder, started, timeout, overwrite
+    ):
+        """Save the PDF that Firefox's viewer shows: the original bytes.
+
+        pdf.js keeps the file it was given (getData() returns those bytes, not
+        a re-rendering), so nothing is requested again: a cookie, a form post
+        or a blob URL behind the PDF does not matter. The bytes cross the BiDi
+        socket as base64 in chunks under its message limit, into a 0600 file
+        written beside the destination and renamed into place.
+        """
+        from . import browser
+
+        deadline = started + timeout
+
+        def run(function, arguments=(), ownership="none"):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ValueError(
+                    f"The PDF was not saved within {timeout:g} s; nothing was saved"
+                )
+            try:
+                result = bridge.command(
+                    "script.callFunction",
+                    {
+                        "functionDeclaration": function,
+                        "arguments": list(arguments),
+                        "target": {"context": context},
+                        "awaitPromise": True,
+                        "resultOwnership": ownership,
+                    },
+                    timeout=remaining,
+                )
+            except TimeoutError:
+                raise ValueError(
+                    f"The PDF was not saved within {timeout:g} s; nothing was saved"
+                ) from None
+            except browser.BrowserError as error:
+                raise ValueError(
+                    f"The PDF viewer could not be read ({error}); nothing was saved"
+                ) from None
+            if result.get("type") == "exception":
+                details = result.get("exceptionDetails", {})
+                raise ValueError(
+                    "The PDF viewer could not give the file "
+                    f"({details.get('text', 'script error')}); nothing was saved"
+                )
+            return result["result"]
+
+        # Wait for the document (a large file still loading), then its bytes.
+        data = run(
+            "async () => { const app = PDFViewerApplication;"
+            " await app.initializedPromise;"
+            " while (!app.pdfDocument) {"
+            "  if (app.pdfLoadingTask) await app.pdfLoadingTask.promise;"
+            "  else await new Promise(r => setTimeout(r, 100)); }"
+            " return await app.pdfDocument.getData(); }",
+            ownership="root",
+        )
+        handle = data.get("handle")
+        try:
+            if data.get("type") != "typedarray" or handle is None:
+                raise ValueError("The PDF viewer gave no file; nothing was saved")
+            reference = {"handle": handle}
+            size = browser.remote_value(run("(d) => d.length", [reference]))
+            if not isinstance(size, int) or size <= 0:
+                raise ValueError("The PDF viewer gave an empty file; nothing was saved")
+            if size > PDF_BYTES:
+                raise ValueError(
+                    f"The PDF is {size} bytes, over {PDF_BYTES}; nothing was saved. "
+                    'Use send source="cookies" with curl for it'
+                )
+            name = pdf_name(
+                browser.remote_value(
+                    run(
+                        "() => PDFViewerApplication._contentDispositionFilename || null"
+                    )
+                ),
+                self.page_state(bridge, context).get("url"),
+            )
+            if destination is None:
+                stem, index = name[:-4], 1
+                destination = folder / name
+                while destination.exists():
+                    destination = folder / f"{stem}({index}).pdf"
+                    index += 1
+            temporary = destination.with_name(
+                f".{destination.name}.{uuid.uuid4().hex[:8]}.part"
+            )
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
+            try:
+                descriptor = os.open(temporary, flags, 0o600)
+            except OSError as error:
+                raise ValueError(f"Not written: {error}") from None
+            digest = hashlib.sha256()
+            try:
+                with os.fdopen(descriptor, "wb") as file:
+                    for start in range(0, size, PDF_CHUNK):
+                        chunk = browser.remote_value(
+                            run(
+                                "(d, start, end) => new Promise((ok, fail) => {"
+                                " const reader = new FileReader();"
+                                " reader.onload = () =>"
+                                "  ok(reader.result.slice(reader.result.indexOf(',') + 1));"
+                                " reader.onerror = () => fail(reader.error);"
+                                " reader.readAsDataURL("
+                                "  new Blob([d.subarray(start, end)])); })",
+                                [
+                                    reference,
+                                    {"type": "number", "value": start},
+                                    {"type": "number", "value": start + PDF_CHUNK},
+                                ],
+                            )
+                        )
+                        block = base64.b64decode(chunk or "", validate=True)
+                        if len(block) != min(PDF_CHUNK, size - start):
+                            raise ValueError(
+                                "The PDF viewer gave a short chunk; nothing was saved"
+                            )
+                        digest.update(block)
+                        file.write(block)
+                if destination.exists() and overwrite is not True:
+                    raise ValueError(
+                        f"{destination} exists; pass overwrite to replace it"
+                    )
+                os.replace(temporary, destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+        finally:
+            if handle is not None:
+                try:
+                    bridge.command(
+                        "script.disown",
+                        {"handles": [handle], "target": {"context": context}},
+                        timeout=5,
+                    )
+                except (browser.BrowserError, TimeoutError):
+                    pass  # the page's next navigation frees it anyway
+        return {
+            "downloaded": True,
+            "name": name,
+            "file": str(destination),
+            "bytes": size,
+            "sha256": digest.hexdigest(),
+            "content_type": "application/pdf",
+            "from_viewer": True,
             "seconds": round(time.monotonic() - started, 1),
             "context": context,
         }

@@ -5,6 +5,51 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — An unanswered host prompt explains itself
+
+Follows "The hook result still looks like a tool error" in the
+[VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)
+and the 11-19 report. The cause is Claude Code's documented behavior, not the
+server. The [hooks reference](https://code.claude.com/docs/en/hooks) says that
+for `"ask"`, `permissionDecisionReason` is shown to the user in the prompt, and
+that when Claude Code denies the call in a `-p` run where no one can answer, the
+agent reads that reason in the tool result. The server is never called, so it
+can't reply. No `PreToolUse` field makes the refusal a normal result. A
+`PermissionRequest` hook could deny with its own `message`, but it can't tell an
+unattended run from an interactive one, so it would refuse people too.
+
+Change: the documented hook's reason now works for both readers: "Agent Desktop
+asks to use your screen. Nothing runs on it until you approve; no answer means
+no, and the agent should ask you in chat before trying again." INTEGRATIONS.md
+describes both paths exactly. The `desktop_request_host` description says that
+a call refused before it runs started nothing, and that the agent should ask
+the user before calling again. A test runs the hook command from
+INTEGRATIONS.md and checks its JSON and reason.
+
+Validation:
+
+- Non-interactive check with Claude Code 2.1.332 and `--model haiku`. The run
+  used a temporary `--settings` file, `--setting-sources project` from an empty
+  temporary folder, `--strict-mcp-config` with only this server
+  (`AGENT_DESKTOP_HOST_APPROVAL=client`, `AGENT_DESKTOP_HOST_NOTIFY=0`), and a
+  temporary state directory. A private labwc session stood in as the host
+  display (`WAYLAND_DISPLAY`). The maintainer's settings and screen were not used.
+  - Old reason, default mode: `is_error: true`, text "An agent asks to use
+    your screen". The agent said it would wait for the person to answer the
+    prompt, which was already gone.
+  - New reason, default mode, and new reason in `bypassPermissions`: both
+    `is_error: true` with the new text, and the call is listed in
+    `permission_denials`. The agent said it would ask in chat and not retry.
+  - The temporary state held only the stand-in session, so the server was
+    never called. Cost $0.006 over 3 runs. The temporary directory and the
+    stand-in were removed.
+- Not checked: an interactive decline, which needs a person. The hooks
+  reference says the reason is shown in the prompt there.
+- `test_host_hook.py` 1 test OK. With labwc, grim, dbus and at-spi from
+  `nix shell`: `test_host.py` 11 OK and `test_mcp.py` 2 OK. `ruff check` and
+  `ruff format --check` pass. Docs and tool text only, plus one test, so the
+  full suite was not run for this change.
+
 ## 2026-11-25 — site-cookies: list a site's cookies in a profile, never values
 
 Follows the 2026-11-20 field report (`docs/trials/2026-11-20-vpn-token-and-quota-check.md`,

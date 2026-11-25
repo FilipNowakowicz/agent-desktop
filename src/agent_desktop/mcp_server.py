@@ -1004,6 +1004,9 @@ def desktop_request_host(reason: str, minutes: float = 15) -> dict:
     the user is typing or moving the mouse. "browser" says whether
     desktop_browser can use their own Firefox (it needs a WebDriver BiDi port).
     If your client asked the user before this call, the session starts at once.
+    If the call is refused before it runs (a client permission prompt that was
+    declined or that no one could answer), nothing was started: tell the user,
+    and call again only when they say so.
     """
     return core.request_host(
         reason, minutes, client_approved=core.client_approves_host()

@@ -647,9 +647,21 @@ browser or app may not be secure", because Firefox under the bridge sets
 login=true)`. When you take control, the bridged Firefox is closed and reopened on
 the same profile and page without the remote agent, so you sign in to an ordinary
 browser. When you release control, that Firefox is closed by its window, so that it
-saves its cookies, and started again under the bridge. `desktop_control` then reports
-`last.browser`, either `{"restarted": true, "url": ...}` or the error with a recovery
-step, and the agent finds its tab again with `tabs`. The take reply's
+saves its cookies, and started again under the bridge. A login without "Remember
+me" usually lives in session-only cookies, which Firefox keeps only in its session
+store and which the bridged Firefox does not restore. Between the quit and the
+restart they are therefore written into the session profile's own `cookies.sqlite`
+as persistent cookies that expire 24 hours after the release (the same rule as
+`import-cookies`); the person's own Firefox is never touched. After that they are
+gone, and the site may end the login sooner, so ticking "Remember me" is still the
+way to keep a login across days. `desktop_control` then reports `last.browser`,
+either `{"restarted": true, "url": ..., "kept_session_cookies": N}` or the error
+with a recovery step, and the agent finds its tab again with `tabs`. When N is
+above 0 it also carries `session_cookies_expire` and `session_cookies_from` (the
+session store file they came from). `session_cookies_note` says what went wrong
+when Firefox did not quit cleanly (then cookies set after its last periodic save
+may be missing), no fresh session store was saved, or a file was unreadable;
+these never stop the restart. The take reply's
 `login_browser` says whether the swap happened (`"swapped": false` with a reason when
 no bridged Firefox was running). The viewer starts first, so if it fails, the bridged
 Firefox is left as it was. A request without `login=true`

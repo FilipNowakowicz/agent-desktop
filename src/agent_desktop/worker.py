@@ -2783,7 +2783,8 @@ class Worker:
         return None
 
     def stop_firefox(self, process, bridge=None):
-        """Quit a Firefox and wait, so its profile is saved and unlocked."""
+        """Quit a Firefox and wait, so its profile is saved and unlocked.
+        Returns whether it exited by itself (status 0) rather than being killed."""
         try:
             if bridge is not None:
                 bridge.command("browser.close", {}, timeout=10)
@@ -2796,6 +2797,7 @@ class Worker:
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=5)
+        return process.returncode == 0
 
     def open_login_browser(self):
         """For a person's login: the bridged Firefox, reopened without the
@@ -2820,6 +2822,7 @@ class Worker:
         if not executable:
             return {"swapped": False, "url": url, "error": "firefox not found"}
         app = uuid.uuid4().hex[:12]
+        started = time.time()
         with (self.root / f"app-{app}.log").open("ab") as log:
             self.apps[app] = subprocess.Popen(
                 [executable, *argv[1:]],
@@ -2829,13 +2832,15 @@ class Worker:
                 stderr=log,
                 start_new_session=True,
             )
-        return {"swapped": True, "application": app, "url": url}
+        return {"swapped": True, "application": app, "url": url, "started": started}
 
     def restore_bridge(self, login):
-        """After the login: quit the plain Firefox, start it again under BiDi."""
+        """After the login: quit the plain Firefox, keep its session-only
+        cookies for a day, and start it again under BiDi."""
         process = self.apps.get(login.get("application"))
         if process is not None and process.poll() is None:
             self.stop_firefox(process)
+        kept = self.keep_login_cookies(login, process)
         lease = self.active_lease()
         try:
             self.start_browser(login.get("url"), lease["holder"] if lease else None)
@@ -2844,8 +2849,53 @@ class Worker:
                 "restarted": False,
                 "error": str(error)[:300],
                 "recovery": 'Start the bridge again with desktop_browser "start".',
+                **kept,
             }
-        return {"restarted": True, "url": login.get("url")}
+        return {"restarted": True, "url": login.get("url"), **kept}
+
+    def keep_login_cookies(self, login, process):
+        """Session-only cookies of the login (Firefox under BiDi does not
+        restore them) become persistent ones in the session's own profile,
+        expiring in cookies.SESSION_COOKIE_HOURS. Never raises: a problem is
+        reported and the restart goes on."""
+        from . import cookies
+
+        notes = []
+        try:
+            if process is not None and process.poll() is None:
+                return {
+                    "kept_session_cookies": 0,
+                    "session_cookies_note": "Firefox was still running; "
+                    "its session-only cookies were not kept.",
+                }
+            if process is not None and process.returncode != 0:
+                notes.append(
+                    f"Firefox did not quit cleanly (status {process.returncode}), "
+                    "so cookies set after its last periodic save may be missing"
+                )
+            if "firefox" not in self.info.get("pinned_browsers", []):
+                notes.append("Firefox is not pinned to the session profile")
+                kept = {"kept": 0, "expires": None, "problems": []}
+            else:
+                since = login.get("started")
+                kept = cookies.keep_session_cookies(
+                    Path(self.env["HOME"]) / cookies.SESSION_FIREFOX,
+                    since=since - 2 if isinstance(since, (int, float)) else None,
+                )
+                if kept["store"] is None and not kept["problems"]:
+                    notes.append("no session store was saved during the login")
+            notes += kept["problems"]
+        except Exception as error:
+            kept = {"kept": 0, "expires": None}
+            notes.append(f"{type(error).__name__}: {str(error)[:200]}")
+        result = {"kept_session_cookies": kept["kept"]}
+        if kept.get("store"):
+            result["session_cookies_from"] = kept["store"]
+        if kept["expires"]:
+            result["session_cookies_expire"] = kept["expires"]
+        if notes:
+            result["session_cookies_note"] = "; ".join(notes) + "."
+        return result
 
     def take(self, wayvnc, keyboard=None):
         endpoint = Path(self.info["runtime"]) / "takeover.sock"

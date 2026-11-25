@@ -5,6 +5,57 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — A login handoff keeps session-only cookies for 24 hours
+
+Follows the field report in PR #222
+(`docs/trials/2026-11-25-exchange-research-and-lecture-fetch.md`): on 11-23 the
+person signed in twice with `take --paste`, and both logins were gone after
+release. The plain Firefox of the person's turn (N7) is quit and restarted under
+BiDi, which does not restore the session store, so session-only cookies were
+lost. The maintainer decided on 2026-11-25 to keep them for 24 h.
+
+- `cookies.keep_session_cookies` reuses `read_session_cookies` (now `sites=None`
+  for all hosts and `since` to skip stores written before the login's Firefox
+  started) and `session_row`. It writes the cookies into the same profile's
+  `cookies.sqlite` with a 24-hour expiry, in seconds or milliseconds as the
+  database uses. Private-browsing cookies are skipped. Problems are returned,
+  never raised, and values are never included.
+- `restore_bridge` calls it between the quit and the BiDi restart, on the
+  session's own `$HOME/.mozilla/agent-desktop` only. `stop_firefox` returns
+  whether Firefox exited with status 0, and `open_login_browser` records
+  `started`. `last.browser` gains `kept_session_cookies`, plus
+  `session_cookies_expire` and `session_cookies_from` when cookies were kept.
+  `session_cookies_note` covers an unclean quit, Firefox still running, no fresh
+  store, Firefox not pinned, or an unreadable file. The release never fails
+  because of these.
+- Where the cookies were: a temporary probe (not committed) in a real session
+  showed that after the window-close quit the session-only cookie was only in
+  `sessionstore.jsonlz4` (1 cookie, written about 3 s after the plain Firefox
+  started). `sessionstore-backups/recovery.jsonlz4` had been removed,
+  `previous.jsonlz4` (the bridged Firefox's earlier store) held 0 cookies, and
+  `cookies.sqlite` held no session rows. After a kill, a fresh
+  `recovery.jsonlz4` is used instead.
+- Validation: `uv run ruff check .` passes. `uv run ruff format --check src
+  tests` passes; `ruff format --check .` also flags the existing
+  `docs/project/CAPABILITY_MATRIX.md` snippet, which this change does not touch.
+  Locally, `uv run python -m unittest discover -s tests -p
+  'test_keep_session_cookies.py'` ran 6 tests, OK. `-p test_profiles.py` ran 26,
+  OK (skipped=11). `-p test_events.py` ran 8, OK (skipped=1). `nix shell ...
+  --command uv run python -m unittest discover -s tests -p
+  'test_login_handoff.py'` ran 1 test, OK in 5.5 s (a real private session: the
+  reply had `kept_session_cookies: 1` from `sessionstore.jsonlz4`, the bridged
+  page saw `session_login=yes`, and the row expired about 24 h after release).
+  Full desktop suite on the worker at b82f052: `on-worker run -n handoff -- nix
+  shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl
+  nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox
+  nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p
+  'test*.py'` ran 475 tests in 622 s, OK (skipped=35, expected failures=1),
+  exit status 0. It shared the VM with another job (`f3-scope`).
+- Limits: the cookies last 24 h and the site may end the login sooner, so
+  "Remember me" is still the durable route. After an unclean quit only the last
+  periodic save (every 15 s by default) is available. The `control_returned`
+  event does not carry the count.
+
 ## 2026-11-25 — F3: opt-in systemd scope for children that clear their environment
 
 The 2026-10-08 review decision accepted, as a limit, that a child started with `setsid env -i` survives recovery after both supervisors die. It named a cgroup as the only fix, and declined to require one for a distribution-neutral install. I looked at the alternatives again:

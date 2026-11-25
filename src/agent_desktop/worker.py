@@ -3713,8 +3713,12 @@ class Worker:
                             "characters; the rest was not sent. " + TAKEN_OVER
                         )
                     self.mark_mutation()
-                    missing += keyboard.type(part[start : start + TYPE_CHUNK], nested)
-                    typed += len(part[start : start + TYPE_CHUNK])
+                    chunk = part[start : start + TYPE_CHUNK]
+                    if nested:
+                        missing += keyboard.type(chunk, nested)
+                    else:
+                        keyboard.type(chunk)
+                    typed += len(chunk)
             self.last_keys = ("type", time.monotonic())
             if nested and missing and not warning:
                 warning = (

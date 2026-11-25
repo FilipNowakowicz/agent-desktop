@@ -1590,10 +1590,12 @@ class Worker:
                 while True:
                     found = bridge.find(context, **target)
                     # A text is also looked for in the document title, which no
-                    # element holds ("Just a moment..." on a bot-check page).
+                    # element holds ("Just a moment..." on a bot-check page). Not
+                    # with within: the title lies in no row or dialog.
                     in_title = bool(
                         target["text"]
                         and not target["selector"]
+                        and not target["within"]
                         and bridge.title_matches(
                             context, target["text"], target["exact"]
                         )

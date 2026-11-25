@@ -45,6 +45,12 @@ Validation:
   docs/VALIDATION.md, shared with another job): first run 478 tests in 686.8 s,
   FAILED (errors=1): `test_delivery` lost-ack test, whose Mock bridge returned a
   Mock from `challenge()`. Fixed in the test double. Second run: `on-worker run -n botcheck2`, 478 tests in 686.2 s, OK (skipped=35, expected failures=1).
+- Review fix (before merge): a text wait with `within` also matched the title,
+  which lies in no row or dialog, so `wait text=X within=Y` was met by the title
+  alone and `gone` never was. The title now counts only without `within`.
+  New `test_delivery` test failed before. Rebased onto the reviewed
+  waits-and-hook; local `test_browser_settle.py` 12 OK, `test_browser.py` 16 OK,
+  `test_delivery.py` 22 OK.
 
 Limits: only the listed wording and ids are detected (other vendors' challenge
 pages are missed); not tested against a live Cloudflare page, only fixtures.

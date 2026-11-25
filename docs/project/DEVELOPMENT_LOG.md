@@ -34,8 +34,13 @@ logins it held.
   seconds and milliseconds expiry, flags, storage names, file unchanged and no
   copy left, in-use refusal, missing profile, bad site, profile without a
   cookie file, MCP argument combinations.
-- Validation: see the pull request; `-p test_profiles.py` ran 31 tests, OK
-  (skipped=11: desktop-session tests, no labwc/grim/dbus-daemon here).
+- Validation: `uv run ruff check src scripts tests` and `uv run ruff format
+  --check src scripts tests` pass. `uv run python -m unittest discover -s tests
+  -p test_profiles.py`: 31 tests, OK (skipped=11). `uv run python -m unittest
+  discover -s tests`: 474 tests, OK (skipped=175). This is a unit-level run on
+  the laptop without labwc, grim or a Firefox session, so the desktop tests
+  skipped; no real-desktop run was made. The change reads only files and takes
+  no session, so a desktop run would not exercise it.
 
 ## 2026-11-25 — Small fixes from the exchange research field report
 

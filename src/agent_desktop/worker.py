@@ -145,11 +145,43 @@ def owned_processes(token):
     return found
 
 
-def session_process_starts(token, tree=True):
-    """{pid: start time} of live session processes: token carriers, plus this
-    supervisor's subtree."""
+def scope_name(session):
+    return f"agent-desktop-{session}.scope"
+
+
+def own_scope(session):
+    """This process's cgroup if it is the session's systemd scope, else None."""
+    try:
+        lines = Path("/proc/self/cgroup").read_text().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        if line.startswith("0::"):
+            path = line[3:]
+            if path.rsplit("/", 1)[-1] == scope_name(session):
+                return path
+    return None
+
+
+def scope_members(cgroup):
+    """Processes in a session's cgroup (cgroup v2), including any that cleared
+    their environment or left its process group; none without a cgroup."""
+    if cgroup is None:
+        return []
+    for mount in ("/sys/fs/cgroup", "/sys/fs/cgroup/unified"):
+        try:
+            text = Path(mount + cgroup, "cgroup.procs").read_text()
+        except OSError:
+            continue
+        return [int(pid) for pid in text.split()]
+    return []  # the scope is gone: systemd removes it once it is empty
+
+
+def session_process_starts(token, tree=True, cgroup=None):
+    """{pid: start time} of live session processes: token carriers, members of
+    the session's systemd scope, plus this supervisor's subtree."""
     table = process_table()
-    pids = set(owned_processes(token))
+    pids = set(owned_processes(token)) | set(scope_members(cgroup))
     if tree:
         pids |= set(descendants(os.getpid(), table))
     # Never this supervisor or its parent (the worker's guardian).
@@ -157,8 +189,8 @@ def session_process_starts(token, tree=True):
     return {p: table[p][2] for p in pids if p in table and table[p][1] not in "ZX"}
 
 
-def session_processes(token, tree=True):
-    return sorted(session_process_starts(token, tree))
+def session_processes(token, tree=True, cgroup=None):
+    return sorted(session_process_starts(token, tree, cgroup))
 
 
 def child_pids(pid):
@@ -203,7 +235,7 @@ def reap_orphans(tracked=()):
             pass
 
 
-def cleanup_processes(token, tracked=(), spare=(), tree=True):
+def cleanup_processes(token, tracked=(), spare=(), tree=True, cgroup=None):
     """Stop the session tree; processes in spare get SIGTERM only after the rest.
 
     Each process is identified by its number and start time, so a number reused
@@ -218,7 +250,7 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
             # Rescan: a process may fork while the tree is being stopped.
             remaining = {
                 (pid, started)
-                for pid, started in session_process_starts(token, tree).items()
+                for pid, started in session_process_starts(token, tree, cgroup).items()
                 if pid not in excluded
             }
             if not remaining:
@@ -228,7 +260,7 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True):
                 signal_process(pid, started, sig)
             reap_orphans(tracked)
             time.sleep(0.05)
-        if not session_processes(token, tree):
+        if not session_processes(token, tree, cgroup):
             return
     raise RuntimeError("Session processes remain after cleanup")
 
@@ -4205,6 +4237,16 @@ def receive_profile_locks(sock, held):
         held.extend(os.fdopen(fd, "a") for fd in fds)
 
 
+def record_scope(root):
+    """Note the session's systemd scope (AGENT_DESKTOP_SYSTEMD_SCOPE=1), so that
+    recovery after both supervisors die can find every process in it."""
+    info = json.loads((root / "session.json").read_text())
+    cgroup = own_scope(info["id"])
+    if cgroup:
+        info["cgroup"] = cgroup
+        write_manifest(root, info)
+
+
 def take_profile_lock(root):
     info = json.loads((root / "session.json").read_text())
     if not info.get("profile_lock"):
@@ -4224,6 +4266,7 @@ def main():
     # Both processes are subreapers: orphans stay with the worker while it lives,
     # then fall to the guardian, never to init or a host service manager.
     become_subreaper()
+    record_scope(root)
     GUARDIAN_PROFILE_LOCK = take_profile_lock(root)
     guardian_end, worker_end = socket.socketpair()
     worker = os.fork()

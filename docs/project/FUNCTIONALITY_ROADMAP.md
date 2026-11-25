@@ -112,7 +112,8 @@ sessions alone cannot protect judge files from same-user arbitrary scripts.
 - [x] Check owned processes/sockets/input leases and retained artifacts against
   declared retention rules; do not kill unrelated applications. Known gap: a
   child that clears its environment survives recovery after both supervisors
-  die.
+  die, unless the session runs in a systemd user scope
+  (`AGENT_DESKTOP_SYSTEMD_SCOPE=1`, opt-in, 2026-11-25).
 - [ ] Test supported distributions and applications using the repository's
   validation policy; quantify duration/repetition counts and remaining gaps.
 

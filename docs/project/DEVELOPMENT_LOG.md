@@ -48,6 +48,12 @@ spent about 20 calls paging through the viewer.
   nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#dbus nixpkgs#at-spi2-core
   --command uv run python -m unittest discover -s tests -p test_download.py -k
   RealFirefox` the four real-Firefox tests pass (about 22 s). On the worker (commit 83f21a6, shared with two other suites), `on-worker run -n pdf -- nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p 'test*.py'`: Ran 474 tests in 655 s, OK (skipped=35, expected failures=1).
+- Review fix (before merge): the viewer file name was cut at 200 characters,
+  not bytes, so a server name of 120 CJK characters (360 bytes in UTF-8) made
+  the hidden `.part` file fail with "File name too long" and nothing was saved.
+  `pdf_name` now keeps at most 200 bytes with the suffix, cut at a character
+  boundary. New `test_a_long_name_fits_with_its_part_file` failed before.
+  Local: `test_download.py` 13 OK (real Firefox included); ruff passes.
 
 ## 2026-11-25 — A login handoff keeps session-only cookies for 24 hours
 

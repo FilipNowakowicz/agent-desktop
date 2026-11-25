@@ -386,6 +386,17 @@ class PdfNameTests(unittest.TestCase):
         self.assertEqual(pdf_name(None, "https://s.test/"), "document.pdf")
         self.assertEqual(pdf_name("", "blob:https://s.test/1234"), "document.pdf")
 
+    def test_a_long_name_fits_with_its_part_file(self):
+        # 120 characters but 360 bytes: over the 255-byte name limit as it was.
+        long = pdf_name("講義資料" * 30 + ".pdf", None)
+        self.assertTrue(long.endswith(".pdf"), long)
+        self.assertLessEqual(len(long.encode()), 200)
+        self.assertTrue(long.startswith("講義資料"))
+        self.assertEqual(len(pdf_name("a" * 300, None).encode()), 200)
+        with tempfile.TemporaryDirectory() as folder:
+            part = Path(folder) / f".{long[:-4]}(12).pdf.0123abcd.part"
+            os.close(os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+
 
 if __name__ == "__main__":
     unittest.main()

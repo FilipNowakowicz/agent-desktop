@@ -392,10 +392,13 @@ def pdf_name(name, url):
                 break
     else:
         candidate = "document"
-    candidate = candidate[:200]
-    if not candidate.lower().endswith(".pdf"):
-        candidate += ".pdf"
-    return candidate
+    suffix = ".pdf"
+    if candidate.lower().endswith(".pdf"):
+        candidate, suffix = candidate[:-4], candidate[-4:]
+    # At most PDF_NAME_BYTES in UTF-8 with the suffix, so the hidden .part file
+    # beside it and a "(N)" for a second copy stay under the 255-byte limit.
+    stem = candidate.encode()[: PDF_NAME_BYTES - 4].decode(errors="ignore")
+    return (stem.rstrip() or "document") + suffix
 
 
 def private_path(home, to_file):
@@ -437,6 +440,7 @@ DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a downlo
 OPEN_SETTLE_SECONDS = 10
 
 PDF_BYTES = 256 * 1024 * 1024  # largest PDF copied out of Firefox's viewer
+PDF_NAME_BYTES = 200  # a viewer PDF's file name, with .pdf
 PDF_CHUNK = 6 * 1024 * 1024  # 8 MiB as base64, under the 16 MiB BiDi message limit
 # Firefox's own PDF viewer (pdf.js) shows an application/pdf document; a site's
 # copy of pdf.js runs in an HTML page and is not taken for it.

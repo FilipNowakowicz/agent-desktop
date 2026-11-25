@@ -44,7 +44,7 @@ Validation:
 - Full desktop suite on gcp-worker (`on-worker run -n botcheck`, nix shell from
   docs/VALIDATION.md, shared with another job): first run 478 tests in 686.8 s,
   FAILED (errors=1): `test_delivery` lost-ack test, whose Mock bridge returned a
-  Mock from `challenge()`. Fixed in the test double. Second run: RESULT_PLACEHOLDER
+  Mock from `challenge()`. Fixed in the test double. Second run: `on-worker run -n botcheck2`, 478 tests in 686.2 s, OK (skipped=35, expected failures=1).
 
 Limits: only the listed wording and ids are detected (other vendors' challenge
 pages are missed); not tested against a live Cloudflare page, only fixtures.

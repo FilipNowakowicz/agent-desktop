@@ -1,0 +1,524 @@
+import argparse
+import json
+import os
+import shlex
+
+from .core import (
+    DesktopError,
+    activity,
+    answer_host,
+    attach_profile,
+    create,
+    delete_profile,
+    destroy,
+    host_status,
+    logs,
+    profiles,
+    prune,
+    release_held_keys,
+    request,
+    request_host,
+    run_actions,
+    sessions,
+    set_profile_note,
+    stop_host,
+    trace,
+    usage,
+    use_runtime,
+    wait,
+)
+from .doctor import doctor
+from .viewer import take, view
+
+
+def settled_screenshot(session, controller):
+    """A screenshot once the screen has been still for 0.3 s (at most 3 s)."""
+    return request(
+        session, "screenshot", controller, settle_ms=300, settle_timeout_ms=3000
+    )
+
+
+def main():
+    use_runtime()
+    parser = argparse.ArgumentParser(
+        description="Private Linux desktops",
+        epilog="Each session has one controller. Input, launch, focus and "
+        "ui-action from a named controller take the session's lease (renewed by "
+        "its requests, expiring after AGENT_DESKTOP_LEASE_SECONDS, default 60, "
+        "without them); other controllers' input is refused while it is held. "
+        "Without a controller id, input works only while no lease is held.",
+    )
+    parser.add_argument(
+        "--controller",
+        help="controller id for the session lease (default: $AGENT_DESKTOP_CONTROLLER)",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    new = sub.add_parser("create")
+    new.add_argument("--mode", choices=("headless", "visible"), default="headless")
+    new.add_argument(
+        "--profile", help="keep this named home (e.g. browser logins) across sessions"
+    )
+    new.add_argument(
+        "--guard-host",
+        action="store_true",
+        help="block the system bus and host-affecting commands for session apps",
+    )
+    new.add_argument(
+        "--renderer", help="pixman (software, the default), gles2 or vulkan"
+    )
+    new.add_argument("--render-device", help="render node for a GPU renderer")
+    new.add_argument("--size", help="WIDTHxHEIGHT of a headless desktop (1280x720)")
+    for tool in ("labwc", "grim"):
+        new.add_argument(f"--{tool}")
+    sub.add_parser("list")
+    feed = sub.add_parser(
+        "events",
+        help="JSON lines for a shell or notifier: requests, control, sessions",
+    )
+    feed.add_argument("--session")
+    feed.add_argument(
+        "--follow", action="store_true", help="keep printing changes as they happen"
+    )
+    used = sub.add_parser(
+        "activity", help="how sessions were used: counts and error types, no content"
+    )
+    used.add_argument("session", nargs="?")
+    used.add_argument("--days", type=float, help="only the last N days")
+    checkup = sub.add_parser("doctor", help="check the runtime before first use")
+    checkup.add_argument(
+        "--smoke",
+        action="store_true",
+        help="also create, capture and destroy a session",
+    )
+    review = sub.add_parser(
+        "review", help="render saved evidence as a private offline HTML report"
+    )
+    review.add_argument(
+        "--input", required=True, help="saved run, operation or predicate JSON"
+    )
+    review.add_argument(
+        "--output", required=True, help="local HTML file (created with mode 0600)"
+    )
+    sub.add_parser("profiles")
+    sub.add_parser("usage", help="disk used by sessions, screenshots and profiles")
+    pruning = sub.add_parser("prune", help="delete stopped/failed sessions' state")
+    pruning.add_argument("--older-than", type=float, default=0, metavar="DAYS")
+    pruning.add_argument("--dry-run", action="store_true")
+    attaching = sub.add_parser(
+        "attach-profile",
+        help="give a running private session a saved profile (no applications running)",
+    )
+    attaching.add_argument("session")
+    attaching.add_argument("profile")
+    removal = sub.add_parser("delete-profile", help="permanently delete saved logins")
+    removal.add_argument("profile")
+    noting = sub.add_parser(
+        "profile-note",
+        help="set or clear a profile's one-line note (e.g. which account it signs in as)",
+    )
+    noting.add_argument("profile")
+    noting.add_argument("text", nargs="?", help="note text; omit to clear")
+    noting.add_argument("--clear", action="store_true", help="remove the note")
+    cookies = sub.add_parser(
+        "import-cookies",
+        help="copy chosen sites' cookies from your Firefox into a profile",
+    )
+    cookies.add_argument("profile")
+    cookies.add_argument(
+        "--site",
+        action="append",
+        required=True,
+        help="a site such as example.com (its subdomains too); repeatable",
+    )
+    cookies.add_argument(
+        "--from",
+        dest="source",
+        help="Firefox profile directory (default: your default profile)",
+    )
+    forget = sub.add_parser(
+        "forget-site", help="remove a site's cookies and storage from a profile"
+    )
+    forget.add_argument("profile")
+    forget.add_argument(
+        "--site", action="append", required=True, help="e.g. example.com; repeatable"
+    )
+    for name, text in (
+        ("view", "watch a session read-only"),
+        ("take", "control a session yourself; closing the viewer hands it back"),
+    ):
+        observer = sub.add_parser(name, help=text)
+        observer.add_argument("session")
+        observer.add_argument("--wayvnc")
+        observer.add_argument("--viewer")
+        if name == "take":
+            observer.add_argument(
+                "--paste",
+                action="store_true",
+                help="send your clipboard in (cleared from the session on release)",
+            )
+            observer.add_argument(
+                "--keyboard",
+                help="your layout, e.g. us-dvorak (default: detected from the host)",
+            )
+    waiter = sub.add_parser("wait", help="wait for a window and/or a settled screen")
+    waiter.add_argument("session")
+    waiter.add_argument("--title")
+    waiter.add_argument("--app-id")
+    waiter.add_argument("--gone", action="store_true")
+    waiter.add_argument("--stable-ms", type=int, default=0)
+    waiter.add_argument("--seconds", type=float, default=0, help="pause first")
+    waiter.add_argument("--timeout", type=float, default=10)
+    waiter.add_argument("--element", help="accessible name substring")
+    waiter.add_argument("--role")
+    waiter.add_argument("--text", help="substring of the element's text or value")
+    waiter.add_argument("--state", help="e.g. checked, enabled, focused, expanded")
+    waiter.add_argument("--exact", action="store_true", help="whole element name")
+    waiter.add_argument("--file", help='a result file: "~/..." (session home) or /abs')
+    waiter.add_argument("--contains", help="text the file must contain")
+    waiter.add_argument("--key", help='INI-style config key, "section/key"')
+    waiter.add_argument("--value", help="the value --key must have")
+    tree = sub.add_parser("ui", help="list visible UI elements (accessibility)")
+    tree.add_argument("session")
+    tree.add_argument("--app")
+    tree.add_argument("--window")
+    tree.add_argument("--max-nodes", type=int, default=300)
+    check = sub.add_parser("check", help="evaluate a scoped read-only predicate")
+    check.add_argument("session")
+    check.add_argument("predicate", type=json.loads, help="JSON predicate object")
+    act = sub.add_parser("ui-action", help="press, focus or set_text on a UI node")
+    act.add_argument("session")
+    act.add_argument("node")
+    act.add_argument("action")
+    act.add_argument("--text")
+    act.add_argument("--observation")
+    bridge = sub.add_parser(
+        "browser", help="private Firefox through WebDriver BiDi (start, open, ...)"
+    )
+    bridge.add_argument("session")
+    bridge.add_argument(
+        "action",
+        choices=(
+            "start",
+            "tabs",
+            "open",
+            "close",
+            "text",
+            "find",
+            "wait",
+            "click",
+            "fill",
+            "select",
+            "send",
+            "save",
+            "download",
+            "steps",
+        ),
+    )
+    bridge.add_argument("--url")
+    bridge.add_argument("--selector", help="CSS selector")
+    bridge.add_argument("--text", help="visible text, label or placeholder")
+    bridge.add_argument("--exact", action="store_true")
+    bridge.add_argument("--value", help="text to fill or option to select")
+    bridge.add_argument("--tab", type=int)
+    bridge.add_argument("--context", help="stable context id from browser tabs")
+    bridge.add_argument("--new-tab", action="store_true")
+    bridge.add_argument("--gone", action="store_true")
+    bridge.add_argument("--timeout", type=float)
+    bridge.add_argument("--seconds", type=float, help="wait: pause first (up to 30)")
+    bridge.add_argument("--within", help="text of the row, item or form holding it")
+    bridge.add_argument("--steps", type=json.loads, help="JSON list of actions")
+    bridge.add_argument(
+        "--source",
+        choices=("element", "clipboard", "cookies"),
+        help="send: what to move",
+    )
+    bridge.add_argument("--site", help="send --source cookies: the domain")
+    bridge.add_argument(
+        "--to-file", help="send, download: a new 0600 file (relative: home)"
+    )
+    bridge.add_argument(
+        "--to-command", type=shlex.split, help="send: a command reading stdin"
+    )
+    bridge.add_argument("--reveal", type=int, help="send: prefix characters (0-8)")
+    bridge.add_argument(
+        "--overwrite", action="store_true", help="send, download: replace"
+    )
+    steps = sub.add_parser(
+        "actions", help="run a JSON list of steps, stopping on surprises"
+    )
+    steps.add_argument("session")
+    steps.add_argument("actions", type=json.loads)
+    steps.add_argument("--observation")
+    steps.add_argument("--timeout", type=float, help="bound the whole run (seconds)")
+    jobs = sub.add_parser(
+        "operation", help="start, inspect or cancel a durable private-session operation"
+    )
+    jobs.add_argument("session")
+    jobs.add_argument("action", choices=("start", "status", "cancel"))
+    jobs.add_argument("--operation-id")
+    jobs.add_argument("--actions", type=json.loads)
+    jobs.add_argument("--kind", choices=("actions", "browser"), default="actions")
+    jobs.add_argument("--observation")
+    jobs.add_argument("--timeout", type=float, default=600)
+    jobs.add_argument(
+        "--predicates", type=json.loads, help="JSON list of at most 20 scoped checks"
+    )
+    steps.add_argument(
+        "--screenshot",
+        action="store_true",
+        help="after the input, wait until the screen is still (0.3 s, at most 3 s) "
+        "and include a screenshot",
+    )
+    leasing = sub.add_parser(
+        "lease", help="take, renew or release this controller's session lease"
+    )
+    leasing.add_argument("session")
+    leasing.add_argument("--seconds", type=float, help="expiry after inactivity")
+    leasing.add_argument("--release", action="store_true")
+    leasing.add_argument(
+        "--force", action="store_true", help="release another controller's lease"
+    )
+    hosting = sub.add_parser(
+        "host", help="let an agent use your own screen (experimental, opt-in)"
+    )
+    hosting.add_argument(
+        "action",
+        choices=("start", "approve", "deny", "stop", "request", "status"),
+        help="start/approve: allow (approve answers a pending request); deny; "
+        "stop: end the host session; request: ask as an agent would",
+    )
+    hosting.add_argument("reason", nargs="?", help="for request")
+    hosting.add_argument("--minutes", type=float, default=15)
+    tracing = sub.add_parser(
+        "trace", help="recent actions: target, focus and outcome, no typed text"
+    )
+    tracing.add_argument("session")
+    tracing.add_argument("--limit", type=int, default=50)
+    waiting = sub.add_parser("request-human", help="ask a person to take control")
+    waiting.add_argument("session")
+    waiting.add_argument("reason", nargs="?")
+    waiting.add_argument(
+        "--withdraw", action="store_true", help="withdraw the pending request"
+    )
+    for command in (
+        "status",
+        "windows",
+        "screenshot",
+        "logs",
+        "destroy",
+        "launch",
+        "click",
+        "move",
+        "drag",
+        "focus",
+        "type",
+        "key",
+        "scroll",
+        "control",
+        "release",
+    ):
+        operation = sub.add_parser(command)
+        operation.add_argument("session")
+        if command == "launch":
+            operation.add_argument("argv", nargs=argparse.REMAINDER)
+        elif command in ("click", "move", "drag"):
+            operation.add_argument("x", type=int)
+            operation.add_argument("y", type=int)
+            if command == "drag":
+                operation.add_argument("to_x", type=int)
+                operation.add_argument("to_y", type=int)
+            if command in ("click", "drag"):
+                operation.add_argument(
+                    "--button", default="left", choices=("left", "middle", "right")
+                )
+        elif command == "type":
+            operation.add_argument("text")
+        elif command == "key":
+            operation.add_argument("key")
+            operation.add_argument(
+                "--modifier", action="append", dest="modifiers", default=[]
+            )
+            operation.add_argument("--repeat", type=int, default=1)
+        elif command == "scroll":
+            operation.add_argument("dy", type=int, help="wheel notches, > 0 down")
+            operation.add_argument("--dx", type=int, default=0, help="> 0 right")
+            operation.add_argument("--x", type=int, help="scroll here (move first)")
+            operation.add_argument("--y", type=int)
+        elif command == "focus":
+            operation.add_argument("window")
+        elif command == "release":
+            operation.add_argument(
+                "--force",
+                action="store_true",
+                help="return control even if the clipboard could not be cleared",
+            )
+        elif command == "screenshot":
+            operation.add_argument(
+                "--region",
+                type=lambda v: [int(n) for n in v.split(",")],
+                help="x,y,width,height in desktop coordinates",
+            )
+            operation.add_argument("--scale", type=float)
+            operation.add_argument(
+                "--settle-ms",
+                type=int,
+                help="first wait until the screen is still this long (at most 3 s)",
+            )
+        if command in ("click", "move", "drag", "type", "key", "scroll"):
+            operation.add_argument(
+                "--observation",
+                help="screenshot token; refuse input if windows or output changed",
+            )
+            operation.add_argument(
+                "--screenshot",
+                action="store_true",
+            )
+    args = vars(parser.parse_args())
+    command = args.pop("command")
+    controller = args.pop("controller")
+    try:
+        if command == "create":
+            mode, profile = args.pop("mode"), args.pop("profile")
+            guard = args.pop("guard_host")
+            gpu = {k: args.pop(k) for k in ("renderer", "render_device", "size")}
+            result = create(mode, tools=args, profile=profile, guard_host=guard, **gpu)
+        elif command == "list":
+            result = sessions()
+        elif command == "activity":
+            result = activity(args["session"], args["days"])
+        elif command == "events":
+            from . import events
+
+            if args["follow"]:
+                try:
+                    events.follow(args["session"])
+                except KeyboardInterrupt:
+                    pass
+                return 0
+            for event in events.snapshot(args["session"]):
+                print(json.dumps(event))
+            return 0
+        elif command == "doctor":
+            result = doctor(with_smoke=args["smoke"])
+            print(json.dumps(result, indent=2))
+            return 0 if result["status"] != "fail" else 1
+        elif command == "review":
+            from .review import from_file
+
+            result = from_file(args["input"], args["output"])
+        elif command == "profiles":
+            result = profiles()
+        elif command == "usage":
+            result = usage()
+        elif command == "prune":
+            result = prune(args["older_than"], args["dry_run"])
+        elif command == "attach-profile":
+            result = attach_profile(args["session"], args["profile"], controller)
+        elif command == "delete-profile":
+            result = delete_profile(args["profile"])
+        elif command == "profile-note":
+            if args["clear"] and args["text"] is not None:
+                raise DesktopError("Give either TEXT or --clear, not both")
+            result = set_profile_note(
+                args["profile"], None if args["clear"] else args["text"]
+            )
+        elif command == "import-cookies":
+            from .cookies import import_firefox_cookies
+
+            result = import_firefox_cookies(
+                args["profile"], args["site"], args["source"]
+            )
+        elif command == "forget-site":
+            from .cookies import forget_site
+
+            result = forget_site(args["profile"], args["site"])
+        elif command == "logs":
+            result = logs(args["session"])
+        elif command == "host":
+            action = args["action"]
+            if action in ("start", "approve"):
+                result = answer_host(True, args["minutes"])
+            elif action == "deny":
+                result = answer_host(False)
+            elif action == "stop":
+                result = stop_host()
+            elif action == "request":
+                result = {"status": "pending"}
+                while result.get("status") == "pending":
+                    result = request_host(args["reason"] or "", args["minutes"])
+            else:
+                result = host_status()
+        elif command == "trace":
+            result = trace(args["session"], args["limit"])
+        elif command == "destroy":
+            result = destroy(args["session"])
+        elif command == "view":
+            result = view(**args)
+        elif command == "browser":
+            session = args.pop("session")
+            # Keep 0 (tab 0, reveal 0); drop unset options and unset flags.
+            options = {
+                k: v for k, v in args.items() if v is not None and v is not False
+            }
+            result = request(session, "browser", controller, **options)
+        elif command == "check":
+            from .checks import evaluate
+
+            result = evaluate(args["session"], args["predicate"], controller)
+        elif command in ("ui", "ui-action"):
+            session = args.pop("session")
+            result = request(session, command.replace("-", "_"), controller, **args)
+        elif command == "actions":
+            look = args.pop("screenshot")
+            try:
+                result = run_actions(
+                    **args, controller=controller, release_held=not look
+                )
+                if look:
+                    result["screenshot"] = settled_screenshot(
+                        args["session"], controller
+                    )
+            finally:
+                if look:
+                    release_held_keys(args["session"], args["actions"], controller)
+        elif command == "operation":
+            from .operations import operate
+
+            result = operate(**args, controller=controller)
+        elif command == "wait":
+            result = wait(**args, controller=controller)
+        elif command == "lease":
+            options = {"action": "release" if args["release"] else "acquire"}
+            if args["seconds"] is not None:
+                options["seconds"] = args["seconds"]
+            if args["force"]:
+                options["force"] = True
+            result = request(args["session"], "lease", controller, **options)
+        elif command == "take":
+            result = take(**args)
+        elif command == "request-human":
+            if args["withdraw"]:
+                options = {"withdraw": True}
+            else:
+                options = {"reason": args["reason"]}
+            result = request(args["session"], "request_human", controller, **options)
+        else:
+            session = args.pop("session")
+            look = args.pop("screenshot", False)
+            if command == "screenshot" and args.get("settle_ms") is not None:
+                args["settle_timeout_ms"] = 3000
+            elif command == "screenshot":
+                args.pop("settle_ms")
+            if command == "launch" and args["argv"][:1] == ["--"]:
+                args["argv"] = args["argv"][1:]
+            if command == "launch":
+                # Relative paths on the command line mean the caller's directory.
+                args["cwd"] = os.getcwd()
+            result = request(session, command, controller, **args)
+            if look:
+                result["screenshot"] = settled_screenshot(session, controller)
+        print(json.dumps(result, indent=2))
+    except DesktopError as error:
+        print(json.dumps({"error": str(error)}))
+        return 1
+    return 0

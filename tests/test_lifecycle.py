@@ -8,6 +8,7 @@ session's own processes were stopped. Private sessions only.
 import functools
 import hashlib
 import http.server
+import json
 import os
 import shutil
 import signal
@@ -17,6 +18,7 @@ import tempfile
 import threading
 import time
 import unittest
+import uuid
 from pathlib import Path
 
 from test_runtime import running, sleeping, unique_duration, wait_for
@@ -652,6 +654,305 @@ class RepeatedCycleTests(unittest.TestCase):
         self.assertEqual(report["pruned"], self.CYCLES)
         self.assertTrue(report["sentinel_alive"])
         self.assertTrue(report["ok"], report)
+
+
+SOURCE = Path(__file__).resolve().parents[1] / "src/agent_desktop"
+
+
+@unittest.skipUnless(DESKTOP, "desktop tools unavailable")
+class UpgradeTests(LifecycleCase):
+    """Runtime upgrade: a running session is recreated, never upgraded in place."""
+
+    def test_session_outlives_the_removal_of_the_installation_it_started_from(self):
+        # The installed version: a copy of the package, removed by the upgrade.
+        installed = self.root / "installed"
+        shutil.copytree(SOURCE, installed / "agent_desktop")
+        previous = os.environ.get("PYTHONPATH")
+        os.environ["PYTHONPATH"] = str(installed)
+        try:
+            session = self.create("f3-upgrade")["session"]
+        finally:
+            if previous is None:
+                os.environ.pop("PYTHONPATH")
+            else:
+                os.environ["PYTHONPATH"] = previous
+        info = core.manifest(session)
+        worker = Path(f"/proc/{info['worker_pid']}/environ").read_bytes()
+        self.assertIn(f"PYTHONPATH={installed}".encode(), worker.split(b"\0"))
+        self.run_shell(session, 'echo before > "$HOME/kept.txt"', CLIENT)
+        shutil.rmtree(installed)
+
+        # The running worker keeps the code it started with, including modules
+        # a request would otherwise import on first use.
+        self.assertEqual(core.request(session, "status", CLIENT)["status"], "ready")
+        core.request(session, "screenshot", CLIENT)
+        with self.assertRaisesRegex(core.DesktopError, "No bridged Firefox"):
+            core.request(session, "browser", CLIENT, action="tabs")
+        self.assertEqual(core.request(session, "status", CLIENT)["status"], "ready")
+        statuses = {s["session"]: s["status"] for s in core.sessions()}
+        self.assertEqual(statuses[session], "ready")
+
+        core.destroy(session)
+        self.runtime_gone(info)
+        self.assertEqual(core.manifest(session)["status"], "stopped")
+        # The new version takes over the profile; the files are kept.
+        result = self.create("f3-upgrade")
+        self.assertEqual(result["previous_session"]["status"], "stopped")
+        output = self.root / "read-back"
+        self.run_shell(result["session"], f'cat "$HOME/kept.txt" > {output}')
+        self.assertEqual(output.read_text(), "before\n")
+        self.assert_unrelated_running()
+
+    def test_desktop_runtime_replaced_under_a_running_session(self):
+        def runtime(name):
+            directory = self.root / name / "bin"
+            directory.mkdir(parents=True)
+            tools = {}
+            for tool in ("labwc", "grim", "dbus-daemon"):
+                wrapper = directory / tool
+                wrapper.write_text(f'#!/bin/sh\nexec {shutil.which(tool)} "$@"\n')
+                wrapper.chmod(0o700)
+                tools[tool] = str(wrapper)
+            return tools
+
+        old = runtime("runtime-old")
+        result = core.create(profile="f3-tools", tools=old)
+        session = result["session"]
+        self.created.append(session)
+        info = core.manifest(session)
+        self.assertEqual(info["tools"], old)
+        self.run_shell(session, 'echo before > "$HOME/kept.txt"', CLIENT)
+        core.request(session, "screenshot", CLIENT)
+        # The upgrade removes the old runtime (a garbage-collected store path).
+        shutil.rmtree(self.root / "runtime-old")
+
+        with self.assertRaisesRegex(core.DesktopError, "desktop runtime changed"):
+            core.request(session, "screenshot", CLIENT)
+        # Not supported for a running session, but it still stops cleanly.
+        self.assertEqual(core.request(session, "status", CLIENT)["status"], "ready")
+        core.destroy(session)
+        self.runtime_gone(info)
+        self.assertEqual(core.manifest(session)["status"], "stopped")
+
+        new = runtime("runtime-new")
+        again = core.create(profile="f3-tools", tools=new)
+        self.created.append(again["session"])
+        self.assertEqual(core.manifest(again["session"])["tools"], new)
+        self.assertEqual(again["previous_session"]["status"], "stopped")
+        core.request(again["session"], "screenshot")
+        output = self.root / "read-back"
+        self.run_shell(again["session"], f'cat "$HOME/kept.txt" > {output}')
+        self.assertEqual(output.read_text(), "before\n")
+        self.assert_unrelated_running()
+
+
+class OlderRecordTests(unittest.TestCase):
+    """Session records written by earlier versions (no desktop needed)."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="desktop-f3-")
+        self.root = Path(self.temporary.name)
+        self.previous = {
+            k: os.environ.get(k) for k in ("AGENT_DESKTOP_STATE_DIR", "XDG_RUNTIME_DIR")
+        }
+        (self.root / "runtime").mkdir(mode=0o700)
+        os.environ["AGENT_DESKTOP_STATE_DIR"] = str(self.root / "state")
+        os.environ["XDG_RUNTIME_DIR"] = str(self.root / "runtime")
+
+    def tearDown(self):
+        for key, value in self.previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        self.temporary.cleanup()
+
+    def record(self, status, profile=None, **extra):
+        """A manifest with the keys of the 2026-10-05 schema only."""
+        session = uuid.uuid4().hex[:12]
+        root = self.root / "state" / session
+        root.mkdir(parents=True, mode=0o700)
+        runtime = self.root / "runtime" / "agent-desktop" / session
+        info = {
+            "id": session,
+            "mode": "headless",
+            "tools": {"labwc": "/gone/labwc", "grim": "/gone/grim"},
+            "runtime": str(runtime),
+            "control_socket": str(runtime / "control.sock"),
+            "parent_wayland": None,
+            "token": uuid.uuid4().hex,
+            "status": status,
+            "created_at": time.time() - 86400 * 30,
+            **extra,
+        }
+        if profile:
+            home = core.profile_path(profile) / "home"
+            home.mkdir(parents=True, mode=0o700)
+            (home / "kept.txt").write_text("before\n")
+            info.update(
+                profile=profile,
+                guard_host=False,
+                home=str(home),
+                profile_lock=str(core.profile_lock(home.parent)),
+            )
+            (home.parent / "last-session.json").write_text(
+                json.dumps({"session": session}) + "\n"
+            )
+        (root / "session.json").write_text(json.dumps(info) + "\n")
+        (root / "home").mkdir()
+        return session
+
+    def test_older_records_are_listed_recovered_and_pruned(self):
+        stopped = self.record("stopped")
+        failed = self.record("failed", error="Supervisor exited unexpectedly")
+        # Running at the upgrade; its supervisors (old numbers) are gone.
+        abandoned = self.record("ready", worker_pid=2**22 + 1, guardian_pid=2**22 + 2)
+        statuses = {s["session"]: s["status"] for s in core.sessions()}
+        self.assertEqual(
+            statuses,
+            {stopped: "stopped", failed: "failed", abandoned: "unavailable"},
+        )
+        self.assertEqual(
+            core.usage()["sessions"], {"stopped": 1, "failed": 1, "ready": 1}
+        )
+        self.assertEqual(core.destroy(stopped)["status"], "stopped")
+        recovered = core.destroy(abandoned)
+        self.assertTrue(recovered["recovered"])
+        self.assertFalse((core.session_path(abandoned) / "home").exists())
+        pruned = core.prune()
+        self.assertEqual(
+            sorted(pruned["removed"]), sorted([stopped, failed, abandoned])
+        )
+        self.assertEqual(core.sessions(), [])
+
+    def test_profile_with_an_older_abandoned_session(self):
+        session = self.record(
+            "ready", profile="f3-old", worker_pid=2**22 + 1, guardian_pid=2**22 + 2
+        )
+        (profile,) = core.profiles()
+        self.assertFalse(profile["in_use"])
+        self.assertEqual(profile["last_session"]["status"], "abandoned")
+        # What create does before starting on the profile.
+        core.recover(session, core.manifest(session))
+        (profile,) = core.profiles()
+        self.assertEqual(profile["last_session"]["status"], "stopped")
+        self.assertTrue(profile["last_session"]["recovered"])
+        home = core.profile_path("f3-old") / "home"
+        self.assertEqual((home / "kept.txt").read_text(), "before\n")
+
+    def test_operation_record_from_another_schema_fails_closed(self):
+        session = self.record("stopped")
+        directory = operations.directory(session)
+        ident = uuid.uuid4().hex
+        (directory / f"{ident}.json").write_text(
+            json.dumps({"schema_version": 2, "session": session, "state": "running"})
+        )
+        with self.assertRaisesRegex(core.DesktopError, "delivery is unknown"):
+            operations.status(session, ident)
+
+
+class BootIdentityTests(unittest.TestCase):
+    def test_a_process_start_time_counts_only_in_its_boot(self):
+        pid = os.getpid()
+        started = start_time(pid)
+        self.assertTrue(operations.process_alive(pid, started, operations.boot_id()))
+        # Records from before boot ids were kept are judged as before.
+        self.assertTrue(operations.process_alive(pid, started))
+        self.assertFalse(operations.process_alive(pid, started, uuid.uuid4().hex))
+
+
+@unittest.skipUnless(DESKTOP, "desktop tools unavailable")
+class RebootTests(LifecycleCase):
+    """A reboot simulated in private directories: never the real machine."""
+
+    def power_off(self, *infos):
+        """Every session process dies at once, as at a power loss."""
+        tokens = [info["token"] for info in infos]
+        while pids := [p for token in tokens for p in owned_processes(token)]:
+            for pid in pids:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            time.sleep(0.05)
+        wait_for(lambda: not any(core.supervisor_alive(info) for info in infos))
+
+    def test_reboot_recovers_sessions_profiles_and_jobs(self):
+        kept = self.create("f3-reboot")["session"]
+        kept_info = core.manifest(kept)
+        plain = self.create()["session"]
+        plain_info = core.manifest(plain)
+        self.run_shell(kept, 'echo before > "$HOME/kept.txt"', CLIENT)
+        shot = core.request(kept, "screenshot", CLIENT)
+        core.request(kept, "lease", CLIENT, action="release")
+        self.run_shell(plain, 'echo scratch > "$HOME/scratch.txt"')
+        job = operations.start(kept, [{"action": "wait", "seconds": 30}])
+        wait_for(
+            lambda: (
+                operations.status(kept, job["operation_id"])["steps"][0][
+                    "dispatch_state"
+                ]
+                == "dispatching"
+            )
+        )
+
+        self.power_off(kept_info, plain_info)
+        # The new boot: an empty runtime directory, at another path this time,
+        # and old process numbers now belong to unrelated processes, one with
+        # the very start time a job record names.
+        shutil.rmtree(self.root / "runtime")
+        (self.root / "runtime-after").mkdir(mode=0o700)
+        os.environ["XDG_RUNTIME_DIR"] = str(self.root / "runtime-after")
+        reused = self.unrelated.pid
+        for session, info in ((kept, kept_info), (plain, plain_info)):
+            info = core.manifest(session)
+            info.update(worker_pid=reused, guardian_pid=os.getpid())
+            (core.session_path(session) / "session.json").write_text(json.dumps(info))
+        path = operations.record_path(kept, job["operation_id"])
+        record = json.loads(path.read_text())
+        record.update(
+            pid=reused, process_start=start_time(reused), boot_id=uuid.uuid4().hex
+        )
+        path.write_text(json.dumps(record))
+
+        statuses = {s["session"]: s["status"] for s in core.sessions()}
+        self.assertEqual(statuses, {kept: "unavailable", plain: "unavailable"})
+        (profile,) = core.profiles()
+        self.assertFalse(profile["in_use"])
+        self.assertEqual(profile["last_session"]["status"], "abandoned")
+        lost = self.finished(kept, job["operation_id"])
+        self.assertEqual(lost["state"], "delivery_unknown")
+        self.assertEqual(lost["steps"][0]["dispatch_state"], "uncertain")
+        # Records of sessions that were running are not pruned before recovery.
+        self.assertEqual(core.prune()["removed"], [])
+        self.assertTrue((core.session_path(plain) / "home" / "scratch.txt").exists())
+
+        # The next session on the profile recovers the old one first.
+        result = self.create("f3-reboot")
+        self.assertEqual(
+            result["previous_session"],
+            {"session": kept, "status": "stopped", "recovered": True},
+        )
+        output = self.root / "read-back"
+        self.run_shell(result["session"], f'cat "$HOME/kept.txt" > {output}')
+        self.assertEqual(output.read_text(), "before\n")
+        self.assertTrue(core.profiles()[0]["in_use"])
+        # destroy recovers a session without a profile.
+        recovered = core.destroy(plain)
+        self.assertTrue(recovered["recovered"])
+        self.assertTrue(recovered["runtime_removed"])
+        self.assertFalse((core.session_path(plain) / "home").exists())
+        self.record_kept(kept, Path(shot["path"]).name)
+        self.assertEqual(
+            operations.status(kept, job["operation_id"])["state"], "delivery_unknown"
+        )
+        core.destroy(result["session"])
+        self.assertFalse(core.profiles()[0]["in_use"])
+        self.assertEqual(
+            sorted(core.prune()["removed"]), sorted([kept, plain, result["session"]])
+        )
+        self.created = []  # pruned
+        self.assert_unrelated_running()
 
 
 if __name__ == "__main__":

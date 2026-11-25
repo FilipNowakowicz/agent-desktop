@@ -707,6 +707,10 @@ class Worker:
             )
         except subprocess.TimeoutExpired:
             raise RuntimeError(f"{tool} did not finish within {timeout} s") from None
+        except FileNotFoundError:
+            raise RuntimeError(
+                runtime_changed(tool, self.info["tools"][tool])
+            ) from None
         if result.returncode:
             raise RuntimeError(
                 f"{tool} failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -2399,12 +2403,17 @@ class Worker:
         """Capture the output as raw RGB without writing a file."""
         if self.compositor.poll() is not None:
             raise RuntimeError("Private compositor has exited")
-        result = subprocess.run(
-            [self.info["tools"]["grim"], "-t", "ppm", "-"],
-            env=self.env,
-            capture_output=True,
-            timeout=10,
-        )
+        try:
+            result = subprocess.run(
+                [self.info["tools"]["grim"], "-t", "ppm", "-"],
+                env=self.env,
+                capture_output=True,
+                timeout=10,
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                runtime_changed("grim", self.info["tools"]["grim"])
+            ) from None
         if result.returncode:
             raise RuntimeError(f"grim failed: {result.stderr.decode(errors='replace')}")
         data = result.stdout
@@ -4087,7 +4096,29 @@ def accessibility_failure(reason, enforce=Path("/sys/fs/selinux/enforce")):
     return f"Accessibility unavailable: {reason}; the semantic UI tools cannot be used"
 
 
+def runtime_changed(tool, path):
+    """The error when a tool the session started with has since been removed."""
+    return (
+        f"{tool} is no longer at {path}: the desktop runtime changed after this "
+        "session started (an upgrade). Destroy the session and create a new one"
+    )
+
+
+def load_request_modules():
+    """Import now what requests would otherwise import on first use.
+
+    A running session then keeps the code it started with when Agent Desktop
+    is upgraded or removed underneath it (an editable checkout pulled, a tool
+    reinstalled), instead of mixing in the new version's modules or failing
+    with an ImportError on its first browser or `set` request.
+    """
+    import websockets.exceptions  # noqa: F401
+
+    from . import atlas, browser, core  # noqa: F401
+
+
 def run_worker(root):
+    load_request_modules()
     worker = Worker(root)
 
     def stop(_signal, _frame):

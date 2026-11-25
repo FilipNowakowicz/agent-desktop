@@ -1085,7 +1085,10 @@ def recover(session, info):
     root = session_path(session)
     runtime = Path(info["runtime"])
     expected = host_runtime_dir() / "agent-desktop" / session
-    if runtime.resolve() != expected.resolve():
+    # A runtime that is already gone (a reboot cleared it) needs no check: the
+    # session may have been created with another XDG_RUNTIME_DIR, e.g. the
+    # /tmp fallback from a service, and its record must still be recoverable.
+    if runtime.exists() and runtime.resolve() != expected.resolve():
         raise DesktopError("Refusing to remove an unexpected runtime directory")
     try:
         # Token only: this process's own children are not session processes.

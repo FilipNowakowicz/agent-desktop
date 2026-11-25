@@ -255,8 +255,19 @@ def load(path, session, operation_id):
         ) from error
 
 
-def process_alive(pid, started):
+def boot_id():
+    """This boot's identifier: a process start time means nothing across boots."""
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return None
+
+
+def process_alive(pid, started, boot=None):
     if type(pid) is not int or type(started) is not int:
+        return False
+    # After a reboot the same number can start at the same tick: not this job.
+    if boot is not None and boot != boot_id():
         return False
     try:
         raw = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
@@ -276,7 +287,9 @@ def status(session, operation_id):
     path = record_path(session, operation_id)
     record = load(path, session, operation_id)
     if record["state"] not in TERMINAL:
-        alive = process_alive(record.get("pid"), record.get("process_start"))
+        alive = process_alive(
+            record.get("pid"), record.get("process_start"), record.get("boot_id")
+        )
         if not alive and record.get("outcome") in TERMINAL:
             # Killed while checking or cleaning up: every step had already
             # reached its state.
@@ -529,7 +542,9 @@ def start(
                 start_new_session=True,
             )
             _children[operation_id] = child
-            record.update(pid=child.pid, process_start=start_time(child.pid))
+            record.update(
+                pid=child.pid, process_start=start_time(child.pid), boot_id=boot_id()
+            )
             save(path, record)
             path.with_suffix(".ready").touch(mode=0o600)
         except (OSError, core.DesktopError) as error:

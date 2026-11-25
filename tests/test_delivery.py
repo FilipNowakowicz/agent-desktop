@@ -21,6 +21,7 @@ class DeliveryTests(unittest.TestCase):
         bridge.target.return_value = "context"
         bridge.element.return_value = ({}, {"name": "Submit"})
         bridge.find.return_value = {"count": 1, "items": []}
+        bridge.challenge.return_value = {}
         worker.browser = (bridge, lambda: None)
         worker.attach_browser = mock.Mock(return_value=True)
         return worker, bridge

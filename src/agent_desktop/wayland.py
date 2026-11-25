@@ -639,8 +639,9 @@ class VirtualKeyboard:
             self.overrides = {code: row}
             self.dirty = True
             # A real Shift press: a compositor resolving through a layout of
-            # its own (a nested one) never sees a modifier mask.
-            if shifted and "shift" not in modifiers:
+            # its own (a nested one) never sees a modifier mask. Not while a
+            # Shift is held (key_down): releasing ours would clear its mask.
+            if shifted and "shift" not in modifiers and not self.mask & SHIFT:
                 modifiers = [*modifiers, "shift"]
             key = code, False
         else:

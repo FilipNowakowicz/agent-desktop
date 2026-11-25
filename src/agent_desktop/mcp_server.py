@@ -663,6 +663,10 @@ def desktop_browser(
     screenshots for visual questions. Don't pause a fixed number of seconds:
     after "open" read the page directly; after a click use {"action": "wait"},
     or wait for a text you expect.
+    A bot-check page ("Just a moment...", "Performing security verification")
+    makes open, text, find and wait reply challenge: true with a hint: wait a
+    few seconds, else hand off with desktop_request_human; never try to solve it.
+    A text wait also matches the page title.
 
     For secrets (a generated API key, token or password shown once), never use
     "text", and don't find it first: give "send" its selector directly (e.g.

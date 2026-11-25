@@ -119,6 +119,59 @@ FIND = """
 """.replace("MAX_ITEMS", str(MAX_ITEMS)).replace("READ", str(READ))
 
 
+# Bot-check interstitials ("Just a moment..." and similar). The detector is
+# deliberately small and conservative; it only reports, it never tries to solve
+# or bypass anything. A page is flagged when
+#  - its title starts with CHALLENGE_TITLE, or
+#  - it has a challenge-page element (an id Cloudflare's interstitial uses), or
+#  - its whole visible text is short (CHALLENGE_SHORT characters or fewer) and
+#    holds one of CHALLENGE_PHRASES.
+# A long article that quotes "just a moment" is not flagged; a login form with a
+# Turnstile widget is not either (the widget's iframe is not a marker).
+CHALLENGE_TITLE = "just a moment"
+CHALLENGE_PHRASES = (
+    "performing security verification",
+    "checking your browser before",
+    "verify you are human",
+    "verifying you are human",
+)
+CHALLENGE_IDS = (
+    "challenge-form",
+    "challenge-running",
+    "challenge-stage",
+    "cf-challenge-running",
+)
+CHALLENGE_SHORT = 800
+CHALLENGE_HINT = (
+    "This looks like a bot-check page. Wait a few seconds (wait with no "
+    "arguments) for it to clear; if it persists, hand off with "
+    "desktop_request_human (the person solves it) or use the person's own "
+    "Firefox via desktop_request_host. Do not try to solve or bypass it."
+)
+
+# Runs in the page: what challenge_reason needs.
+CHALLENGE_PROBE = """() => JSON.stringify({
+  title: document.title,
+  text: (document.body ? document.body.innerText : "").slice(0, 2000),
+  ids: IDS.filter((i) => document.getElementById(i)),
+})""".replace("IDS", json.dumps(list(CHALLENGE_IDS)))
+
+
+def challenge_reason(title, text, ids):
+    """Why the page looks like a bot-check interstitial, or None."""
+    if (title or "").strip().lower().startswith(CHALLENGE_TITLE):
+        return f"title {title.strip()!r}"
+    if ids:
+        return f"challenge element #{ids[0]}"
+    folded = " ".join((text or "").split())
+    if len(folded) <= CHALLENGE_SHORT:
+        lowered = folded.lower()
+        for phrase in CHALLENGE_PHRASES:
+            if phrase in lowered:
+                return f"text {phrase!r}"
+    return None
+
+
 class BrowserError(RuntimeError):
     pass
 
@@ -444,6 +497,27 @@ class Browser:
             hide_fields(item, ("value",), 200)
             hide_fields(item, ("options",))
         return found
+
+    def challenge(self, context):
+        """{"challenge": True, "challenge_hint": ...} on a bot-check page, else {}.
+
+        Best effort: a page that is navigating or not scriptable reports {}.
+        """
+        try:
+            probe = json.loads(remote_value(self.call(CHALLENGE_PROBE, [], context)))
+            reason = challenge_reason(probe["title"], probe["text"], probe["ids"])
+        except Exception:
+            return {}
+        if not reason:
+            return {}
+        return {"challenge": True, "challenge_hint": CHALLENGE_HINT}
+
+    def title_matches(self, context, text, exact=False):
+        """Whether the document title holds the text (find matches only the body)."""
+        title = remote_value(self.call("() => document.title", [], context)) or ""
+        title = " ".join(title.split())
+        wanted = " ".join((text or "").split())
+        return bool(wanted) and (title == wanted if exact else wanted in title)
 
     def element(self, context, selector=None, text=None, exact=False, within=None):
         """A reference to the one visible element that matches."""

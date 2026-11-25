@@ -14,7 +14,9 @@ The newest readable one is copied to the temporary directory too, decoded
 (mozLz4: a magic, the decoded size and one LZ4 block) and its matching cookies
 are written as persistent cookies that expire SESSION_COOKIE_HOURS after the
 import, because Firefox reads only persistent cookies from cookies.sqlite. A
-missing or unreadable session store is reported, not fatal.
+missing or unreadable session store is reported, not fatal. keep_session_cookies
+does the same within a session's own profile after a login handoff, so a
+login survives the private Firefox restarting under the bridge.
 """
 
 import configparser
@@ -190,18 +192,21 @@ def read_mozlz4(path):
     return lz4_block(data[12:], size)
 
 
-def read_session_cookies(source, sites):
+def read_session_cookies(source, sites, since=None):
     """(matching session-only cookies, the store they came from, problems).
 
     The session stores are copied to a private temporary directory and the
-    newest readable one is used. Problems name a file and what is wrong with
-    it, never its contents.
+    newest readable one is used. `sites` None matches every host; a store
+    last written before `since` (a time.time() value) is left out as stale.
+    Problems name a file and what is wrong with it, never its contents.
     """
     stores = []
     for name in SESSION_STORES:
         path = Path(source) / name
         if path.is_file():
-            stores.append((path.stat().st_mtime, name, path))
+            written = path.stat().st_mtime
+            if since is None or written >= since:
+                stores.append((written, name, path))
     stores.sort(reverse=True)
     problems = []
     with tempfile.TemporaryDirectory(prefix="agent-desktop-cookies-") as temporary:
@@ -232,7 +237,7 @@ def read_session_cookies(source, sites):
                 and all(isinstance(c.get(k, ""), str) for k in ("name", "path"))
                 and isinstance(c.get("host"), str)
                 and isinstance(c.get("value"), str)
-                and matches(c["host"], sites)
+                and (sites is None or matches(c["host"], sites))
                 and origin_suffix(c.get("originAttributes")) is not None
             ]
             return found, name, problems
@@ -431,6 +436,66 @@ def import_firefox_cookies(profile, sites, source=None):
             "site from this profile again. Record which account the profile "
             "uses with profile-note."
         )
+    return result
+
+
+def keep_session_cookies(directory, since=None, now=None):
+    """Make the session-only cookies a quit Firefox saved in its session store
+    persistent in its own cookies.sqlite, expiring SESSION_COOKIE_HOURS from now.
+
+    For a session's own profile after a login handoff: Firefox started under
+    the bridge does not restore the session store, so without this a login
+    that did not "remember me" is gone. Firefox must not be running on
+    `directory`. Returns {"kept": count, "store": file or None, "expires":
+    ISO time or None, "problems": [...]}; nothing here raises for unreadable
+    files.
+    """
+    directory = Path(directory)
+    now = time.time() if now is None else now
+    result = {"kept": 0, "store": None, "expires": None, "problems": []}
+    session, store, problems = read_session_cookies(directory, None, since)
+    result.update(store=store, problems=problems)
+    if not session:
+        return result
+    database = directory / "cookies.sqlite"
+    if not database.is_file() or database.is_symlink():
+        problems.append("cookies.sqlite is missing")
+        return result
+    until = now + SESSION_COOKIE_HOURS * 3600
+    try:
+        connection = sqlite3.connect(database)
+        try:
+            existing = [
+                r[1] for r in connection.execute("PRAGMA table_info(moz_cookies)")
+            ]
+            if not existing:
+                problems.append("cookies.sqlite has no moz_cookies table")
+                return result
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            (latest,) = connection.execute(
+                "SELECT max(expiry) FROM moz_cookies"
+            ).fetchone()
+            # As in cookie_rows: milliseconds from Firefox 160 (schema 17).
+            milliseconds = latest > 10**11 if latest else version >= 17
+            expiry = int(until * 1000) if milliseconds else int(until)
+            rows = [
+                session_row(c, expiry, int(now * 1_000_000), i)
+                for i, c in enumerate(session)
+            ]
+            known = [c for c in rows[0] if c in existing]
+            with connection:
+                connection.executemany(
+                    f"INSERT OR REPLACE INTO moz_cookies ({', '.join(known)}) "
+                    f"VALUES ({', '.join('?' for _ in known)})",
+                    [[row[c] for c in known] for row in rows],
+                )
+        finally:
+            connection.close()
+    except sqlite3.DatabaseError as error:
+        problems.append(f"cookies.sqlite could not be written ({error})")
+        return result
+    stamp = datetime.datetime.fromtimestamp(until, datetime.UTC)
+    result.update(kept=len(rows), expires=stamp.isoformat(timespec="seconds"))
     return result
 
 

@@ -1,10 +1,13 @@
 """A login handoff reopens the bridged Firefox without the remote agent."""
 
+import datetime
 import http.server
 import os
 import shutil
+import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -14,10 +17,12 @@ from agent_desktop import core
 from agent_desktop.worker import owned_processes
 
 # Each load reports whether the page sees a remote-controlled browser, and the
-# person's turn (webdriver false) leaves a cookie, as a real sign-in would.
+# person's turn (webdriver false) leaves a cookie, as a real sign-in would, and
+# a session-only one, as a sign-in without "Remember me" would.
 PAGE = b"""<!doctype html><title>Sign in</title><p id="state">loading</p><script>
 const wd = navigator.webdriver;
 if (!wd) document.cookie = "signed_in=yes; max-age=3600; path=/";
+if (!wd) document.cookie = "session_login=yes; path=/";
 fetch("/report?webdriver=" + wd).then(() => {
   state.textContent = "reported " + wd + " cookies " + document.cookie;
 });
@@ -97,14 +102,47 @@ class LoginHandoffTests(unittest.TestCase):
             wait_for(lambda: Site.reports[-1:] == ["false"], timeout=30), Site.reports
         )
         released = core.request(self.session, "release")
+        released_at = time.time()
         self.assertEqual(released["owner"], "agent")
+        browser = released["last"]["browser"]
+        # The window close is a clean quit: Firefox writes its session store,
+        # and its one session-only cookie is kept for a day.
         self.assertEqual(
-            released["last"]["browser"], {"restarted": True, "url": self.url}
+            {k: v for k, v in browser.items() if k != "session_cookies_expire"},
+            {
+                "restarted": True,
+                "url": self.url,
+                "kept_session_cookies": 1,
+                "session_cookies_from": "sessionstore.jsonlz4",
+            },
         )
-        # The bridge is back on the same profile and keeps the new cookie.
+        expires = datetime.datetime.fromisoformat(browser["session_cookies_expire"])
+        self.assertAlmostEqual(expires.timestamp(), released_at + 86400, delta=120)
+        self.assertEqual(
+            core.request(self.session, "control")["last"]["browser"], browser
+        )
+        # The bridge is back on the same profile and keeps both new cookies.
         self.assertTrue(
             wait_for(lambda: Site.reports[-1:] == ["true"], timeout=30), Site.reports
         )
-        found = self.browser("wait", text="signed_in=yes", timeout=15)
+        found = self.browser("wait", text="session_login=yes", timeout=15)
         self.assertTrue(found["satisfied"], self.browser("text", selector="#state"))
-        self.assertIn("reported true", self.browser("text", selector="#state")["text"])
+        state = self.browser("text", selector="#state")["text"]
+        self.assertIn("reported true", state)
+        self.assertIn("signed_in=yes", state)
+        # Stored as a persistent cookie expiring about 24 hours after release.
+        profile = core.session_path(self.session) / "home/.mozilla/agent-desktop"
+        copy = Path(self.temporary.name) / "cookies-copy.sqlite"
+        for suffix in ("", "-wal"):
+            source = Path(f"{profile / 'cookies.sqlite'}{suffix}")
+            if source.is_file():
+                shutil.copyfile(source, f"{copy}{suffix}")
+        connection = sqlite3.connect(copy)
+        try:
+            ((expiry,),) = connection.execute(
+                "SELECT expiry FROM moz_cookies WHERE name = 'session_login'"
+            ).fetchall()
+        finally:
+            connection.close()
+        seconds = expiry / 1000 if expiry > 10**11 else expiry
+        self.assertAlmostEqual(seconds, released_at + 86400, delta=120)

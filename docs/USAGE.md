@@ -447,7 +447,9 @@ uv run agent-desktop browser SESSION send --source cookies --site video.example 
 yt-dlp --cookies ~/.local/state/agent-desktop/profiles/NAME/home/cookies.txt URL
 ```
 
-Delete the file when done: it is a login. This replaces copying a profile's
+The file is a login (0600). It may stay on disk for the length of a long job
+(for example a multi-hour download), outside the repository or in a gitignored
+path, and must be deleted when the job ends. This replaces copying a profile's
 `cookies.sqlite` or session-restore files by hand, which an agent did in a field
 report. Private sessions only. The person's own Firefox is never exported.
 

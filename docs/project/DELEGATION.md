@@ -1,5 +1,13 @@
 # Zero-touch delegation: design proposal
 
+> **Decision 2026-11-25: not adopted as the main line.** Field reports from
+> 2026-11-12 to 2026-11-25 show agents rarely need the person (at most one
+> withdrawn handoff per window), so the touch-reduction stages (Z0, Z2, Z4-Z6)
+> lack evidence. The shell-facing parts (hotkey, panel, banners, result cards)
+> are deferred to the maintainer's own Hyprland and desktop-shell work in the
+> NixOS configuration repository. This document remains a design record. Its
+> advice in section 2.4 not to merge #196 is superseded: #196 merged.
+
 Proposed 2026-11-12 for the maintainer's review. **Nothing in this document is
 implemented.** It is a design, a critique and a staged roadmap; it changes no
 code. [PROJECT_PLAN.md](PROJECT_PLAN.md) stays the status authority until the

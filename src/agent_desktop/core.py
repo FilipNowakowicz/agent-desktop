@@ -632,6 +632,7 @@ def create(
     with (root / "session.log").open("ab") as log:
         process = subprocess.Popen(
             [
+                *systemd_scope(session),
                 sys.executable,
                 "-m",
                 "agent_desktop.worker",
@@ -672,6 +673,29 @@ def create(
 
     os.killpg(process.pid, signal.SIGTERM)
     raise DesktopError(f"Session startup timed out; see {root / 'session.log'}")
+
+
+def systemd_scope(session):
+    """With AGENT_DESKTOP_SYSTEMD_SCOPE=1, the command prefix that starts the
+    supervisors in their own transient scope of the user's systemd manager.
+
+    The kernel keeps every descendant in that cgroup, so recovery after both
+    supervisors die also stops processes that cleared their environment. Off by
+    default: it needs a user systemd instance, which containers and some
+    installations lack. No fallback: if it is asked for and fails, so does create.
+    """
+    if os.environ.get("AGENT_DESKTOP_SYSTEMD_SCOPE", "0") != "1":
+        return []
+    tool = shutil.which("systemd-run")
+    if not tool:
+        raise DesktopError("AGENT_DESKTOP_SYSTEMD_SCOPE=1 needs systemd-run")
+    from .worker import scope_name
+
+    return [
+        *(tool, "--user", "--scope", "--quiet", "--collect"),
+        f"--unit={scope_name(session)}",
+        "--",
+    ]
 
 
 def sessions():
@@ -1080,7 +1104,12 @@ def supervisor_alive(info):
 
 def recover(session, info):
     """Clean up after supervisors that no longer exist, using the session token."""
-    from .worker import cleanup_processes, remove_session_files, write_manifest
+    from .worker import (
+        cleanup_processes,
+        remove_session_files,
+        scope_name,
+        write_manifest,
+    )
 
     root = session_path(session)
     runtime = Path(info["runtime"])
@@ -1090,9 +1119,18 @@ def recover(session, info):
     # /tmp fallback from a service, and its record must still be recoverable.
     if runtime.exists() and runtime.resolve() != expected.resolve():
         raise DesktopError("Refusing to remove an unexpected runtime directory")
+    cgroup = info.get("cgroup")
+    if cgroup is not None and (
+        not isinstance(cgroup, str)
+        or not cgroup.startswith("/")
+        or ".." in cgroup.split("/")
+        or cgroup.rsplit("/", 1)[-1] != scope_name(session)
+    ):
+        raise DesktopError("Refusing an unexpected session cgroup")
     try:
-        # Token only: this process's own children are not session processes.
-        cleanup_processes(info["token"], tree=False)
+        # Token and scope only: this process's own children are not session
+        # processes.
+        cleanup_processes(info["token"], tree=False, cgroup=cgroup)
     except RuntimeError as error:
         raise DesktopError(f"Recovery failed: {error}") from error
     remove_session_files(root, runtime)

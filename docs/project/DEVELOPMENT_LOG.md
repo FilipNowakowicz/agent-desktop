@@ -5,6 +5,41 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — F3: opt-in systemd scope for children that clear their environment
+
+The 2026-10-08 review decision accepted, as a limit, that a child started with `setsid env -i` survives recovery after both supervisors die. It named a cgroup as the only fix, and declined to require one for a distribution-neutral install. I looked at the alternatives again:
+
+- pidfds and process groups need a live holder, or can be left with `setsid`.
+- Inherited process attributes (timer slack, `no_new_privs`) are not unique, and could lead to killing an unrelated process.
+- A cgroup is kernel-tracked and an unprivileged process cannot leave its delegated subtree except into another unit. On this laptop and the worker VM, `systemd-run --user --scope` provides one cheaply.
+
+Decision (conservative; the maintainer decides the default):
+
+- **Opt-in.** With `AGENT_DESKTOP_SYSTEMD_SCOPE=1`, `create` runs the supervisors under `systemd-run --user --scope --quiet --collect --unit=agent-desktop-SESSION.scope`. The supervisor records its cgroup in the manifest (`record_scope`).
+- `cleanup_processes` and `recover` add the scope's `cgroup.procs` to the token carriers. Each process is still signalled only if its PID and start time match.
+- `recover` refuses a cgroup that is not the session's own scope.
+- Default unchanged. If the variable is set and `systemd-run` or a user manager is missing, `create` fails; there is no fallback.
+
+Not on by default because that would move every session under `user@UID.service/app.slice`. The session would then outlive an ssh login scope, and systemd-oomd could treat it as one unit.
+
+Tests:
+
+- `SystemdScopeTests` (skipped without a user manager): an env-cleared daemon is stopped by `destroy` recovery, and also by the next `create` on the profile. A normal `destroy` empties the scope and systemd removes it.
+- `ScopeRecordTests`: a tampered cgroup (`/`, `/user.slice`, a path with `..`, a non-string) is refused and the home is left alone; a scope that is already gone is handled.
+- The expected-failure test keeps documenting the default. `LifecycleCase` now sets `AGENT_DESKTOP_SYSTEMD_SCOPE=0` unless a class asks for a scope.
+- `systemd-run` finds the manager through `XDG_RUNTIME_DIR`, so the tests link their private runtime's `systemd` entry to the real one. Without that link, `create` failed with "Failed to connect to user scope bus via local transport".
+- One test race was found and fixed. After SIGKILL, a supervisor's `/proc/PID/environ` empties before its files close, so the profile lock can still be held for an instant after `supervisor_alive` turns false. The profile test now waits for the lock. A real abandoned profile is unaffected.
+
+Validation:
+
+- `uv run ruff check src tests` and `uv run ruff format --check src tests` pass.
+- Laptop: `-k Scope -k SupervisorLoss` ran 9 tests, OK (skipped=1, expected failures=1), three runs in a row. No `agent-desktop-*` units or test `sleep` processes were left (`systemctl --user list-units --all 'agent-desktop-*'`).
+- Worker, one job: `on-worker run -n f3-scope -- nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command sh -c '... uv run python -m unittest discover -s tests -p "test*.py"; ... uv run python scripts/lifecycle_stress.py --cycles 20 --load 4'`.
+  - `systemd-run --user --scope` worked there.
+  - Suite: 481 tests in 640 s, OK (skipped=35, expected failures=1). The skip count matches the earlier run, so the scope tests ran. It shared the VM with another contributor's job.
+  - Stress: 20/20 cycles passed, 10 with a profile, 20 pruned, cycle median 1.66 s (max 1.77 s), 12 descriptors at the first and last cycle, `ok: true`.
+- Checks matrix, triggered once on this branch (`gh workflow run checks.yml --ref f3-scope`, run 45558503727, commit 53d76f8). Ubuntu `runtime`, `runtime (fedora)` and `runtime (arch)` passed. `nix` failed: 481 tests, errors=1, skipped=19, expected failures=1. The one error is the upgrade test's missing D-Bus configuration, a test-only bug fixed in the previous entry's PR. `SystemdScopeTests` passed on the Ubuntu and Nix runners, which have a user manager, and skipped in the Fedora and Arch containers. The matrix was not re-run.
+
 ## 2026-11-25 — F3: runtime upgrade and reboot rows
 
 X3 continues from the first stage (#216). These rows of [LIFETIMES.md](LIFETIMES.md) were untested: a runtime upgrade under a running session, and a machine reboot or logout. Both are now tested in `tests/test_lifecycle.py`. Neither the machine nor the real runtime directory is touched.

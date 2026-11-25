@@ -101,7 +101,7 @@ validation behind each feature.
 | Repeated create/use/destroy under load | tested | `scripts/lifecycle_stress.py` (also run by `test_lifecycle`), `scripts/soak.py` (manual runs in the log) |
 | Application, Firefox, compositor, supervisor and viewer lifecycle events checked against LIFETIMES.md | tested | `test_lifecycle` |
 | Runtime and Agent Desktop upgrades under a running session, older session records, and a reboot (simulated in private directories) | tested | `test_lifecycle` (`UpgradeTests`, `OlderRecordTests`, `RebootTests`); a real reboot or logout is untested |
-| Detached descendants that clear their environment | unsupported | Accepted limit (review decisions, 2026-10-08); needs cgroups or a container. Stopped while a supervisor lives; left after both die (`test_lifecycle` expected failure) |
+| Detached descendants that clear their environment | unsupported by default | Accepted limit (review decisions, 2026-10-08). Stopped while a supervisor lives; left after both die (`test_lifecycle` expected failure). Opt-in `AGENT_DESKTOP_SYSTEMD_SCOPE=1` (needs a user systemd manager) puts the session in a transient scope, and recovery then stops them too (`SystemdScopeTests`); a process that moves itself to another unit (for example with `systemd-run`) still leaves |
 | A crashed job's lease | tested | Fixed with the durable-execution case above |
 
 ## First F1 failure

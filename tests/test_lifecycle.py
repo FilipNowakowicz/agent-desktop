@@ -25,7 +25,13 @@ from test_runtime import running, sleeping, unique_duration, wait_for
 from test_takeover import connect
 
 from agent_desktop import core, operations, viewer
-from agent_desktop.worker import descendants, owned_processes, start_time
+from agent_desktop.worker import (
+    descendants,
+    owned_processes,
+    scope_members,
+    scope_name,
+    start_time,
+)
 from scripts import lifecycle_stress
 
 DESKTOP = all(shutil.which(t) for t in ("labwc", "grim", "foot", "dbus-daemon"))
@@ -60,15 +66,23 @@ c.close()
 
 
 class LifecycleCase(unittest.TestCase):
+    SCOPE = "0"  # AGENT_DESKTOP_SYSTEMD_SCOPE for the sessions a test creates
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="desktop-f3-")
         self.root = Path(self.temporary.name)
         self.previous = {
-            k: os.environ.get(k) for k in ("AGENT_DESKTOP_STATE_DIR", "XDG_RUNTIME_DIR")
+            k: os.environ.get(k)
+            for k in (
+                "AGENT_DESKTOP_STATE_DIR",
+                "XDG_RUNTIME_DIR",
+                "AGENT_DESKTOP_SYSTEMD_SCOPE",
+            )
         }
         (self.root / "runtime").mkdir(mode=0o700)
         os.environ["AGENT_DESKTOP_STATE_DIR"] = str(self.root / "state")
         os.environ["XDG_RUNTIME_DIR"] = str(self.root / "runtime")
+        os.environ["AGENT_DESKTOP_SYSTEMD_SCOPE"] = self.SCOPE
         self.created = []
         self.duration = unique_duration()
         environment = {
@@ -526,9 +540,10 @@ class SupervisorLossTests(LifecycleCase):
 
     @unittest.expectedFailure
     def test_env_cleared_daemon_is_stopped_by_recovery(self):
-        """Known limit (CAPABILITY_MATRIX: detached descendants that clear
-        their environment). With both supervisors gone, recovery finds
-        processes by token only, so `setsid env -i` children are left."""
+        """Known limit without a systemd scope (CAPABILITY_MATRIX: detached
+        descendants that clear their environment). With both supervisors gone,
+        recovery finds processes by token only, so `setsid env -i` children
+        are left. SystemdScopeTests covers AGENT_DESKTOP_SYSTEMD_SCOPE=1."""
         session = self.create()["session"]
         info = core.manifest(session)
         self.start_daemon(session)
@@ -961,6 +976,127 @@ class RebootTests(LifecycleCase):
         )
         self.created = []  # pruned
         self.assert_unrelated_running()
+
+
+def user_systemd():
+    """Whether this user's systemd manager starts transient scopes."""
+    tool = shutil.which("systemd-run")
+    if not tool:
+        return False
+    try:
+        probe = subprocess.run(
+            [tool, "--user", "--scope", "--quiet", "--collect", "true"],
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
+
+
+def cgroup_exists(cgroup):
+    return any(
+        Path(mount + cgroup).is_dir()
+        for mount in ("/sys/fs/cgroup", "/sys/fs/cgroup/unified")
+    )
+
+
+@unittest.skipUnless(DESKTOP, "desktop tools unavailable")
+class SystemdScopeTests(LifecycleCase):
+    """AGENT_DESKTOP_SYSTEMD_SCOPE=1: a transient scope of the user's manager."""
+
+    SCOPE = "1"
+
+    @classmethod
+    def setUpClass(cls):
+        if not user_systemd():
+            raise unittest.SkipTest("no user systemd manager for transient scopes")
+
+    def setUp(self):
+        super().setUp()
+        # systemd-run finds the user's manager in XDG_RUNTIME_DIR; the tests'
+        # runtime directory is private, so it links to the real one.
+        real = Path(self.previous["XDG_RUNTIME_DIR"] or f"/run/user/{os.getuid()}")
+        (self.root / "runtime" / "systemd").symlink_to(real / "systemd")
+
+    def stop_session_daemons(self):
+        for pid in self.session_daemons():
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    def test_env_cleared_daemon_is_stopped_by_recovery_in_a_scope(self):
+        session = self.create()["session"]
+        info = core.manifest(session)
+        self.assertEqual(info["cgroup"].rsplit("/", 1)[-1], scope_name(session))
+        daemon = self.start_daemon(session)
+        self.addCleanup(self.stop_session_daemons)
+        members = scope_members(info["cgroup"])
+        self.assertLessEqual(
+            {info["worker_pid"], info["guardian_pid"], *daemon}, set(members)
+        )
+        self.assertNotIn(self.unrelated.pid, members)
+        for pid in (info["guardian_pid"], info["worker_pid"]):
+            os.kill(pid, signal.SIGKILL)
+        wait_for(lambda: not core.supervisor_alive(info))
+        self.assertEqual(self.session_daemons(), daemon)
+
+        result = core.destroy(session)
+        self.assertTrue(result["recovered"])
+        self.assertEqual(self.session_daemons(), [])
+        self.assertEqual(owned_processes(info["token"]), [])
+        wait_for(lambda: not cgroup_exists(info["cgroup"]))
+        self.assert_unrelated_running()
+
+    def test_next_session_on_the_profile_stops_the_scope_first(self):
+        session = self.create("f3-scope")["session"]
+        info = core.manifest(session)
+        self.start_daemon(session)
+        self.addCleanup(self.stop_session_daemons)
+        for pid in (info["guardian_pid"], info["worker_pid"]):
+            os.kill(pid, signal.SIGKILL)
+        wait_for(lambda: not core.supervisor_alive(info))
+        # Their memory goes before their files: wait for the lock to be released.
+        wait_for(lambda: not core.profiles()[0]["in_use"])
+
+        result = self.create("f3-scope")
+        self.assertEqual(
+            result["previous_session"],
+            {"session": session, "status": "stopped", "recovered": True},
+        )
+        self.assertEqual(self.session_daemons(), [])
+        wait_for(lambda: not cgroup_exists(info["cgroup"]))
+        self.assert_unrelated_running()
+
+    def test_destroy_empties_and_removes_the_scope(self):
+        session = self.create()["session"]
+        info = core.manifest(session)
+        self.start_daemon(session)
+        core.request(session, "launch", argv=["sleep", self.duration])
+        core.destroy(session)
+        self.runtime_gone(info)
+        wait_for(lambda: not cgroup_exists(info["cgroup"]))
+
+
+class ScopeRecordTests(RecordCase):
+    def test_a_cgroup_outside_the_session_scope_is_refused(self):
+        for cgroup in ("/", "/user.slice", "/x/../agent-desktop-0.scope", 7):
+            with self.subTest(cgroup=cgroup):
+                session = self.record("ready", cgroup=cgroup)
+                with self.assertRaisesRegex(core.DesktopError, "unexpected session"):
+                    core.destroy(session)
+                self.assertTrue((core.session_path(session) / "home").exists())
+
+    def test_a_scope_that_is_gone_has_no_members(self):
+        self.assertEqual(scope_members(None), [])
+        session = self.record("ready")
+        missing = f"/user.slice/{scope_name(session)}"
+        self.assertEqual(scope_members(missing), [])
+        info = core.manifest(session)
+        info["cgroup"] = missing
+        (core.session_path(session) / "session.json").write_text(json.dumps(info))
+        self.assertTrue(core.destroy(session)["recovered"])
 
 
 if __name__ == "__main__":

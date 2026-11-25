@@ -1014,6 +1014,18 @@ guardian process watches the supervisor; if the supervisor dies, the guardian st
 the session's processes and marks it `failed`. If both are killed, `destroy`
 recovers the session using its environment token (processes that cleared their
 environment cannot be found then).
+
+With `AGENT_DESKTOP_SYSTEMD_SCOPE=1` in the environment of the CLI or MCP
+server, `create` starts the supervisors in a transient scope of the user's
+systemd manager, `agent-desktop-SESSION.scope` (through `systemd-run --user
+--scope`), and the manifest records its cgroup. The kernel keeps every
+descendant in that cgroup, so recovery after both supervisors die also stops
+processes that cleared their environment or left the process group. It is off
+by default and has no fallback: without `systemd-run` or a reachable user
+manager (which systemd-run finds through `XDG_RUNTIME_DIR`), `create` fails. A
+process that moves itself into another unit, for example by running
+`systemd-run` itself, leaves the scope. systemd removes the scope once it is
+empty.
 Screenshots and bounded log tails remain in
 `~/.local/state/agent-desktop/SESSION/` after teardown. Set
 `AGENT_DESKTOP_STATE_DIR` to choose another state directory. Input reports delivery;

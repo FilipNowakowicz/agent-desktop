@@ -5,6 +5,45 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Flaky `test_during_application_work`: the kill raced the next step's dispatch
+
+`tests/test_interruptions.py` `test_during_application_work` failed now and then on
+`main` (2 of 6 local runs, 1 of 4 on another branch, once in a full worker suite).
+
+Reproduction (commit 40c185b, 12 cores, in the nix desktop shell, the test run 20
+times in a row with `uv run python -m unittest discover -s tests -p
+test_interruptions.py -k test_during_application_work`): idle, 0 failing runs of 20;
+beside 12 busy-loop processes (load average about 15), 6 failing runs of 20. Every
+failure was the same: `'stopped' != 'delivery_unknown'`, with step 0 (`click
+#slow`) `acknowledged`, step 1 (`wait`) still `pending`, `current_step` 0 and the
+reason "Operation process exited with no step in flight; delivery is as recorded".
+
+Root cause: the test, not the runtime. It killed the helper as soon as step 0 was
+`acknowledged`. Under load the helper had often not yet saved step 1 as
+`dispatching` (each save is an fsync'd rename), so the kill landed between steps.
+Since #211 the reader reports that case as a known `stopped`, which is correct:
+no input was in flight, and `test_during_a_steps_expectation` checks the same
+boundary. The test still expected `delivery_unknown`, which is right only when the
+kill lands inside the wait. Both outcomes left the record and the page correct: the
+click stayed acknowledged, `completed` was 1 and the page counted to 1 once.
+
+Change: the test now kills when step 1 is `dispatching`, the boundary it names
+(the job is inside its wait while the page's 1.5 s timer runs), and also checks
+that step 1 becomes `uncertain`. No sleep or timeout was changed; the state
+assertion prints the record when it fails. Runtime code is unchanged.
+
+Validation, same command and machine, with the change: under the same load 0 failing
+runs of 20 (load average 15.8 to 16.8); idle 0 failing runs of 20; the whole
+`test_interruptions.py` file 11 tests OK. `uv run ruff check src tests` and
+`uv run ruff format --check src tests` pass. The load was stopped by its process
+group and no sessions remain. The full suite was not rerun, since only the test
+changed.
+
+Open: a kill during a read-only browser step such as `wait` is reported as
+`delivery_unknown` (the reader cannot tell which action was in flight), while a
+kill just before it is a known `stopped`. That is conservative, not wrong. It is
+noted here and not changed.
+
 ## 2026-11-25 — Letters for a nested Hyprland's layout (X11)
 
 Reproduced first. Guarded private session (`create --guard-host --renderer gles2

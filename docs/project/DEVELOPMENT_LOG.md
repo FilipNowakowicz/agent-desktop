@@ -5,6 +5,69 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — open waits for the page to settle; a bare wait does the same
+
+Follows "Fixed waits" in the [VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)
+(82% of batch waits were fixed pauses, the same as before N5). N5 only counted
+them and asked for text waits in the tool description.
+
+Why agents still paused. In the maintainer's transcripts from 11-01 to 11-25
+(the usage review script, read-only), 133 fixed pauses inside browser batches
+came right after `click` (62) or `open` (54), and were followed by `text` (58),
+`find` (33) or `save` (13). The agent paused so it could read a page it had not
+seen yet, so it had no text to wait for. And waiting was needed: `open` returned
+at the `load` event, and the consoles in those reports (single-page apps) fetch
+and render their content after it, so a `text` right after `open` read
+"Loading". Nothing waited after a click at all.
+
+Change:
+
+- `Browser.settle` (browser.py) waits until the document has loaded and, for
+  0.5 s, its tab has had no network event and no request open, and its DOM has
+  not changed. Requests come from BiDi network events: the bridge subscribes
+  once when it connects, so requests started before `load` are known, and
+  `command` records them while it waits for replies (they were dropped before).
+  Timestamps are the events' own. A request open longer than 5 s (a long poll)
+  is ignored. The DOM is watched by a `MutationObserver` in a BiDi sandbox, so
+  the page sees no globals.
+- `open`, and `start` with a url, settle after navigating, up to `timeout`
+  (default 10 s, 0 to skip), and return `settled` and `settle_ms`.
+  `settled: false` is not an error.
+- `{"action": "wait"}` with no selector, text or seconds waits until the page
+  settles (up to `timeout`) and is unmet if it doesn't. Before, it was refused.
+  Activity counts it as a wait for a condition.
+- In `steps`, a plain `seconds` pause right after `open`, `start` or `click`
+  gets a one-line `hint`. The tool description says what to do instead.
+
+Decisions: settling is on by default for `open`, because the cost on a static
+page is 0.5 s and that page loads anyway. Clicks don't settle by default, since
+most don't load anything and each would cost 0.5 s. Fixed pauses still work as before.
+
+Validation:
+
+- New `tests/test_browser_settle.py`: a fixture "console" served over local HTTP
+  shows "Loading", makes an API call the server delays 1.5 s, and renders 0.2 s
+  later. `open` returns `settled` after at least 1.5 s, and `text` straight away
+  reads "Quota: 42". `click` + `{"action": "wait"}` + `text` reads the next page
+  with no pause. `open` with `timeout=0` skips settling. A fixed pause after a
+  click carries the hint. A page that changes its DOM every 100 ms returns
+  `settled: false` after the 2 s timeout, and a bare wait on it stops the batch
+  as unmet. Unit tests cover the hint and the trace. The first version
+  subscribed to network events only once settling began, so it missed the
+  page's own fetch and settled after 655 ms. The test caught this.
+- `test_browser.py`: the assertion that a bare wait is refused now expects it
+  to settle.
+- Local (labwc, grim, dbus and at-spi from `nix shell`, Firefox 160.0.1):
+  `test_browser_settle.py` 5 tests OK. `test_browser.py` 16 OK (after the
+  update above). `test_secret_text.py` 14, `test_completion_targets.py` 8,
+  `test_activity.py` 6, `test_trace.py` 4, `test_download.py` 7 and
+  `test_operations.py` 21 are all OK. `ruff check` and `ruff format --check`
+  pass.
+- Full suite on the worker: WORKER_RESULT
+
+Not yet shown: whether agents stop pausing. The next usage review should
+compare fixed waits after `open` and `click` with this report.
+
 ## 2026-11-25 — An unanswered host prompt explains itself
 
 Follows "The hook result still looks like a tool error" in the

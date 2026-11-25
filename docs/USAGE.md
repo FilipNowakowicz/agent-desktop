@@ -215,16 +215,30 @@ session. Then:
 
 | Action | Does |
 | --- | --- |
-| `open` | navigate to `url` and wait for the load (`new_tab` for a new tab) |
+| `open` | navigate to `url`, wait for the load, then until the page settles (below); `new_tab` for a new tab |
 | `tabs` | list tabs with stable `context` IDs, url and title; `tab` or `context` picks one for later calls |
 | `close` | close the current tab |
 | `text` | visible text of the page or of `selector` (up to 8000 characters) |
 | `find` | elements by CSS `selector`, or by visible `text`, label or placeholder (`exact` for the whole text); each item has its tag, attributes, classes, text, label, value and a `selector` that matches only that element at the moment; text that looks like a credential is hidden (see below) |
-| `wait` | until an element is found, or `gone` (up to 60 s), with the same items as `find`; `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
+| `wait` | until an element is found, or `gone` (up to 60 s), with the same items as `find`; with neither `selector` nor `text`, until the page settles; `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
 | `download` | fetch `url` with the browser's login and wait for the file; see below |
 | `save` | write the page's text, or one element's, to `to_file` (up to 8 MiB) and return only its size and digest |
+
+A page has **settled** when it has finished loading and, for 0.5 s, has started or
+finished no request and has none open (followed through BiDi network events for
+its tab; a request open longer than 5 s, such as a long poll, is ignored) and its
+DOM has not changed (a `MutationObserver` in a sandbox the page cannot see). Single-page
+apps such as cloud consoles finish `load` first and then fetch and render their
+content, so before this `open` could return while the page still said "Loading",
+and agents paused 5 to 12 seconds after it. `open` (and `start` with a `url`) waits
+for this up to `timeout` seconds (default 10, 0 to skip) and reports `settled` and
+`settle_ms`; `settled: false` means the page was still changing (a clock, a
+ticker), not an error. `{"action": "wait"}` with no target waits the same way, up to
+`timeout`, and is unmet if the page never settles: use it after a click that loads
+a page you haven't seen yet, when there is no text to wait for. A plain `seconds`
+pause right after `open` or `click` in `steps` carries a one-line `hint`.
 
 `within` narrows a target to the row, list item, form or dialog containing a
 text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
@@ -808,7 +822,8 @@ A browser batch that stops early is not a tool error, so it is counted separatel
 `disabled`, `wait_unmet`, `deadline`, `target_lost`, `uncertain` or `other`), and
 `uncertain_deliveries` for steps whose delivery is unknown. `browser_waits_fixed`,
 `browser_waits_for_condition` and `browser_fixed_wait_seconds` show how much time
-went into fixed pauses rather than waiting for a text or selector. Traces written
+went into fixed pauses rather than waiting for a text, a selector or the page to
+settle (a `wait` with none of them counts as a condition). Traces written
 before 2026-11-11 do not record these.
 
 ## Events for shells and notifiers

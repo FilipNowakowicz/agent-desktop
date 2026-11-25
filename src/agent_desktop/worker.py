@@ -382,6 +382,8 @@ SAVE_BYTES = 8 * 1024 * 1024  # under the 16 MiB BiDi message limit
 DOWNLOAD_SECONDS = 120  # default wait for a download to finish
 DOWNLOAD_MAX_SECONDS = 600
 DOWNLOAD_PAGE_SECONDS = 5  # no download by then and a page loaded: not a download
+# How long open (or start with a url) waits, at most, for the page to settle.
+OPEN_SETTLE_SECONDS = 10
 BROWSER_ACTIONS = (
     "start tabs open close find text wait click fill select send save download steps"
 ).split()
@@ -460,12 +462,53 @@ def trace_arguments(request):
     return kept
 
 
+def settle_limit(request):
+    """Seconds that open (or start with a url) waits for the page to settle."""
+    limit = request.get("timeout", OPEN_SETTLE_SECONDS)
+    if (
+        not isinstance(limit, (int, float))
+        or isinstance(limit, bool)
+        or not 0 <= limit <= 60
+    ):
+        raise ValueError("timeout must be between 0 and 60 seconds")
+    return limit
+
+
+def fixed_wait_hint(steps, index):
+    """One line for a plain pause right after open or click in a batch."""
+    step = steps[index]
+    if (
+        step.get("action") != "wait"
+        or not step.get("seconds")
+        or step.get("selector")
+        or step.get("text")
+        or index == 0
+        or steps[index - 1].get("action") not in ("open", "start", "click")
+    ):
+        return None
+    if steps[index - 1]["action"] == "click":
+        return (
+            '{"action": "wait"} without seconds returns as soon as the page '
+            "stops loading and changing; add text or selector to wait for "
+            "something specific"
+        )
+    return (
+        "open already waited until the page stopped loading and changing "
+        '(see settled); to wait longer, add {"action": "wait", "text": ...}'
+    )
+
+
 def browser_trace(step):
     """For a browser wait: its pause and whether it waits for a condition."""
     if step.get("action") != "wait":
         return {}
     seconds = step.get("seconds")
-    kept = {"condition": bool(step.get("selector") or step.get("text"))}
+    # A wait with no pause and no target waits for the page to settle.
+    kept = {
+        "condition": bool(
+            step.get("selector") or step.get("text") or not step.get("seconds")
+        )
+    }
     if isinstance(seconds, (int, float)) and not isinstance(seconds, bool):
         kept["seconds"] = seconds
     return kept
@@ -1379,6 +1422,7 @@ class Worker:
                 self.browser[0].deadline = request.get("deadline")
                 return {"tabs": self.browser[0].tabs()[1]}
             if action == "start":
+                limit = settle_limit(request) if request.get("url") else 0
                 mutation_started = True
                 bridge = self.start_browser(
                     request.get("url"), request.get("controller")
@@ -1386,7 +1430,18 @@ class Worker:
                 bridge.deadline = request.get("deadline")
                 return self.browser_observed(
                     {"started": True, "delivered": True},
-                    lambda: {"tabs": bridge.tabs()[1]},
+                    lambda: {
+                        **(
+                            bridge.settle(
+                                bridge.target(),
+                                limit=limit,
+                                interrupt=self.take_requested,
+                            )
+                            if limit
+                            else {}
+                        ),
+                        "tabs": bridge.tabs()[1],
+                    },
                 )
             if not self.attach_browser():
                 if host and action == "open" and request.get("new_tab"):
@@ -1435,6 +1490,7 @@ class Worker:
                 url = request.get("url")
                 if not isinstance(url, str) or not url:
                     raise ValueError("open needs a url")
+                limit = settle_limit(request)
                 if url.lower().startswith("view-source:"):
                     raise ValueError(
                         "Firefox refuses view-source: URLs over the bridge; open "
@@ -1461,7 +1517,16 @@ class Worker:
                 )
                 return self.browser_observed(
                     {"delivered": True, "context": context},
-                    lambda: self.page_state(bridge, context),
+                    lambda: {
+                        **(
+                            bridge.settle(
+                                context, limit=limit, interrupt=self.take_requested
+                            )
+                            if limit
+                            else {}
+                        ),
+                        **self.page_state(bridge, context),
+                    },
                 )
             if action == "close":
                 mutation_started = True
@@ -1504,11 +1569,18 @@ class Worker:
                     raise ValueError("seconds must be between 0 and 30")
                 self.pause(seconds)
                 if not (target["selector"] or target["text"]):
-                    if not seconds:
-                        raise ValueError(
-                            "wait needs a CSS selector or a text, or seconds"
-                        )
-                    return {"satisfied": True, "waited": seconds}
+                    if seconds:
+                        return {"satisfied": True, "waited": seconds}
+                    # Neither: until the page stops loading and changing.
+                    settled = bridge.settle(
+                        context, limit=timeout, interrupt=self.take_requested
+                    )
+                    self.pause(0)  # a take stopped it: say so, as other waits do
+                    return {
+                        "satisfied": settled["settled"],
+                        **settled,
+                        **self.page_state(bridge, context),
+                    }
                 gone = request.get("gone") is True
                 deadline = time.monotonic() + timeout
                 while True:
@@ -2069,6 +2141,9 @@ class Worker:
                         "uncertain": bool(result.get("uncertain")),
                     },
                 }
+            hint = fixed_wait_hint(steps, index)
+            if hint:
+                result = {**result, "hint": hint}
             if step["action"] == "wait" and not result.get("satisfied"):
                 results.append(result)
                 return {

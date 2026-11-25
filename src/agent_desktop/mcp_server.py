@@ -632,11 +632,15 @@ def desktop_browser(
     bridge, or connects to one already started in the session with
     --remote-debugging-port (other actions connect to that one too); a Firefox
     started without it must be closed first. Then: "open" a url
-    (new_tab for a new tab), "close" (the current tab), "tabs", "text" (visible text of the page or
+    (new_tab for a new tab; it returns once the page has loaded and its
+    requests and DOM have been still for 0.5 s, at most timeout, default 10;
+    settled says which), "close" (the current tab), "tabs", "text" (visible text of the page or
     selector), "find" (elements by CSS selector or by visible text, label or
     placeholder; exact for the whole text; each item has its text, label, value
     and a unique selector), "wait" (until found, or gone, with the same items; up to
-    60 s; seconds pauses first, up to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
+    60 s; with neither, until the page stops loading and changing, e.g. after
+    a click that loads a page you have not seen yet; seconds pauses first, up
+    to 30, and alone is a plain pause), "click", "fill" (replace a field's text with value, typed as real
     keys) and "select" (an option of a <select> by text or value). click, fill
     and select need exactly one visible, enabled match, otherwise nothing is
     done and the matches are listed. If a modal or overlay is on top of the
@@ -656,9 +660,9 @@ def desktop_browser(
     {"action": "click", "text": "Sign in"}, {"action": "wait", "text":
     "Dashboard"}]) and stops at the first failure or unmet wait: plan several
     actions per call. Faster and more exact than pixels for web pages; use
-    screenshots for visual questions. After "open", wait for a heading, button
-    or text you expect rather than a fixed number of seconds: it returns as soon
-    as the page is ready.
+    screenshots for visual questions. Don't pause a fixed number of seconds:
+    after "open" read the page directly; after a click use {"action": "wait"},
+    or wait for a text you expect.
 
     For secrets (a generated API key, token or password shown once), never use
     "text", and don't find it first: give "send" its selector directly (e.g.

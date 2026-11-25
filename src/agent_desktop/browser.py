@@ -187,6 +187,32 @@ def cover_text(cover):
     return name
 
 
+SETTLE_EVENTS = [
+    "network.beforeRequestSent",
+    "network.responseCompleted",
+    "network.fetchError",
+]
+SANDBOX = "agent-desktop-settle"
+LONG_REQUEST = 5
+# Installs an observer on the first call in each document, then reports whether
+# the document has loaded and how long its DOM has been unchanged. A change of
+# only a style attribute does not count: scripts animate spinners and carousels
+# through it every frame, and such a page would otherwise never settle.
+DOM_QUIET = """() => {
+  const now = performance.now();
+  if (!window.__adQuiet) {
+    window.__adQuiet = {since: now};
+    new MutationObserver((records) => {
+      if (records.some((r) => r.type !== "attributes" || r.attributeName !== "style"))
+        window.__adQuiet.since = performance.now();
+    }).observe(document, {subtree: true, childList: true, attributes: true,
+      characterData: true});
+  }
+  return JSON.stringify({ready: document.readyState === "complete",
+    idle_ms: Math.round(now - window.__adQuiet.since)});
+}"""
+
+
 class Browser:
     """One BiDi session with a Firefox instance."""
 
@@ -195,12 +221,33 @@ class Browser:
             url.rstrip("/") + "/session", open_timeout=timeout, max_size=2**24
         )
         self.next_id = 0
+        # Requests in flight, {id: (context, started)}, and each context's last
+        # network event, both in wall-clock seconds from the events' timestamps.
+        self.requests = {}
+        self.network_at = {}
         try:
             self.command("session.new", {"capabilities": {}})
         except Exception:
             self.socket.close()
             raise
+        try:
+            # From the start, so a page's first requests are known to be open.
+            self.command("session.subscribe", {"events": SETTLE_EVENTS})
+        except BrowserError:
+            pass  # without events, settling follows the DOM alone
         self.context = None
+
+    def network_event(self, message):
+        params = message.get("params", {})
+        context = params.get("context")
+        request = params.get("request", {}).get("request")
+        at = params.get("timestamp", time.time() * 1000) / 1000
+        if message["method"] == "network.beforeRequestSent":
+            if len(self.requests) < 10000:
+                self.requests[request] = (context, at)
+        else:
+            self.requests.pop(request, None)
+        self.network_at[context] = max(self.network_at.get(context, 0), at)
 
     def alive(self):
         try:
@@ -221,6 +268,7 @@ class Browser:
 
         With `interrupt`, the wait checks it every 0.1 s and raises Interrupted
         when it returns true. The command has then been sent and may still run.
+        Network events that arrive meanwhile are recorded; others are dropped.
         """
         deadline = time.monotonic() + timeout
         if getattr(self, "deadline", None) is not None:
@@ -244,6 +292,8 @@ class Browser:
             else:
                 message = json.loads(self.socket.recv(timeout=remaining))
             if message.get("id") != ident:
+                if str(message.get("method", "")).startswith("network."):
+                    self.network_event(message)
                 continue  # an event
             if message.get("type") == "error":
                 raise BrowserError(
@@ -294,6 +344,68 @@ class Browser:
                 raise BrowserError("Firefox has no open tab")
             self.context = tree[-1]["context"]
         return self.context
+
+    def settle(self, context, quiet=0.5, limit=10.0, interrupt=None):
+        """Wait until the page has loaded and neither its requests nor its DOM
+        have changed for `quiet` seconds, at most `limit` seconds.
+
+        With `interrupt`, the wait stops as soon as it returns true and the
+        reply says interrupted; the caller decides what that means.
+
+        Single-page apps finish `load` and then fetch and render their content,
+        so a navigation that returned "complete" can still show "Loading".
+        Requests are followed through BiDi network events (see network_event),
+        the DOM through a MutationObserver in a sandbox the page cannot see. A
+        request open longer than LONG_REQUEST (a long poll, a stream) is ignored.
+        """
+        started = time.monotonic()
+        deadline = started + limit
+        if getattr(self, "deadline", None) is not None:
+            deadline = min(deadline, self.deadline - 1)
+        settled = interrupted = False
+        while True:
+            if interrupt is not None and interrupt():
+                interrupted = True
+                break
+            try:
+                state = json.loads(
+                    remote_value(
+                        self.command(
+                            "script.callFunction",
+                            {
+                                "functionDeclaration": DOM_QUIET,
+                                "arguments": [],
+                                "target": {"context": context, "sandbox": SANDBOX},
+                                "awaitPromise": False,
+                            },
+                        )
+                    )
+                )
+            except (BrowserError, TypeError, ValueError):
+                state = {}  # mid-navigation: the document is being replaced
+            now, wall = time.monotonic(), time.time()
+            busy = any(
+                c == context and wall - at < LONG_REQUEST
+                for c, at in self.requests.values()
+            )
+            if (
+                state.get("ready")
+                and not busy
+                and wall - self.network_at.get(context, 0) >= quiet
+                and state.get("idle_ms", 0) >= quiet * 1000
+            ):
+                settled = True
+                break
+            if now >= deadline:
+                break
+            time.sleep(min(0.1, max(0.0, deadline - now)))
+        result = {
+            "settled": settled,
+            "settle_ms": round((time.monotonic() - started) * 1000),
+        }
+        if interrupted:
+            result["interrupted"] = True
+        return result
 
     def evaluate(self, expression, context):
         result = self.command(

@@ -517,8 +517,8 @@ class BrowserTests(unittest.TestCase):
         self.assertIsNone(paused["stopped"], paused)
         self.assertGreaterEqual(time.monotonic() - started, 0.7)
         self.assertEqual(paused["results"][0], {"satisfied": True, "waited": 0.5})
-        with self.assertRaisesRegex(core.DesktopError, "or seconds"):
-            self.browser("wait")
+        # Neither a target nor a pause: until the page settles.
+        self.assertTrue(self.browser("wait")["settled"])
 
 
 if __name__ == "__main__":

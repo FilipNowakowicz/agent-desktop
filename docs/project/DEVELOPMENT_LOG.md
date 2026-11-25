@@ -14,7 +14,6 @@ Docs and tool text only; no tests were run.
 - `PROJECT_PLAN.md`: dated 2026-11-25. The former Now table (N1-N10, all done) is kept under "Completed 2026-11-11 to 11-20". A new Now section lists the open pull requests (#222-#235) with dependencies and a suggested merge order, the X1-X3 and X11 rows point to their open PRs without claiming they merged, and the remaining open items are listed.
 - Validation: `ruff` and the Lint workflow only; the docstring change is text.
 
-
 ## 2026-11-25 — Flaky `test_during_application_work`: the kill raced the next step's dispatch
 
 `tests/test_interruptions.py` `test_during_application_work` failed now and then on

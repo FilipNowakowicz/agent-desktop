@@ -50,32 +50,31 @@ On 2026-11-11 the maintainer accepted the proposed defaults.
 | Q4 | May B2 generate calls to sites' internal endpoints, on the maintainer's own accounts only? | **Decided 2026-11-11:** not now. B2 stays parked | P1 |
 | Q5 | Should the agent-workflow repository be frozen? | **Decided 2026-11-11:** this repository needs no action | None |
 
-### Now (2026-11-25): open pull requests
+### Now (2026-11-25): pull requests merged 2026-11-25
 
-None of these is merged. Each row's status is "open, not merged".
+All fifteen merged on 2026-11-25, in the order below.
 
 | ID | Item | PR | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| O1 | Field report 2026-11-25 and use-case list update (docs) | #222 | None. #224 is independent; both touch the top of the development log | open, not merged |
-| O2 | Small fixes from the usage review: where relative browser files land, `wait` through a page with no body, stop flagging tool output files | #224 | None (independent of #222) | open, not merged |
-| O3 | List a site's cookie names and expiries (`site-cookies`, `desktop_profiles cookies=`) | #223 | None | open, not merged |
-| O4 | Clearer host-approval hook text and docs. Claude Code turns an unanswered ask into an error in non-interactive runs; that is not fixable from here | #225 | None | open, not merged |
-| O5 | `open` waits for the page to settle; bare `wait` does the same; hint after fixed pauses | #226 | None | open, not merged |
-| O6 | Bot-check (challenge) page detection and title-aware text waits | #235 | #226 (stacked) | open, not merged |
-| O7 | F2 mixed workflow with a deterministic driver | #228 | None | open, not merged |
-| O8 | F2 agent tasks for the document edit and the mixed workflow (4 model runs passed, $0.98) | #229 | #228 (stacked) | open, not merged |
-| O9 | F3 upgrade and reboot rows plus four fixes. One Checks run failed only on Nix from a test bug that #227 has since fixed; it was not re-run in CI | #227 | None | open, not merged |
-| O10 | Opt-in systemd scope for env-cleared children (maintainer decided 2026-11-25 to keep it opt-in) | #231 | #227 (stacked) | open, not merged |
-| O11 | A login handoff keeps session-only cookies for 24 h (maintainer decided 2026-11-25) | #230 | #222, for its report reference | open, not merged |
-| O12 | `download` saves a PDF shown in Firefox's viewer as the original bytes (maintainer decided 2026-11-25) | #232 | None | open, not merged |
-| O13 | X11: `type` and keys follow a nested Hyprland's layout (AltGr is not placed) | #233 | None | open, not merged |
-| O14 | Fix the flaky interruption test (a test race, not the runtime) | #234 | None | open, not merged |
-| O15 | This plan refresh, and cookie files may stay for a long job | this PR | None | open, not merged |
+| O1 | Field report 2026-11-25 and use-case list update (docs) | #222 | None. #224 is independent; both touch the top of the development log | merged 2026-11-25 |
+| O2 | Small fixes from the usage review: where relative browser files land, `wait` through a page with no body, stop flagging tool output files | #224 | None (independent of #222) | merged 2026-11-25 |
+| O3 | List a site's cookie names and expiries (`site-cookies`, `desktop_profiles cookies=`) | #223 | None | merged 2026-11-25 |
+| O4 | Clearer host-approval hook text and docs. Claude Code turns an unanswered ask into an error in non-interactive runs; that is not fixable from here | #225 | None | merged 2026-11-25 |
+| O5 | `open` waits for the page to settle; bare `wait` does the same; hint after fixed pauses | #226 | None | merged 2026-11-25 |
+| O6 | Bot-check (challenge) page detection and title-aware text waits | #235 | #226 (stacked) | merged 2026-11-25 |
+| O7 | F2 mixed workflow with a deterministic driver | #228 | None | merged 2026-11-25 |
+| O8 | F2 agent tasks for the document edit and the mixed workflow (4 model runs passed, $0.98) | #229 | #228 (stacked) | merged 2026-11-25 |
+| O9 | F3 upgrade and reboot rows plus four fixes. One Checks run failed only on Nix from a test bug that #227 has since fixed; it was not re-run in CI | #227 | None | merged 2026-11-25 |
+| O10 | Opt-in systemd scope for env-cleared children (maintainer decided 2026-11-25 to keep it opt-in) | #231 | #227 (stacked) | merged 2026-11-25 |
+| O11 | A login handoff keeps session-only cookies for 24 h (maintainer decided 2026-11-25) | #230 | #222, for its report reference | merged 2026-11-25 |
+| O12 | `download` saves a PDF shown in Firefox's viewer as the original bytes (maintainer decided 2026-11-25) | #232 | None | merged 2026-11-25 |
+| O13 | X11: `type` and keys follow a nested Hyprland's layout (AltGr is not placed) | #233 | None | merged 2026-11-25 |
+| O14 | Fix the flaky interruption test (a test race, not the runtime) | #234 | None | merged 2026-11-25 |
+| O15 | This plan refresh, and cookie files may stay for a long job | #236 | None | merged 2026-11-25 |
 
-Suggested merge order: #222, #224, then the independent ones (#223, #225, #226,
-#228, #227, #232, #233, #234), then the stacked ones after their bases (#235 after
-#226, #229 after #228, #231 after #227) and #230 after #222. Top-of-file entries
-in DEVELOPMENT_LOG.md will need trivial rebases.
+Merge order used: #222, #224, #223, #225, #226, #235, #228, #229, #227, #231,
+#230, #232, #233, #234, #236. Each was rebased onto main before merging; the
+stacked ones (#235, #229, #231) were retargeted to main and kept only their own commits.
 
 Remaining open items after these PRs:
 

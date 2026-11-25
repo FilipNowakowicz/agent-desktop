@@ -591,9 +591,30 @@ class VirtualKeyboard:
     def modifiers(self, mask):
         self.connection.send(self.id, 2, struct.pack("=IIII", mask, 0, 0, 0))
 
-    def type(self, text):
+    def type(self, text, layout=None):
+        """Type text. A compositor nested in this one translates key codes
+        through its own layout, so with `layout` each character goes to the code
+        that layout reads as it, with a real Shift press where it needs one (a
+        modifier mask alone is not seen by the nested compositor). Returns how
+        many characters had no key in that layout.
+        """
         pending = []
+        missing = 0
         for keysym in [char_keysym(c) for c in text]:
+            placed = layout.place(keysym) if layout else None
+            if layout and not placed:
+                missing += 1
+            if placed:
+                self.send(pending)
+                pending = []
+                code, shifted, _ = placed
+                shifted = shifted and not self.mask & SHIFT
+                if shifted:
+                    self.event(MODIFIER_CODES["shift"], 1)
+                self.send([(code, False)])
+                if shifted:
+                    self.event(MODIFIER_CODES["shift"], 0)
+                continue
             key = self.lookup(keysym)
             if key is None:
                 # Every extra key is in use by pending keys: send them first.
@@ -603,6 +624,7 @@ class VirtualKeyboard:
             pending.append(key)
         self.send(pending)
         self.connection.roundtrip()
+        return missing
 
     def key(self, keysym, modifiers=(), repeat=1, layout=None):
         """Press real modifier keys around a key, as a physical keyboard would.
@@ -616,7 +638,11 @@ class VirtualKeyboard:
             code, shifted, row = placed
             self.overrides = {code: row}
             self.dirty = True
-            key = code, shifted
+            # A real Shift press: a compositor resolving through a layout of
+            # its own (a nested one) never sees a modifier mask.
+            if shifted and "shift" not in modifiers:
+                modifiers = [*modifiers, "shift"]
+            key = code, False
         else:
             key = self.lookup(keysym)
         if self.dirty:

@@ -712,6 +712,7 @@ def lease_seconds_default():
 class Worker:
     held_since = None  # when keys were last held down
     bind_layout_cache = None
+    nested_layout_cache = None
 
     def __init__(self, root):
         self.root = root
@@ -3695,6 +3696,8 @@ class Worker:
             # Characters and Tab/Return runs are sent separately, each after the
             # screen settles, so a Tab cannot overtake the text before or after it.
             typed = 0
+            nested, warning = self.nested_layout()
+            missing = 0
             for index, part in enumerate(re.findall(r"[\t\n]+|[^\t\n]+", text)):
                 if index and not host:
                     self.settle()
@@ -3710,9 +3713,14 @@ class Worker:
                             "characters; the rest was not sent. " + TAKEN_OVER
                         )
                     self.mark_mutation()
-                    keyboard.type(part[start : start + TYPE_CHUNK])
+                    missing += keyboard.type(part[start : start + TYPE_CHUNK], nested)
                     typed += len(part[start : start + TYPE_CHUNK])
             self.last_keys = ("type", time.monotonic())
+            if nested and missing and not warning:
+                warning = (
+                    f"{missing} characters have no key in the nested Hyprland's "
+                    "layout and were sent as US keys; verify the result."
+                )
         elif operation == "key":
             key = request.get("key")
             modifiers = request.get("modifiers", [])
@@ -3785,6 +3793,101 @@ class Worker:
         reply = {"session": self.info["id"], "operation": operation, "delivered": True}
         return {**reply, "warning": warning} if warning else reply
 
+    def nested_layout(self):
+        """(layout, warning) of a Hyprland nested in this private session.
+
+        Keys reach a nested compositor as codes and it reads them through its own
+        layout, whatever keymap this session's compositor has. Only while that
+        compositor's window has focus; (None, None) otherwise.
+        """
+        focused = self.focused_window()
+        if (
+            self.info["mode"] == "host"
+            or not isinstance(focused, dict)
+            or focused["app_id"] != "aquamarine"
+        ):
+            return None, None
+        now = time.monotonic()
+        if self.nested_layout_cache and now < self.nested_layout_cache[0]:
+            return self.nested_layout_cache[1:]
+        try:
+            environment = self.nested_hyprland()
+            if environment is None:
+                result = None, None
+            else:
+                env = {**self.env, **environment}
+                if self.hyprland_option("kb_file", env):
+                    raise WaylandError("input:kb_file layouts are not read")
+                devices = json.loads(
+                    subprocess.run(
+                        ["hyprctl", "-j", "devices"],
+                        env=env,
+                        capture_output=True,
+                        timeout=2,
+                        check=True,
+                    ).stdout
+                )
+                keyboard = next(k for k in devices["keyboards"] if k.get("main"))
+                index = keyboard.get("active_layout_index", 0)
+
+                def nth(value):
+                    parts = value.split(",")
+                    return parts[index] if index < len(parts) else ""
+
+                result = (
+                    BindLayout(
+                        self.keysyms.library,
+                        rules=self.hyprland_option("kb_rules", env),
+                        model=keyboard["model"],
+                        layout=nth(keyboard["layout"]),
+                        variant=nth(keyboard["variant"]),
+                        options=keyboard["options"],
+                    ),
+                    None,
+                )
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            StopIteration,
+            WaylandError,
+            subprocess.SubprocessError,
+        ):
+            result = (
+                None,
+                (
+                    "Could not read the nested Hyprland's keyboard layout, so keys "
+                    "use US positions and may arrive as other characters. Verify "
+                    "the result."
+                ),
+            )
+        self.nested_layout_cache = (now + BIND_LAYOUT_SECONDS, *result)
+        return result
+
+    def nested_hyprland(self):
+        """XDG_RUNTIME_DIR and instance signature of a Hyprland this session
+        started, or None. The lock file in the instance directory names its pid."""
+        for pid in session_processes(self.info["token"]):
+            # comm is truncated to 15 characters: ".Hyprland-wrapp" on Nix.
+            if "Hyprland" not in (command_name(pid) or ""):
+                continue
+            try:
+                environment = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+                runtime = next(
+                    v[16:].decode()
+                    for v in environment
+                    if v.startswith(b"XDG_RUNTIME_DIR=")
+                )
+                for lock in Path(runtime, "hypr").glob("*/hyprland.lock"):
+                    if int(lock.read_text().split()[0]) == pid:
+                        return {
+                            "XDG_RUNTIME_DIR": runtime,
+                            "HYPRLAND_INSTANCE_SIGNATURE": lock.parent.name,
+                        }
+            except (OSError, ValueError, IndexError, StopIteration):
+                continue
+        return None
+
     def bind_layout(self):
         """(layout shortcuts resolve through, warning), for Hyprland hosts.
 
@@ -3794,7 +3897,7 @@ class Worker:
         if self.info["mode"] != "host" or not self.env.get(
             "HYPRLAND_INSTANCE_SIGNATURE"
         ):
-            return None, None
+            return self.nested_layout()
         now = time.monotonic()
         if self.bind_layout_cache and now < self.bind_layout_cache[0]:
             return self.bind_layout_cache[1:]
@@ -3871,12 +3974,12 @@ class Worker:
             result.append({**window, **one})
         return result
 
-    def hyprland_option(self, name):
+    def hyprland_option(self, name, env=None):
         """One input: option's value; an unset string reads as empty."""
         reply = json.loads(
             subprocess.run(
                 ["hyprctl", "-j", "getoption", f"input:{name}"],
-                env=self.env,
+                env=env or self.env,
                 capture_output=True,
                 timeout=2,
                 check=True,

@@ -223,7 +223,7 @@ session. Then:
 | `wait` | until an element is found, or `gone` (up to 60 s), with the same items as `find`; with neither `selector` nor `text`, until the page settles; `seconds` (up to 30) pauses first, and alone is a plain pause, as in action sequences |
 | `click`, `fill`, `select` | act on the one visible, enabled match; `fill` replaces a field's text with `value` as typed keys; `select` picks an option by text or value |
 | `send` | move a secret to `to_file` or a command's stdin (`to_command`) without returning it; see below |
-| `download` | fetch `url` with the browser's login and wait for the file; see below |
+| `download` | fetch `url` with the browser's login and wait for the file, or save the PDF the tab shows (no `url`); see below |
 | `save` | write the page's text, or one element's, to `to_file` (up to 8 MiB) and return only its size and digest |
 
 A page has **settled** when it has finished loading and, for 0.5 s, has started or
@@ -331,13 +331,27 @@ since download links often carry a signed query.
 
 The download is recognised as the one new file in `~/Downloads` with no `.part`
 file beside it and a stable size, so start downloads one at a time. If the URL loads a
-page instead (a login redirect, or a type Firefox shows itself, such as a PDF without
-`Content-Disposition: attachment`), `download` says so and nothing is saved. If the
-timeout passes mid-transfer, it says so: the transfer continues in the background,
-and the download should not be started again. Private sessions only.
+page instead (a login redirect, or another type Firefox shows itself), `download` says
+so and nothing is saved. If the timeout passes mid-transfer, it says so: the transfer
+continues in the background, and the download should not be started again. Private
+sessions only.
+
+A PDF that Firefox shows in its built-in viewer (served without
+`Content-Disposition: attachment`) is saved too: `download` copies the viewer's copy
+of the original file, the bytes the server sent, so the `sha256` matches the server's
+file. Nothing is requested again. The receipt adds `content_type: "application/pdf"`
+and `from_viewer: true`, and the tab is left showing the PDF. Called without `url`,
+`download` saves the PDF the tab already shows, which also covers a PDF produced by
+a form post or opened from a `blob:` URL; on a tab without one it refuses. In
+`~/Downloads` the file takes the server's file name (else the URL's), with `(1)`,
+`(2)` added rather than replacing a file, and is written 0600. The limit is 256 MiB;
+for larger files, use `send` with `source="cookies"` and `curl`. A PDF embedded in a
+frame of an HTML page, or shown by a site's own copy of pdf.js, is not taken from the
+page: open or download its own URL.
 
 ```sh
 uv run agent-desktop browser SESSION download --url 'https://site.example/files/1/download' --to-file course/notes.pdf
+uv run agent-desktop browser SESSION download --to-file course/report.pdf  # the PDF the tab shows
 ```
 
 ### Moving secrets without reading them

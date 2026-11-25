@@ -222,7 +222,9 @@ def main():
             "steps",
         ),
     )
-    bridge.add_argument("--url")
+    bridge.add_argument(
+        "--url", help="open, start, download (none: save the PDF the tab shows)"
+    )
     bridge.add_argument("--selector", help="CSS selector")
     bridge.add_argument("--text", help="visible text, label or placeholder")
     bridge.add_argument("--exact", action="store_true")

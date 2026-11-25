@@ -699,9 +699,12 @@ def desktop_browser(
     file is complete (timeout, default 120 s, up to 600). It returns the file's
     path in the session's ~/Downloads (or to_file, moved there as 0600; in a
     profile session ~/Downloads is kept, so move the file out), name,
-    bytes and sha256: don't poll the folder or repeat it. If the url opens a page
-    instead (a login, or a type the browser displays), it says so and saves
-    nothing.
+    bytes and sha256: don't poll the folder or repeat it. A PDF the browser
+    shows in its viewer is saved as the original file (content_type and
+    from_viewer in the receipt); without url, download saves the PDF the tab
+    shows (a form result or blob too). Don't page through a PDF to read it:
+    download it and read the file locally. If the url opens another page
+    instead (a login), it says so and saves nothing.
 
     On a host session it uses the person's own Firefox, if they started it with
     --remote-debugging-port ("start" only connects): read any tab, but open

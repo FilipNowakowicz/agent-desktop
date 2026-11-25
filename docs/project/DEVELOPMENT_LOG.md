@@ -5,6 +5,50 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — download saves a PDF that Firefox's viewer shows
+
+Follows the field report in PR #222 ("PDFs that Firefox displays can't be
+downloaded", suggestion 5); the maintainer decided on 2026-11-25 to save the
+original bytes. `download` refused a PDF that opened in pdf.js, and an agent then
+spent about 20 calls paging through the viewer.
+
+- Approach: copy the bytes pdf.js already holds. In Firefox's viewer
+  (`document.contentType` is `application/pdf` and `PDFViewerApplication` exists),
+  `PDFViewerApplication.pdfDocument.getData()` returns the file the viewer was given,
+  not a re-rendering. The `Uint8Array` is kept as a BiDi handle (`resultOwnership:
+  root`) and read in 6 MiB slices as base64 (8 MiB per message, under the 16 MiB
+  socket limit), then released with `script.disown`. Rejected: `fetch(location.href,
+  {credentials: "include"})` in the viewer fails (`NetworkError`; the viewer's origin
+  is `resource://pdf.js`), and it would request the file again, which a form post or
+  a blob cannot repeat. Setting `pdfjs.disabled` in the session profile would change
+  how every PDF displays and cannot be toggled per call over BiDi.
+- Behavior: `download` with a `url` that opens the viewer (detected as soon as a new
+  document realm shows it, without the 5 s page wait) saves the PDF and returns the
+  usual receipt plus `content_type: "application/pdf"` and `from_viewer: true`.
+  `download` without `url` saves the PDF the tab shows (form posts, `blob:` URLs) and
+  refuses on a tab without one. The file is written 0600 to a temporary name beside
+  the destination and renamed; in `~/Downloads` it takes the server's
+  Content-Disposition name (else the URL's last segment, else `document.pdf`) and
+  gains `(1)`, `(2)` instead of replacing a file; `to_file`/`overwrite` follow the
+  existing rules. Limit 256 MiB (`PDF_BYTES`). The tab is left showing the PDF. The
+  remaining "opened a page instead" refusal now points to `send source="cookies"`
+  with curl. Not covered: a PDF in a frame of an HTML page, or a site's own pdf.js
+  (an HTML page); download their own URL.
+- Text: `desktop_browser` description, CLI `--url` help, `docs/USAGE.md`
+  ("Downloading files").
+- Tests (`tests/test_download.py`): a fixture PDF (every byte value in a stream and
+  bytes after `%%EOF`) served inline behind a cookie; real Firefox: refused without
+  the cookie and on a non-PDF tab, saved from `download url=...` with sha256 equal to
+  the fixture's, mode 0600, the signed query not echoed, `(1)` naming, `to_file` and
+  `overwrite`; a form POST and a `blob:` URL saved without `url`; a 13 MiB PDF in
+  three chunks. Unit: no-url refusal with a fake bridge, `pdf_name`.
+- Validation: `uv run ruff check src tests` and `uv run ruff format --check src tests`
+  pass. Locally (no labwc on `PATH`) `uv run python -m unittest discover -s tests -p
+  'test*.py'` OK (skipped=178). Under `nix shell nixpkgs#labwc nixpkgs#foot
+  nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#dbus nixpkgs#at-spi2-core
+  --command uv run python -m unittest discover -s tests -p test_download.py -k
+  RealFirefox` the four real-Firefox tests pass (about 22 s). WORKER_RESULT
+
 ## 2026-11-25 — A login handoff keeps session-only cookies for 24 hours
 
 Follows the field report in PR #222

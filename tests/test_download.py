@@ -15,9 +15,43 @@ from pathlib import Path
 from unittest import mock
 
 from agent_desktop import core
-from agent_desktop.worker import Worker, owned_processes
+from agent_desktop.worker import Worker, owned_processes, pdf_name
 
 BODY = b"%PDF-1.4\n" + bytes(range(256)) * 400
+
+
+def fixture_pdf(padding=b""):
+    """A one-page PDF that pdf.js can show, with every byte value in a stream
+    and bytes after %%EOF, so a re-encoded copy would not match its digest."""
+    text = b"BT /F1 24 Tf 20 100 Td (Fixture page) Tj ET"
+    blob = bytes(range(256)) * 64 + padding
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n%s\nendstream" % (len(text), text),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length %d >>\nstream\n%s\nendstream" % (len(blob), blob),
+    ]
+    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n%s\nendobj\n" % (number, body)
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objects) + 1,
+        xref,
+    )
+    return bytes(out) + b"% trailing bytes \x00\xff\n"
+
+
+PDF = fixture_pdf()
+# Over two PDF_CHUNKs, so it crosses the bridge in three pieces.
+BIG_PDF = fixture_pdf(os.urandom(13 * 1024 * 1024))
 
 
 def fake_worker(home, on_navigate, url="https://site.test/course"):
@@ -145,13 +179,65 @@ class DownloadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "private sessions"):
             self.download(worker)
 
+    def test_without_a_url_only_a_shown_pdf_is_saved(self):
+        worker = fake_worker(self.home, like_firefox("x.pdf"))
+        with self.assertRaisesRegex(ValueError, "this tab shows no PDF"):
+            worker.browser_request({"action": "download"})
+        self.assertEqual(sorted(os.listdir(self.home / "Downloads")), ["older.pdf"])
+
     def test_budget_covers_the_timeout(self):
         self.assertGreater(
             core.request_budget("browser", {"action": "download", "timeout": 500}), 500
         )
 
 
+BLOB_PAGE = b"""<title>Blob</title><p id=state>loading</p><a id=blob>Open blob</a>
+<script>
+fetch("/doc.pdf").then(r => r.blob()).then(b => {
+  document.getElementById("blob").href = URL.createObjectURL(b);
+  document.getElementById("state").textContent = "ready";
+});
+</script>"""
+FORM_PAGE = b"""<title>Report</title><form method=post action=/report>
+<input name=month value=11><button>Make report</button></form>"""
+
+
 class Files(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        if self.path.startswith("/login"):
+            self.reply(b"<title>Signed in</title><p>Signed in</p>", "text/html")
+        elif self.path.startswith("/doc.pdf"):
+            if "sid=ok" not in (self.headers.get("Cookie") or ""):
+                self.reply(b"<title>Forbidden</title><p>Sign in</p>", "text/html", 403)
+            else:
+                self.reply(PDF, "application/pdf")
+        elif self.path.startswith("/big.pdf"):
+            self.reply(BIG_PDF, "application/pdf")
+        elif self.path.startswith("/blob.html"):
+            self.reply(BLOB_PAGE, "text/html")
+        elif self.path.startswith("/form.html"):
+            self.reply(FORM_PAGE, "text/html")
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        if self.path == "/report" and "sid=ok" in (self.headers.get("Cookie") or ""):
+            self.reply(PDF, "application/pdf")
+        else:
+            self.reply(b"<title>Forbidden</title><p>No</p>", "text/html", 403)
+
+    def reply(self, body, content_type, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        if self.path.startswith("/login"):
+            self.send_header("Set-Cookie", "sid=ok; Path=/; HttpOnly")
+        if content_type == "application/pdf":
+            self.send_header("Content-Disposition", 'inline; filename="lecture 3.pdf"')
+        http.server.BaseHTTPRequestHandler.end_headers(self)
+        self.wfile.write(body)
+
     def end_headers(self):
         if self.path.startswith("/notes.bin"):
             self.send_header("Content-Disposition", 'attachment; filename="notes.bin"')
@@ -216,6 +302,89 @@ class RealFirefoxDownloadTests(unittest.TestCase):
         self.assertEqual(self.browser("text", selector="p")["text"], "Hello")
         with self.assertRaisesRegex(core.DesktopError, "opened a page instead"):
             self.browser("download", url=f"{self.base}/page.html?x=1", timeout=20)
+
+    def test_a_pdf_the_viewer_shows_is_saved_as_the_original_bytes(self):
+        digest = hashlib.sha256(PDF).hexdigest()
+        self.browser("start", url=f"{self.base}/doc.pdf")
+        # Without the cookie the server refuses: a page, not a PDF.
+        self.assertTrue(self.browser("wait", text="Sign in", timeout=30)["satisfied"])
+        with self.assertRaisesRegex(core.DesktopError, "this tab shows no PDF"):
+            self.browser("download")
+        self.browser("open", url=f"{self.base}/login")
+        receipt = self.browser("download", url=f"{self.base}/doc.pdf?sig=abc")
+        self.assertTrue(receipt["downloaded"], receipt)
+        self.assertTrue(receipt["from_viewer"])
+        self.assertEqual(receipt["content_type"], "application/pdf")
+        self.assertEqual(receipt["name"], "lecture 3.pdf")
+        self.assertEqual(receipt["bytes"], len(PDF))
+        self.assertEqual(receipt["sha256"], digest)
+        path = Path(receipt["file"])
+        self.assertEqual(path.parent.name, "Downloads")
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+        self.assertNotIn("sig=abc", json.dumps(receipt))
+        # The tab shows the PDF now: without a url, that one is saved; a second
+        # copy in Downloads gets a new name rather than replacing the first.
+        again = self.browser("download")
+        self.assertEqual(Path(again["file"]).name, "lecture 3(1).pdf")
+        self.assertEqual(again["sha256"], digest)
+        target = self.browser("download", to_file="course/lecture3.pdf")
+        self.assertEqual(Path(target["file"]).read_bytes(), PDF)
+        with self.assertRaisesRegex(core.DesktopError, "exists; pass overwrite"):
+            self.browser("download", to_file="course/lecture3.pdf")
+        self.assertEqual(
+            self.browser("download", to_file="course/lecture3.pdf", overwrite=True)[
+                "sha256"
+            ],
+            digest,
+        )
+
+    def test_a_large_pdf_crosses_in_chunks(self):
+        self.browser("start", url=f"{self.base}/page.html")
+        receipt = self.browser("download", url=f"{self.base}/big.pdf", timeout=120)
+        self.assertTrue(receipt["from_viewer"], receipt)
+        self.assertEqual(receipt["bytes"], len(BIG_PDF))
+        self.assertEqual(receipt["sha256"], hashlib.sha256(BIG_PDF).hexdigest())
+        self.assertEqual(Path(receipt["file"]).read_bytes(), BIG_PDF)
+
+    def test_a_posted_or_blob_pdf_is_saved_from_the_tab(self):
+        digest = hashlib.sha256(PDF).hexdigest()
+        self.browser("start", url=f"{self.base}/login")
+        self.assertTrue(self.browser("wait", text="Signed in", timeout=30)["satisfied"])
+        self.browser("open", url=f"{self.base}/form.html")
+        self.browser("click", text="Make report")
+        self.wait_for(
+            lambda: self.browser("tabs")["tabs"][-1]["url"].endswith("/report"), 30
+        )
+        receipt = self.wait_for(lambda: self.saved_from_tab(), 30)
+        self.assertEqual(receipt["sha256"], digest)
+        self.assertEqual(receipt["name"], "lecture 3.pdf")
+        self.browser("open", url=f"{self.base}/blob.html")
+        self.assertTrue(self.browser("wait", text="ready", timeout=30)["satisfied"])
+        self.browser("click", text="Open blob")
+        self.wait_for(
+            lambda: self.browser("tabs")["tabs"][-1]["url"].startswith("blob:"), 30
+        )
+        receipt = self.wait_for(lambda: self.saved_from_tab(), 30)
+        self.assertEqual(receipt["sha256"], digest)
+        self.assertTrue(receipt["name"].endswith(".pdf"), receipt)
+
+    def saved_from_tab(self):
+        try:
+            return self.browser("download")
+        except core.DesktopError as error:
+            if "this tab shows no PDF" in str(error):
+                return None  # the viewer is still loading
+            raise
+
+
+class PdfNameTests(unittest.TestCase):
+    def test_names(self):
+        self.assertEqual(pdf_name("lecture 3.pdf", None), "lecture 3.pdf")
+        self.assertEqual(pdf_name("../../x", None), "_.._x.pdf")
+        self.assertEqual(pdf_name(None, "https://s.test/a/b%20c.PDF?sig=1"), "b c.PDF")
+        self.assertEqual(pdf_name(None, "https://s.test/"), "document.pdf")
+        self.assertEqual(pdf_name("", "blob:https://s.test/1234"), "document.pdf")
 
 
 if __name__ == "__main__":

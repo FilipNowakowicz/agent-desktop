@@ -147,7 +147,7 @@ It is not a security boundary: applications run as your user (see above).
 | [Compatibility](docs/COMPATIBILITY.md) | Tested environments, application coverage and known failures |
 | [Validation](docs/VALIDATION.md) | Checks, lifecycle experiments and application smoke tests |
 | [Benchmarks](docs/BENCHMARK.md) | Task definitions, recorded results and comparison limits |
-| [Use cases](docs/USE_CASES.md) | How agents actually use Agent Desktop, from dated field reports: shell testing, background web work with the person's logins, file collection, native apps, the real screen |
+| [Use cases](docs/USE_CASES.md) | How agents actually use Agent Desktop, from dated field reports: shell testing, background web work with the person's logins, their own accounts, research reading, file collection, native apps, the real screen |
 | [Contributing](CONTRIBUTING.md) / [security](SECURITY.md) | Development workflow, testing boundaries and reporting vulnerabilities |
 | [Start here](docs/project/START_HERE.md) | Contributor orientation and continuation workflow |
 | [Project plan](docs/project/PROJECT_PLAN.md) / [development log](docs/project/DEVELOPMENT_LOG.md) | Direction, stage status and dated evidence |

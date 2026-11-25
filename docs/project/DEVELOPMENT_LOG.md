@@ -5,6 +5,25 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Usage review: exchange research and lecture fetch
+
+Ran `scripts/usage_review.py --since 2026-11-20` (243 calls, 11 transcripts, 76 flags)
+and `agent-desktop activity --days 5` (16 sessions, 211 operations). 16 calls in one
+transcript were already in the 11-20 report. The rest (227 calls) are a new exchange
+research project (201, including three subagents), two `/lecture` caption fetches and
+one flashcard-project course sync. Report:
+docs/trials/2026-11-25-exchange-research-and-lecture-fetch.md.
+
+Main findings: all three login handoffs failed. Twice the person signed in with
+`take --paste` and the login was gone after release, probably because `restore_bridge`
+restarts Firefox and session-only cookies don't survive the restart. `import-cookies`
+with session-only cookies (#220) recovered both times. A bot-check page stopped agents
+in five sessions, and a `gone` wait on its title text was satisfied falsely. Relative
+`save`/`download` paths land in the persistent profile home (30 of the flags).
+`download` can't save a PDF that Firefox displays. A `wait` with `within` failed on a
+page with no body yet. Named covers (#221) and download receipts (#204) were confirmed
+in use. Fixed waits dropped from 82% to 76%. No tests were run.
+
 ## 2026-11-20 — Profile notes: record which account a profile signs in as
 
 Follows the field report in PR #217 ("The agent signed in to the wrong Google

@@ -204,5 +204,40 @@ class UsageReviewTest(unittest.TestCase):
             usage_review.main(["--out", str(usage_review.REPO / "review")])
 
 
+class ReturnedFileTest(unittest.TestCase):
+    returned = {
+        "/home/someone/.local/state/agent-desktop/profiles/p/home/page.txt",
+        "/home/someone/.local/state/agent-desktop/profiles/p/home/Downloads/a b.txt",
+    }
+
+    def test_reading_a_returned_file_is_tool_output(self):
+        for command in (
+            "grep -n x /home/someone/.local/state/agent-desktop/profiles/p/home/page.txt",
+            "cd ~/.local/state/agent-desktop/profiles/p/home; grep x page.txt",
+            'mv "/home/someone/.local/state/agent-desktop/profiles/p/home/Downloads/a b.txt" .',
+        ):
+            self.assertTrue(
+                usage_review.reads_returned_file(command, self.returned), command
+            )
+
+    def test_other_profile_files_are_still_flagged(self):
+        for command in (
+            "cat ~/.local/state/agent-desktop/profiles/p/home/other.txt",
+            "ls ~/.local/state/agent-desktop/profiles/q/home/",
+        ):
+            self.assertFalse(
+                usage_review.reads_returned_file(command, self.returned), command
+            )
+
+    def test_reply_paths_are_found_in_plain_and_nested_json(self):
+        plain = json.dumps({"saved": True, "to_file": "/s/home/x.txt"})
+        nested = json.dumps({"results": [{"downloaded": True, "file": "/s/d/y.pdf"}]})
+        escaped = json.dumps({"result": nested})
+        found = set()
+        for text in (plain, nested, escaped):
+            found.update(usage_review.RETURNED_FILE.findall(text))
+        self.assertEqual(found, {"/s/home/x.txt", "/s/d/y.pdf"})
+
+
 if __name__ == "__main__":
     unittest.main()

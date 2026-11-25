@@ -62,7 +62,9 @@ FIND = """
     // Containers (row, list item, form, dialog...) of the innermost visible
     // elements whose text includes `within`; targets must lie inside one.
     const w = fold(within);
-    let holders = [...document.body.querySelectorAll("*")].filter(
+    // Before a page has a body, nothing is inside a scope yet.
+    const root = document.body || document.documentElement;
+    let holders = (root ? [...root.querySelectorAll("*")] : []).filter(
       (e) => visible(e) && own(e).includes(w));
     holders = holders.filter((e) => !holders.some((o) => o !== e && e.contains(o)));
     const scopes = holders.map((e) => e.closest(

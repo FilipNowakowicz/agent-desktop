@@ -5,6 +5,28 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Small fixes from the exchange research field report
+
+Follows suggestions 3 and 4 of the 2026-11-25 field report (#222).
+
+- `desktop_browser` text: a relative `to_file` for `send`/`save` is in the session
+  home, which in a profile session is the profile's and stays after destroy, so the
+  text suggests an absolute path in the agent's own scratch folder. `download` says
+  that a profile's `~/Downloads` is kept.
+- The page script's `within` scope no longer reads `document.body` before the page
+  has one. It finds nothing yet, so `wait` keeps polling instead of failing with
+  "Page script failed: ... document.body is null".
+- `scripts/usage_review.py` counts a shell command that reads a file a tool reply
+  named (`to_file` or `file`, by full path or by folder and name) as
+  "tool output", not as a "profile files" or "session state" flag.
+- Validation: `uv run python -m unittest tests.test_usage_review` OK (3 new
+  `ReturnedFileTest` tests). `discover -p test_browser.py` ran 16 tests, all skipped
+  (no labwc here), so the page-script change was checked only by running `FIND`
+  under node with a null `document.body`: main throws, this branch returns
+  `{"count":0,"items":[]}`. A rerun of the review over 2026-11-20 to 11-25 left 2 of
+  the 30 profile and session-state flags, both real leads. ruff check and format
+  pass. The full desktop suite wasn't run.
+
 ## 2026-11-25 — Usage review: exchange research and lecture fetch
 
 Ran `scripts/usage_review.py --since 2026-11-20` (243 calls, 11 transcripts, 76 flags)

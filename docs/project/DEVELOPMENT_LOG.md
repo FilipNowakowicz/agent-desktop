@@ -35,6 +35,8 @@ Validation:
 - Laptop, with `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p test_lifecycle.py`: 17 tests OK (expected failures=1) in 47.5 s.
 - Worker, `on-worker run -n f3 -- nix shell ... --command uv run python -m unittest discover -s tests -p 'test*.py'`: 476 tests in 650 s, FAILED (failures=1, skipped=35, expected failures=1). The failure is `test_interruptions.InterruptionTests.test_during_application_work` (`'stopped' != 'delivery_unknown'`), which is flaky on `main` as well. On the laptop it failed 2 of 6 runs on `origin/main` and 1 of 4 on this branch. The kill sometimes lands between the two steps, which correctly reads `stopped`. This change does not touch it; it is left open.
 
+The Checks matrix, run once on the stacked branch (run 45558503727), found a test bug: on the Nix job, `test_desktop_runtime_replaced_under_a_running_session` failed with `Failed to open "/etc/dbus-1/session.conf"`. Its wrapper runtime had no `share/dbus-1` beside the daemon, and Nix's dbus-daemon has no `/etc` default to fall back on. The wrapper prefix now links the real `share/dbus-1`, as a runtime prefix ships it. This passed on the laptop; CI was not run again.
+
 Remaining for X3: other distributions (the Checks matrix), a real reboot or logout, and env-cleared children after both supervisors die. An opt-in systemd scope for the last one is in a stacked PR.
 
 ## 2026-11-25 — Agent-driven F2 document edit and mixed workflow (X2)

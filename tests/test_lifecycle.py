@@ -713,6 +713,12 @@ class UpgradeTests(LifecycleCase):
                 wrapper.write_text(f'#!/bin/sh\nexec {shutil.which(tool)} "$@"\n')
                 wrapper.chmod(0o700)
                 tools[tool] = str(wrapper)
+            # A runtime prefix ships D-Bus's configuration beside the daemon
+            # (Nix's dbus-daemon has no /etc/dbus-1 default to fall back on).
+            real = Path(shutil.which("dbus-daemon")).resolve().parent.parent
+            if (real / "share/dbus-1").is_dir():
+                (directory.parent / "share").mkdir()
+                (directory.parent / "share/dbus-1").symlink_to(real / "share/dbus-1")
             return tools
 
         old = runtime("runtime-old")

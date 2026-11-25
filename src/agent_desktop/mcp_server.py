@@ -682,11 +682,12 @@ def desktop_browser(
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
     When a shell tool (curl, yt-dlp) needs the browser's login, use
     source="cookies" with site="example.com": it writes the live cookies for
-    that site as a Netscape cookies.txt and returns only their count. Delete
-    the file when done. Never copy or edit a profile's cookie files by hand: to
-    see which cookies a profile holds for a site, call desktop_profiles with
-    profile and cookies (values are never shown); to remove a site's login from
-    a profile no session is using, run
+    that site as a Netscape cookies.txt and returns only their count. The file
+    may stay for a long job, outside the repository or in a gitignored path;
+    delete it when the job ends. Never copy or edit a profile's cookie files by
+    hand: to see which cookies a profile holds for a site, call desktop_profiles
+    with profile and cookies (values are never shown); to remove a site's login
+    from a profile no session is using, run
     `agent-desktop forget-site PROFILE --site SITE`.
 
     For data too large or too long to read here (an API listing, a long

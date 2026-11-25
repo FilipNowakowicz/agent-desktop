@@ -1,14 +1,20 @@
 # Agent Desktop project plan
 
-Updated: 2026-11-11. This document records the chosen direction, implemented
+Updated: 2026-11-25. This document records the chosen direction, implemented
 stages and remaining release gates. See the [development log](DEVELOPMENT_LOG.md)
 for exact validation, failures and historical changes. The runtime is experimental;
 implemented features are not a claim of universal compatibility.
 
 ## Execution plan (2026-11-11)
 
-**Proposed new direction (2026-11-12, not yet adopted):** zero-touch delegation, in
-[DELEGATION.md](DELEGATION.md). Until the maintainer decides, the plan below stands.
+**Delegation not adopted (decided 2026-11-25):** the zero-touch delegation proposal
+of 2026-11-12, in [DELEGATION.md](DELEGATION.md), is not the main line now. Field
+reports from 2026-11-12 to 2026-11-25 show agents rarely need the person (at most
+one withdrawn handoff per window), so the touch-reduction stages (Z0, Z2, Z4-Z6)
+lack evidence. The shell-facing parts (hotkey, panel, banners, result cards) are
+deferred to the maintainer's own Hyprland and desktop-shell work in the NixOS
+configuration repository. DELEGATION.md remains a design record; its section 2.4
+advice not to merge #196 is superseded, because #196 merged. The plan below stands.
 
 This is the single ordered list of work that is planned or proposed. It collects the
 field-report follow-ups, the functionality roadmap, the open items from daily use,
@@ -44,7 +50,45 @@ On 2026-11-11 the maintainer accepted the proposed defaults.
 | Q4 | May B2 generate calls to sites' internal endpoints, on the maintainer's own accounts only? | **Decided 2026-11-11:** not now. B2 stays parked | P1 |
 | Q5 | Should the agent-workflow repository be frozen? | **Decided 2026-11-11:** this repository needs no action | None |
 
-### Now
+### Now (2026-11-25): pull requests merged 2026-11-25
+
+All fifteen merged on 2026-11-25, in the order below.
+
+| ID | Item | PR | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| O1 | Field report 2026-11-25 and use-case list update (docs) | #222 | None. #224 is independent; both touch the top of the development log | merged 2026-11-25 |
+| O2 | Small fixes from the usage review: where relative browser files land, `wait` through a page with no body, stop flagging tool output files | #224 | None (independent of #222) | merged 2026-11-25 |
+| O3 | List a site's cookie names and expiries (`site-cookies`, `desktop_profiles cookies=`) | #223 | None | merged 2026-11-25 |
+| O4 | Clearer host-approval hook text and docs. Claude Code turns an unanswered ask into an error in non-interactive runs; that is not fixable from here | #225 | None | merged 2026-11-25 |
+| O5 | `open` waits for the page to settle; bare `wait` does the same; hint after fixed pauses | #226 | None | merged 2026-11-25 |
+| O6 | Bot-check (challenge) page detection and title-aware text waits | #235 | #226 (stacked) | merged 2026-11-25 |
+| O7 | F2 mixed workflow with a deterministic driver | #228 | None | merged 2026-11-25 |
+| O8 | F2 agent tasks for the document edit and the mixed workflow (4 model runs passed, $0.98) | #229 | #228 (stacked) | merged 2026-11-25 |
+| O9 | F3 upgrade and reboot rows plus four fixes. One Checks run failed only on Nix from a test bug that #227 has since fixed; it was not re-run in CI | #227 | None | merged 2026-11-25 |
+| O10 | Opt-in systemd scope for env-cleared children (maintainer decided 2026-11-25 to keep it opt-in) | #231 | #227 (stacked) | merged 2026-11-25 |
+| O11 | A login handoff keeps session-only cookies for 24 h (maintainer decided 2026-11-25) | #230 | #222, for its report reference | merged 2026-11-25 |
+| O12 | `download` saves a PDF shown in Firefox's viewer as the original bytes (maintainer decided 2026-11-25) | #232 | None | merged 2026-11-25 |
+| O13 | X11: `type` and keys follow a nested Hyprland's layout (AltGr is not placed) | #233 | None | merged 2026-11-25 |
+| O14 | Fix the flaky interruption test (a test race, not the runtime) | #234 | None | merged 2026-11-25 |
+| O15 | This plan refresh, and cookie files may stay for a long job | #236 | None | merged 2026-11-25 |
+
+Merge order used: #222, #224, #223, #225, #226, #235, #228, #229, #227, #231,
+#230, #232, #233, #234, #236. Each was rebased onto main before merging; the
+stacked ones (#235, #229, #231) were retargeted to main and kept only their own commits.
+
+Remaining open items after these PRs:
+
+- X2: matched trials (M4), Chromium for the mixed task, kills during agent runs.
+- X3: a real reboot or logout, and env-cleared children with the scope off.
+- X9: the off-screen refusal check on the maintainer's machine.
+- X12: the Fedora Chromium drop (needs a Fedora machine).
+- MCP tool-surface review: 22 tools were unused (maintainer decision).
+- The fixed-wait habit: re-measure at the next usage review.
+- AltGr placement for nested layouts.
+
+### Completed 2026-11-11 to 11-20 (former Now, N1-N10)
+
+All ten items are done; the rows are kept as history.
 
 | ID | Item | Source | Scope (one PR) | Depends on | Acceptance | Issue |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -68,9 +112,9 @@ run in parallel at any point. N8 waits until shell testing resumes.
 
 | ID | Item | Source | Depends on |
 | --- | --- | --- | --- |
-| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11; interruption during checks fixed 2026-11-12; kill during a step's expectation fixed, cancel and take during checks tested 2026-11-19; take during a long `open`, `send` or `type` fixed 2026-11-19; partial accessibility coverage under interruption tested 2026-11-19; #213 done 2026-11-19: a take while `send` writes a value over the 64 KiB pipe buffer reports the bytes written, and a take during a job's accessibility check comes back within 1 s |
-| X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows. The browser dataset edit has a deterministic driver (`test_dataset_workflow`) and an agent task (`--suite f2`; two runs on one seed passed on 2026-11-12, without injected failures); the native document edit has a deterministic driver (`test_document_workflow`, 2026-11-12); the mixed workflow (download, edit in Writer, upload through the file chooser, with a refused upload and a lost reply) has a deterministic driver (`test_mixed_workflow`, 2026-11-25); agent tasks for both (`f2-document-edit`, `f2-mixed-upload`) passed two runs each on 2026-11-25 ($0.98 in all, the mixed runs with a refused upload and a lost reply). Remaining: more agent-driven runs per task and seed (matched trials for M4), Chromium for the mixed task, and helper, browser or LibreOffice kills during agent runs | Roadmap F2, M4 | X1 |
-| X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1; first stage done 2026-11-20 (`test_lifecycle`): application and Firefox restart, compositor loss, worker and both-supervisor loss, viewer closure and repeated cycles checked against LIFETIMES.md. Runtime and Agent Desktop upgrade rows and a simulated reboot tested 2026-11-25 (`UpgradeTests`, `OlderRecordTests`, `RebootTests`; a job record now carries the boot id, and recovery accepts a runtime directory that is already gone). Opt-in `AGENT_DESKTOP_SYSTEMD_SCOPE=1` (2026-11-25) puts a session in a systemd user scope so recovery also stops env-cleared children; whether to make it the default where a user manager exists is the maintainer's decision. Remaining: other distributions, a real reboot or logout, and env-cleared children without a scope |
+| X1 | F1: correctness under interruption | Roadmap F1 | N9; first patch (killed helper's lease) done 2026-11-11; interruption during checks fixed 2026-11-12; kill during a step's expectation fixed, cancel and take during checks tested 2026-11-19; take during a long `open`, `send` or `type` fixed 2026-11-19; partial accessibility coverage under interruption tested 2026-11-19; #213 done 2026-11-19: a take while `send` writes a value over the 64 KiB pipe buffer reports the bytes written, and a take during a job's accessibility check comes back within 1 s. A flaky interruption test (`test_during_application_work`) was a test race, not the runtime; the test fix merged 2026-11-25 (#234) |
+| X2 | F2: three end-to-end acceptance workflows. This also carries the M4 gate of matched trials on representative workflows. The browser dataset edit has a deterministic driver (`test_dataset_workflow`) and an agent task (`--suite f2`; two runs on one seed passed on 2026-11-12, without injected failures); the native document edit has a deterministic driver (`test_document_workflow`, 2026-11-12); the mixed workflow (download, edit in Writer, upload through the file chooser, with a refused upload and a lost reply) has a deterministic driver (`test_mixed_workflow`, 2026-11-25); agent tasks for both (`f2-document-edit`, `f2-mixed-upload`) passed two runs each on 2026-11-25 ($0.98 in all, the mixed runs with a refused upload and a lost reply). Remaining: more agent-driven runs per task and seed (matched trials for M4), Chromium for the mixed task, and helper, browser or LibreOffice kills during agent runs | Roadmap F2, M4 | X1; #228 and #229 merged 2026-11-25 |
+| X3 | F3: persistence and lifecycle stress | Roadmap F3 | X1; first stage done 2026-11-20 (`test_lifecycle`): application and Firefox restart, compositor loss, worker and both-supervisor loss, viewer closure and repeated cycles checked against LIFETIMES.md. Runtime and Agent Desktop upgrade rows and a simulated reboot tested 2026-11-25 (`UpgradeTests`, `OlderRecordTests`, `RebootTests`; a job record now carries the boot id, and recovery accepts a runtime directory that is already gone). Opt-in `AGENT_DESKTOP_SYSTEMD_SCOPE=1` (2026-11-25) puts a session in a systemd user scope so recovery also stops env-cleared children; whether to make it the default where a user manager exists is the maintainer's decision. Remaining: other distributions, a real reboot or logout, and env-cleared children without a scope. #227 and #231 merged 2026-11-25 |
 | X4 | Event stream and an approve/deny/take API. This is the "structured events" contract in USER_EXPERIENCE.md and the start of B3. It includes a non-blocking wait for control to return | Big directions B3, USER_EXPERIENCE.md, 2026-10-15 list | N2, N5; contract proposed 2026-11-11 (EVENT_CONTRACT.md); first version done 2026-11-11 (agent-desktop events) |
 | X5 | Focus a window on another Hyprland workspace (windows have reported their workspace since #149) | 2026-10-15 list | None; works: activation switches workspace in Hyprland 0.57.1 (nested stand-in 2026-11-11, the maintainer's screen 2026-11-12) |
 | X6 | Host screenshots that wait for compositor animations | 2026-10-15 list | None; done 2026-11-11; seen on the maintainer's screen 2026-11-12 (a workspace switch captured whole after 737 ms) |
@@ -78,7 +122,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X8 | Add a profile to a running session | 2026-10-15 list | None; done 2026-11-19 (`agent-desktop attach-profile`, MCP `desktop_profiles(session, attach)`): refused while an application runs, a session keeps one profile; see USAGE.md |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None; layout placement confirmed on the maintainer's screen 2026-11-12 (text, `ctrl+l`, `logo+h` under US Dvorak). The off-screen refusal still needs the person to switch terminals |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None; done 2026-11-11; seen on the maintainer's screen 2026-11-12: the tab opened in an existing Firefox window, which stayed in the background |
-| X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None; done 2026-11-25: `type` and `key` place letters for the focused nested Hyprland's layout (read with `hyprctl -j devices`); Dvorak and German reproduced and fixed, AltGr-level characters are not placed |
+| X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None; done 2026-11-25: `type` and `key` place letters for the focused nested Hyprland's layout (read with `hyprctl -j devices`); Dvorak and German reproduced and fixed, AltGr-level characters are not placed (#233, merged 2026-11-25) |
 | X12 | Fedora drops the first typed character in Chromium, now and then (Checks run 43089078794). Loop `test_chromium_receives_every_character` locally under load with the store's Chromium. Local loop on 2026-11-11: 20 of 20 passed under load on NixOS with Chromium 156, so it does not reproduce here; it needs a Fedora machine. Fedora 44 VM on 2026-11-12: 60 of 60 as a user (50 under 4-CPU load) and 20 of 20 as root with `--no-sandbox` under load, run alone rather than mid-suite, so it does not reproduce there either | Development log 2026-11-11 | None |
 | X13 | Accessibility on SELinux-enforcing Fedora. When the session's private `dbus-daemon` (`unconfined_dbusd_t`) activates `org.a11y.Bus`, the policy computes `gnome_atspi_t` for `at-spi-bus-launcher`, which is not valid for the user's role (`SELINUX_ERR invalid_context`), so the exec is refused. Sessions now start without accessibility and say why (2026-11-12). Done 2026-11-12: the worker starts the launcher itself (keeping its own context) and waits for `org.a11y.Bus` before the registry; on the enforcing Fedora VM `test_ui` passed with accessibility on | Fedora 44 VM, development log 2026-11-12 | None |
 

@@ -5,6 +5,15 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Refresh the project plan; cookie files may stay for a long job
+
+Docs and tool text only; no tests were run.
+
+- Decision (maintainer, 2026-11-25): a 0600 cookie export from `desktop_browser send source="cookies"` may stay on disk for the length of a long job (for example a multi-hour shell download), outside the repository or in a gitignored path, and must be deleted when the job ends. `docs/USAGE.md` and the `desktop_browser` description (one sentence) say so instead of "delete when done".
+- Decision (maintainer, 2026-11-25): zero-touch delegation is not the main line now. Recent field reports show agents rarely need the person (at most one withdrawn handoff per window from 11-12 to 11-25), so Z0, Z2 and Z4-Z6 lack evidence; the shell-facing parts are deferred to the maintainer's own Hyprland and desktop-shell work in the NixOS configuration repository. `DELEGATION.md` has a note at the top and stays a design record; its advice not to merge #196 is superseded because #196 merged.
+- `PROJECT_PLAN.md`: dated 2026-11-25. The former Now table (N1-N10, all done) is kept under "Completed 2026-11-11 to 11-20". A new Now section lists the open pull requests (#222-#235) with dependencies and a suggested merge order, the X1-X3 and X11 rows point to their open PRs without claiming they merged, and the remaining open items are listed.
+- Validation: `ruff` and the Lint workflow only; the docstring change is text.
+
 ## 2026-11-25 — Flaky `test_during_application_work`: the kill raced the next step's dispatch
 
 `tests/test_interruptions.py` `test_during_application_work` failed now and then on

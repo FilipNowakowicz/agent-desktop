@@ -5,6 +5,67 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Agent-driven F2 document edit and mixed workflow (X2)
+
+`--suite f2` gains two tasks. Both use the deterministic drivers' fixtures and
+evaluators, and LibreOffice starts with its first-run dialogs answered, as in the
+drivers (`benchmarks/office.py` `command(..., first_run_done=True)`; the office
+suite is unchanged).
+
+- `f2-document-edit` (`benchmarks/f2_document.py`): the agreement is open in
+  Writer. The agent changes the payment term, saves to the same file in its
+  format and closes LibreOffice. The format (`.odt` or `.docx`) and clause order
+  follow `--seed`. The check is the document evaluator on the file and its
+  folder, so a lock file left by an open document fails it.
+- `f2-mixed-upload` (`benchmarks/f2_mixed.py`): Writer is open with no
+  document, and the browser shows the contract portal. The agent downloads the
+  current agreement, edits it and uploads it once. The format and the injected
+  failure (`refused` or `lost reply`) follow `--seed`. The check waits 7 s, then
+  runs the portal evaluator on what the portal stored. The prompt does not
+  mention the failure.
+
+`AgentTaskTests` in both test files check setup and the judge without a model:
+no edit fails, the right outcome passes, and a lock file, a refused upload or a
+duplicate fails.
+
+Dry runs (negative control, no account use) for both tasks with seeds 1, 2, 4 and
+7, all with `--firefox` (some also with `--bridge`): every check failed (the payment clause
+unchanged with a lock file, or nothing uploaded), and there were no errors or
+cleanup failures.
+
+```sh
+nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
+  nixpkgs#dbus nixpkgs#at-spi2-core nixpkgs#libreoffice --command \
+  uv run scripts/benchmark.py --suite f2 --only f2-document-edit --seed 1
+# likewise --seed 4; and for the mixed workflow:
+#   --only f2-mixed-upload --firefox --bridge --budget 2 --seed 2   (and --seed 7)
+```
+
+The agreed budget was at most two model runs per new task. The model was the
+CLI default, as in the 2026-11-12 dataset runs (`claude-opus-5-5`, Claude Code
+2.1.332). Costs are API-equivalent, billed to the maintainer's subscription. The
+per-task cap was the default $1 for the document edit and $2 for the mixed
+workflow. All four runs passed:
+
+| Task | Seed | Trial | Passed | Turns | Tool calls | Wall s | Cost USD |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| f2-document-edit | 1 | 948735, `.odt` | yes | 6 | 5 | 24.1 | 0.20 |
+| f2-document-edit | 4 | 859847, `.docx` | yes | 9 | 8 | 27.0 | 0.14 |
+| f2-mixed-upload | 2 | 376639, `.odt`, lost reply | yes | 17 | 16 | 61.4 | 0.36 |
+| f2-mixed-upload | 7 | 507885, `.docx`, refused | yes | 17 | 16 | 68.9 | 0.28 |
+
+Total $0.98. There were no tool errors and no leftover processes. In the
+lost-reply run, the page said "No reply". The agent read Received, found the file
+there once and did not upload again, and the portal saw one attempt. In the
+refused run, the agent uploaded again after the 503, and the portal stored
+`[False, True]`. The document-edit agents worked through `desktop_actions` and
+screenshots. Neither agent reopened the file (the first said so), so the reopen
+step rests on the evaluator, which parses the file. The mixed agents used
+`desktop_browser` for the portal and its download, and `desktop_actions` (keys
+and clicks) for Writer and the file chooser. Chromium was not tried for the
+mixed task. Two runs per task show the capabilities are
+sufficient on these seeds. They are not a reliability estimate.
+
 ## 2026-11-25 — F2 mixed workflow, deterministic driver (X2)
 
 The third F2 workflow: download a file, process it in an application, upload the

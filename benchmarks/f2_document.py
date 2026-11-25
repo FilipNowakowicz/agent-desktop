@@ -12,6 +12,9 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
+from .office import command as office_command
+from .tasks import Task
+
 ODF = {
     name: f"urn:oasis:names:tc:opendocument:xmlns:{name}:1.0"
     for name in ("office", "text")
@@ -159,3 +162,39 @@ def evaluate(path, initial, closed=True):
         # A save in another format or name, or a lock left by an unclosed app.
         problems.append(f"other files beside the document: {others}")
     return problems
+
+
+class DocumentEdit(Task):
+    """An agent does the edit the deterministic driver does: the agreement is
+    open in Writer; change the payment term, save it to the same file in its
+    format, close LibreOffice. The format and clause order follow --seed. The
+    check reads only the file and its folder, so a lock file left by a
+    document that was not closed fails it."""
+
+    name = "f2-document-edit"
+    requires = ("libreoffice",)
+
+    def __init__(self, seed=None, suffix=None):
+        self.seed, self.suffix = seed, suffix
+
+    def setup(self, context):
+        chooser = random.Random(self.seed if self.seed is not None else random.random())
+        seed = self.seed if self.seed is not None else chooser.randrange(10**6)
+        suffix = self.suffix or chooser.choice([".odt", ".docx"])
+        folder = context.directory / "documents"
+        folder.mkdir()
+        context.document = folder / f"agreement{suffix}"
+        context.initial = paragraphs(seed)
+        write(context.document, context.initial)
+        context.trial = {"seed": seed, "suffix": suffix}
+        prompt = (
+            f"The agreement {context.document} is open in LibreOffice Writer. "
+            f"{GOAL} Save it to the same file in its current format, then close "
+            "LibreOffice. Say when you are done."
+        )
+        command = office_command(context, "writer", [context.document], True)
+        return command, prompt
+
+    def check(self, context):
+        problems = evaluate(context.document, context.initial)
+        return not problems, {**context.trial, "problems": problems}

@@ -2,7 +2,9 @@
 
 Shared by the deterministic driver (tests/test_dataset_workflow.py) and the
 agent-driven benchmark task below. The service owns the records; the page shows
-only what it is given; the evaluator reads only the service.
+only what it is given; the evaluator reads only the service. F2_TASKS
+(--suite f2) also holds the native document edit (f2_document.py) and the
+mixed workflow (f2_mixed.py).
 """
 
 import json
@@ -13,6 +15,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .f2_document import DocumentEdit
+from .f2_mixed import MixedUpload
 from .tasks import Task, browser_command
 
 PER_PAGE = 12
@@ -247,4 +251,4 @@ class DatasetEdit(Task):
         return not problems, detail
 
 
-F2_TASKS = [DatasetEdit()]
+F2_TASKS = [DatasetEdit(), DocumentEdit(), MixedUpload()]

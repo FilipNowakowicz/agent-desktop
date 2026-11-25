@@ -8,10 +8,13 @@ answer too late for the page (the page cannot tell whether it arrived). The
 evaluator reads only what the portal received: exactly one accepted upload, in
 the downloaded file's format, whose paragraphs are the expected ones.
 
-Used by the deterministic driver, tests/test_mixed_workflow.py.
+Shared by the deterministic driver (tests/test_mixed_workflow.py) and the
+agent-driven benchmark task below.
 """
 
 import json
+import os
+import random
 import tempfile
 import threading
 import time
@@ -20,6 +23,8 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
 from . import f2_document as doc
+from .office import command as office_command
+from .tasks import Task, browser_command
 
 REPLY_TIMEOUT_MS = 3000  # The page gives up waiting for an upload's reply.
 LATE_REPLY_S = 6  # A "lost reply" upload is stored, then answered after this.
@@ -212,3 +217,66 @@ def evaluate(portal):
             for problem in doc.evaluate(path, portal.initial):
                 problems.append(f"{label}: {problem}")
     return problems
+
+
+GOAL = (
+    "The browser shows a contract portal. Download the current supply agreement "
+    "(not the superseded one), and in LibreOffice Writer change the payment term "
+    "in its payment clause from 30 days to 14 days. Change nothing else, and keep "
+    "the file's format. Then upload the revised file through the portal, so "
+    "that the portal has received it exactly once. Say when you are done."
+)
+
+
+def trial(seed, chooser):
+    """The varied inputs for one agent run."""
+    return {
+        "seed": seed,
+        "suffix": chooser.choice([".odt", ".docx"]),
+        "failure": chooser.choice(["refused", "lost reply"]),
+    }
+
+
+class MixedUpload(Task):
+    """An agent does what the mixed driver does: download from a portal, edit in
+    LibreOffice Writer (already open, with no document), upload once. The first
+    upload is refused or answered too late for the page, as the seed chooses."""
+
+    name = "f2-mixed-upload"
+
+    @property
+    def requires(self):
+        """The browser browser_command() will launch, and LibreOffice."""
+        firefox = os.environ.get("AGENT_DESKTOP_BENCH_BROWSER") == "firefox"
+        return ("firefox" if firefox else "chromium", "libreoffice")
+
+    def __init__(self, seed=None, suffix=None, failure=None):
+        self.seed, self.suffix, self.failure = seed, suffix, failure
+
+    def setup(self, context):
+        chooser = random.Random(self.seed if self.seed is not None else random.random())
+        seed = self.seed if self.seed is not None else chooser.randrange(10**6)
+        context.trial = trial(seed, chooser)
+        if self.suffix:
+            context.trial["suffix"] = self.suffix
+        if self.failure:
+            context.trial["failure"] = self.failure
+        context.portal = Portal(
+            seed, context.trial["suffix"], failure=context.trial["failure"]
+        )
+        context.closers = [*getattr(context, "closers", []), context.portal.close]
+        # LibreOffice first, the browser last: the browser holds the answer.
+        return [
+            office_command(context, "writer", first_run_done=True),
+            browser_command(context, context.portal.url),
+        ], GOAL
+
+    def check(self, context):
+        time.sleep(LATE_REPLY_S + 1)  # An upload still in flight would land here.
+        problems = evaluate(context.portal)
+        attempts = [
+            {k: a[k] for k in ("name", "bytes", "stored")}
+            for a in context.portal.attempts
+        ]
+        detail = {**context.trial, "attempts": attempts, "problems": problems}
+        return not problems, detail

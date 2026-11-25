@@ -240,6 +240,22 @@ ticker), not an error. `{"action": "wait"}` with no target waits the same way, u
 a page you haven't seen yet, when there is no text to wait for. A plain `seconds`
 pause right after `open` or `click` in `steps` carries a one-line `hint`.
 
+**Bot-check pages.** A page that looks like a bot-check interstitial (Cloudflare's
+"Just a moment..." and similar) makes `open`, `text`, `find` and `wait` reply
+`challenge: true` with a `challenge_hint`: wait a few seconds (a bare `wait`) for
+it to clear, and if it persists hand off with `desktop_request_human` (the person
+solves it) or use their own Firefox via `desktop_request_host`. The tool never
+tries to solve or bypass it. Detection is conservative (`browser.challenge_reason`):
+the title starts with "Just a moment", or the page has one of the elements
+`#challenge-form`, `#challenge-running`, `#challenge-stage`, `#cf-challenge-running`,
+or its whole visible text is at most 800 characters and holds "Performing security
+verification", "Checking your browser before", "Verify you are human" or
+"Verifying you are human". A long page that merely says "just a moment", or a form
+with a Turnstile widget, is not flagged; a challenge with other wording is missed.
+A text `wait` (not one with a `selector`) also matches the document title, which
+`find` does not search: the reply says `title_matches: true`, and with `gone` the
+wait is unmet while the title still holds the text.
+
 `within` narrows a target to the row, list item, form or dialog containing a
 text (`text="Edit", within="mallory"`). `steps` runs a list of these actions in
 one call and stops at the first failure or unmet wait. Any action connects to a

@@ -5,6 +5,57 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — bot-check pages are flagged; text waits match the title
+
+Follows the [exchange research and lecture fetch field report](../trials/2026-11-25-exchange-research-and-lecture-fetch.md):
+a bot-check interstitial (title "Just a moment...", body "Performing security
+verification") stopped agents in 5 sessions on 4 days and none handed off. A
+`wait` for "Just a moment" with `gone: true` was satisfied falsely: the text is
+only in the title, and `find` matches elements, never the title. Stacks on #226
+(it changes the same open and wait replies).
+
+Change:
+
+- `browser.challenge_reason` (pure, unit-tested) flags a page when its title
+  starts with "Just a moment", or it has `#challenge-form`, `#challenge-running`,
+  `#challenge-stage` or `#cf-challenge-running`, or its whole visible text is at
+  most 800 characters and holds "Performing security verification", "Checking
+  your browser before", "Verify you are human" or "Verifying you are human".
+  Conservative on purpose: a Turnstile iframe alone is not a marker (login
+  forms carry it), and a long page that says "just a moment" is not flagged.
+- `open`, `text`, `find` and `wait` add `challenge: true` and `challenge_hint`
+  (wait a few seconds; else `desktop_request_human`, or the person's Firefox via
+  `desktop_request_host`; never solve or bypass). Detection is best effort: a
+  page that is navigating reports nothing.
+- A text `wait` (no selector) also matches the document title and reports
+  `title_matches: true`; with `gone` it is unmet while the title holds the text.
+- One sentence in the `desktop_browser` docstring; note in docs/USAGE.md.
+
+Validation:
+
+- `tests/test_browser_settle.py`: detector unit tests (markers, and ordinary
+  pages not flagged); real Firefox: a fixture titled "Just a moment..." that
+  navigates to "Welcome" after 4 s is flagged by open, text and find; a text
+  wait sees the title, `gone` is unmet until it clears and then satisfied, and
+  the cleared page is not flagged; a long ordinary page that says "just a moment"
+  is not flagged. `tests/test_delivery.py`: the mock bridge returns no challenge.
+- Local (labwc etc. from `nix shell`, system Firefox): `test_browser*.py`
+  25 tests OK in 123.7 s. `ruff check` and `ruff format --check` pass.
+- Full desktop suite on gcp-worker (`on-worker run -n botcheck`, nix shell from
+  docs/VALIDATION.md, shared with another job): first run 478 tests in 686.8 s,
+  FAILED (errors=1): `test_delivery` lost-ack test, whose Mock bridge returned a
+  Mock from `challenge()`. Fixed in the test double. Second run: `on-worker run -n botcheck2`, 478 tests in 686.2 s, OK (skipped=35, expected failures=1).
+- Review fix (before merge): a text wait with `within` also matched the title,
+  which lies in no row or dialog, so `wait text=X within=Y` was met by the title
+  alone and `gone` never was. The title now counts only without `within`.
+  New `test_delivery` test failed before. Rebased onto the reviewed
+  waits-and-hook; local `test_browser_settle.py` 12 OK, `test_browser.py` 16 OK,
+  `test_delivery.py` 22 OK.
+
+Limits: only the listed wording and ids are detected (other vendors' challenge
+pages are missed); not tested against a live Cloudflare page, only fixtures.
+The title match is substring, case-sensitive like `find`.
+
 ## 2026-11-25 — open waits for the page to settle; a bare wait does the same
 
 Follows "Fixed waits" in the [VPN token and quota check field report](../trials/2026-11-20-vpn-token-and-quota-check.md)

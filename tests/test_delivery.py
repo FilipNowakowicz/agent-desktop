@@ -21,9 +21,26 @@ class DeliveryTests(unittest.TestCase):
         bridge.target.return_value = "context"
         bridge.element.return_value = ({}, {"name": "Submit"})
         bridge.find.return_value = {"count": 1, "items": []}
+        bridge.challenge.return_value = {}
         worker.browser = (bridge, lambda: None)
         worker.attach_browser = mock.Mock(return_value=True)
         return worker, bridge
+
+    def test_a_text_wait_within_a_scope_ignores_the_title(self):
+        # The title is in no row, so it can neither meet nor block a scoped wait.
+        worker, bridge = self.worker()
+        worker.take_requested = lambda: False
+        bridge.find.return_value = {"count": 0, "items": []}
+        bridge.title_matches.return_value = True
+        scoped = {"action": "wait", "text": "Inbox", "within": "Row A", "timeout": 0}
+        self.assertFalse(worker.browser_request(scoped)["satisfied"])
+        gone = worker.browser_request({**scoped, "gone": True})
+        self.assertTrue(gone["satisfied"])
+        self.assertNotIn("title_matches", gone)
+        bridge.title_matches.assert_not_called()
+        # Without within, the title still counts.
+        found = worker.browser_request({"action": "wait", "text": "Inbox"})
+        self.assertTrue(found["title_matches"])
 
     def test_send_to_a_command_outlasts_the_command_timeout(self):
         from agent_desktop.worker import SECRET_COMMAND_SECONDS

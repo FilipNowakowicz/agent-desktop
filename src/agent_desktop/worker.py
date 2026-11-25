@@ -1526,6 +1526,7 @@ class Worker:
                             else {}
                         ),
                         **self.page_state(bridge, context),
+                        **bridge.challenge(context),
                     },
                 )
             if action == "close":
@@ -1539,7 +1540,8 @@ class Worker:
                     lambda: {"tabs": bridge.tabs()[1]},
                 )
             if action == "find":
-                return bridge.find(context, **target)
+                found = bridge.find(context, **target)
+                return {**found, **bridge.challenge(context)}
             if action == "text":
                 text = bridge.call(
                     "(s) => (s ? document.querySelector(s) : document.body)"
@@ -1554,6 +1556,7 @@ class Worker:
                     "text": text[: browser.MAX_TEXT],
                     "truncated": len(text) > browser.MAX_TEXT,
                     **self.page_state(bridge, context),
+                    **bridge.challenge(context),
                 }
             if action == "wait":
                 timeout = request.get("timeout", 10)
@@ -1580,15 +1583,33 @@ class Worker:
                         "satisfied": settled["settled"],
                         **settled,
                         **self.page_state(bridge, context),
+                        **bridge.challenge(context),
                     }
                 gone = request.get("gone") is True
                 deadline = time.monotonic() + timeout
                 while True:
                     found = bridge.find(context, **target)
-                    if bool(found["count"]) != gone:
-                        return {"satisfied": True, **found}
+                    # A text is also looked for in the document title, which no
+                    # element holds ("Just a moment..." on a bot-check page). Not
+                    # with within: the title lies in no row or dialog.
+                    in_title = bool(
+                        target["text"]
+                        and not target["selector"]
+                        and not target["within"]
+                        and bridge.title_matches(
+                            context, target["text"], target["exact"]
+                        )
+                    )
+                    if in_title:
+                        found = {**found, "title_matches": True}
+                    if bool(found["count"] or in_title) != gone:
+                        return {"satisfied": True, **found, **bridge.challenge(context)}
                     if time.monotonic() >= deadline:
-                        return {"satisfied": False, **found}
+                        return {
+                            "satisfied": False,
+                            **found,
+                            **bridge.challenge(context),
+                        }
                     self.pause(0.2)
             if action in ("click", "fill", "select"):
                 element, described = bridge.element(context, **target)

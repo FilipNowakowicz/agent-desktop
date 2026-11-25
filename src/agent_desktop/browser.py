@@ -195,14 +195,18 @@ SETTLE_EVENTS = [
 SANDBOX = "agent-desktop-settle"
 LONG_REQUEST = 5
 # Installs an observer on the first call in each document, then reports whether
-# the document has loaded and how long its DOM has been unchanged.
+# the document has loaded and how long its DOM has been unchanged. A change of
+# only a style attribute does not count: scripts animate spinners and carousels
+# through it every frame, and such a page would otherwise never settle.
 DOM_QUIET = """() => {
   const now = performance.now();
   if (!window.__adQuiet) {
     window.__adQuiet = {since: now};
-    new MutationObserver(() => { window.__adQuiet.since = performance.now(); })
-      .observe(document, {subtree: true, childList: true, attributes: true,
-        characterData: true});
+    new MutationObserver((records) => {
+      if (records.some((r) => r.type !== "attributes" || r.attributeName !== "style"))
+        window.__adQuiet.since = performance.now();
+    }).observe(document, {subtree: true, childList: true, attributes: true,
+      characterData: true});
   }
   return JSON.stringify({ready: document.readyState === "complete",
     idle_ms: Math.round(now - window.__adQuiet.since)});
@@ -341,9 +345,12 @@ class Browser:
             self.context = tree[-1]["context"]
         return self.context
 
-    def settle(self, context, quiet=0.5, limit=10.0):
+    def settle(self, context, quiet=0.5, limit=10.0, interrupt=None):
         """Wait until the page has loaded and neither its requests nor its DOM
         have changed for `quiet` seconds, at most `limit` seconds.
+
+        With `interrupt`, the wait stops as soon as it returns true and the
+        reply says interrupted; the caller decides what that means.
 
         Single-page apps finish `load` and then fetch and render their content,
         so a navigation that returned "complete" can still show "Loading".
@@ -355,8 +362,11 @@ class Browser:
         deadline = started + limit
         if getattr(self, "deadline", None) is not None:
             deadline = min(deadline, self.deadline - 1)
-        settled = False
+        settled = interrupted = False
         while True:
+            if interrupt is not None and interrupt():
+                interrupted = True
+                break
             try:
                 state = json.loads(
                     remote_value(
@@ -389,10 +399,13 @@ class Browser:
             if now >= deadline:
                 break
             time.sleep(min(0.1, max(0.0, deadline - now)))
-        return {
+        result = {
             "settled": settled,
             "settle_ms": round((time.monotonic() - started) * 1000),
         }
+        if interrupted:
+            result["interrupted"] = True
+        return result
 
     def evaluate(self, expression, context):
         result = self.command(

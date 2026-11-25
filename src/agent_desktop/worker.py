@@ -1432,7 +1432,13 @@ class Worker:
                     {"started": True, "delivered": True},
                     lambda: {
                         **(
-                            bridge.settle(bridge.target(), limit=limit) if limit else {}
+                            bridge.settle(
+                                bridge.target(),
+                                limit=limit,
+                                interrupt=self.take_requested,
+                            )
+                            if limit
+                            else {}
                         ),
                         "tabs": bridge.tabs()[1],
                     },
@@ -1512,7 +1518,13 @@ class Worker:
                 return self.browser_observed(
                     {"delivered": True, "context": context},
                     lambda: {
-                        **(bridge.settle(context, limit=limit) if limit else {}),
+                        **(
+                            bridge.settle(
+                                context, limit=limit, interrupt=self.take_requested
+                            )
+                            if limit
+                            else {}
+                        ),
                         **self.page_state(bridge, context),
                     },
                 )
@@ -1560,7 +1572,10 @@ class Worker:
                     if seconds:
                         return {"satisfied": True, "waited": seconds}
                     # Neither: until the page stops loading and changing.
-                    settled = bridge.settle(context, limit=timeout)
+                    settled = bridge.settle(
+                        context, limit=timeout, interrupt=self.take_requested
+                    )
+                    self.pause(0)  # a take stopped it: say so, as other waits do
                     return {
                         "satisfied": settled["settled"],
                         **settled,

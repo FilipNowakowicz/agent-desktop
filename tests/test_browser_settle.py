@@ -8,11 +8,19 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from test_runtime import wait_for
 
 from agent_desktop import core
-from agent_desktop.worker import browser_trace, fixed_wait_hint, owned_processes
+from agent_desktop.browser import Browser
+from agent_desktop.worker import (
+    HumanControl,
+    Worker,
+    browser_trace,
+    fixed_wait_hint,
+    owned_processes,
+)
 
 # Like a cloud console: "Loading" at load, then a slow API call, then the content.
 CONSOLE = """<!doctype html><meta charset="utf-8"><title>Console</title>
@@ -32,6 +40,19 @@ TICKER = """<!doctype html><title>Ticker</title><p id="t">0</p>
 """
 
 
+# Content that is done, with a spinner a script turns every frame through its
+# style, as many sites animate: still content, so open should settle.
+SPINNER = """<!doctype html><title>Spinner</title><h1>Ready</h1>
+<div id="s" style="width:20px;height:20px;background:#08f"></div>
+<script>
+let a = 0;
+const turn = () => { a = (a + 6) % 360; s.style.transform = `rotate(${a}deg)`;
+  requestAnimationFrame(turn); };
+turn();
+</script>
+"""
+
+
 class Pages(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/"):
@@ -39,7 +60,8 @@ class Pages(http.server.BaseHTTPRequestHandler):
             body = b"42" if self.path == "/api/quota" else b"3 active"
             kind = "text/plain"
         else:
-            body = (CONSOLE if self.path == "/console" else TICKER).encode()
+            body = {"/console": CONSOLE, "/spinner": SPINNER}.get(self.path, TICKER)
+            body = body.encode()
             kind = "text/html; charset=utf-8"
         self.send_response(200)
         self.send_header("Content-Type", kind)
@@ -70,6 +92,45 @@ class HintTests(unittest.TestCase):
         self.assertTrue(browser_trace({"action": "wait"})["condition"])
         self.assertTrue(browser_trace({"action": "wait", "text": "x"})["condition"])
         self.assertFalse(browser_trace({"action": "wait", "seconds": 2})["condition"])
+
+
+class SettleTakeTests(unittest.TestCase):
+    """A person taking control stops a settle wait at once (no Firefox)."""
+
+    def busy_bridge(self):
+        # A page that is never still: loaded, but its DOM always just changed.
+        bridge = Browser.__new__(Browser)
+        bridge.requests, bridge.network_at, bridge.deadline = {}, {}, None
+        state = '{"ready": true, "idle_ms": 0}'
+        bridge.command = mock.Mock(
+            return_value={
+                "type": "success",
+                "result": {"type": "string", "value": state},
+            }
+        )
+        return bridge
+
+    def test_settle_stops_when_interrupted(self):
+        bridge = self.busy_bridge()
+        began = time.monotonic()
+        result = bridge.settle(
+            "context", limit=30, interrupt=lambda: time.monotonic() - began > 0.3
+        )
+        self.assertLess(time.monotonic() - began, 2)
+        self.assertEqual((result["settled"], result["interrupted"]), (False, True))
+
+    def test_a_bare_wait_gives_way_to_a_take(self):
+        worker = Worker.__new__(Worker)
+        worker.info = {"mode": "headless"}
+        bridge = self.busy_bridge()
+        bridge.target = mock.Mock(return_value="context")
+        worker.browser = (bridge, lambda: None)
+        worker.attach_browser = mock.Mock(return_value=True)
+        began = time.monotonic()
+        worker.take_requested = lambda: time.monotonic() - began > 0.3
+        with self.assertRaises(HumanControl):
+            worker.browser_request({"action": "wait", "timeout": 30})
+        self.assertLess(time.monotonic() - began, 2)
 
 
 @unittest.skipUnless(
@@ -143,6 +204,12 @@ class SettleTests(unittest.TestCase):
             ],
         )
         self.assertIn("without seconds", batch["results"][1]["hint"])
+
+    def test_a_style_animation_does_not_hold_the_page_open(self):
+        self.browser("start")
+        opened = self.browser("open", url=self.base + "/spinner", timeout=5)
+        self.assertTrue(opened["settled"], opened)
+        self.assertLess(opened["settle_ms"], 3000, opened)
 
     def test_a_page_that_never_settles_is_bounded(self):
         self.browser("start")

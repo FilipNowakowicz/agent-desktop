@@ -67,6 +67,22 @@ Validation:
   docs/VALIDATION.md, sharing the VM with two other jobs): 474 tests in 691.8 s,
   OK (skipped=35, expected failures=1).
 
+Review fixes (before merge):
+
+- A bare wait (up to 60 s) and the settle after `open` did not give way to a
+  person taking control: `settle` slept with `time.sleep`, not the worker's
+  `pause`. `settle` now takes `interrupt` (the worker passes `take_requested`);
+  a bare wait then raises HumanControl like other waits, and `open` returns
+  `interrupted: true`. New `SettleTakeTests`: without the fix the bare wait
+  ran its whole 30 s timeout.
+- A page whose script animates a spinner through its `style` every frame never
+  settled, so each `open` cost the full 10 s. Mutations of only the `style`
+  attribute no longer count; content changes, other attributes and the network
+  still do. New `test_a_style_animation_does_not_hold_the_page_open` failed
+  before (`settled: false` after the 5 s limit).
+- Local: `test_browser_settle.py` 8 OK, `test_browser.py` 16 OK,
+  `test_delivery.py` 21 OK; ruff check and format pass.
+
 Not yet shown: whether agents stop pausing. The next usage review should
 compare fixed waits after `open` and `click` with this report.
 

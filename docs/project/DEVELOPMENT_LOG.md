@@ -63,7 +63,9 @@ Validation:
   `test_activity.py` 6, `test_trace.py` 4, `test_download.py` 7 and
   `test_operations.py` 21 are all OK. `ruff check` and `ruff format --check`
   pass.
-- Full suite on the worker: WORKER_RESULT
+- Full desktop suite on gcp-worker (`on-worker run -n waits`, the nix shell from
+  docs/VALIDATION.md, sharing the VM with two other jobs): 474 tests in 691.8 s,
+  OK (skipped=35, expected failures=1).
 
 Not yet shown: whether agents stop pausing. The next usage review should
 compare fixed waits after `open` and `click` with this report.

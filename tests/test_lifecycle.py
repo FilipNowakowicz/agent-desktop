@@ -746,8 +746,8 @@ class UpgradeTests(LifecycleCase):
         self.assert_unrelated_running()
 
 
-class OlderRecordTests(unittest.TestCase):
-    """Session records written by earlier versions (no desktop needed)."""
+class RecordCase(unittest.TestCase):
+    """Session records written directly, as earlier versions did (no desktop)."""
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="desktop-f3-")
@@ -802,6 +802,8 @@ class OlderRecordTests(unittest.TestCase):
         (root / "home").mkdir()
         return session
 
+
+class OlderRecordTests(RecordCase):
     def test_older_records_are_listed_recovered_and_pruned(self):
         stopped = self.record("stopped")
         failed = self.record("failed", error="Supervisor exited unexpectedly")

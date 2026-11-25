@@ -47,7 +47,7 @@ spent about 20 calls paging through the viewer.
   'test*.py'` OK (skipped=178). Under `nix shell nixpkgs#labwc nixpkgs#foot
   nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#dbus nixpkgs#at-spi2-core
   --command uv run python -m unittest discover -s tests -p test_download.py -k
-  RealFirefox` the four real-Firefox tests pass (about 22 s). WORKER_RESULT
+  RealFirefox` the four real-Firefox tests pass (about 22 s). On the worker (commit 83f21a6, shared with two other suites), `on-worker run -n pdf -- nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p 'test*.py'`: Ran 474 tests in 655 s, OK (skipped=35, expected failures=1).
 
 ## 2026-11-25 — A login handoff keeps session-only cookies for 24 hours
 

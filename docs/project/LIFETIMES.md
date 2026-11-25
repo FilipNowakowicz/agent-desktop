@@ -37,8 +37,9 @@ A host session has neither, and works on the person's own screen and files.
 | Firefox restarted in the session | Until `browser start`, actions fail with "No bridged Firefox"; `start` launches and connects to a new Firefox; tab contexts from before are gone, and an action naming one fails with `target_lost` rather than using another tab | Operation records keep their contexts | A cookie and a download in the home survive the restart; across sessions only in a profile | **tested**: `test_lifecycle` (clean exit and restart, profile session), `test_interruptions` (`target_lost` for a closed tab) |
 | The viewer (`viewer`, `take`) closes | The session keeps running with its lease. The read-only server stays and is reused by the next viewer; a takeover server exits with its viewer, control returns to the agent (a new screenshot is needed) and `take` starts a new one | Kept (`viewer.log`, `takeover.log`) | Kept | **tested**: `test_lifecycle` (5 read-only and 5 takeover closures), `test_viewer`, `test_takeover` |
 | The compositor exits or is killed | The worker notices (0.7–0.8 s when idle; a `type` in progress replies `DeliveryUnknown` at once) and the session ends: processes stopped by token, runtime removed | Marked `failed` with an error naming the compositor; records kept | Kept and unlocked; the next session on it reports the failed end | **tested**: `test_runtime`, `test_lifecycle` |
-| Runtime upgrade (new labwc, Firefox, …) | Not supported for a running session: recreate it | Kept | Kept; applications must cope with their own profile versions | untested |
-| Machine reboot or logout | Gone with `RUNTIME`; `list` reports such sessions as `unavailable` until they are destroyed (which recovers them) | Kept | Kept | untested |
+| Runtime upgrade (new labwc, Firefox, …) | Not supported for a running session: recreate it. A tool the session started with that has since been removed fails with an error saying the runtime changed; `status` and `destroy` still work. A new session uses the new tools | Kept | Kept; applications must cope with their own profile versions | **tested**: `test_lifecycle` (tools removed under a running session, a new session on the profile) |
+| Agent Desktop upgraded or removed (a pulled checkout, a reinstalled tool) | A running worker keeps the code it started with: the modules its requests use are loaded at start. The new version can list, recover and destroy it, but other requests across versions are not promised: recreate the session to use the new code | Records from earlier versions are listed, recovered and pruned; an operation record of another schema version is refused as evidence, not guessed at | Kept; an abandoned session in an older record is recovered before reuse | **tested**: `test_lifecycle` (installation removed under a running session; 2026-10-05 manifests) |
+| Machine reboot or logout | Gone with `RUNTIME`; `list` reports such sessions as `unavailable` until they are destroyed (which recovers them), also when `RUNTIME` is at another path after the reboot. Process numbers in the record that now belong to other processes are never signalled: recovery finds processes by session token | Kept, including `home` until recovery. A job that was running reads `delivery_unknown`: a job's process is identified by number, start time and boot id, so a new process with the same number and start time is not taken for it. `prune` keeps such records until recovery | Kept, and unlocked; the next session on it recovers the old one first | **tested**: `test_lifecycle` (simulated in private directories: processes killed at once, `RUNTIME` removed, numbers reused, another boot id) |
 | `prune [--older-than DAYS]` | Never touches live sessions | Removes stopped or failed records past the cutoff | Never touched | **tested**: `test_retention` |
 | `delete-profile NAME` | Refused while a session uses the profile | Not touched | Removed | **tested**: `test_profiles` |
 
@@ -68,7 +69,11 @@ downloads, operation records, owned processes, sockets and leases against this
 table, and confirm that unrelated applications were not stopped.
 
 `tests/test_lifecycle.py` does this for application restart, Firefox restart,
-compositor loss, worker loss, loss of both supervisors, viewer closure and
-repeated cycles. Each test keeps a process outside the session with the same
-command line (`sleep D`) as one inside it and checks that it still runs. The
-runtime upgrade and reboot rows remain untested.
+compositor loss, worker loss, loss of both supervisors, viewer closure,
+repeated cycles, runtime and Agent Desktop upgrades, and a reboot. Each test
+keeps a process outside the session with the same command line (`sleep D`) as
+one inside it and checks that it still runs. The reboot is simulated without
+touching the machine: every session process is killed at once, the private
+`RUNTIME` is removed and replaced at another path, recorded process numbers are
+pointed at live unrelated processes and a job record gets another boot id. A
+real reboot or logout has not been tested.

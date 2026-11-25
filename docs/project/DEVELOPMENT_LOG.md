@@ -5,6 +5,40 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — F3: runtime upgrade and reboot rows
+
+X3 continues from the first stage (#216). These rows of [LIFETIMES.md](LIFETIMES.md) were untested: a runtime upgrade under a running session, and a machine reboot or logout. Both are now tested in `tests/test_lifecycle.py`. Neither the machine nor the real runtime directory is touched.
+
+- `UpgradeTests`:
+  - A session's worker is started from a copy of the package, which is then deleted, standing in for an installation that an upgrade removes. Then `status`, `screenshot`, a browser request, `list` and `destroy` are checked, and a new session on the profile reads the old file.
+  - The session's `labwc`, `grim` and `dbus-daemon` are wrappers in a directory, which is then deleted, standing in for a garbage-collected store path. A screenshot then fails, saying the runtime changed; `status` and `destroy` still work. A new session records the new tools and keeps the profile.
+- `OlderRecordTests`: manifests with only the 2026-10-05 keys (stopped, failed, and `ready` with dead supervisors) are listed, counted, recovered and pruned. A profile whose last session is such a record shows as `abandoned` and is recovered. An operation record with `schema_version` 2 fails closed.
+- `RebootTests`: two sessions, one with a profile, the profile session running a job. The test then:
+  - kills every token process at once;
+  - removes `RUNTIME` and moves `XDG_RUNTIME_DIR` to a new path;
+  - points recorded supervisor PIDs at live unrelated processes, and gives the job record an unrelated PID with its real start time and another boot id.
+
+  Checked: `list` shows `unavailable`, the profile is unlocked and `abandoned`, the job settles as `delivery_unknown` with its step `uncertain`, and `prune` removes nothing. The next `create` on the profile recovers the old session and keeps its file, `destroy` recovers the other one, the record is kept, `prune` then removes everything, and the unrelated process keeps running.
+
+Bugs found and fixed:
+
+1. **A job record across a reboot.** `process_alive` trusted PID plus start time, but start times count from boot. A new process with the same pair after a reboot kept a dead job `running` forever. Records now carry `boot_id`, and a different boot id means the process is not alive. Older records without the field are judged as before (`BootIdentityTests`).
+2. **Recovery refused after the runtime directory moved.** `recover` refused a recorded runtime outside the current `XDG_RUNTIME_DIR`, even when that runtime was already gone, for example a session created under the `/tmp` fallback and recovered from a login shell after a reboot. Both `destroy` and `create` on the profile were then stuck. The check now applies only when the directory exists.
+3. **Mixed versions in a running worker.** The worker imported `browser`, `atlas`, `core` and `websockets` on first use. After the installation was removed, a browser request replied `ImportError: cannot import name 'browser'`. After an in-place upgrade it would have loaded the new version's module into the old worker. `load_request_modules()` now imports them at worker start, which costs about 80 ms (measured with `-X importtime`).
+4. A tool removed under a running session now raises "the desktop runtime changed ... Destroy the session and create a new one" instead of `FileNotFoundError`.
+
+Without fixes 1 and 2, `RebootTests` fails: the job never settles ("Timed out waiting"), and recovery reports "Refusing to remove an unexpected runtime directory".
+
+Validation:
+
+- `uv run ruff check src tests` and `uv run ruff format --check src tests` pass.
+- Laptop, with `nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core --command uv run python -m unittest discover -s tests -p test_lifecycle.py`: 17 tests OK (expected failures=1) in 47.5 s.
+- Worker, `on-worker run -n f3 -- nix shell ... --command uv run python -m unittest discover -s tests -p 'test*.py'`: 476 tests in 650 s, FAILED (failures=1, skipped=35, expected failures=1). The failure is `test_interruptions.InterruptionTests.test_during_application_work` (`'stopped' != 'delivery_unknown'`), which is flaky on `main` as well. On the laptop it failed 2 of 6 runs on `origin/main` and 1 of 4 on this branch. The kill sometimes lands between the two steps, which correctly reads `stopped`. This change does not touch it; it is left open.
+
+The Checks matrix, run once on the stacked branch (run 45558503727), found a test bug: on the Nix job, `test_desktop_runtime_replaced_under_a_running_session` failed with `Failed to open "/etc/dbus-1/session.conf"`. Its wrapper runtime had no `share/dbus-1` beside the daemon, and Nix's dbus-daemon has no `/etc` default to fall back on. The wrapper prefix now links the real `share/dbus-1`, as a runtime prefix ships it. This passed on the laptop; CI was not run again.
+
+Remaining for X3: other distributions (the Checks matrix), a real reboot or logout, and env-cleared children after both supervisors die. An opt-in systemd scope for the last one is in a stacked PR.
+
 ## 2026-11-25 — Agent-driven F2 document edit and mixed workflow (X2)
 
 `--suite f2` gains two tasks. Both use the deterministic drivers' fixtures and

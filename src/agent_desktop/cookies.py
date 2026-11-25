@@ -501,3 +501,66 @@ def forget_site(profile, sites):
         "storage_removed": removed_storage,
         "detail": "History, bookmarks and the session store are not changed.",
     }
+
+
+def expiry_text(expiry, milliseconds):
+    """ISO time (UTC) of a stored expiry, or "session" for none."""
+    if not expiry or expiry <= 0:
+        return "session"
+    seconds = expiry / 1000 if milliseconds else expiry
+    try:
+        moment = datetime.datetime.fromtimestamp(seconds, datetime.UTC)
+    except (OverflowError, OSError, ValueError):
+        return "never"
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def site_cookies(profile, sites):
+    """List the cookies of `sites` (and subdomains) a saved profile holds.
+
+    Read-only and never shows values: only host, name, path, expiry and the
+    secure/httpOnly flags, plus the names of the site's storage directories.
+    The profile must not be in use. The database is read from a copy, so a
+    write by Firefox can never be corrupted.
+    """
+    sites = site_names(sites)
+    path = core.profile_path(profile)
+    if not path.is_dir():
+        raise core.DesktopError(f"No profile named {profile}")
+    target = path / "home" / SESSION_FIREFOX
+    with core.profile_lock(path).open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise core.profile_busy(profile, path) from None
+        listed = []
+        database = target / "cookies.sqlite"
+        if database.is_file() and not database.is_symlink():
+            columns, rows, _schema, _version, milliseconds = read_cookies(target, sites)
+            index = {name: i for i, name in enumerate(columns)}
+            for row in rows:
+                listed.append(
+                    {
+                        "host": row[index["host"]],
+                        "name": row[index["name"]],
+                        "path": row[index["path"]],
+                        "expires": expiry_text(row[index["expiry"]], milliseconds),
+                        "secure": bool(row[index["isSecure"]]),
+                        "http_only": bool(row[index["isHttpOnly"]]),
+                    }
+                )
+            listed.sort(key=lambda c: (c["host"].lstrip("."), c["name"], c["path"]))
+        storage_names = []
+        storage = target / "storage" / "default"
+        if storage.is_dir() and not storage.is_symlink():
+            for entry in sorted(storage.iterdir()):
+                host = storage_host(entry.name)
+                if host and matches(host, sites) and not entry.is_symlink():
+                    storage_names.append(entry.name)
+    return {
+        "profile": profile,
+        "sites": sites,
+        "cookies": listed,
+        "storage": storage_names,
+        "detail": "Values are never shown. forget-site removes a site again.",
+    }

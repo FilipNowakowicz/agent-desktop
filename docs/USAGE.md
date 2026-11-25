@@ -954,6 +954,19 @@ in use:
 uv run agent-desktop forget-site cloud --site google.com
 ```
 
+To see which logins a profile holds for a site before or instead of removing
+them, use `site-cookies` (or `desktop_profiles` with `profile` and `cookies`).
+It lists each cookie of the site and its subdomains with its host, name, path,
+expiry (a UTC ISO time, or `session`) and `secure` / `http_only` flags, and the
+names of the site's storage directories. Values are never shown. It reads a
+copy of the database, changes nothing, and is refused while a session uses the
+profile (the error names that session). Do not open a profile's `cookies.sqlite`
+by hand:
+
+```sh
+uv run agent-desktop site-cookies cloud --site google.com
+```
+
 `profiles` and a `create` with a profile report the profile's previous session
 (`last_session` / `previous_session`): its id and whether it ended `stopped`,
 `failed` (with the error) or `recovered`. After a failed or recovered end,

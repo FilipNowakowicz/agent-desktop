@@ -142,6 +142,14 @@ def main():
     forget.add_argument(
         "--site", action="append", required=True, help="e.g. example.com; repeatable"
     )
+    listing = sub.add_parser(
+        "site-cookies",
+        help="list a site's cookies in a profile (never their values)",
+    )
+    listing.add_argument("profile")
+    listing.add_argument(
+        "--site", action="append", required=True, help="e.g. example.com; repeatable"
+    )
     for name, text in (
         ("view", "watch a session read-only"),
         ("take", "control a session yourself; closing the viewer hands it back"),
@@ -432,6 +440,10 @@ def main():
             from .cookies import forget_site
 
             result = forget_site(args["profile"], args["site"])
+        elif command == "site-cookies":
+            from .cookies import site_cookies
+
+            result = site_cookies(args["profile"], args["site"])
         elif command == "logs":
             result = logs(args["session"])
         elif command == "host":

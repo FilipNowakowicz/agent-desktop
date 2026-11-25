@@ -252,6 +252,29 @@ deterministic driver for the same service is `tests/test_dataset_workflow.py`.
 First runs (seed 1, one each): Firefox with `--firefox --bridge` passed in 41 s for
 $0.29 with 6 tool calls; Chromium passed in 76 s for $0.41 with 24 tool calls.
 
+Since 2026-11-25 the suite also holds `f2-document-edit` and `f2-mixed-upload`.
+In `f2-document-edit`, an agreement is open in Writer. The agent changes the
+payment clause only, saves in the same format (`.odt` or `.docx`) and closes
+LibreOffice. The check reads the file and its folder. In `f2-mixed-upload`, the
+agent downloads the current agreement from a loopback portal (a superseded one is
+listed beside it), edits it in Writer and uploads it through the file chooser.
+The portal refuses the first upload, or stores it and answers too late for the
+page. The check reads what the portal stored: exactly one upload, in the same
+format, with the expected paragraphs. The format and the failure follow `--seed`.
+Their deterministic drivers are `tests/test_document_workflow.py` and
+`tests/test_mixed_workflow.py`.
+
+```sh
+uv run scripts/benchmark.py --suite f2 --only f2-document-edit f2-mixed-upload \
+  --firefox --bridge --seed 1 --dry-run   # needs libreoffice and firefox on PATH
+```
+
+First runs (two each, `claude-opus-5-5`) all passed. The document edit took
+24–27 s and $0.14–0.20. The mixed workflow, with `--firefox --bridge`, took
+61–69 s and $0.28–0.36. In the lost-reply run, the agent confirmed the upload in
+Received instead of resubmitting. Details are in the
+[development log](project/DEVELOPMENT_LOG.md).
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

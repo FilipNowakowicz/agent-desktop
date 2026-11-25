@@ -12,8 +12,10 @@ import shutil
 import signal
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import test_runtime
 from test_runtime import wait_for
@@ -67,6 +69,41 @@ class EvaluatorTests(unittest.TestCase):
             for s in range(20)
         }
         self.assertGreater(len(positions), 2)
+
+
+def fake_context(directory):
+    """A benchmark context whose session directory exists, without a session."""
+    session = "0123456789ab"
+    (directory / "state" / session).mkdir(parents=True)
+    work = directory / "task"
+    work.mkdir()
+    return types.SimpleNamespace(directory=work, session=session)
+
+
+class AgentTaskTests(unittest.TestCase):
+    """The benchmark task writes the same fixture and judges only the file."""
+
+    def test_task_judges_the_saved_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            state = {"AGENT_DESKTOP_STATE_DIR": str(directory / "state")}
+            with mock.patch.dict(os.environ, state):
+                context = fake_context(directory)
+                task = doc.DocumentEdit(seed=3, suffix=".docx")
+                argv, prompt = task.setup(context)
+                profile = directory / "state" / context.session / "home/.office-profile"
+                self.assertTrue((profile / "user/registrymodifications.xcu").exists())
+            self.assertEqual(argv[-1], str(context.document))
+            self.assertIn(str(context.document), prompt)
+            self.assertNotIn(doc.PAID, prompt)
+            self.assertEqual(doc.read(context.document), doc.paragraphs(3))
+            self.assertFalse(task.check(context)[0])  # Nothing was edited yet.
+            doc.write(context.document, doc.expected(context.initial))
+            passed, detail = task.check(context)
+            self.assertTrue(passed, detail)
+            lock = context.document.with_name(f".~lock.{context.document.name}#")
+            lock.write_text("x")  # Not closed.
+            self.assertFalse(task.check(context)[0])
 
 
 @unittest.skipUnless(

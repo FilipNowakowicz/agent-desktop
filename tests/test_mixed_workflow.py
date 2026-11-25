@@ -12,11 +12,13 @@ portal stored, so a lost upload, a duplicate, a wrong format, the superseded
 document or an unedited one each fail the trial.
 """
 
+import os
 import shutil
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.parse import urljoin
 
 import test_browser
@@ -27,8 +29,10 @@ from agent_desktop import core
 from benchmarks import f2_document as doc
 from benchmarks.f2_mixed import (
     CURRENT,
+    GOAL,
     LATE_REPLY_S,
     PAGE,
+    MixedUpload,
     Portal,
     evaluate,
 )
@@ -113,6 +117,42 @@ class EvaluatorTests(unittest.TestCase):
         self.assertNotIn("14 days", PAGE)
         self.assertNotIn(doc.PAID, PAGE)
         self.assertNotEqual(self.portal.initial, self.portal.superseded)
+
+
+class AgentTaskTests(unittest.TestCase):
+    """The benchmark task wraps the same portal and judges only its uploads."""
+
+    def test_task_judges_the_portal(self):
+        task = MixedUpload(seed=9, suffix=".odt", failure="refused")
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            state = {"AGENT_DESKTOP_STATE_DIR": str(directory / "state")}
+            with mock.patch.dict(os.environ, state):
+                context = test_document_workflow.fake_context(directory)
+                commands, prompt = task.setup(context)
+            try:
+                self.assertEqual(prompt, GOAL)
+                self.assertIn("--writer", commands[0])
+                self.assertEqual(commands[-1][-1], context.portal.url)
+                portal = context.portal
+                with mock.patch("benchmarks.f2_mixed.time.sleep"):
+                    self.assertFalse(task.check(context)[0])  # Nothing uploaded.
+                    path = directory / "agreement.odt"
+                    doc.write(path, doc.expected(portal.initial))
+                    right = path.read_bytes()
+                    portal.upload("agreement.odt", right)  # Refused.
+                    self.assertFalse(task.check(context)[0])
+                    portal.upload("agreement.odt", right)
+                    passed, detail = task.check(context)
+                    self.assertTrue(passed, detail)
+                    self.assertEqual(
+                        [a["stored"] for a in detail["attempts"]], [False, True]
+                    )
+                    portal.upload("agreement.odt", right)
+                    self.assertFalse(task.check(context)[0])  # A duplicate.
+            finally:
+                for close in context.closers:
+                    close()
 
 
 class Driver:

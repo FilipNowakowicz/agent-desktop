@@ -103,15 +103,21 @@ class InterruptionTests(unittest.TestCase):
             ],
             kind="browser",
         )
+        # Kill while the job is inside its wait, as the page's own timer runs.
+        # Killing as soon as the click is acknowledged can land before the
+        # helper records the wait as dispatching; that is a known stop between
+        # steps (test_during_a_steps_expectation), not this boundary.
         result = self.kill_when(
             job["operation_id"],
-            lambda r: r["steps"][0]["dispatch_state"] in ("acknowledged", "observed"),
+            lambda r: r["steps"][1]["dispatch_state"] == "dispatching",
         )
-        self.assertEqual(result["state"], "delivery_unknown")
-        # The click was acknowledged before the kill and stays known.
+        self.assertEqual(result["state"], "delivery_unknown", result)
+        # The click was acknowledged before the kill and stays known; only the
+        # step in flight becomes uncertain.
         self.assertIn(
             result["steps"][0]["dispatch_state"], ("acknowledged", "observed")
         )
+        self.assertEqual(result["steps"][1]["dispatch_state"], "uncertain")
         self.assertEqual(result["completed"], 1)
         # The page finishes its own work once, and nothing repeats the click.
         self.assertTrue(wait_for(lambda: self.count() == "1", timeout=10))

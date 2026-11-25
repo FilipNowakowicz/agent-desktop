@@ -5,6 +5,48 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — Letters for a nested Hyprland's layout (X11)
+
+Reproduced first. Guarded private session (`create --guard-host --renderer gles2
+--render-device /dev/dri/renderD129`, the NVIDIA node, with the Mesa variables unset),
+nested Hyprland 0.57.2 started with `AQ_BACKEND=wayland` and a short
+`XDG_RUNTIME_DIR=/run/user/<uid>/q.XXXX`, set to `us` / `dvorak` with
+`hyprctl eval 'hl.config({input={kb_variant="dvorak"}})'`, and a foot running
+`stty -echo; cat > received.txt` inside it. `agent-desktop type SESSION 'hello world,
+Quick Test 123'` then `key Return` arrived as `d.nnr ,rpnew 'gcjt y.oy 123`: the
+parent labwc forwards key codes, which the nested Hyprland reads through Dvorak, and
+capitals lost their Shift because a modifier mask is not seen by the nested compositor.
+
+Fix: while the session's focused toplevel is the nested Hyprland's window (app id
+`aquamarine`), the worker finds the Hyprland the session started (descendant whose
+`comm` contains `Hyprland`, its own `XDG_RUNTIME_DIR`, the `hyprland.lock` naming its
+pid), reads `hyprctl -j devices` (main keyboard rules, model, layout, variant, options,
+active layout index) and `input:kb_rules`/`kb_file`, and builds a `BindLayout`. `type`
+sends each character to the code that layout reads as it, with a real Shift press
+around shifted ones; `key`/`key_down`/`key_up` use the same layout (and `key` now
+presses a real Shift for an implicitly shifted placed key). Cached for 10 s. Chosen over
+uploading a different keymap because the nested compositor ignores the parent's
+keymap and reads codes through its own configuration. Host sessions, other focus and
+`input:kb_file` layouts are unchanged (a `warning` says when the layout could not be
+read).
+
+After the fix, the same text arrived intact under Dvorak, and a line with
+capitals and punctuation (`Hello, World! (a-z) "x" {y} ~ ; : / ? @#$ <> |\ zZ`) arrived
+intact under Dvorak and under US. Under `de` it arrived except `{ ~ @ | \`, which need
+AltGr (level 3), so the reply carried the warning `6 characters have no key in the
+nested Hyprland's layout`. Placing level-3 characters is not done. Unit tests in
+`tests/test_keyboard.py` cover the typed placement, the missing count and the real Shift.
+Not covered by an automated test: the live nested run above (needs a GPU renderer and
+Hyprland, as in the log of 2026-11-11). All sessions I started were destroyed and no
+Hyprland process remained.
+
+Full desktop suite on gcp-worker (`on-worker run -n nested2 -- nix shell ... --command uv run
+python -m unittest discover -s tests -p 'test*.py'`): 471 tests, OK, 35 skipped, 1 expected
+failure. The first run (`nested`) had one failure, `test_partial_typing_preserves_uncertainty`,
+because `type` was now called with an extra argument; fixed by keeping the one-argument call
+when no nested layout applies. `ruff check` passes; `ruff format --check` flags only
+docs/project/CAPABILITY_MATRIX.md, which this change does not touch.
+
 ## 2026-11-25 — download saves a PDF that Firefox's viewer shows
 
 Follows the field report in PR #222 ("PDFs that Firefox displays can't be

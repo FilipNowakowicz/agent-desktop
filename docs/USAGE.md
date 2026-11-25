@@ -1093,9 +1093,13 @@ the reply says when it could not be read. `key_down` and `key_up` steps in
 `desktop_actions` hold a key across steps, for example `Super_L` during `Tab` presses.
 Everything held is released when the run ends (after the image, with `screenshot=true`,
 so it can show what a held key displays), when a person takes control, and after
-30 seconds if the client disappears. A compositor nested inside a private session is
-not detected: give it a US layout or `input:resolve_binds_by_sym` if letter shortcuts land
-on the wrong key. `scroll` takes optional
+30 seconds if the client disappears. While a Hyprland nested inside a private session has
+focus (its window is the session's focused toplevel), `type` and `key` place letters for
+the layout it reports through `hyprctl -j devices`, read from the instance the session
+started, because it reads key codes through its own layout, not the session's. A `warning`
+says when that layout could not be read, or that some characters have no key in it
+(for example AltGr characters on German); those are sent as US keys. Other nested
+compositors are not detected: give them a US layout. `scroll` takes optional
 `x`/`y` (CLI `--x/--y`) to move there first. `delivered` means the input was sent
 to the compositor, not that the application handled it: on the host, a
 layer-shell panel (quick settings, a launcher) can hold keyboard focus without

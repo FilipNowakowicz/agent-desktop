@@ -94,6 +94,45 @@ class ChordTests(unittest.TestCase):
         self.assertEqual(device.overrides, {})
         self.assertTrue(device.dirty)
 
+    def test_typed_text_goes_to_the_codes_of_a_nested_layout(self):
+        device = keyboard()
+        layout = FakeLayout(
+            {
+                ord("h"): (32, False, []),  # Dvorak: the key at US "d" reads h
+                ord("H"): (32, True, []),
+                ord("!"): (2, True, []),
+            }
+        )
+        missing = device.type("hH!é", layout)
+        self.assertEqual(missing, 1)
+        shift = wayland.MODIFIER_CODES["shift"]
+        self.assertEqual(
+            [e[1:] for e in events(device) if e[0] == "key"][:8],
+            [(32, 1), (32, 0), (shift, 1), (32, 1), (32, 0), (shift, 0)]
+            + [(shift, 1), (2, 1)],
+        )
+
+    def test_a_shifted_placed_key_presses_a_real_shift(self):
+        device = keyboard()
+        layout = FakeLayout({ord("L"): (25, True, [ord("l"), ord("L")])})
+        device.key(ord("L"), [], layout=layout)
+        shift = wayland.MODIFIER_CODES["shift"]
+        self.assertEqual(
+            [e[1:] for e in events(device) if e[0] == "key"],
+            [(shift, 1), (25, 1), (25, 0), (shift, 0)],
+        )
+
+    def test_a_shifted_placed_key_keeps_a_held_right_shift(self):
+        # Pressing and releasing Shift_L here would clear the Shift mask while
+        # the held Shift_R is still down.
+        device = keyboard()
+        device.down(0xFFE2)  # Shift_R, code 54
+        device.connection.calls.clear()
+        layout = FakeLayout({ord("L"): (25, True, [ord("l"), ord("L")])})
+        device.key(ord("L"), [], layout=layout)
+        self.assertEqual(events(device), [("key", 25, 1), ("key", 25, 0)])
+        self.assertEqual(device.mask, wayland.SHIFT)
+
 
 class FakeLayout:
     def __init__(self, places):

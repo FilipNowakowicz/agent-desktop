@@ -4,6 +4,7 @@ Entries are newest first. This file holds November 2026. Earlier months are kept
 verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
+
 ## 2026-11-25 — Refresh the project plan; cookie files may stay for a long job
 
 Docs and tool text only; no tests were run.

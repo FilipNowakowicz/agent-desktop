@@ -10,7 +10,7 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 Ran `scripts/usage_review.py --since 2026-11-20` (243 calls, 11 transcripts, 76 flags)
 and `agent-desktop activity --days 5` (16 sessions, 211 operations). 16 calls in one
 transcript were already in the 11-20 report. The rest (227 calls) are a new exchange
-research project (217, including three subagents), two `/lecture` caption fetches and
+research project (201, including three subagents), two `/lecture` caption fetches and
 one flashcard-project course sync. Report:
 docs/trials/2026-11-25-exchange-research-and-lecture-fetch.md.
 

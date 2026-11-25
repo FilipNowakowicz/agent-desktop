@@ -5,6 +5,80 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — F2 mixed workflow, deterministic driver (X2)
+
+The third F2 workflow: download a file, process it in an application, upload the
+result. `benchmarks/f2_mixed.py` runs a loopback contract portal. It lists the
+current agreement and a superseded one (the same clauses in another order), serves
+each as an attachment, takes uploads through a file input and lists what it
+stored under "Received". The documents and the expected edit are the native
+document edit's (`benchmarks/f2_document.py`). Two injections:
+
+- `refused`: the first upload gets a 503 and nothing is stored. The page says so.
+- `lost reply`: the first upload is stored, but the portal answers after 6 s and
+  the page stops waiting after 3 s. The page cannot tell whether the upload
+  arrived and says to check Received before uploading again.
+
+The evaluator reads only what the portal stored. It requires exactly one stored
+upload (a second one is reported as a duplicate submission), in the downloaded
+file's format, and runs the document evaluator on a copy of exactly the bytes
+received, so every paragraph is compared with the expected text. Its own tests
+check known-wrong outcomes: nothing uploaded, a duplicate, the unedited file,
+the superseded agreement edited correctly, every "30 days" changed, a truncated
+upload, an empty upload and the other format. A refused attempt does not count;
+a stored attempt with a lost reply does. The page holds neither the new term nor
+the expected paragraphs.
+
+`tests/test_mixed_workflow.py` drives a real private session with Firefox and
+LibreOffice Writer. It finds the current agreement's link on the page, downloads
+it with the bridge's `download`, opens it in Writer and makes the same edit as
+the document driver (Find, type, Ctrl+S, the Word button for `.docx`, Ctrl+Q). It
+then uploads the saved file through Firefox's own file chooser. A bridge click on
+the file input opens "File Upload" (`xdg-desktop-portal-gtk`, parented to the
+Firefox window). The driver focuses it, presses Ctrl+L, types the path and
+presses Return, and waits until the input holds the file. Before every attempt
+it reads Received and submits only if the file (name and size) is not there.
+Two trials:
+
+- `.odt` with `refused`: the first attempt fails, the driver retries, and the
+  portal records attempts stored `[False, True]`.
+- `.docx` with `lost reply`: the page reports no reply, Received shows the
+  file, and the driver does not resubmit. The portal saw one attempt.
+
+Both wait 7 s after the driver finishes, so a late upload would be counted.
+Clipboard and poor-accessibility interfaces are still not covered end to end,
+and nothing kills Firefox or LibreOffice mid-workflow here (the document trial
+already kills LibreOffice before a save).
+
+Validation on NixOS (labwc 0.20.2, LibreOffice 26.8.3.1 and the runtime tools
+from nixpkgs through `nix shell`, Firefox 160.0.1):
+
+```sh
+nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
+  nixpkgs#dbus nixpkgs#at-spi2-core nixpkgs#libreoffice \
+  --command uv run python -m unittest discover -s tests -p test_mixed_workflow.py
+```
+
+It ran 6 tests (4 evaluator, 2 desktop trials) and passed 4 times in a row, in 57–59 s
+each. `test_document_workflow` (6 tests) also passed here for the first time, in
+51 s; before, it had only run on the Fedora VM and in CI. `uv run ruff check` and
+`uv run ruff format --check` pass.
+
+Full desktop suite on the worker (`gcp-worker`, 14 vCPUs shared with another job;
+the packages above plus wayvnc, tigervnc and firefox from nixpkgs), at `115e21e`:
+
+```sh
+on-worker run -n f2 -- nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype \
+  nixpkgs#wlrctl nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox \
+  nixpkgs#at-spi2-core nixpkgs#libreoffice \
+  --command uv run python -m unittest discover -s tests -p 'test*.py'
+```
+
+It ran 475 tests in 786 s: OK (skipped=28, expected failures=1). A verbose run of
+`-p 'test_*_workflow.py'` there (job `f2-wf`) ran all 19 dataset, document and
+mixed tests in 151 s with none skipped, so the 28 skips are outside the F2
+workflows.
+
 ## 2026-11-25 — bot-check pages are flagged; text waits match the title
 
 Follows the [exchange research and lecture fetch field report](../trials/2026-11-25-exchange-research-and-lecture-fetch.md):

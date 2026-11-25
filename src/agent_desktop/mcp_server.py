@@ -646,7 +646,9 @@ def desktop_browser(
     a credential with "<hidden: looks like a secret, N chars; use send>" and
     list the field in hidden, but not every secret looks like one. "send" moves one element's text, or with source="clipboard"
     the session clipboard (e.g. after clicking a Copy button), to to_file (a new
-    0600 file; relative paths are in the session home; overwrite to replace) or
+    0600 file; relative paths are in the session home, which in a session
+    with a profile is the profile's and stays after destroy, so prefer an
+    absolute path in your own scratch folder; overwrite to replace) or
     to a command's stdin (to_command=["gh", "secret", "set", "NAME"]; its output
     is discarded). The reply has only its bytes, sha256 and a prefix of reveal
     characters (default 4, 0 for none). Ambiguous matches are refused unlisted.
@@ -660,11 +662,13 @@ def desktop_browser(
     For data too large or too long to read here (an API listing, a long
     table), action "save" writes the page's text, or one element's
     (selector/text; for JSON click "Raw Data" and save "pre"), to to_file and
-    returns bytes and sha256 only, up to 8 MiB. Then read the file locally.
+    returns bytes and sha256 only, up to 8 MiB (to_file as for send). Then read
+    the file locally.
 
     action "download" fetches url with the browser's login and waits until the
     file is complete (timeout, default 120 s, up to 600). It returns the file's
-    path in the session's ~/Downloads (or to_file, moved there as 0600), name,
+    path in the session's ~/Downloads (or to_file, moved there as 0600; in a
+    profile session ~/Downloads is kept, so move the file out), name,
     bytes and sha256: don't poll the folder or repeat it. If the url opens a page
     instead (a login, or a type the browser displays), it says so and saves
     nothing.

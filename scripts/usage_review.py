@@ -44,6 +44,10 @@ SHELL_PATTERNS = (
     ("cli", re.compile(r"(^|[\s/;&|(])agent-desktop\s+[a-z]")),
     ("session state", re.compile(r"\.local/state/agent-desktop/[0-9a-f]{12}")),
 )
+# A file a tool reply named (save, send, download): reading it in the shell is
+# the documented route, so such a command is counted as "tool output" instead.
+RETURNED_FILE = re.compile(r'\\?"(?:to_file|file)\\?":\s*\\?"([^"\\]+)')
+STATE_PART = re.compile(r"\.local/state/agent-desktop/(.+)")
 CORRECTION = re.compile(
     r"\b(actually|instead|why (did|do|is)|can you not|can't you|don'?t|stop|"
     r"wrong|again|still|annoying|not working|doesn'?t work)\b",
@@ -237,6 +241,20 @@ def error_kind(text):
     return text.split(";")[0].split("\n")[0][:90]
 
 
+def reads_returned_file(command, returned):
+    """Whether a shell command names a file that a tool reply returned: its
+    full path, or its folder (under the state directory) and its name."""
+    for path in returned:
+        if path in command:
+            return True
+        part = STATE_PART.search(path)
+        if part:
+            folder, _, name = part.group(1).rpartition("/")
+            if folder and folder in command and name in command:
+                return True
+    return False
+
+
 def review(transcripts, since=None, until=None):
     """Count, deduplicate and flag the calls; returns (summary, flags, kept)."""
     seen = set()
@@ -272,7 +290,7 @@ def review(transcripts, since=None, until=None):
     for transcript in kept:
         project = Path(transcript.project or transcript.path.parent.name).name
         projects[f"{transcript.source}:{project}"] += len(transcript.calls)
-        created, destroyed, last_use = set(), set(), {}
+        created, destroyed, last_use, returned = set(), set(), {}, set()
         previous = None
         for call in transcript.calls:
             tool, arguments, moment = call["tool"], call["args"], call["time"]
@@ -308,6 +326,7 @@ def review(transcripts, since=None, until=None):
                     )
             if session:
                 last_use[session] = moment
+            returned.update(RETURNED_FILE.findall(call["result"]))
             if call["error"]:
                 errors[(tool, error_kind(call["result"]))] += 1
                 flag(
@@ -373,6 +392,11 @@ def review(transcripts, since=None, until=None):
                 continue
             for kind, pattern in SHELL_PATTERNS:
                 if pattern.search(command):
+                    if kind in ("profile files", "session state") and (
+                        reads_returned_file(command, returned)
+                    ):
+                        shell["tool output"] += 1
+                        break
                     shell[kind] += 1
                     flag(f"shell: {kind}", transcript, moment, command[:160])
                     break

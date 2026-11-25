@@ -5,6 +5,43 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-25 — site-cookies: list a site's cookies in a profile, never values
+
+Follows the 2026-11-20 field report (`docs/trials/2026-11-20-vpn-token-and-quota-check.md`,
+suggestion 2): an agent edited a profile's `cookies.sqlite` by hand to see which
+logins it held.
+
+- Interface: `cookies.site_cookies(profile, sites)`; `agent-desktop site-cookies
+  PROFILE --site SITE`; `desktop_profiles(profile=..., cookies=SITE)`. Each cookie
+  gives `host`, `name`, `path`, `expires` (UTC ISO time, or `session` when the
+  stored expiry is 0) and `secure` / `http_only`; the reply also lists the
+  site's `storage/default` directories (same `storage_host`/`matches` rules as
+  `forget-site`). Values are never read into the reply.
+- Safety: the profile lock is taken without blocking, and a profile in use is
+  refused with `core.profile_busy` (names the holder session). The database
+  and its `-wal` are copied to a temporary directory and read there
+  (`read_cookies`), so the profile's file is never opened for writing.
+- `desktop_profiles` combinations: `cookies` needs `profile` and no `note`,
+  `session` or `attach`; the other combinations are unchanged. The
+  `desktop_browser` cookies hint and the `desktop_profiles` description point
+  here instead of leaving only `forget-site`.
+- Decision: the read-only view is a copy rather than `mode=ro` on the original,
+  because a read-only WAL database cannot be opened without its `-shm` file and
+  the copy matches how `import-cookies` already reads the person's Firefox.
+- Tests (`tests/test_profiles.py`, `CookieImportTests` and `ProfileNoteTests`):
+  planted values absent from the JSON and CLI output, subdomains matched, a
+  look-alike domain and other sites excluded, session cookie shown as `session`,
+  seconds and milliseconds expiry, flags, storage names, file unchanged and no
+  copy left, in-use refusal, missing profile, bad site, profile without a
+  cookie file, MCP argument combinations.
+- Validation: `uv run ruff check src scripts tests` and `uv run ruff format
+  --check src scripts tests` pass. `uv run python -m unittest discover -s tests
+  -p test_profiles.py`: 31 tests, OK (skipped=11). `uv run python -m unittest
+  discover -s tests`: 474 tests, OK (skipped=175). This is a unit-level run on
+  the laptop without labwc, grim or a Firefox session, so the desktop tests
+  skipped; no real-desktop run was made. The change reads only files and takes
+  no session, so a desktop run would not exercise it.
+
 ## 2026-11-25 — Small fixes from the exchange research field report
 
 Follows suggestions 3 and 4 of the 2026-11-25 field report (#222).

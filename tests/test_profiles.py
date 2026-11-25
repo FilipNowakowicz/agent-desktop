@@ -532,6 +532,125 @@ class CookieImportTests(unittest.TestCase):
         with self.assertRaisesRegex(core.DesktopError, "No profile"):
             cookies.forget_site("missing", ["google.com"])
 
+    def listed_profile(self):
+        source = self.person(
+            [
+                ("SID", "private-list-sid-fixture", ".google.com"),
+                ("LSID", "private-list-lsid-fixture", "accounts.google.com"),
+                ("x", "private-list-other-fixture", "login.tailscale.com"),
+                ("y", "private-list-lookalike-fixture", "notgoogle.com"),
+            ]
+        )
+        cookies.import_firefox_cookies(
+            "cloud", ["google.com", "tailscale.com", "notgoogle.com"], source
+        )
+        firefox = core.profile_path("cloud") / "home/.mozilla/agent-desktop"
+        with sqlite3.connect(firefox / "cookies.sqlite") as connection:
+            connection.execute(
+                "UPDATE moz_cookies SET isSecure = 1, isHttpOnly = 1, "
+                "expiry = 1798761600 WHERE name = 'SID'"
+            )
+            connection.execute(
+                "INSERT INTO moz_cookies (name, value, host, path, expiry) "
+                "VALUES ('tmp', 'private-list-session-fixture', 'mail.google.com', "
+                "'/mail', 0)"
+            )
+        for name in ("https+++mail.google.com", "https+++notgoogle.com"):
+            (firefox / "storage/default" / name / "ls").mkdir(parents=True)
+        return firefox
+
+    def test_site_cookies_lists_names_never_values(self):
+        firefox = self.listed_profile()
+        before = (firefox / "cookies.sqlite").read_bytes()
+        result = cookies.site_cookies("cloud", ["Google.com"])
+        text = json.dumps(result)
+        self.assertNotIn("private-list", text)
+        self.assertEqual(result["sites"], ["google.com"])
+        self.assertEqual(
+            [(c["host"], c["name"]) for c in result["cookies"]],
+            [
+                ("accounts.google.com", "LSID"),
+                (".google.com", "SID"),
+                ("mail.google.com", "tmp"),
+            ],
+        )
+        by_name = {c["name"]: c for c in result["cookies"]}
+        self.assertEqual(sorted(by_name), ["LSID", "SID", "tmp"])
+        self.assertEqual(by_name["SID"]["host"], ".google.com")
+        self.assertEqual(by_name["SID"]["expires"], "2027-01-01T00:00:00Z")
+        self.assertTrue(by_name["SID"]["secure"])
+        self.assertTrue(by_name["SID"]["http_only"])
+        self.assertEqual(by_name["tmp"]["expires"], "session")
+        self.assertEqual(by_name["tmp"]["path"], "/mail")
+        self.assertFalse(by_name["tmp"]["secure"])
+        for cookie in result["cookies"]:
+            self.assertEqual(
+                set(cookie),
+                {"host", "name", "path", "expires", "secure", "http_only"},
+            )
+        self.assertEqual(result["storage"], ["https+++mail.google.com"])
+        # Nothing was changed, and a database copy is not left in the profile.
+        self.assertEqual((firefox / "cookies.sqlite").read_bytes(), before)
+        self.assertEqual(
+            sorted(p.name for p in firefox.iterdir() if "cookies" in p.name),
+            ["cookies.sqlite"],
+        )
+
+    def test_site_cookies_other_sites_missing_and_in_use(self):
+        self.listed_profile()
+        other = cookies.site_cookies("cloud", ["tailscale.com"])
+        self.assertEqual([c["name"] for c in other["cookies"]], ["x"])
+        self.assertEqual(other["storage"], [])
+        none = cookies.site_cookies("cloud", ["example.org"])
+        self.assertEqual((none["cookies"], none["storage"]), ([], []))
+        import fcntl
+
+        with core.profile_lock(core.profile_path("cloud")).open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            with self.assertRaisesRegex(core.DesktopError, "in use"):
+                cookies.site_cookies("cloud", ["google.com"])
+        with self.assertRaisesRegex(core.DesktopError, "No profile"):
+            cookies.site_cookies("missing", ["google.com"])
+        with self.assertRaisesRegex(core.DesktopError, "Not a site name"):
+            cookies.site_cookies("cloud", ["not a site"])
+        # A profile that never held a login has no cookie file at all.
+        (core.profile_path("blank") / "home").mkdir(parents=True)
+        blank = cookies.site_cookies("blank", ["google.com"])
+        self.assertEqual((blank["cookies"], blank["storage"]), ([], []))
+
+    def test_site_cookies_milliseconds_expiry(self):
+        self.listed_profile()
+        database = (
+            core.profile_path("cloud") / "home/.mozilla/agent-desktop/cookies.sqlite"
+        )
+        with sqlite3.connect(database) as connection:
+            connection.execute("UPDATE moz_cookies SET expiry = expiry * 1000")
+        result = cookies.site_cookies("cloud", ["google.com"])
+        sid = [c for c in result["cookies"] if c["name"] == "SID"][0]
+        self.assertEqual(sid["expires"], "2027-01-01T00:00:00Z")
+
+    def test_site_cookies_cli(self):
+        self.listed_profile()
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from agent_desktop.cli import main; main()",
+                "site-cookies",
+                "cloud",
+                "--site",
+                "google.com",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertNotIn("private-list", process.stdout + process.stderr)
+        self.assertEqual(
+            sorted(c["name"] for c in json.loads(process.stdout)["cookies"]),
+            ["LSID", "SID", "tmp"],
+        )
+
     def test_default_profile_from_profiles_ini(self):
         source = self.person([("sid", "1", "shop.example")])
         (self.root / "profiles.ini").write_text(
@@ -647,6 +766,27 @@ class ProfileNoteTests(unittest.TestCase):
             ):
                 call(**arguments)
         self.assertNotIn("note", call()[0])
+
+    def test_mcp_tool_cookie_listing_validates(self):
+        from agent_desktop import mcp_server
+
+        def call(**arguments):
+            return asyncio.run(mcp_server.desktop_profiles(**arguments))
+
+        for arguments in (
+            {"cookies": "example.com"},
+            {"profile": "work", "cookies": "example.com", "note": "x"},
+            {"profile": "work", "cookies": "example.com", "session": "s"},
+            {"profile": "work", "cookies": "example.com", "attach": "work"},
+        ):
+            with (
+                self.subTest(arguments=arguments),
+                self.assertRaisesRegex(core.DesktopError, "Listing cookies"),
+            ):
+                call(**arguments)
+        with self.assertRaisesRegex(core.DesktopError, "No profile named nobody"):
+            call(profile="nobody", cookies="example.com")
+        self.assertEqual(call(profile="work", cookies="example.com")["cookies"], [])
 
 
 @unittest.skipUnless(

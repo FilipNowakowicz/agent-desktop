@@ -323,6 +323,7 @@ def desktop_profiles(
     attach: str | None = None,
     profile: str | None = None,
     note: str | None = None,
+    cookies: str | None = None,
 ) -> list[dict] | dict:
     """List saved profiles and whether a session is using them.
 
@@ -338,7 +339,26 @@ def desktop_profiles(
     login. Applications started afterwards use it; the session must have no
     application running (close Firefox first, since it keeps the old home) and
     no profile yet, and the profile no other session (the refusal names it).
+
+    With profile and cookies (a site such as example.com), instead list the
+    cookies that profile holds for the site and its subdomains: host, name,
+    path, expiry (or "session") and secure/http_only flags, plus its storage
+    directories. Values are never shown. The profile must not be in use.
     """
+    if cookies is not None:
+        if (
+            profile is None
+            or note is not None
+            or session is not None
+            or attach is not None
+        ):
+            raise core.DesktopError(
+                "Listing cookies takes profile and cookies (a site), "
+                "and no note, session or attach"
+            )
+        from . import cookies as cookie_store
+
+        return cookie_store.site_cookies(profile, [cookies])
     if profile is not None or note is not None:
         if profile is None or note is None or session is not None or attach is not None:
             raise core.DesktopError(
@@ -656,7 +676,9 @@ def desktop_browser(
     source="cookies" with site="example.com": it writes the live cookies for
     that site as a Netscape cookies.txt and returns only their count. Delete
     the file when done. Never copy or edit a profile's cookie files by hand: to
-    remove a site's login from a profile no session is using, run
+    see which cookies a profile holds for a site, call desktop_profiles with
+    profile and cookies (values are never shown); to remove a site's login from
+    a profile no session is using, run
     `agent-desktop forget-site PROFILE --site SITE`.
 
     For data too large or too long to read here (an API listing, a long

@@ -84,7 +84,8 @@ Remaining open items after these PRs:
 - X12: the Fedora Chromium drop (needs a Fedora machine).
 - MCP tool-surface review: 22 tools were unused (maintainer decision).
 - The fixed-wait habit: re-measure at the next usage review.
-- AltGr placement for nested layouts.
+- AltGr placement for nested layouts: open PR (branch `altgr-nested`, based on
+  main, no dependencies); not merged yet.
 
 ### Completed 2026-11-11 to 11-20 (former Now, N1-N10)
 
@@ -122,7 +123,7 @@ run in parallel at any point. N8 waits until shell testing resumes.
 | X8 | Add a profile to a running session | 2026-10-15 list | None; done 2026-11-19 (`agent-desktop attach-profile`, MCP `desktop_profiles(session, attach)`): refused while an application runs, a session keeps one profile; see USAGE.md |
 | X9 | Two checks on the maintainer's machine, with no code: the off-screen host refusal on a real inactive terminal, and layout-aware key placement on a real host session | Hyprland report residuals, development log 2026-11-08 | None; layout placement confirmed on the maintainer's screen 2026-11-12 (text, `ctrl+l`, `logo+h` under US Dvorak). The off-screen refusal still needs the person to switch terminals |
 | X10 | A host action that opens a URL in the person's running Firefox | Hyprland report, notes from 2026-10-15 | None; done 2026-11-11; seen on the maintainer's screen 2026-11-12: the tab opened in an existing Firefox window, which stayed in the background |
-| X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None; done 2026-11-25: `type` and `key` place letters for the focused nested Hyprland's layout (read with `hyprctl -j devices`); Dvorak and German reproduced and fixed, AltGr-level characters are not placed (#233, merged 2026-11-25) |
+| X11 | Place letters for a nested Hyprland's layout when keys go through the parent labwc (split from N8) | Development log 2026-11-08, N8 | None; done 2026-11-25: `type` and `key` place letters for the focused nested Hyprland's layout (read with `hyprctl -j devices`); Dvorak and German reproduced and fixed (#233, merged 2026-11-25). AltGr-level characters (German `@ € { \ ~`, Polish `ą ł Ż`, French `@ #`) are placed with a real press of the nested layout's ISO_Level3_Shift key, reproduced and fixed 2026-11-26 (open PR, branch `altgr-nested`). Not placed: dead-key compositions and level-5 keys |
 | X12 | Fedora drops the first typed character in Chromium, now and then (Checks run 43089078794). Loop `test_chromium_receives_every_character` locally under load with the store's Chromium. Local loop on 2026-11-11: 20 of 20 passed under load on NixOS with Chromium 156, so it does not reproduce here; it needs a Fedora machine. Fedora 44 VM on 2026-11-12: 60 of 60 as a user (50 under 4-CPU load) and 20 of 20 as root with `--no-sandbox` under load, run alone rather than mid-suite, so it does not reproduce there either | Development log 2026-11-11 | None |
 | X13 | Accessibility on SELinux-enforcing Fedora. When the session's private `dbus-daemon` (`unconfined_dbusd_t`) activates `org.a11y.Bus`, the policy computes `gnome_atspi_t` for `at-spi-bus-launcher`, which is not valid for the user's role (`SELINUX_ERR invalid_context`), so the exec is refused. Sessions now start without accessibility and say why (2026-11-12). Done 2026-11-12: the worker starts the launcher itself (keeping its own context) and waits for `org.a11y.Bus` before the registry; on the enforcing Fedora VM `test_ui` passed with accessibility on | Fedora 44 VM, development log 2026-11-12 | None |
 

@@ -255,11 +255,14 @@ def record_lineage(root, guardian, stop):
         members = watch.scan()
         if members != last:
             entries = sorted([pid, started] for pid, started in members.items())
-            write_private(
-                temporary, json.dumps({"boot_id": boot, "processes": entries})
-            )
-            temporary.replace(path)
-            last = members
+            try:
+                write_private(
+                    temporary, json.dumps({"boot_id": boot, "processes": entries})
+                )
+                temporary.replace(path)
+                last = members
+            except OSError as error:  # a full disk: try again next time
+                print(f"Process record not written: {error}", file=sys.stderr)
         if stop.wait(LINEAGE_INTERVAL):
             return
 

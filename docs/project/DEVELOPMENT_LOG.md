@@ -5,6 +5,50 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-26 — MCP tool surface: 29 default tools become 17
+
+This closes the plan's open item "22 tools were unused". The maintainer decided on
+2026-11-26 to find out why, then remove the stale or redundant tools. The analysis
+is in [research/2026-11-26-tool-surface-review.md](../research/2026-11-26-tool-surface-review.md).
+It draws on `scripts/usage_review.py --since 2026-10-01` (905 calls in 35 transcripts,
+from 2026-11-06 to 11-26), `agent-desktop activity --days 60` (977 worker calls) and
+the October benchmark results. The "22" came from a two-day window. Across the long
+window, 21 tools were called and 8 never were.
+
+Changes, a breaking change for MCP clients (the CLI is unchanged):
+
+- `desktop_list` and `desktop_logs` fold into `desktop_status`: called without a
+  session it lists sessions, and `logs=true` adds the log tails, also for a stopped
+  session.
+- `desktop_move`, `desktop_drag`, `desktop_scroll`, `desktop_focus` and
+  `desktop_ui_action` are removed, because they were already `desktop_actions`
+  steps. The `desktop_actions` description now gives each step's arguments.
+- `desktop_check` and `desktop_operation` are removed from MCP. The CLI's `check`
+  and `operation` stay.
+- `desktop_atlas`, `desktop_set` and `desktop_effects` are registered only when
+  `AGENT_DESKTOP_ATLAS` or `AGENT_DESKTOP_EFFECTS=1` is set, as `desktop_run` already is.
+- The `desktop_ui` and `desktop_windows` descriptions and the server instructions now
+  say when to use accessibility and the step forms.
+- The benchmark tool profiles drop the removed names. The usage review's "tools not
+  called" now lists only tools registered by default, and pointer steps in
+  `desktop_actions` count as coordinate input.
+
+Schema cost, measured as in the 2026-11-11 protocol (characters of name,
+description and input schema, plus instructions, divided by 4): 29 tools, 36,963
++ 3,191 characters, about 10,040 tokens, before; 17 tools, 28,819 + 3,480
+characters, about 8,075 tokens, after. That is 20% less. No model runs were made.
+
+Validation: `ruff check` and `ruff format --check` on src, scripts, tests and
+benchmarks; locally `uv run python -m unittest discover -s tests` (no runtime: OK,
+197 skipped); locally with the labwc/foot/grim/wtype/wlrctl/dbus nix shell,
+`tests.test_mcp tests.test_usage_review tests.test_benchmark_timing` (16 tests,
+OK). That includes the stdio round trip with `desktop_status` listing and
+`logs=true` before and after destroy, and the new `ToolSurfaceTests`. Full desktop
+suite on the worker (`on-worker run -n tool-surface-suite -- nix shell … --command
+uv run python -m unittest discover -s tests -p 'test*.py'`): 538 tests in 746 s, OK
+(37 skipped). That run was on the commit before the rebase onto #239, which
+changes only docs and `test_mixed_workflow.py`.
+
 ## 2026-11-26 — F2 mixed workflow in Chromium (X2)
 
 `tests/test_mixed_workflow.py` now runs the mixed workflow (download, edit in Writer, upload through the file chooser, with a refused upload and a lost reply) in Chromium as well: `ChromiumMixedWorkflowTests` reuses the Firefox class's two trials (`.odt` refused once and retried, `.docx` reply lost and reconciled) with a `ChromiumDriver`. Chromium has no DOM bridge, so the driver reads and operates the portal through the accessibility tree (`desktop_ui`: press the "Supply agreement (current)" link, the "Choose file" and "Upload" buttons, read the Received table cells and the result message). The edit, save and quit steps and the evaluator are the Firefox driver's. The class is skipped when Chromium, LibreOffice, the desktop tools or at-spi2-core are missing.

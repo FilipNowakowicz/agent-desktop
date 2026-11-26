@@ -5,6 +5,19 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-26 — F2 mixed workflow in Chromium (X2)
+
+`tests/test_mixed_workflow.py` now runs the mixed workflow (download, edit in Writer, upload through the file chooser, with a refused upload and a lost reply) in Chromium as well: `ChromiumMixedWorkflowTests` reuses the Firefox class's two trials (`.odt` refused once and retried, `.docx` reply lost and reconciled) with a `ChromiumDriver`. Chromium has no DOM bridge, so the driver reads and operates the portal through the accessibility tree (`desktop_ui`: press the "Supply agreement (current)" link, the "Choose file" and "Upload" buttons, read the Received table cells and the result message). The edit, save and quit steps and the evaluator are the Firefox driver's. The class is skipped when Chromium, LibreOffice, the desktop tools or at-spi2-core are missing.
+
+Runtime gaps: none found. The download landed in the session's `~/Downloads` (Chromium 158 writes `.crdownload`, then renames), the chooser appeared as an "Open File" GTK dialog that takes the same ctrl+L and typed path as Firefox's, and a11y `press` on the file button opened it (so it counts as a user gesture). `--force-renderer-accessibility` is required, as for the other Chromium UI tests. `Driver.upload` and `Driver.choose` were split (`send`, `choose_in_dialog`) so the two drivers share the flow.
+
+Validation (nix shell with labwc, foot, grim, wtype, wlrctl, wayvnc, tigervnc, dbus, firefox 160.0.1, chromium 158.0.8127.36, libreoffice 26.8.3.1, at-spi2-core; `uv run python -m unittest discover -s tests -p test_mixed_workflow.py`):
+- all of `test_mixed_workflow.py` (Firefox and Chromium): 9 tests OK in 111 s.
+- Chromium classes only (`-k Chromium`, 2 tests, about 52 s each run), 5 runs in a row: 5 of 5 OK.
+- Full desktop suite on the worker: see the pull request.
+
+Not done: an agent run of `f2-mixed-upload` in Chromium (no paid runs here); kills during agent runs.
+
 ## 2026-11-26 — AltGr-level characters for a nested Hyprland's layout (X11)
 
 Follows #233, which left level-3 (AltGr) characters unplaced. PR #237.

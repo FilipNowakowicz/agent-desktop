@@ -62,7 +62,7 @@ validation behind each feature.
 | A browser `click` or `fill` on an element under a modal or overlay is refused before input | tested | `test_browser` |
 | Accessibility actions in GTK and Qt dialogs | tested | `test_ui` |
 | Scripts in the session, bounded and supervised (R3) | tested | `test_run`, `test_script_jobs` |
-| File dialogs in complete workflows | tested | `test_mixed_workflow` (Firefox's upload chooser), `test_document_workflow` (LibreOffice's format dialog) |
+| File dialogs in complete workflows | tested | `test_mixed_workflow` (the upload chooser in Firefox and in Chromium), `test_document_workflow` (LibreOffice's format dialog) |
 | Clipboard between applications, poor-accessibility interfaces in complete workflows | untested | Covered piecemeal |
 | Native Windows or macOS applications | unsupported | Linux first (PRODUCT_DIRECTION.md) |
 

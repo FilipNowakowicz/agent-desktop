@@ -23,9 +23,10 @@ from urllib.parse import urljoin
 
 import test_browser
 import test_document_workflow
-from test_runtime import wait_for
+from test_runtime import CHROMIUM, wait_for
 
 from agent_desktop import core
+from agent_desktop.worker import find_registryd
 from benchmarks import f2_document as doc
 from benchmarks.f2_mixed import (
     CURRENT,
@@ -159,6 +160,8 @@ class Driver:
     """A deterministic procedure that sees only the page, the downloaded file
     and the session's windows."""
 
+    DIALOG = "File Upload"
+
     def __init__(self, test, portal):
         self.test = test
         self.session = test.session
@@ -194,15 +197,25 @@ class Driver:
         return rows
 
     def choose(self, path):
-        # The browser's own file chooser (here xdg-desktop-portal-gtk): type
-        # the path into its location field.
         self.browser("click", selector="#file")
+        self.choose_in_dialog(path)
+        wait_for(
+            lambda: (
+                self.browser("find", selector="#file")["items"][0]
+                .get("value", "")
+                .endswith(path.name)
+            ),
+            timeout=20,
+        )
+
+    def choose_in_dialog(self, path):
+        # The browser's own file chooser: type the path into its location field.
         dialog = wait_for(
             lambda: next(
                 (
                     w
                     for w in core.request(self.session, "windows")["windows"]
-                    if w["title"].startswith("File Upload")
+                    if w["title"].startswith(self.DIALOG)
                 ),
                 None,
             ),
@@ -214,14 +227,9 @@ class Driver:
         core.request(self.session, "type", text=str(path))
         time.sleep(0.3)  # GTK file chooser path validation, as office_smoke has it.
         core.request(self.session, "key", key="Return")
-        wait_for(
-            lambda: (
-                self.browser("find", selector="#file")["items"][0]
-                .get("value", "")
-                .endswith(path.name)
-            ),
-            timeout=20,
-        )
+
+    def send(self):
+        self.browser("click", selector="#send")
 
     def message(self):
         def settled():
@@ -238,7 +246,7 @@ class Driver:
                     self.log.append("reconciled from Received, not resubmitted")
                 return
             self.choose(path)
-            self.browser("click", selector="#send")
+            self.send()
             reply = self.message()
             self.log.append(f"attempt {attempt + 1}: {reply}")
             if reply.startswith("Uploaded"):
@@ -255,6 +263,70 @@ class Driver:
         self.process(path)
         self.upload(path)
         return path
+
+
+class ChromiumDriver(Driver):
+    """The same procedure in Chromium, which has no DOM bridge: the page is read
+    and operated through its accessibility tree (desktop_ui)."""
+
+    DIALOG = "Open File"
+
+    def nodes(self):
+        return core.request(self.session, "ui", max_nodes=2000)["nodes"]
+
+    def node(self, name, role=None):
+        return next(
+            (
+                n
+                for n in self.nodes()
+                if (n.get("name") or "").startswith(name)
+                and (role is None or n["role"] == role)
+            ),
+            None,
+        )
+
+    def press(self, name, role):
+        node = wait_for(lambda: self.node(name, role), timeout=20)
+        core.request(self.session, "ui_action", node=node["id"], action="press")
+
+    def download(self):
+        folder = core.session_path(self.session) / "home/Downloads"
+        self.press(CURRENT, "link")
+        name = self.portal.name
+        size = len(self.portal.files[name])
+        path = folder / name
+        # Chromium writes NAME.crdownload, then renames it.
+        wait_for(lambda: path.exists() and path.stat().st_size == size, timeout=30)
+        self.log.append(f"downloaded {name} ({size} bytes)")
+        return path
+
+    def received(self):
+        cells = [
+            (n.get("name") or "")
+            for n in self.nodes()
+            if n["role"] in ("table cell", "cell")
+        ]
+        return [(cells[i], int(cells[i + 1])) for i in range(0, len(cells) - 2, 3)]
+
+    def choose(self, path):
+        self.press("Choose file", "button")
+        self.choose_in_dialog(path)
+        wait_for(lambda: self.node(f"Choose file: {path.name}", "button"), timeout=20)
+
+    def send(self):
+        self.press("Upload", "button")
+
+    def message(self):
+        def settled():
+            for n in self.nodes():
+                text = (n.get("name") or "").strip()
+                if n["role"] == "static" and text.startswith(
+                    ("Uploaded", "Upload failed", "No reply")
+                ):
+                    return text
+            return None
+
+        return wait_for(settled, timeout=30)
 
 
 @unittest.skipUnless(
@@ -299,6 +371,47 @@ class MixedWorkflowTests(unittest.TestCase):
         self.assertTrue(
             {"kept the Word format", "saved without a format dialog"} & set(log), log
         )
+
+
+@unittest.skipUnless(
+    all(shutil.which(t) for t in ("labwc", "grim", "dbus-daemon", "libreoffice"))
+    and CHROMIUM
+    and find_registryd(),
+    "desktop tools, Chromium, LibreOffice or at-spi2-core unavailable",
+)
+class ChromiumMixedWorkflowTests(MixedWorkflowTests):
+    """The mixed workflow with Chromium as the browser."""
+
+    def launch(self, url):
+        argv = [
+            CHROMIUM,
+            f"--user-data-dir={self.root / 'chromium'}",
+            "--no-first-run",
+            "--ozone-platform=wayland",
+            "--disable-gpu",
+            "--password-store=basic",
+            "--force-renderer-accessibility",
+        ]
+        if os.geteuid() == 0:  # CI containers; never used for real profiles
+            argv.append("--no-sandbox")
+        app = core.request(self.session, "launch", argv=[*argv, url])
+        found = core.wait(self.session, title="Contract portal", timeout=40)
+        if (
+            not found["satisfied"]
+            and "No usable sandbox" in Path(app["logs"]).read_text()
+        ):
+            self.skipTest("Chromium sandbox unavailable in this environment")
+        self.assertTrue(found["satisfied"], Path(app["logs"]).read_text()[-2000:])
+
+    def trial(self, seed, suffix, failure=None):
+        portal = Portal(seed, suffix, failure=failure)
+        self.addCleanup(portal.close)
+        self.launch(portal.url)
+        driver = ChromiumDriver(self, portal)
+        driver.run()
+        time.sleep(LATE_REPLY_S + 1)  # An upload still in flight would land here.
+        self.assertEqual(evaluate(portal), [], driver.log)
+        return driver.log, portal
 
 
 if __name__ == "__main__":

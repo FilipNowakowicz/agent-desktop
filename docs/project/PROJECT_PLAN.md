@@ -82,7 +82,15 @@ Remaining open items after these PRs:
 - X3: a real reboot or logout. Env-cleared children with the scope off are found from the guardian's record (#238, merged 2026-11-26), except a child started in the last 0.5 s before both supervisors die, or later outside every recorded group and session.
 - X9: the off-screen refusal check on the maintainer's machine.
 - X12: the Fedora Chromium drop (needs a Fedora machine).
-- MCP tool-surface review: 22 tools were unused. Maintainer decided 2026-11-26: find why, then remove stale or redundant tools.
+- MCP tool-surface review: 22 tools were unused. Maintainer decided 2026-11-26: find
+  why, then remove stale or redundant tools. Done in an open PR (`tool-surface`, based on main, no
+  dependencies). 29 default tools become 17: `list` and `logs` fold into
+  `status`, `move`, `drag`, `scroll`, `focus` and `ui_action` become
+  `desktop_actions` steps only, `check` and `operation` stay CLI-only, and `atlas`,
+  `set` and `effects` are offered only with their variables. The schema prefix
+  drops from about 10,040 to about 8,075 estimated tokens. Analysis:
+  [research/2026-11-26-tool-surface-review.md](../research/2026-11-26-tool-surface-review.md).
+  Re-check at the next usage review whether agents find the new steps and `desktop_ui`.
 - The fixed-wait habit: re-measure at the next usage review.
 - AltGr placement for nested layouts: done in #237 (merged 2026-11-26); dead keys and level-5 keys are not placed.
 

@@ -134,7 +134,7 @@ the ledger treats it as application state.
 `--suite atlas` holds four Mousepad settings tasks in everyday words, checked in
 Mousepad's settings file. `--atlas DIR` enables the experimental
 `desktop_atlas` and `desktop_set` tools with that atlas directory; without it
-both tools are disabled. Results: [effect-atlas report](research/2026-10-09-effect-atlas.md#agent-ab).
+the server does not offer them. Results: [effect-atlas report](research/2026-10-09-effect-atlas.md#agent-ab).
 
 ## Realistic suite (E0, 2026-10-11)
 
@@ -440,6 +440,9 @@ before choosing further interaction extensions.
 ## Tool profile comparison, 2026-10-04 (claude-opus-5-5, accessibility on in both)
 
 `--tools basic` disables wait, actions and semantic UI; `--tools full` allows them.
+(Since 2026-11-26 the server has no separate `ui_action`, `move`, `drag`, `scroll`
+or `focus` tools; they are `desktop_actions` steps, so `basic` now lacks them
+entirely. Rerunning this comparison would not reproduce the October tool sets.)
 Two rounds, seeds 7 and 8. Results: `benchmarks/results/2026-10-04-tool-profiles.json`.
 
 | Suite / profile | Passed | Tool calls | Cost (USD) | Total tokens |

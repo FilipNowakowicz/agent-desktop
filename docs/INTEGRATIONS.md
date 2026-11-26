@@ -6,7 +6,10 @@ local MCP tools. No model or cloud service is required by the runtime itself.
 ## MCP
 
 Run the stdio server with `uv run agent-desktop-mcp`. It exposes session lifecycle,
-launch, windows, PNG images with dimensions, input and logs through the same core.
+launch, windows, PNG images with dimensions, input, accessibility, the Firefox
+bridge and handoffs through the same core: 17 tools by default, listed in the
+[desktop guide](USAGE.md#mcp-tools). On 2026-11-26 twelve rarely chosen tools
+were removed or made opt-in; that guide says what replaces each one.
 Desktop sessions persist when an MCP client disconnects; destroy them explicitly.
 The server sends instructions to the client describing the screenshot/act/verify
 loop and the login handoff (`desktop_request_human`, `desktop_control`, profiles).

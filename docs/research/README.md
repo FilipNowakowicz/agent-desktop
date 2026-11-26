@@ -38,6 +38,7 @@ current promises. Current direction is in the
 | 2026-11-10 | [Big directions (work in progress)](2026-11-10-big-directions-wip.md) | Larger directions B1-B5 and C1-C3 | Open: accepted items moved to the execution plan; others parked or in Later (see the directions board) |
 | 2026-11-11 | [Desktop subagent protocol](2026-11-11-desktop-subagent-protocol.md) | N10 A/B protocol, with a schema-cost measurement | Done as the protocol of the pilot below |
 | 2026-11-11 | [Desktop subagent pilot](2026-11-11-desktop-subagent-pilot.md) | Holding the desktop tools in a subagent (B1) | Weakened: main-context tokens fell 93-97% but wall time rose 51-58% (gate not met); direct tools stay the default |
+| 2026-11-26 | [MCP tool-surface review](2026-11-26-tool-surface-review.md) | Why 8 of the 29 default tools were never called (and 22 in one short window), and what to fold, remove or make discoverable | Adopted: 17 default tools, schema prefix about 20% smaller |
 
 Data kept beside the documents: [effects/](effects/) (aggregates cited by the
 October notes), and the scripts named above. Evidence for the 2026-11-06 round is in

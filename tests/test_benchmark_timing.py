@@ -50,16 +50,16 @@ class TimeSplitTests(unittest.TestCase):
             log = Path(directory) / "calls.jsonl"
             previous = os.environ.pop("AGENT_DESKTOP_CALL_LOG", None)
             try:
-                mcp_server.log_call("desktop_list", 1.0, True)
+                mcp_server.log_call("desktop_status", 1.0, True)
                 self.assertFalse(log.exists())
                 os.environ["AGENT_DESKTOP_CALL_LOG"] = str(log)
-                mcp_server.log_call("desktop_list", 1.0, False)
+                mcp_server.log_call("desktop_status", 1.0, False)
             finally:
                 os.environ.pop("AGENT_DESKTOP_CALL_LOG", None)
                 if previous is not None:
                     os.environ["AGENT_DESKTOP_CALL_LOG"] = previous
             record = json.loads(log.read_text())
-        self.assertEqual(record["tool"], "desktop_list")
+        self.assertEqual(record["tool"], "desktop_status")
         self.assertFalse(record["ok"])
         self.assertGreaterEqual(record["end"], record["start"])
 

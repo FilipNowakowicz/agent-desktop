@@ -48,11 +48,13 @@ SUITES = {
 # private sessions only. So are request_human and control: no person is there
 # to answer, so a handoff would only wait for the agent timeout.
 LIFECYCLE = ["create", "destroy", "launch", "request_host", "request_human", "control"]
+# Since 2026-11-26 move, drag, scroll, focus and ui_action are desktop_actions
+# steps only, so "basic" (no actions) no longer offers them at all, and the
+# separate scroll, drag and move tools of the October runs are gone.
 NEWER = [
     "wait",
     "actions",
     "ui",
-    "ui_action",
     "profiles",
 ]
 # D1 "code": the agent looks with screenshots, ui, windows and wait, and acts
@@ -61,12 +63,7 @@ STEPS = [
     "click",
     "type",
     "key",
-    "scroll",
-    "drag",
-    "move",
     "actions",
-    "ui_action",
-    "focus",
 ]
 TOOL_PROFILES = {
     "basic": LIFECYCLE + NEWER,
@@ -339,10 +336,6 @@ def time_split(elapsed, api_ms, call_log, started, ended):
     }
 
 
-def effects_enabled():
-    return os.environ.get("AGENT_DESKTOP_EFFECTS") == "1"
-
-
 def agent_directory(root, task):
     """The transcript lives outside the task directory, which the effect
     ledger watches: otherwise the agent is shown its own transcript."""
@@ -553,16 +546,12 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
                         for name in TOOL_PROFILES[profile]
-                        + ([] if effects_enabled() else ["effects"])
+                        # effects, atlas and set are offered only with their
+                        # variable, so they need no entry here.
                         + (
                             []
                             if os.environ.get("AGENT_DESKTOP_BENCH_BRIDGE") == "1"
                             else ["browser"]
-                        )
-                        + (
-                            []
-                            if os.environ.get("AGENT_DESKTOP_ATLAS")
-                            else ["atlas", "set"]
                         )
                     ],
                 )

@@ -221,7 +221,9 @@ def find_transcripts(claude_root, codex_root):
 
 def exposed_tools():
     source = (REPO / "src/agent_desktop/mcp_server.py").read_text()
-    return sorted(set(re.findall(r"\ndef (desktop_\w+)\(", source)))
+    # Registered by default: decorated with @tool. Opt-in experiments
+    # (desktop_run, desktop_atlas, ...) are registered later, only with their variable.
+    return sorted(set(re.findall(r"\n@tool\([^)]*\)\ndef (desktop_\w+)\(", source)))
 
 
 def steps_of(call):
@@ -358,10 +360,24 @@ def review(transcripts, since=None, until=None):
                     ] += 1
             if call["tool"] == "desktop_browser" and arguments.get("action") == "steps":
                 totals["browser batches"] += 1
+            # Pointer input: the single tools, and since 2026-11-26 (when move,
+            # drag and scroll became steps only) pointer steps in desktop_actions.
+            pointer = 0
             if tool in ("desktop_click", "desktop_scroll", "desktop_drag"):
-                totals["coordinate input"] += 1
+                pointer = 1
+            elif tool == "desktop_actions" and isinstance(
+                arguments.get("actions"), list
+            ):
+                pointer = sum(
+                    isinstance(step, dict)
+                    and step.get("action") in ("click", "scroll", "drag", "move")
+                    and "x" in step
+                    for step in arguments["actions"]
+                )
+            if pointer:
+                totals["coordinate input"] += pointer
                 if arguments.get("observation"):
-                    totals["coordinate input with observation"] += 1
+                    totals["coordinate input with observation"] += pointer
             if tool == "desktop_screenshot" and not arguments.get("scale"):
                 totals["unscaled screenshots"] += 1
             if tool == "desktop_create" and arguments.get("renderer") not in (

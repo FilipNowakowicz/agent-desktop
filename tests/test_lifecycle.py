@@ -26,8 +26,13 @@ from test_takeover import connect
 
 from agent_desktop import core, operations, viewer
 from agent_desktop.worker import (
+    LINEAGE_FILE,
+    boot_id,
     descendants,
+    lineage_members,
     owned_processes,
+    process_table,
+    read_lineage,
     scope_members,
     scope_name,
     start_time,
@@ -538,22 +543,86 @@ class SupervisorLossTests(LifecycleCase):
         self.assertEqual(control["owner"], "agent")
         self.assertIsNone(control["lease"])
 
-    @unittest.expectedFailure
-    def test_env_cleared_daemon_is_stopped_by_recovery(self):
-        """Known limit without a systemd scope (CAPABILITY_MATRIX: detached
-        descendants that clear their environment). With both supervisors gone,
-        recovery finds processes by token only, so `setsid env -i` children
-        are left. SystemdScopeTests covers AGENT_DESKTOP_SYSTEMD_SCOPE=1."""
-        session = self.create()["session"]
-        info = core.manifest(session)
-        self.start_daemon(session)
-        self.addCleanup(self.stop_session_daemons)
+    def recorded(self, session, pids):
+        """Wait until the guardian's record of its subtree lists `pids`."""
+        root = core.session_path(session)
+        wait_for(lambda: set(pids) <= {pid for pid, _ in read_lineage(root)})
+
+    def kill_supervisors(self, info):
         for pid in (info["guardian_pid"], info["worker_pid"]):
             os.kill(pid, signal.SIGKILL)
         wait_for(lambda: not core.supervisor_alive(info))
+
+    def test_env_cleared_daemon_is_stopped_by_recovery(self):
+        """Without a systemd scope (SystemdScopeTests has one): a `setsid env -i`
+        child carries no token, and recovery finds it in the guardian's record
+        of its subtree."""
+        session = self.create()["session"]
+        info = core.manifest(session)
+        daemon = self.start_daemon(session)
+        self.addCleanup(self.stop_session_daemons)
+        self.assertNotIn(daemon[0], owned_processes(info["token"]))
+        self.recorded(session, daemon)
+        self.kill_supervisors(info)
+        self.assertEqual(self.session_daemons(), daemon)
+
         self.assertTrue(core.destroy(session)["recovered"])
         self.assertEqual(owned_processes(info["token"]), [])
         self.assertEqual(self.session_daemons(), [])
+        self.assertFalse((core.session_path(session) / LINEAGE_FILE).exists())
+        self.assert_unrelated_running()
+
+    def test_double_forked_daemon_is_stopped_by_the_next_session(self):
+        session = self.create("f3-daemon")["session"]
+        info = core.manifest(session)
+        # The classic daemon: fork, setsid, fork again, the middle one exits.
+        inner = f"env -i sleep {self.duration} </dev/null >/dev/null 2>&1 &"
+        core.request(
+            session,
+            "launch",
+            argv=["sh", "-c", f"(setsid sh -c '{inner}' &); exit 0"],
+        )
+        daemon = wait_for(self.session_daemons)
+        self.addCleanup(self.stop_session_daemons)
+        self.recorded(session, daemon)
+        self.kill_supervisors(info)
+        wait_for(lambda: not core.profiles()[0]["in_use"])
+        self.assertEqual(self.session_daemons(), daemon)
+
+        result = self.create("f3-daemon")
+        self.assertEqual(
+            result["previous_session"],
+            {"session": session, "status": "stopped", "recovered": True},
+        )
+        self.assertEqual(self.session_daemons(), [])
+        self.assert_unrelated_running()
+
+    def test_child_forked_after_the_record_shares_a_recorded_session(self):
+        """A child born after both supervisors died, whose parent then exited, is
+        found through the (Unix) session of a recorded process that still runs."""
+        session = self.create()["session"]
+        info = core.manifest(session)
+        script = (
+            f'sleep 2; sh -c "sleep {self.duration} </dev/null >/dev/null 2>&1 &"; '
+            f"exec sleep {self.duration}"
+        )
+        path = f"PATH={os.environ['PATH']}"
+        app = core.request(
+            session, "launch", argv=["env", "-i", path, "sh", "-c", script]
+        )
+        self.addCleanup(self.stop_session_daemons)
+        self.recorded(session, [app["pid"]])
+        self.kill_supervisors(info)
+        daemons = wait_for(lambda: len(d := self.session_daemons()) == 2 and d)
+        self.assertIn(app["pid"], daemons)
+        orphan = next(pid for pid in daemons if pid != app["pid"])
+        recorded = {pid for pid, _ in read_lineage(core.session_path(session))}
+        self.assertNotIn(orphan, recorded)
+        self.assertNotIn(orphan, descendants(app["pid"]))
+
+        self.assertTrue(core.destroy(session)["recovered"])
+        self.assertEqual(self.session_daemons(), [])
+        self.assert_unrelated_running()
 
     def stop_session_daemons(self):
         for pid in self.session_daemons():
@@ -1077,6 +1146,60 @@ class SystemdScopeTests(LifecycleCase):
         core.destroy(session)
         self.runtime_gone(info)
         wait_for(lambda: not cgroup_exists(info["cgroup"]))
+
+
+class LineageRecordTests(RecordCase):
+    def setUp(self):
+        super().setUp()
+        self.outside = subprocess.Popen(
+            ["sleep", unique_duration()], start_new_session=True
+        )
+        self.addCleanup(self.outside.wait)
+        self.addCleanup(self.outside.kill)
+
+    def write(self, session, data):
+        path = core.session_path(session) / LINEAGE_FILE
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_a_record_is_trusted_only_in_its_boot_and_with_matching_starts(self):
+        pid = self.outside.pid
+        started = start_time(pid)
+        session = self.record("ready")
+        root = core.session_path(session)
+        self.write(session, {"boot_id": boot_id(), "processes": [[pid, started]]})
+        self.assertEqual(read_lineage(root), {(pid, started)})
+        for data in (
+            {"boot_id": uuid.uuid4().hex, "processes": [[pid, started]]},
+            {"boot_id": None, "processes": [[pid, started]]},
+            {"boot_id": boot_id(), "processes": "nonsense"},
+            {"boot_id": boot_id(), "processes": [[pid, started, 1], [0, 1], ["1", 2]]},
+            [],
+        ):
+            with self.subTest(data=data):
+                self.write(session, data)
+                self.assertEqual(read_lineage(root), set())
+        # A number reused by another process (another start time) stops nothing.
+        path = self.write(
+            session, {"boot_id": boot_id(), "processes": [[pid, started + 1]]}
+        )
+        self.assertTrue(core.destroy(session)["recovered"])
+        self.assertIsNone(self.outside.poll())
+        self.assertFalse(path.exists())
+
+    def test_the_callers_own_group_and_session_are_never_vouched_for(self):
+        # Both share this process's group and session; only the known one counts.
+        known = subprocess.Popen(["sleep", unique_duration()])
+        other = subprocess.Popen(["sleep", unique_duration()])
+        for process in (known, other):
+            self.addCleanup(process.wait)
+            self.addCleanup(process.kill)
+        found = lineage_members({(known.pid, start_time(known.pid))}, process_table())
+        self.assertEqual(found, {known.pid})
+        self.assertEqual(
+            lineage_members({(known.pid, start_time(known.pid) + 1)}, process_table()),
+            set(),
+        )
 
 
 class ScopeRecordTests(RecordCase):

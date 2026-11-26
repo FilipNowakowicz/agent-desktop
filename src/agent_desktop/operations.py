@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 
 from . import checks, core
-from .worker import start_time
+from .worker import boot_id, start_time
 
 MAX_RECORDS = 32
 MAX_BYTES = 524288
@@ -253,14 +253,6 @@ def load(path, session, operation_id):
         raise core.DesktopError(
             "Operation evidence unavailable or invalid; delivery is unknown. Do not resubmit blindly."
         ) from error
-
-
-def boot_id():
-    """This boot's identifier: a process start time means nothing across boots."""
-    try:
-        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
-    except OSError:
-        return None
 
 
 def process_alive(pid, started, boot=None):

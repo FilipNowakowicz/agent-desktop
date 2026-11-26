@@ -78,6 +78,27 @@ def process_table():
     return table
 
 
+def process_groups(table):
+    """{pid: (process group, session)} for the processes in `table`."""
+    groups = {}
+    for pid in table:
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text()
+        except OSError:
+            continue
+        fields = stat[stat.rindex(")") + 2 :].split()
+        groups[pid] = (int(fields[2]), int(fields[3]))
+    return groups
+
+
+def boot_id():
+    """This boot's identifier: a process start time means nothing across boots."""
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return None
+
+
 def start_time(pid):
     """A process's start time, or None if it no longer exists."""
     try:
@@ -178,20 +199,138 @@ def scope_members(cgroup):
     return []  # the scope is gone: systemd removes it once it is empty
 
 
-def session_process_starts(token, tree=True, cgroup=None):
+# STATE/<session>/processes.json: the guardian's record of its subtree.
+LINEAGE_FILE = "processes.json"
+LINEAGE_INTERVAL = 0.5
+
+
+def subtree_starts(root):
+    """{pid: start time} of root's live descendants.
+
+    Walks /proc/<pid>/task/*/children, much cheaper than a full process scan,
+    and falls back to one where the kernel does not list children.
+    """
+    if child_pids(root) is None:
+        return {
+            pid: started
+            for pid in descendants(root)
+            if (started := start_time(pid)) is not None
+        }
+    found, pending = {}, [root]
+    while pending:
+        for child in child_pids(pending.pop()) or ():
+            if child not in found and (started := start_time(child)) is not None:
+                found[child] = started
+                pending.append(child)
+    return found
+
+
+def record_lineage(root, guardian, stop):
+    """Guardian thread: keep the session record's list of live descendants.
+
+    Both supervisors are subreapers, so while either lives every descendant
+    stays in this subtree, including one that cleared its environment, left
+    its session or daemonized. Recovery after both die starts from this list.
+    It is rewritten only when the subtree changes.
+    """
+    path, temporary = root / LINEAGE_FILE, root / (LINEAGE_FILE + ".tmp")
+    boot, last = boot_id(), None
+    while True:
+        members = subtree_starts(guardian)
+        if members != last:
+            entries = sorted([pid, started] for pid, started in members.items())
+            write_private(
+                temporary, json.dumps({"boot_id": boot, "processes": entries})
+            )
+            temporary.replace(path)
+            last = members
+        if stop.wait(LINEAGE_INTERVAL):
+            return
+
+
+def read_lineage(root):
+    """{(pid, start time)} the guardian last recorded in this boot, else empty."""
+    try:
+        data = json.loads((root / LINEAGE_FILE).read_text())
+        boot, entries = data["boot_id"], data["processes"]
+    except (OSError, ValueError, TypeError, KeyError):
+        return set()
+    if boot is None or boot != boot_id() or not isinstance(entries, list):
+        return set()
+    return {
+        tuple(entry)
+        for entry in entries
+        if isinstance(entry, list)
+        and len(entry) == 2
+        and all(type(value) is int and value > 0 for value in entry)
+    }
+
+
+def lineage_members(known, table):
+    """Live processes descended from the known session processes, or sharing a
+    process group or session with one of them.
+
+    `known` holds (pid, start time) pairs, so a number since reused is not taken
+    for a session process. A process group or session number cannot be reused
+    while any member is alive, and a process can only join a group in its own
+    session, so a live known member vouches for every other member: children it
+    forked after the record whose parent has since exited, for example. The
+    caller's own group and session, and those of init and the kernel, never do.
+    """
+    groups = process_groups(table)
+    me = groups.get(os.getpid(), (None, None))
+    never = {0, 1, *me}
+    children, by_group, by_session = {}, {}, {}
+    for pid, (parent, _state, _start) in table.items():
+        children.setdefault(parent, []).append(pid)
+    for pid, (group, session) in groups.items():
+        by_group.setdefault(group, []).append(pid)
+        by_session.setdefault(session, []).append(pid)
+    pending = [
+        pid for pid, started in known if table.get(pid, (0, "", None))[2] == started
+    ]
+    found, seen = set(), set()
+    while pending:
+        pid = pending.pop()
+        if pid in found or pid not in table:
+            continue
+        found.add(pid)
+        pending += children.get(pid, [])
+        group, session = groups.get(pid, (0, 0))
+        for key, members in (
+            ("g", by_group.get(group)),
+            ("s", by_session.get(session)),
+        ):
+            number = group if key == "g" else session
+            if number not in never and (key, number) not in seen:
+                seen.add((key, number))
+                pending += members or []
+    return found
+
+
+def session_process_starts(token, tree=True, cgroup=None, lineage=None):
     """{pid: start time} of live session processes: token carriers, members of
-    the session's systemd scope, plus this supervisor's subtree."""
+    the session's systemd scope, plus this supervisor's subtree.
+
+    With `lineage`, a set of (pid, start time) pairs from read_lineage, also the
+    processes lineage_members finds from it. The set grows with each scan, so a
+    process found once still vouches for its group after its parent is stopped.
+    """
     table = process_table()
     pids = set(owned_processes(token)) | set(scope_members(cgroup))
     if tree:
         pids |= set(descendants(os.getpid(), table))
+    if lineage is not None:
+        found = lineage_members(lineage, table) - {os.getpid(), os.getppid()}
+        lineage.update((pid, table[pid][2]) for pid in found)
+        pids |= found
     # Never this supervisor or its parent (the worker's guardian).
     pids -= {os.getpid(), os.getppid()}
     return {p: table[p][2] for p in pids if p in table and table[p][1] not in "ZX"}
 
 
-def session_processes(token, tree=True, cgroup=None):
-    return sorted(session_process_starts(token, tree, cgroup))
+def session_processes(token, tree=True, cgroup=None, lineage=None):
+    return sorted(session_process_starts(token, tree, cgroup, lineage))
 
 
 def child_pids(pid):
@@ -236,7 +375,9 @@ def reap_orphans(tracked=()):
             pass
 
 
-def cleanup_processes(token, tracked=(), spare=(), tree=True, cgroup=None):
+def cleanup_processes(
+    token, tracked=(), spare=(), tree=True, cgroup=None, lineage=None
+):
     """Stop the session tree; processes in spare get SIGTERM only after the rest.
 
     Each process is identified by its number and start time, so a number reused
@@ -251,7 +392,9 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True, cgroup=None):
             # Rescan: a process may fork while the tree is being stopped.
             remaining = {
                 (pid, started)
-                for pid, started in session_process_starts(token, tree, cgroup).items()
+                for pid, started in session_process_starts(
+                    token, tree, cgroup, lineage
+                ).items()
                 if pid not in excluded
             }
             if not remaining:
@@ -261,7 +404,7 @@ def cleanup_processes(token, tracked=(), spare=(), tree=True, cgroup=None):
                 signal_process(pid, started, sig)
             reap_orphans(tracked)
             time.sleep(0.05)
-        if not session_processes(token, tree, cgroup):
+        if not session_processes(token, tree, cgroup, lineage):
             return
     raise RuntimeError("Session processes remain after cleanup")
 
@@ -4274,6 +4417,7 @@ def write_manifest(root, info):
 
 def remove_session_files(root, runtime):
     shutil.rmtree(runtime, ignore_errors=True)
+    (root / LINEAGE_FILE).unlink(missing_ok=True)
     for name in ("home", "config"):
         shutil.rmtree(root / name, ignore_errors=True)
 
@@ -4597,10 +4741,18 @@ def guard(root, worker, handoff=None):
 
     signal.signal(signal.SIGTERM, forward)
     signal.signal(signal.SIGINT, forward)
+    stop = threading.Event()
+    recorder = threading.Thread(
+        target=record_lineage, args=(root, os.getpid(), stop), daemon=True
+    )
+    recorder.start()
     _, status = os.waitpid(worker, 0)
     info = json.loads((root / "session.json").read_text())
     # The worker's orphans are now this process's children or token carriers.
     cleanup_processes(info["token"])
+    stop.set()
+    recorder.join()
+    (root / LINEAGE_FILE).unlink(missing_ok=True)
     if info["status"] in ("stopped", "failed"):
         return 0
     if os.WIFSIGNALED(status):

@@ -1103,9 +1103,11 @@ def supervisor_alive(info):
 
 
 def recover(session, info):
-    """Clean up after supervisors that no longer exist, using the session token."""
+    """Clean up after supervisors that no longer exist, using the session token
+    and the guardian's last record of its subtree."""
     from .worker import (
         cleanup_processes,
+        read_lineage,
         remove_session_files,
         scope_name,
         write_manifest,
@@ -1128,9 +1130,11 @@ def recover(session, info):
     ):
         raise DesktopError("Refusing an unexpected session cgroup")
     try:
-        # Token and scope only: this process's own children are not session
-        # processes.
-        cleanup_processes(info["token"], tree=False, cgroup=cgroup)
+        # Token, scope and the guardian's record of its subtree only: this
+        # process's own children are not session processes.
+        cleanup_processes(
+            info["token"], tree=False, cgroup=cgroup, lineage=read_lineage(root)
+        )
     except RuntimeError as error:
         raise DesktopError(f"Recovery failed: {error}") from error
     remove_session_files(root, runtime)

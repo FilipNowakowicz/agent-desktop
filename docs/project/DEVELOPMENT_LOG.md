@@ -7,7 +7,7 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 
 ## 2026-11-26 — MCP tool surface: 29 default tools become 17
 
-This closes the plan's open item "22 tools were unused". The maintainer decided on
+PR #240. This closes the plan's open item "22 tools were unused". The maintainer decided on
 2026-11-26 to find out why, then remove the stale or redundant tools. The analysis
 is in [research/2026-11-26-tool-surface-review.md](../research/2026-11-26-tool-surface-review.md).
 It draws on `scripts/usage_review.py --since 2026-10-01` (905 calls in 35 transcripts,

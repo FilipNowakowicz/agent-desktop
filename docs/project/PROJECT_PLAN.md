@@ -83,7 +83,7 @@ Remaining open items after these PRs:
 - X9: the off-screen refusal check on the maintainer's machine.
 - X12: the Fedora Chromium drop (needs a Fedora machine).
 - MCP tool-surface review: 22 tools were unused. Maintainer decided 2026-11-26: find
-  why, then remove stale or redundant tools. Done in an open PR (`tool-surface`, based on main, no
+  why, then remove stale or redundant tools. Done in #240 (open, based on main, no
   dependencies). 29 default tools become 17: `list` and `logs` fold into
   `status`, `move`, `drag`, `scroll`, `focus` and `ui_action` become
   `desktop_actions` steps only, `check` and `operation` stay CLI-only, and `atlas`,

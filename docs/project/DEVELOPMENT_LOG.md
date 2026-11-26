@@ -5,6 +5,68 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-26 — AltGr-level characters for a nested Hyprland's layout (X11)
+
+Follows #233, which left level-3 (AltGr) characters unplaced. PR #237.
+
+Reproduced first, on main (38acb02). Guarded private session (`create --guard-host
+--renderer gles2 --render-device /dev/dri/renderD129`, `__EGL_VENDOR_LIBRARY_FILENAMES`
+unset), nested Hyprland 0.57.2 started inside it with `AQ_BACKEND=wayland`, a short
+`XDG_RUNTIME_DIR=/run/user/<uid>/q.XXXX`, a Lua config with `input = { kb_layout = "de" }`
+and a foot running `stty -echo; cat > received.txt`. `agent-desktop type SESSION
+'az@€{[]}\~|µ<>²³ end'` then `key Return` arrived as `az2<ü<ü<++#<>=. end` with the
+warning `12 characters have no key in the nested Hyprland's layout`.
+
+Fix (`BindLayout(typing=True)`, used only for the nested layout; host shortcut placement
+is unchanged):
+
+- The layout's level-3 key is the key whose first level is `ISO_Level3_Shift`, Right Alt
+  (code 100) when the layout puts it there. The layout's own `xkb_state` is run with that
+  key held, alone and with Shift, and every key's symbol under it is placed as
+  `(code, shifted, level-3 code)`. Levels one and two keep their keys. A level-3 place
+  replaces an earlier one only when that key is past X11's 255 (`EuroSign` sits at level
+  one of evdev code 435; `€` now goes to AltGr+e on German).
+- Typed text arrives as Unicode keysyms (U+20AC, U+0105) while layouts name them
+  (`EuroSign`, `aogonek`), so every place is also stored under its Unicode keysym
+  (`xkb_keysym_to_utf32`). Without this, Polish `ą` and `€` stayed unplaced.
+- `type` presses the level-3 key (and Shift where needed) around the character as real
+  key events; `key` does the same inside the chord. The parent's modifier mask is not
+  changed (labwc sees code 100 as Alt_R without a modifier mapping). A held level-3 key
+  is not pressed again. `key_down` of a level-3 character is refused with a message
+  (holding it would need AltGr held too); `key_down ISO_Level3_Shift` is unchanged.
+
+Decision (default chosen without a maintainer question): characters reached only through
+dead keys (for example `é` on German) or a level-5 key are still sent as US keys with the
+existing warning; composing dead-key sequences is left out.
+
+After the fix, same harness, each in a new session, received byte for byte:
+`de` `az@€{[]}\~|µ<>²³ end`; `de` variant `nodeadkeys` `Grüße @ {x} € ~ end`; `pl`
+`Zażółć gęślą jaźń ĄĘŁÓŚŻŹĆŃ €5 @#{} end`; `fr` `azerty @#{[|\^]}€ end`; `us` and
+`us`/`dvorak` lines with capitals and punctuation (the #233 strings, plus `{y} @`).
+`key` under `de` with `at EuroSign braceleft backslash bar asciitilde q shift+q` gave
+`@€{\|~qQ`. Every session was destroyed and its short runtime removed; no nested
+Hyprland process remained.
+
+Unit tests (`tests/test_keyboard.py`, real libxkbcommon): German and Polish level-3
+places, the euro sign on AltGr+e, shortcut layouts without AltGr places, event order for
+AltGr and Shift+AltGr in `type` and `key`, and the `key_down` refusal. With the source
+change reverted they fail (1 failure, 9 errors). Not covered by an automated test: the
+live nested run (needs a GPU renderer and Hyprland, as for #233).
+
+Validation:
+
+- `uv run ruff check src tests` and `uv run ruff format --check src tests` pass.
+- Locally, `nix shell nixpkgs#labwc --command uv run python -m unittest tests.test_keyboard`:
+  16 tests OK.
+- Worker (commit f082051, shared with another suite), `on-worker run -n altgr-suite -- nix
+  shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl
+  nixpkgs#wayvnc nixpkgs#tigervnc nixpkgs#dbus nixpkgs#firefox nixpkgs#at-spi2-core
+  --command uv run python -m unittest discover -s tests -p 'test*.py'`: Ran 532 tests in
+  747 s, OK (skipped=37, expected failures=1).
+
+Remaining: dead-key compositions and level-5 keys are not placed; nested compositors
+other than Hyprland are still not detected.
+
 ## 2026-11-26 — Env-cleared children found without a systemd scope (X3)
 
 Problem: with `AGENT_DESKTOP_SYSTEMD_SCOPE` off, a session child that cleared its environment (`setsid env -i …`) carries no token, and recovery after both supervisors die found processes by token only. Such children survived `destroy` and the next `create` on the profile.
@@ -41,6 +103,7 @@ Still not covered without the scope:
 - A process started after they die whose parent exits, when it shares no group or session with a recorded process that still runs. For example, a recorded process forks, the child calls `setsid` and the recorded process exits.
 - The guardian killed long before the worker: the record stops at the guardian's death.
 - Nothing escapes the scope this way, except a process that moves itself to another unit.
+
 
 ## 2026-11-25 — Refresh the project plan; cookie files may stay for a long job
 

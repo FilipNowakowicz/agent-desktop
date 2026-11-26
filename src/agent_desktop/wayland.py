@@ -395,6 +395,10 @@ class Keysyms:
         return keysym
 
 
+ISO_LEVEL3_SHIFT = 0xFE03
+XKB_KEY_DOWN = 1
+
+
 class XkbRuleNames(ctypes.Structure):
     _fields_ = [
         (name, ctypes.c_char_p)
@@ -408,9 +412,14 @@ class BindLayout:
     Hyprland matches shortcuts by reading a key's code through its configured
     layout, ignoring the sending keyboard's keymap. A chord for "l" must therefore
     use the code that means "l" there (on Dvorak, not the US position).
+
+    With `typing` (text for a nested compositor, which reads the codes of every
+    key through its own layout), characters on the AltGr levels are placed as
+    well, on the key that gives them while the layout's ISO_Level3_Shift key is
+    held, and characters are also placed by their Unicode keysyms.
     """
 
-    def __init__(self, library, **names):
+    def __init__(self, library, typing=False, **names):
         library.xkb_context_new.restype = ctypes.c_void_p
         library.xkb_context_new.argtypes = [ctypes.c_int]
         library.xkb_context_unref.argtypes = [ctypes.c_void_p]
@@ -424,6 +433,19 @@ class BindLayout:
         for function in ("xkb_keymap_min_keycode", "xkb_keymap_max_keycode"):
             getattr(library, function).restype = ctypes.c_uint32
             getattr(library, function).argtypes = [ctypes.c_void_p]
+        library.xkb_keysym_to_utf32.restype = ctypes.c_uint32
+        library.xkb_keysym_to_utf32.argtypes = [ctypes.c_uint32]
+        library.xkb_state_new.restype = ctypes.c_void_p
+        library.xkb_state_new.argtypes = [ctypes.c_void_p]
+        library.xkb_state_unref.argtypes = [ctypes.c_void_p]
+        library.xkb_state_update_key.restype = ctypes.c_int
+        library.xkb_state_update_key.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_int,
+        ]
+        library.xkb_state_key_get_one_sym.restype = ctypes.c_uint32
+        library.xkb_state_key_get_one_sym.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
         library.xkb_keymap_key_get_syms_by_level.restype = ctypes.c_int
         library.xkb_keymap_key_get_syms_by_level.argtypes = [
             ctypes.c_void_p,
@@ -444,6 +466,12 @@ class BindLayout:
                 raise WaylandError(f"Cannot compile the keyboard layout: {names}")
             try:
                 self.rows, self.places = self.read(library, keymap)
+                self.level3 = None
+                if typing:
+                    self.level3 = self.read_third_level(
+                        library, keymap, self.rows, self.places
+                    )
+                    self.alias_characters(library, self.places)
             finally:
                 library.xkb_keymap_unref(keymap)
         finally:
@@ -471,12 +499,61 @@ class BindLayout:
                 places.setdefault(keysym, (code, level == 1))
         return rows, places
 
+    @staticmethod
+    def read_third_level(library, keymap, rows, places):
+        """Add what each key gives while the level-3 key is held, alone and
+        with Shift, as (code, shifted, level-3 code). Returns that level-3 code,
+        or None if the layout has no ISO_Level3_Shift key."""
+        selectors = [c for c, row in rows.items() if row[:1] == [ISO_LEVEL3_SHIFT]]
+        if not selectors:
+            return None
+        # Right Alt where the layout puts AltGr there, as most do.
+        level3 = 100 if 100 in selectors else min(selectors)
+        shift = MODIFIER_CODES["shift"]
+        first = library.xkb_keymap_min_keycode(keymap)
+        last = library.xkb_keymap_max_keycode(keymap)
+        for shifted in (False, True):
+            # The keymap's own state machine, as the nested compositor runs it.
+            state = library.xkb_state_new(keymap)
+            if not state:
+                raise WaylandError("Cannot create an xkb state")
+            try:
+                if shifted:
+                    library.xkb_state_update_key(state, shift + 8, XKB_KEY_DOWN)
+                library.xkb_state_update_key(state, level3 + 8, XKB_KEY_DOWN)
+                for xkb_code in range(first, last + 1):
+                    code = xkb_code - 8
+                    if code <= 0 or code in (level3, shift):
+                        continue
+                    keysym = library.xkb_state_key_get_one_sym(state, xkb_code)
+                    known = places.get(keysym)
+                    # Replaces only a key past X11's 255 (EuroSign on evdev's 435).
+                    if keysym and (not known or known[0] + 8 > 255 and code < 248):
+                        places[keysym] = (code, shifted, level3)
+            finally:
+                library.xkb_state_unref(state)
+        return level3
+
+    @staticmethod
+    def alias_characters(library, places):
+        """Typed text arrives as Unicode keysyms (U+20AC for the euro sign);
+        layouts name most of them (EuroSign, aogonek). Place both."""
+        for keysym, place in list(places.items()):
+            point = library.xkb_keysym_to_utf32(keysym)
+            if not point or point >= 0x110000:
+                continue
+            try:
+                places.setdefault(char_keysym(chr(point)), place)
+            except ValueError:
+                continue  # control characters
+
     def place(self, keysym):
-        """(code, shifted, keysyms of that key), or None if no key produces it."""
+        """(code, shifted, keysyms of that key, level-3 code or None), or None
+        if no key produces it. A level-3 code must be held around the key."""
         if keysym not in self.places:
             return None
-        code, shifted = self.places[keysym]
-        return code, shifted, self.rows[code]
+        code, shifted, *level3 = self.places[keysym]
+        return code, shifted, self.rows.get(code, []), (level3 or [None])[0]
 
 
 class VirtualKeyboard:
@@ -594,9 +671,9 @@ class VirtualKeyboard:
     def type(self, text, layout=None):
         """Type text. A compositor nested in this one translates key codes
         through its own layout, so with `layout` each character goes to the code
-        that layout reads as it, with a real Shift press where it needs one (a
-        modifier mask alone is not seen by the nested compositor). Returns how
-        many characters had no key in that layout.
+        that layout reads as it, with a real Shift and level-3 (AltGr) press
+        where it needs them (a modifier mask alone is not seen by the nested
+        compositor). Returns how many characters had no key in that layout.
         """
         pending = []
         missing = 0
@@ -607,11 +684,16 @@ class VirtualKeyboard:
             if placed:
                 self.send(pending)
                 pending = []
-                code, shifted, _ = placed
+                code, shifted, _, level3 = placed
                 shifted = shifted and not self.mask & SHIFT
+                level3 = level3 not in self.held and level3
                 if shifted:
                     self.event(MODIFIER_CODES["shift"], 1)
+                if level3:
+                    self.event(level3, 1)
                 self.send([(code, False)])
+                if level3:
+                    self.event(level3, 0)
                 if shifted:
                     self.event(MODIFIER_CODES["shift"], 0)
                 continue
@@ -634,8 +716,10 @@ class VirtualKeyboard:
         compositor resolving shortcuts through it expects to find it.
         """
         placed = layout.place(keysym) if layout else None
+        level3 = None
         if placed:
-            code, shifted, row = placed
+            code, shifted, row, level3 = placed
+            level3 = level3 not in self.held and level3
             self.overrides = {code: row}
             self.dirty = True
             # A real Shift press: a compositor resolving through a layout of
@@ -656,7 +740,11 @@ class VirtualKeyboard:
                 pressed.append(code)
                 self.mask |= MODIFIER_BITS[code]
                 self.modifiers(self.mask)
+        if level3:
+            self.event(level3, 1)
         self.send([key], 0, repeat)
+        if level3:
+            self.event(level3, 0)
         for code in reversed(pressed):
             self.event(code, 0)
             self.mask &= ~MODIFIER_BITS[code]
@@ -672,8 +760,13 @@ class VirtualKeyboard:
     def down(self, keysym, layout=None):
         """Press a key and leave it held until up() or release_all()."""
         placed = None if keysym in NAMED_MODIFIERS else layout and layout.place(keysym)
+        if placed and placed[3]:
+            raise ValueError(
+                "That character needs AltGr in the nested Hyprland's layout and "
+                "cannot be held; use key or type"
+            )
         if placed:
-            code, _, row = placed
+            code, _, row, _ = placed
         else:
             found = self.lookup(keysym)
             if found is None:

@@ -1107,10 +1107,13 @@ so it can show what a held key displays), when a person takes control, and after
 30 seconds if the client disappears. While a Hyprland nested inside a private session has
 focus (its window is the session's focused toplevel), `type` and `key` place letters for
 the layout it reports through `hyprctl -j devices`, read from the instance the session
-started, because it reads key codes through its own layout, not the session's. A `warning`
-says when that layout could not be read, or that some characters have no key in it
-(for example AltGr characters on German); those are sent as US keys. Other nested
-compositors are not detected: give them a US layout. `scroll` takes optional
+started, because it reads key codes through its own layout, not the session's.
+Characters on that layout's AltGr levels (German `@ € { [ \ ~`, Polish `ą ę ł`) are typed
+with a real press of its AltGr key (ISO_Level3_Shift, normally Right Alt), and Shift
+where they need it. A `key_down` of such a character is refused; use `key` or `type`. A
+`warning` says when that layout could not be read, or that some characters have no key
+in it (characters reached only through dead keys or a level-5 key); those are sent as
+US keys. Other nested compositors are not detected: give them a US layout. `scroll` takes optional
 `x`/`y` (CLI `--x/--y`) to move there first. `delivered` means the input was sent
 to the compositor, not that the application handled it: on the host, a
 layer-shell panel (quick settings, a launcher) can hold keyboard focus without

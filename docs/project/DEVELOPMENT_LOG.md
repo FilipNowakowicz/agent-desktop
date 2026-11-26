@@ -7,7 +7,7 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 
 ## 2026-11-26 — AltGr-level characters for a nested Hyprland's layout (X11)
 
-Follows #233, which left level-3 (AltGr) characters unplaced.
+Follows #233, which left level-3 (AltGr) characters unplaced. PR #237.
 
 Reproduced first, on main (38acb02). Guarded private session (`create --guard-host
 --renderer gles2 --render-device /dev/dri/renderD129`, `__EGL_VENDOR_LIBRARY_FILENAMES`

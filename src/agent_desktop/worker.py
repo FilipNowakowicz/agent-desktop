@@ -204,25 +204,41 @@ LINEAGE_FILE = "processes.json"
 LINEAGE_INTERVAL = 0.5
 
 
-def subtree_starts(root):
-    """{pid: start time} of root's live descendants.
+class SubtreeWatch:
+    """The live descendants of `root`, a subreaper, kept up to date cheaply.
 
-    Walks /proc/<pid>/task/*/children, much cheaper than a full process scan,
-    and falls back to one where the kernel does not list children.
+    Under a subreaper a descendant never leaves the subtree while it lives (an
+    orphan is reparented to an ancestor inside it), and a process outside never
+    joins it. So each scan reads /proc/<pid>/stat only for process numbers it
+    has not classified yet, plus the members' own to confirm their start times.
     """
-    if child_pids(root) is None:
-        return {
-            pid: started
-            for pid in descendants(root)
-            if (started := start_time(pid)) is not None
-        }
-    found, pending = {}, [root]
-    while pending:
-        for child in child_pids(pending.pop()) or ():
-            if child not in found and (started := start_time(child)) is not None:
-                found[child] = started
-                pending.append(child)
-    return found
+
+    def __init__(self, root):
+        self.root = root
+        self.members = {}  # pid: start time
+        self.outside = set()
+
+    def scan(self):
+        pids = {int(name) for name in os.listdir("/proc") if name.isdecimal()}
+        self.outside &= pids
+        for pid, started in list(self.members.items()):
+            if start_time(pid) != started:
+                del self.members[pid]
+        new = []
+        for pid in pids - self.outside - self.members.keys() - {self.root}:
+            try:
+                stat = Path(f"/proc/{pid}/stat").read_text()
+            except OSError:
+                continue
+            fields = stat[stat.rindex(")") + 2 :].split()
+            new.append((int(fields[19]), pid, int(fields[1])))
+        # A parent starts before its child, so it is classified first.
+        for started, pid, parent in sorted(new):
+            if parent == self.root or parent in self.members:
+                self.members[pid] = started
+            else:
+                self.outside.add(pid)
+        return dict(self.members)
 
 
 def record_lineage(root, guardian, stop):
@@ -234,9 +250,9 @@ def record_lineage(root, guardian, stop):
     It is rewritten only when the subtree changes.
     """
     path, temporary = root / LINEAGE_FILE, root / (LINEAGE_FILE + ".tmp")
-    boot, last = boot_id(), None
+    boot, last, watch = boot_id(), None, SubtreeWatch(guardian)
     while True:
-        members = subtree_starts(guardian)
+        members = watch.scan()
         if members != last:
             entries = sorted([pid, started] for pid, started in members.items())
             write_private(

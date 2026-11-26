@@ -1040,8 +1040,16 @@ itself, so daemonizing applications and D-Bus-activated services remain in its
 process tree and are stopped at teardown. `status` lists those processes. A small
 guardian process watches the supervisor; if the supervisor dies, the guardian stops
 the session's processes and marks it `failed`. If both are killed, `destroy`
-recovers the session using its environment token (processes that cleared their
-environment cannot be found then).
+recovers the session using its environment token and the guardian's record of
+its process tree. The guardian rewrites that record, `processes.json` in the
+session directory, within half a second of the tree changing: each process's
+number and start time, with the boot id. Recovery stops the recorded processes
+that still run (same number, start time and boot), their descendants, and the
+other members of their process groups and Unix sessions, so a child that
+cleared its environment, called `setsid` or daemonized is found too. Not found:
+a process started in the last half second before both supervisors died, and
+one started afterwards whose parent has exited and that shares no process group
+or session with a recorded process that still runs.
 
 With `AGENT_DESKTOP_SYSTEMD_SCOPE=1` in the environment of the CLI or MCP
 server, `create` starts the supervisors in a transient scope of the user's
@@ -1049,7 +1057,8 @@ systemd manager, `agent-desktop-SESSION.scope` (through `systemd-run --user
 --scope`), and the manifest records its cgroup. The kernel keeps every
 descendant in that cgroup, so recovery after both supervisors die also stops
 processes that cleared their environment or left the process group. It is off
-by default and has no fallback: without `systemd-run` or a reachable user
+by default (the record above covers most such processes without it) and has
+no fallback: without `systemd-run` or a reachable user
 manager (which systemd-run finds through `XDG_RUNTIME_DIR`), `create` fails. A
 process that moves itself into another unit, for example by running
 `systemd-run` itself, leaves the scope. systemd removes the scope once it is

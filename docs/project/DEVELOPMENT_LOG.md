@@ -14,7 +14,7 @@ Runtime gaps: none found. The download landed in the session's `~/Downloads` (Ch
 Validation (nix shell with labwc, foot, grim, wtype, wlrctl, wayvnc, tigervnc, dbus, firefox 160.0.1, chromium 158.0.8127.36, libreoffice 26.8.3.1, at-spi2-core; `uv run python -m unittest discover -s tests -p test_mixed_workflow.py`):
 - all of `test_mixed_workflow.py` (Firefox and Chromium): 9 tests OK in 111 s.
 - Chromium classes only (`-k Chromium`, 2 tests, about 52 s each run), 5 runs in a row: 5 of 5 OK.
-- Full desktop suite on the worker: see the pull request.
+- Full desktop suite on the worker (`on-worker run -n f2-chromium-suite`, the nix shell above, `uv run python -m unittest discover -s tests -p 'test*.py'`): 528 tests in 1095 s, OK (skipped=19, expected failures=1); no failures.
 
 Not done: an agent run of `f2-mixed-upload` in Chromium (no paid runs here); kills during agent runs.
 

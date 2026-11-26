@@ -4003,6 +4003,7 @@ class Worker:
                 result = (
                     BindLayout(
                         self.keysyms.library,
+                        typing=True,
                         rules=self.hyprland_option("kb_rules", env),
                         model=keyboard["model"],
                         layout=nth(keyboard["layout"]),

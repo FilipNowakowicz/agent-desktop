@@ -5,6 +5,43 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-26 — Env-cleared children found without a systemd scope (X3)
+
+Problem: with `AGENT_DESKTOP_SYSTEMD_SCOPE` off, a session child that cleared its environment (`setsid env -i …`) carries no token, and recovery after both supervisors die found processes by token only. Such children survived `destroy` and the next `create` on the profile.
+
+Reproduction (commit 38acb02 plus the test without its `expectedFailure`, labwc/foot/grim from nixpkgs): `test_lifecycle` `test_env_cleared_daemon_is_stopped_by_recovery` failed, `[19497] != []`: the daemon still ran after `destroy` reported `recovered`.
+
+Mechanism: both supervisors were already child subreapers, so while either lives every descendant stays in its subtree, however it detached. The guardian now keeps a record of that subtree, `STATE/<session>/processes.json` (0600, written atomically): each process's number and start time, plus the boot id. A thread rewrites it within 0.5 s of a change. Recovery (`core.recover`, so `destroy` and the next `create` on the profile) reads it and stops:
+- recorded processes still running with the same number, start time and boot;
+- their current descendants;
+- other members of their process groups and Unix sessions. While a live member keeps a group or session number, the kernel cannot reuse it, and a process can join a group only in its own session. That covers a child forked after the record whose parent has exited.
+
+Processes found are added to the set during the cleanup scans, so a group stays vouched for after its first member is stopped. The caller's own group and session, and those of init and the kernel, never count. A record from another boot, or one that is malformed, is ignored, and a reused number (another start time) stops nothing. The guardian and recovery delete the record when they finish.
+
+Other options were weighed. A process-group or session id alone misses `setsid`. A subreaper alone does nothing once both supervisors are dead. A pidfd dies with its holder. cgroups are what the opt-in scope already provides. The record extends the existing subreaper design with no new dependency.
+
+Cost: the tracker (`SubtreeWatch`) reads `/proc/<pid>/stat` only for process numbers it has not classified yet, plus its members. This is possible because under a subreaper, membership changes only by birth and death. Measured on the laptop (381 processes, a 124-process subtree): 3.4 ms per scan, compared with 34 ms for a walk through `/proc/*/task/*/children` and 11.6 ms for a full scan.
+
+The scope stays opt-in (no maintainer decision changed). `LIFETIMES.md`, `USAGE.md`, `ARCHITECTURE.md`, `CAPABILITY_MATRIX.md`, `FUNCTIONALITY_ROADMAP.md` and the X3 row were updated.
+
+Tests (`tests/test_lifecycle.py`, scope off):
+- `test_env_cleared_daemon_is_stopped_by_recovery`: no longer an expected failure.
+- `test_double_forked_daemon_is_stopped_by_the_next_session`: fork, `setsid`, fork, `env -i`; recovered by the next `create` on the profile.
+- `test_child_forked_after_the_record_shares_a_recorded_session`: a child born 2 s after both supervisors died, whose parent exited, is neither recorded nor a descendant of a recorded process; it is found through the Unix session. With group and session anchoring disabled, this test fails.
+- `LineageRecordTests`: another boot id, no boot id, malformed records and a reused number stop nothing; the caller's own group is never vouched for.
+
+Validation:
+- Laptop (12 cores, nix shell with labwc, foot, grim, wtype, wlrctl, wayvnc, tigervnc, dbus, firefox and at-spi2-core): `uv run python -m unittest discover -s tests -p test_lifecycle.py`, 26 tests OK (three runs, the last on the final code).
+- Laptop: `SupervisorLossTests`, `LineageRecordTests` and `SystemdScopeTests` five times in a row, 11 tests OK each time.
+- Worker (gcp-builder, commit 4c28aba, with another contributor's suite running at the same time): the full desktop suite, `Ran 530 tests in 753.451s`, `OK (skipped=37)`.
+- After 4c28aba, the only change was that a failed write of the record is logged and retried; `test_lifecycle` was run again locally, 26 OK.
+
+Still not covered without the scope:
+- A process started in the last 0.5 s before both supervisors die.
+- A process started after they die whose parent exits, when it shares no group or session with a recorded process that still runs. For example, a recorded process forks, the child calls `setsid` and the recorded process exits.
+- The guardian killed long before the worker: the record stops at the guardian's death.
+- Nothing escapes the scope this way, except a process that moves itself to another unit.
+
 ## 2026-11-25 — Refresh the project plan; cookie files may stay for a long job
 
 Docs and tool text only; no tests were run.

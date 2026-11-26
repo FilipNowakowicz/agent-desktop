@@ -109,7 +109,7 @@ agent input is refused, and observation tokens go stale when control returns.
 
 | Location | Contents |
 | --- | --- |
-| `$XDG_STATE_HOME/agent-desktop/` (default `~/.local/state/agent-desktop/`; override `AGENT_DESKTOP_STATE_DIR`) | One directory per session: `session.json` (the manifest, including a secret token and status), `session.log`, `dbus.log`, `trace.jsonl` (action trace), `screenshots/`, `operations/` (job records), `config/` (labwc) and `home/` (the private home, unless a profile is used). Also `profiles/<name>/home` (persistent logins and app data, with a lock and `last-session.json`) and `host-request.json`. |
+| `$XDG_STATE_HOME/agent-desktop/` (default `~/.local/state/agent-desktop/`; override `AGENT_DESKTOP_STATE_DIR`) | One directory per session: `session.json` (the manifest, including a secret token and status), `session.log`, `dbus.log`, `trace.jsonl` (action trace), `processes.json` (the guardian's record of its process tree while the session runs), `screenshots/`, `operations/` (job records), `config/` (labwc) and `home/` (the private home, unless a profile is used). Also `profiles/<name>/home` (persistent logins and app data, with a lock and `last-session.json`) and `host-request.json`. |
 | `$XDG_RUNTIME_DIR/agent-desktop/<session>/` (a private `/tmp/agent-desktop-<uid>` when unset) | Sockets and markers that must not outlive a boot: `control.sock`, the Wayland socket, the D-Bus socket, `vnc.sock`, `x-display`, `take-requested`. |
 | `$XDG_DATA_HOME/agent-desktop/runtime` (or `AGENT_DESKTOP_RUNTIME`) | An optional installed desktop runtime (labwc, wlroots and tools) that is put first on `PATH`; otherwise tools come from `PATH`. |
 

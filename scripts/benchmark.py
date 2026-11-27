@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent_desktop import core  # noqa: E402
 from agent_desktop.worker import find_registryd, owned_processes  # noqa: E402
+from benchmarks import inject  # noqa: E402
 from benchmarks.atlas import ATLAS_TASKS  # noqa: E402
 from benchmarks.effects import EFFECT_TASKS  # noqa: E402
 from benchmarks.f2 import F2_TASKS  # noqa: E402
@@ -232,7 +233,7 @@ def run_agent(
         "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
         # The service refused the run (e.g. a usage limit): not a task result.
-        "api_error": result.get("api_error") if result.get("is_error") else None,
+        "api_error": api_error(result),
         "screenshots": sum(
             1
             for c, n in zip(calls, names, strict=True)
@@ -246,6 +247,26 @@ def run_agent(
             wall_ended,
         ),
     }
+
+
+def api_error(result):
+    """Why the service ended the run (a usage limit, HTTP 429 or another API
+    error), or None. Such a run is invalid: neither a pass nor a failure."""
+    if not result.get("is_error"):
+        return None
+    status = result.get("api_error_status")
+    return (
+        result.get("api_error")
+        or (f"HTTP {status}" if status else None)
+        or ("api_error" if result.get("terminal_reason") == "api_error" else None)
+    )
+
+
+def verdict(record):
+    """pass, fail, or invalid (api error) for a run the service ended."""
+    if record.get("api_error"):
+        return "invalid (api error)"
+    return "pass" if record.get("passed") else "fail"
 
 
 def main_context_tokens(events):
@@ -477,7 +498,17 @@ def replay(session, code):
     }
 
 
-def run_task(task, root, budget, model, dry_run=False, profile="full", human=False):
+def run_task(
+    task,
+    root,
+    budget,
+    model,
+    dry_run=False,
+    profile="full",
+    human=False,
+    injection=None,
+    allow_launch=False,
+):
     directory = (root / task.name).resolve()
     directory.mkdir(parents=True)
     record = {"task": task.name, "passed": False}
@@ -489,6 +520,7 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
     context.mcp_config = mcp_config_for(root)
     context.reports = Reports()
     context.report_url = context.reports.url
+    injector = None
     try:
         argv, goal = task.setup(context)
         # A task may launch several applications; the last one holds its answer.
@@ -526,6 +558,15 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
             else:
                 prompt += SKILL_PROMPT.format(code=skill.read_text().strip())
             record["skill"] = True
+        if injection:
+            injector = inject.Injector(
+                *injection,
+                call_log_for(root),
+                lambda: owned_processes(info["token"]),
+                worker_pid=info.get("worker_pid"),
+            ).start()
+            if dry_run:
+                injector.fired.wait(10)  # No agent, so only N=0 fires.
         if human:
             record.update(run_human(session, goal))
         elif replaying:
@@ -545,7 +586,11 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     subagent=subagent,
                     disallowed=[
                         f"mcp__agent-desktop__desktop_{name}"
-                        for name in TOOL_PROFILES[profile]
+                        for name in [
+                            n
+                            for n in TOOL_PROFILES[profile]
+                            if not (allow_launch and n == "launch")
+                        ]
                         # effects, atlas and set are offered only with their
                         # variable, so they need no entry here.
                         + (
@@ -556,6 +601,8 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
                     ],
                 )
             )
+        if injector:
+            record["injection"] = injector.stop()
         if learn and not (human or dry_run or replaying):
             code = skill_from_reply(full_reply(agent_directory(root, task)))
             record["learned"] = code is not None
@@ -569,10 +616,20 @@ def run_task(task, root, budget, model, dry_run=False, profile="full", human=Fal
         passed, detail = task.check(context)
         record["passed"] = bool(passed)
         record["detail"] = detail
-        record["final_screenshot"] = core.request(session, "screenshot")["path"]
+        record["injection_outcome"] = inject.outcome(record)
+        record["verdict"] = verdict(record)
+        if record.get("api_error"):
+            # Not scored: the check's result is kept, but it is no pass or fail.
+            record["check_passed"], record["passed"] = record["passed"], None
+        try:
+            record["final_screenshot"] = core.request(session, "screenshot")["path"]
+        except core.DesktopError as error:  # A killed worker ends the session.
+            record["final_screenshot_error"] = str(error)
     except Exception as error:
         record["error"] = f"{type(error).__name__}: {error}"
     finally:
+        if injector and "injection" not in record:
+            record["injection"] = injector.stop()
         context.reports.close()
         for close in getattr(context, "closers", []):
             close()
@@ -671,6 +728,18 @@ def main():
         action="store_true",
         help="let the agent use desktop_browser (needs --firefox)",
     )
+    parser.add_argument(
+        "--inject",
+        type=inject.parse,
+        metavar="TARGET@N",
+        help="SIGKILL TARGET (office, browser, helper, worker) in the session "
+        "after the agent's N-th completed tool call",
+    )
+    parser.add_argument(
+        "--allow-launch",
+        action="store_true",
+        help="let the agent use desktop_launch (to restart a killed application)",
+    )
     args = parser.parse_args()
     if args.tools == "code" and not args.run:
         parser.error("--tools code needs --run")
@@ -736,6 +805,8 @@ def main():
             args.dry_run,
             args.tools,
             args.human,
+            args.inject,
+            args.allow_launch,
         )
         records.append(record)
         print(
@@ -749,6 +820,7 @@ def main():
                         "tool_errors",
                         "elapsed_seconds",
                         "cost_usd",
+                        "injection_outcome",
                         "detail",
                         "error",
                     )
@@ -777,6 +849,8 @@ def main():
         "firefox": args.firefox,
         "bridge": args.bridge,
         "atlas": bool(args.atlas),
+        "inject": "@".join(map(str, args.inject)) if args.inject else None,
+        "allow_launch": args.allow_launch,
         "accessibility": bool(find_registryd()),
         "tasks": len(ran),
         "passed": sum(r["passed"] for r in ran),

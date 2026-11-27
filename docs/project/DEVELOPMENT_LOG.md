@@ -5,6 +5,83 @@ verbatim in [log/2026-10.md](log/2026-10.md). The older narrative of the
 [project plan](PROJECT_PLAN.md) is in
 [archive/PROJECT_PLAN-history.md](archive/PROJECT_PLAN-history.md).
 
+## 2026-11-27 — F2 matched trials and kills during agent runs (X2)
+
+The protocol ([research/2026-11-26-f2-trials-protocol.md](../research/2026-11-26-f2-trials-protocol.md))
+was committed before the first counted run. Results and raw records are in
+[evidence/F2-TRIALS-RESULTS.md](../../evidence/F2-TRIALS-RESULTS.md) and
+`evidence/f2-trials-records.jsonl`.
+
+Harness changes:
+
+- `scripts/benchmark.py --inject TARGET@N` (`benchmarks/inject.py`) SIGKILLs a target in the
+  session once the agent's N-th tool call has completed, counted from the MCP
+  call log. The targets are `office` (`soffice*`, `oosplash`), `browser` (Firefox or
+  Chromium processes), `helper` (a durable job's helper, once one runs) and
+  `worker`. The record gains `injection` (fired, calls, seconds, what was killed)
+  and `injection_outcome`: recovered, honest failure, false success, not fired
+  or invalid (api error). `--allow-launch` gives the agent `desktop_launch`, so it
+  can restart a killed application.
+- A run the service ends (HTTP 429, a usage limit, another API error) is now
+  `verdict: invalid (api error)`. It has `passed: null` and no injection outcome,
+  and the check's result is kept as `check_passed`. Before, a 429 with
+  `api_error` set was already excluded from the totals, but its injection
+  outcome read "honest failure".
+- A killed worker no longer turns the final screenshot into a harness error.
+- `scripts/f2_trials.py` runs the plan in order, with the stop rule and resume
+  by matched pair, and prints the summary (Clopper-Pearson intervals, McNemar).
+- `tests/test_benchmark_inject.py` (9 tests, no desktop) uses sleeping
+  processes named like LibreOffice, Firefox and a helper, some with a fake session
+  token. A kill fires after exactly N calls of this run, never touches the same
+  name outside the session or another application, waits for a helper, and
+  reports never firing. It also classifies the 2026-11-26 usage-limit result
+  event as invalid, and a budget-cap stop as a scored failure.
+
+No-model checks first: every cell with `--dry-run` failed its check (seeds 22, 24
+and 25, the worker kill and Chromium), and each injection at N=0 fired, with
+no leftover processes.
+
+Model runs on the laptop. The worker has no `claude` CLI or login, and the 2026-11-25
+runs also ran here:
+
+```sh
+nix shell nixpkgs#labwc nixpkgs#foot nixpkgs#grim nixpkgs#wtype nixpkgs#wlrctl \
+  nixpkgs#dbus nixpkgs#at-spi2-core nixpkgs#libreoffice \
+  --command uv run scripts/f2_trials.py run --log evidence/f2-trials.log
+uv run scripts/f2_trials.py summary --records evidence/f2-trials-records.jsonl
+```
+
+All runs used `claude-opus-5-5` (Claude Code 2.1.332) on seeds 22, 24 and 25, with a
+baseline and a kill arm per task and seed:
+
+- Baseline 10/10 and kill 9/9 (office@2 for the document edit, browser@3 for the
+  dataset edit, office@7 for the mixed workflow). Every kill was recovered, with
+  no false success. There were 9 complete pairs with 0 discordant (McNemar p = 1).
+- Worker kill: an honest FAILED reply and no leftovers.
+- Chromium mixed (no bridge): 1/2. Seed 22 uploaded the unsaved file first, then
+  the edited one, so the portal stored a duplicate. That is an agent mistake,
+  and the agent reported it.
+- One run was invalid: the 12th was ended by a 429 usage limit, so the loop
+  stopped and was resumed after the reset.
+- $6.415 for 23 runs ($0.383 of it the invalid run), within the approved $10.
+  Agent wall time was 24.7 min. A kill cost 10–13 extra turns and 1.75–3.5 times
+  the wall time.
+
+Deviation: #240 (29 to 17 MCP tools) merged mid-run. Seeds 22 and 24 ran on 29
+tools (apart from the seed-24 mixed cell, rerun in both arms on 17), the rest on
+17. Pairs are matched within one surface, and the rebased harness's profiles
+still disallow only names that exist.
+
+The full desktop suite ran on the worker (gcp-builder, the protocol's `nix shell` with
+wayvnc, tigervnc and firefox, `uv run python -m unittest discover -s tests -p
+'test*.py'`) at `0023156`, rebased on #240: 549 tests in 737 s, OK (skipped=39).
+An earlier run before the rebase gave 543 tests, OK (skipped=37).
+
+Remaining failures and gaps: every kill landed before any committed effect, so
+kills after a partial edit are untested. Helper kills are implemented but no run
+used a durable job. There were no Chromium kill runs, and only one model and one
+machine. These runs are experimental proof, not a reliability estimate.
+
 ## 2026-11-26 — MCP tool surface: 29 default tools become 17
 
 PR #240. This closes the plan's open item "22 tools were unused". The maintainer decided on

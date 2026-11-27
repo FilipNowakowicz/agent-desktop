@@ -124,11 +124,13 @@ class Injector:
 
 
 def outcome(record):
-    """A kill run's outcome: recovered, honest failure, false success or not
-    fired. None for a run without an injection."""
+    """A kill run's outcome: recovered, honest failure, false success, not
+    fired, or invalid (api error). None for a run without an injection."""
     injection = record.get("injection")
     if not injection:
         return None
+    if record.get("api_error"):
+        return "invalid (api error)"  # The service ended the run: not scored.
     if not injection.get("fired"):
         return "not fired"
     if record.get("passed"):

@@ -124,3 +124,15 @@ task, seed, model, profile and machine; provenance as the harness commit, run
 directories, model and CLI version in the raw records; uncertainty as the
 intervals above. Not covered: other models, other machines or distributions,
 held-out task variants beyond the new seeds, and kills of a durable job helper.
+
+## Addendum (2026-11-27, after the first 12 runs; the plan above is unchanged)
+
+- The 12th run (`f2-mixed-upload` seed 24, kill) was ended by the service
+  (HTTP 429, usage limit). It is invalid, not scored, and kept in the raw
+  records. The harness now marks such a run `invalid (api error)` (no pass,
+  failure or injection outcome).
+- #240 merged in between and cut the MCP server from 29 tools to 17. Seeds 22
+  and 24 (except the mixed task's seed 24) ran on 29 tools; everything after
+  ran on 17. A pair is matched only within one surface: the seed-24 mixed
+  cell is run again in both arms on 17 tools, and its 29-tool baseline is
+  reported as an unpaired extra run.

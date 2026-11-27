@@ -233,7 +233,7 @@ def run_agent(
         "model_usage": result.get("modelUsage", {}),
         "turns": result.get("num_turns"),
         # The service refused the run (e.g. a usage limit): not a task result.
-        "api_error": result.get("api_error") if result.get("is_error") else None,
+        "api_error": api_error(result),
         "screenshots": sum(
             1
             for c, n in zip(calls, names, strict=True)
@@ -247,6 +247,26 @@ def run_agent(
             wall_ended,
         ),
     }
+
+
+def api_error(result):
+    """Why the service ended the run (a usage limit, HTTP 429 or another API
+    error), or None. Such a run is invalid: neither a pass nor a failure."""
+    if not result.get("is_error"):
+        return None
+    status = result.get("api_error_status")
+    return (
+        result.get("api_error")
+        or (f"HTTP {status}" if status else None)
+        or ("api_error" if result.get("terminal_reason") == "api_error" else None)
+    )
+
+
+def verdict(record):
+    """pass, fail, or invalid (api error) for a run the service ended."""
+    if record.get("api_error"):
+        return "invalid (api error)"
+    return "pass" if record.get("passed") else "fail"
 
 
 def main_context_tokens(events):
@@ -597,6 +617,10 @@ def run_task(
         record["passed"] = bool(passed)
         record["detail"] = detail
         record["injection_outcome"] = inject.outcome(record)
+        record["verdict"] = verdict(record)
+        if record.get("api_error"):
+            # Not scored: the check's result is kept, but it is no pass or fail.
+            record["check_passed"], record["passed"] = record["passed"], None
         try:
             record["final_screenshot"] = core.request(session, "screenshot")["path"]
         except core.DesktopError as error:  # A killed worker ends the session.

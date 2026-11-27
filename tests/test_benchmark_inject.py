@@ -18,6 +18,7 @@ from pathlib import Path
 
 from agent_desktop.worker import owned_processes
 from benchmarks import inject
+from scripts import benchmark
 
 SLEEP = "import time; time.sleep(60)"
 
@@ -160,6 +161,46 @@ class InjectorTests(unittest.TestCase):
             "honest failure",
         )
         self.assertEqual(inject.outcome({"injection": fired}), "honest failure")
+
+
+class ApiErrorTests(unittest.TestCase):
+    """A run the service ended (a usage limit, HTTP 429) is invalid: neither a
+    pass, a failure nor an injection outcome."""
+
+    # The result event of the 2026-11-26 run stopped by a usage limit.
+    LIMIT = {
+        "type": "result",
+        "subtype": "success",
+        "is_error": True,
+        "terminal_reason": "api_error",
+        "api_error_status": 429,
+        "api_error_type": "rate_limit_error",
+        "api_error": "usage_limit_reached",
+        "result": "You've hit your 5-hour limit",
+    }
+
+    def test_api_error_found_in_the_result(self):
+        self.assertEqual(benchmark.api_error(self.LIMIT), "usage_limit_reached")
+        status_only = {**self.LIMIT, "api_error": None}
+        self.assertEqual(benchmark.api_error(status_only), "HTTP 429")
+        reason_only = {"is_error": True, "terminal_reason": "api_error"}
+        self.assertEqual(benchmark.api_error(reason_only), "api_error")
+        # A run stopped by its own budget cap is a scored failure, not invalid.
+        capped = {"is_error": True, "subtype": "error_max_budget_usd"}
+        self.assertIsNone(benchmark.api_error(capped))
+        self.assertIsNone(benchmark.api_error({**self.LIMIT, "is_error": False}))
+
+    def test_invalid_run_is_not_scored(self):
+        fired = {"fired": True}
+        record = {
+            "injection": fired,
+            "reply": self.LIMIT["result"],
+            "api_error": "usage_limit_reached",
+        }
+        self.assertEqual(inject.outcome(record), "invalid (api error)")
+        self.assertEqual(benchmark.verdict(record), "invalid (api error)")
+        self.assertEqual(benchmark.verdict({"passed": True}), "pass")
+        self.assertEqual(benchmark.verdict({"passed": False}), "fail")
 
 
 if __name__ == "__main__":

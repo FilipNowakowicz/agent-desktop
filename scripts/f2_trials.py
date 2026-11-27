@@ -71,9 +71,54 @@ def entries(log):
     return [json.loads(line) for line in path.read_text().splitlines() if line]
 
 
+def init_event(entry):
+    """The agent's init event (its tools, model and CLI version), or {}."""
+    path = Path(entry["run"]) / "agents" / entry["task"] / "transcript.jsonl"
+    try:
+        for line in path.read_text().splitlines():
+            if '"subtype":"init"' in line.replace(" ", ""):
+                return json.loads(line)
+    except OSError:
+        pass
+    return {}
+
+
+def surface(entry):
+    """The MCP tool surface a run had: 29 server tools before #240 (with
+    desktop_drag among them), 17 after."""
+    tools = init_event(entry).get("tools") or []
+    return 29 if any(t.endswith("__desktop_drag") for t in tools) else 17
+
+
+def valid(entry):
+    data = json.loads((Path(entry["run"]) / "summary.json").read_text())
+    return not data["records"][0].get("api_error")
+
+
+def done(log):
+    """Planned runs already done validly. A baseline/kill cell counts only as
+    a complete pair on one tool surface, so no pair is split across the two
+    surfaces; other arms count once on any surface."""
+    finished = [e for e in entries(log) if not e.get("dry_run") and valid(e)]
+    keys = {(e["task"], e["seed"], e["arm"]) for e in finished}
+    keys = {k for k in keys if k[2] not in ("baseline", "kill")}
+    by_cell = {}
+    for e in finished:
+        if e["arm"] in ("baseline", "kill"):
+            key = (e["task"], e["seed"], surface(e))
+            by_cell.setdefault(key, set()).add(e["arm"])
+    for (task, seed, _), arms in by_cell.items():
+        if arms == {"baseline", "kill"}:
+            keys |= {(task, seed, "baseline"), (task, seed, "kill")}
+    return keys
+
+
 def run(args):
     spent = sum(e.get("cost_usd") or 0 for e in entries(args.log))
+    skip = set() if args.dry_run else done(args.log)
     for task, seed, arm, options, cap, injection in plan():
+        if (task, seed, arm) in skip:
+            continue
         if args.dry_run and injection:
             injection = injection.split("@")[0] + "@0"  # No agent: fire at once.
         if not args.dry_run and spent + cap > STOP:
@@ -100,6 +145,7 @@ def run(args):
             "cost_usd": cost,
             "spent_usd": round(spent, 4),
             "passed": record.get("passed"),
+            "verdict": record.get("verdict"),
             "injection_outcome": record.get("injection_outcome"),
         }
         with open(args.log, "a") as stream:
@@ -180,15 +226,33 @@ def median(values):
 
 
 def summary(args):
-    runs = [load(e) for e in entries(args.log) if not e.get("dry_run")]
-    runs = [r for r in runs if not r["record"].get("api_error")]
+    every = [load(e) for e in entries(args.log) if not e.get("dry_run")]
+    for r in every:
+        r["surface"] = surface(r)
+        r["cli"] = init_event(r).get("claude_code_version")
+        invalid = bool(r["record"].get("api_error"))
+        r["verdict"] = (
+            "invalid (api error)"
+            if invalid
+            else ("pass" if r["record"].get("passed") else "fail")
+        )
     if args.records:
+        heads = ("task", "seed", "arm", "inject", "run", "surface", "cli", "verdict")
         with open(args.records, "w") as stream:
-            for r in runs:
+            for r in every:
                 kept = {k: r["record"].get(k) for k in KEEP if k in r["record"]}
-                head = {k: r[k] for k in ("task", "seed", "arm", "inject", "run")}
-                stream.write(json.dumps({**head, **kept}) + "\n")
-    report = {"runs": len(runs), "cost_usd": round(sum(r["cost_usd"] for r in runs), 3)}
+                stream.write(json.dumps({**{k: r[k] for k in heads}, **kept}) + "\n")
+    runs = [r for r in every if not r["record"].get("api_error")]
+    report = {
+        "runs": len(runs),
+        "invalid_api_error": [
+            f"{r['task']} {r['seed']} {r['arm']} ({r['run']})"
+            for r in every
+            if r["record"].get("api_error")
+        ],
+        "cost_usd_all": round(sum(r["cost_usd"] for r in every), 3),
+        "cost_usd_valid": round(sum(r["cost_usd"] for r in runs), 3),
+    }
     cells = {}
     for r in runs:
         cells.setdefault((r["task"], r["arm"]), []).append(r)
@@ -206,6 +270,7 @@ def summary(args):
             "outcomes": [
                 x.get("injection_outcome") for x in recs if x.get("injection")
             ],
+            "seed_surface": [f"{r['seed']}/{r['surface']}" for r in rs],
         }
     for arm in ("baseline", "kill"):
         rs = [r for r in runs if r["arm"] == arm]
@@ -213,9 +278,10 @@ def summary(args):
         if n:
             report[f"all {arm}"] = {"passed": f"{k}/{n}", "ci95": clopper_pearson(k, n)}
     pairs = {}
-    for r in runs:
+    for r in runs:  # Matched within one tool surface only.
         if r["arm"] in ("baseline", "kill"):
-            pairs.setdefault((r["task"], r["seed"]), {})[r["arm"]] = bool(r["passed"])
+            key = (r["task"], r["seed"], r["surface"])
+            pairs.setdefault(key, {})[r["arm"]] = bool(r["passed"])
     complete = [p for p in pairs.values() if len(p) == 2]
     b = sum(p["baseline"] and not p["kill"] for p in complete)
     c = sum(p["kill"] and not p["baseline"] for p in complete)

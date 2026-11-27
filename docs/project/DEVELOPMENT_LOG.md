@@ -72,6 +72,11 @@ tools (apart from the seed-24 mixed cell, rerun in both arms on 17), the rest on
 17. Pairs are matched within one surface, and the rebased harness's profiles
 still disallow only names that exist.
 
+The full desktop suite ran on the worker (gcp-builder, the protocol's `nix shell` with
+wayvnc, tigervnc and firefox, `uv run python -m unittest discover -s tests -p
+'test*.py'`) at `0023156`, rebased on #240: 549 tests in 737 s, OK (skipped=39).
+An earlier run before the rebase gave 543 tests, OK (skipped=37).
+
 Remaining failures and gaps: every kill landed before any committed effect, so
 kills after a partial edit are untested. Helper kills are implemented but no run
 used a durable job. There were no Chromium kill runs, and only one model and one

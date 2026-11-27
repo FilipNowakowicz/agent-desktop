@@ -275,6 +275,17 @@ First runs (two each, `claude-opus-5-5`) all passed. The document edit took
 Received instead of resubmitting. Details are in the
 [development log](project/DEVELOPMENT_LOG.md).
 
+Kills during agent runs (2026-11-27): `--inject TARGET@N` SIGKILLs `office`,
+`browser`, `helper` (a durable job's helper) or `worker` in the session once the
+agent's N-th tool call has completed, and records `injection` and
+`injection_outcome` (recovered, honest failure, false success, not fired).
+`--allow-launch` lets the agent restart a killed application. A run the service
+ends (a usage limit, HTTP 429) has `verdict: invalid (api error)` and is not
+scored. `scripts/f2_trials.py` runs the matched baseline/kill plan of the
+[protocol](research/2026-11-26-f2-trials-protocol.md). Results are in
+[evidence/F2-TRIALS-RESULTS.md](../evidence/F2-TRIALS-RESULTS.md): baseline 10/10,
+kill 9/9 recovered, Chromium mixed 1/2, $6.42.
+
 ## Hard tasks
 
 Goal: tasks the current suite cannot express, to measure where the agent and

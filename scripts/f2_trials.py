@@ -241,6 +241,8 @@ def summary(args):
         with open(args.records, "w") as stream:
             for r in every:
                 kept = {k: r["record"].get(k) for k in KEEP if k in r["record"]}
+                if r["verdict"].startswith("invalid") and "injection" in kept:
+                    kept["injection_outcome"] = r["verdict"]  # Not scored.
                 stream.write(json.dumps({**{k: r[k] for k in heads}, **kept}) + "\n")
     runs = [r for r in every if not r["record"].get("api_error")]
     report = {

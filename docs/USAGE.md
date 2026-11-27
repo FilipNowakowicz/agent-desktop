@@ -57,6 +57,32 @@ TigerVNC's graphical client needs a host X11 display or Xwayland; the applicatio
 inside the private desktop remain native Wayland. Override optional tools with
 `--wayvnc`, `--viewer`, `AGENT_DESKTOP_WAYVNC` or `AGENT_DESKTOP_VIEWER`.
 
+## MCP tools
+
+The MCP server offers 17 tools by default: `desktop_create`, `desktop_destroy`,
+`desktop_status`, `desktop_profiles`, `desktop_launch`, `desktop_windows`,
+`desktop_screenshot`, `desktop_click`, `desktop_type`, `desktop_key`,
+`desktop_actions`, `desktop_wait`, `desktop_ui`, `desktop_browser`,
+`desktop_request_human`, `desktop_control` and `desktop_request_host`. The CLI
+keeps every command listed in this guide.
+
+**Changed on 2026-11-26 (breaking for MCP clients).** Twelve tools that agents
+had not chosen in daily use were removed from the default list
+([review](research/2026-11-26-tool-surface-review.md)). Use instead:
+
+| Removed tool | Use instead |
+| --- | --- |
+| `desktop_list` | `desktop_status` without `session` |
+| `desktop_logs` | `desktop_status(session, logs=true)`, also for a stopped or failed session |
+| `desktop_move`, `desktop_drag`, `desktop_scroll`, `desktop_focus` | `move`, `drag`, `scroll` and `focus` steps in `desktop_actions` (same arguments) |
+| `desktop_ui_action` | a `ui_action` step in `desktop_actions`, by node id or by name |
+| `desktop_check` | `desktop_wait` (file, config key, element state) or a step's `expect`; the CLI's `check` keeps the full predicates |
+| `desktop_operation` | the CLI's `operation` command |
+| `desktop_atlas`, `desktop_set` | offered only when the server has `AGENT_DESKTOP_ATLAS` |
+| `desktop_effects` | offered only when the server has `AGENT_DESKTOP_EFFECTS=1` |
+
+`desktop_run` remains opt-in with `AGENT_DESKTOP_RUN=1`.
+
 ## Waiting
 
 `agent-desktop wait SESSION --title Settings --stable-ms 500 --timeout 10` (MCP:
@@ -88,8 +114,8 @@ registry is found in the usual libexec locations or through
 
 `uv run agent-desktop ui SESSION [--app NAME] [--window TITLE]` (MCP: `desktop_ui`) lists
 visible elements as a flat list with depth: role, name, states, text, value and
-actions; unnamed layout containers are omitted. `ui-action SESSION NODE press|focus|set_text --text ...` (MCP: `desktop_ui_action`, also usable as a `ui_action` step in
-action sequences) acts without coordinates, which Wayland does not provide to
+actions; unnamed layout containers are omitted. `ui-action SESSION NODE press|focus|set_text --text ...` (MCP: a `ui_action` step in
+`desktop_actions`) acts without coordinates, which Wayland does not provide to
 AT-SPI. Coverage depends on the toolkit: GTK 3/4 expose rich trees; Chromium needs
 `--force-renderer-accessibility` (sessions set `ACCESSIBILITY_ENABLED=1`) and gets
 `set_text` by focusing the field and typing, and `select` on radio buttons and
@@ -118,8 +144,9 @@ waiting for an element further down.
 
 ## Scoped state checks (experimental)
 
-`agent-desktop check SESSION 'JSON'`, MCP `desktop_check`, and script
-`check(predicate)` read one condition and return a structured result. Compare
+`agent-desktop check SESSION 'JSON'` and script
+`check(predicate)` (MCP clients: `desktop_wait` or a step's `expect` cover the
+file, config and element cases) read one condition and return a structured result. Compare
 `status` explicitly: `satisfied`, `violated`, or `unknown`. An unknown result is
 not a passing check. Each result retains the predicate, session, observation
 interval, scope and bounded evidence. These checks do not send input or prove
@@ -458,6 +485,11 @@ report. Private sessions only. The person's own Firefox is never exported.
 `desktop_actions` (CLI: `agent-desktop actions SESSION '[...]' --observation TOKEN`)
 runs up to 50 steps such as `{"action": "click", "x": 10, "y": 20}`,
 `{"action": "type", "text": "hello"}` or `{"action": "wait", "title": "Saved"}`.
+Pointer moves, drags, scrolls and window focus are steps here (MCP has no separate
+tools for them): `{"action": "move", "x": 300, "y": 200}` (hover),
+`{"action": "drag", "x": 300, "y": 400, "to_x": 900, "to_y": 400}`,
+`{"action": "scroll", "dy": 3, "x": 640, "y": 360}` and
+`{"action": "focus", "window": "WINDOW_ID"}` (ids from `desktop_windows`).
 A `ui_action` step names its UI action as `name`, because `action` names the step:
 `{"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}`.
 Each input step is sent only while windows, focus and output match the state right
@@ -500,9 +532,9 @@ that only offer `check` (Chromium).
 
 Long sequences can run independently of a CLI or MCP connection. Submission
 returns an operation ID and `state: submitted`; it does not claim input delivery.
-Use `desktop_operation` with `action="start"`, an `actions` list and
-`kind="actions"` (the guarded action steps above) or `kind="browser"` (up to
-30 browser steps). CLI equivalents:
+Use the CLI's `operation` command with `start`, an actions list and
+`--kind actions` (the guarded action steps above) or `--kind browser` (up to
+30 browser steps). The MCP tool `desktop_operation` was removed on 2026-11-26.
 
 ```sh
 uv run agent-desktop operation SESSION start --kind browser \
@@ -579,7 +611,7 @@ hundred milliseconds after input; it adds roughly 0.3 s per action on a page
 of about 200 elements (`AGENT_DESKTOP_UI_DELTA=0` turns it off).
 
 Applications often write after the reply. `desktop_effects(session, effect_id)`
-reports everything since that action, and `wait_for_file="~/*.ods"` (or an
+(offered by an MCP server started with `AGENT_DESKTOP_EFFECTS=1`) reports everything since that action, and `wait_for_file="~/*.ods"` (or an
 absolute glob) waits until a matching file has been written and gone quiet. An
 empty report means nothing was observed in that window, nothing more: effects
 outside the watched directories, in memory, in binary stores such as dconf, or

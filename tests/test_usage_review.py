@@ -80,6 +80,20 @@ def claude_lines():
         # Repeated by compaction: must be counted once.
         use(2, "2026-11-10T10:01:00Z", "mcp__agent-desktop__desktop_browser", steps),
         use(
+            8,
+            "2026-11-10T10:39:00Z",
+            "mcp__agent-desktop__desktop_actions",
+            {
+                "session": "aaaaaaaaaaaa",
+                "observation": "token",
+                "actions": [
+                    {"action": "move", "x": 1, "y": 2},
+                    {"action": "key", "key": "Return"},
+                    {"action": "scroll", "dy": 3},
+                ],
+            },
+        ),
+        use(
             6,
             "2026-11-10T10:40:00Z",
             "mcp__agent-desktop__desktop_screenshot",
@@ -145,7 +159,7 @@ class UsageReviewTest(unittest.TestCase):
 
     def test_counts_each_call_once_within_the_window(self):
         summary, _, _ = self.run_review()
-        self.assertEqual(summary["calls"], 6)
+        self.assertEqual(summary["calls"], 7)
         self.assertEqual(summary["calls_by_tool"]["desktop_create"], 3)
         self.assertEqual(summary["calls_by_tool"]["desktop_browser"], 1)
         self.assertNotIn("search", summary["calls_by_tool"])
@@ -153,7 +167,12 @@ class UsageReviewTest(unittest.TestCase):
         self.assertEqual(summary["totals"]["fixed waits"], 1)
         self.assertEqual(summary["totals"]["waits for a condition"], 1)
         self.assertEqual(summary["totals"]["failed GPU creates"], 2)
+        self.assertEqual(summary["totals"]["coordinate input"], 1)
+        self.assertEqual(summary["totals"]["coordinate input with observation"], 1)
         self.assertIn("desktop_ui", summary["tools_not_called"])
+        # Opt-in tools are not counted as exposed.
+        self.assertNotIn("desktop_run", summary["tools_not_called"])
+        self.assertNotIn("desktop_atlas", summary["tools_not_called"])
 
     def test_flags_what_a_report_should_read(self):
         summary, flags, _ = self.run_review()

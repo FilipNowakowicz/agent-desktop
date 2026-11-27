@@ -709,6 +709,11 @@ Plan rows, judged against the goal:
 
 ### 3.3 The MCP tool surface
 
+Update 2026-11-26: the maintainer decided the review without this section's A/B. The
+default became 17 tools; see
+[the tool-surface review](../research/2026-11-26-tool-surface-review.md). The rest of
+this section is the 2026-11-12 proposal as written.
+
 Measured (development log, 2026-11-11): 29 tools, 31,436 schema characters, about
 7,900 tokens of fixed prefix. The Hyprland sessions used 11 tools and the cloud
 sessions 10; together 15.

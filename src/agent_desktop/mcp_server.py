@@ -52,7 +52,11 @@ desktop before repeating it.
 
 For web pages in a private session, desktop_browser drives Firefox through
 its DOM (start, open, find, click, fill, select, text, wait): use it instead of
-screenshots and coordinates where it applies.
+screenshots and coordinates where it applies. For other applications,
+desktop_ui lists a window's controls through accessibility; where it shows the
+control you need, act with a ui_action step in desktop_actions rather than by
+coordinates. desktop_status without a session lists sessions; with logs=true
+it shows why a session failed.
 
 Only when the user asks you to act on their own screen (open an app there,
 navigate, click) or accepts it for a login, call desktop_request_host with the reason. They confirm it;
@@ -68,8 +72,8 @@ applications. Use private sessions for everything else."""
 
 EFFECTS_INSTRUCTIONS = """
 
-Effects are on: every input, launch, focus, ui_action and desktop_actions
-reply includes `effects`, what the action actually changed: `ui` (elements of
+Effects are on: every input, launch and desktop_actions reply (including
+focus and ui_action steps) includes `effects`, what the action actually changed: `ui` (elements of
 the focused window added, removed or changed, e.g. a field's new text, a
 dialog's buttons, a status message; or the new window's first elements),
 `files` written in the session home with a line diff, config changes as
@@ -374,15 +378,25 @@ def desktop_profiles(
 
 
 @tool()
-def desktop_list() -> list[dict]:
-    """List desktop sessions and their current availability."""
-    return core.sessions()
+def desktop_status(session: str | None = None, logs: bool = False) -> dict:
+    """Get a session's health, profile, controller and application exit codes.
 
-
-@tool()
-def desktop_status(session: str) -> dict:
-    """Get session health and application exit codes."""
-    return call(session, "status")
+    Without session, list every session with its mode, status and controller,
+    e.g. to find one left from earlier work. logs=true adds bounded compositor
+    and application log tails; they are kept after a session stops or fails
+    to start, so use it to see why.
+    """
+    if session is None:
+        if logs:
+            raise core.DesktopError("logs needs a session")
+        return {"sessions": core.sessions()}
+    if not logs:
+        return call(session, "status")
+    try:
+        result = call(session, "status")
+    except core.DesktopError as error:
+        result = {"session": session, "status_error": str(error)}
+    return {**result, "logs": core.logs(session)}
 
 
 @tool()
@@ -398,11 +412,11 @@ def desktop_launch(session: str, argv: list[str], cwd: str | None = None) -> dic
 @tool()
 def desktop_windows(session: str) -> dict:
     """List desktop windows: id, title, app_id, states and parent. On a Hyprland
-    host session each also has its workspace, when it can be told apart."""
+    host session each also has its workspace, when it can be told apart. To
+    activate one, run a desktop_actions step {"action": "focus", "window": ID}."""
     return call(session, "windows")
 
 
-@tool()
 def desktop_atlas(query: str, app: str | None = None) -> list[dict]:
     """Find the control that changes a setting, e.g. query="highlight current
     line", app="mousepad": its location (menu or dialog tab and label), default
@@ -413,7 +427,6 @@ def desktop_atlas(query: str, app: str | None = None) -> list[dict]:
     return atlas.search(query, app)
 
 
-@tool()
 def desktop_set(session: str, app: str, control: str) -> dict:
     """Apply a verified atlas setting without the GUI: write the configuration
     change learned for `control` (the control text from desktop_atlas) into the
@@ -429,7 +442,6 @@ def desktop_set(session: str, app: str, control: str) -> dict:
     )
 
 
-@tool()
 def desktop_effects(
     session: str,
     effect_id: int,
@@ -517,13 +529,19 @@ def desktop_actions(
 ) -> dict | list:
     """Run up to 50 steps in one call, e.g. click a field, type, press Return.
 
-    Each step is {"action": NAME, ...arguments of that tool}; NAME is click, move,
-    drag, scroll, type, key, key_down, key_up, ui_action, focus or wait (e.g.
-    {"action": "wait", "seconds": 1}). key_down and key_up take "key" (a keysym or
+    Each step is {"action": NAME, ...arguments}. click, type and key take the
+    arguments of desktop_click, desktop_type and desktop_key; wait takes those
+    of desktop_wait (e.g. {"action": "wait", "seconds": 1}). The other steps
+    exist only here: move {x, y} moves the pointer (hover); drag {x, y, to_x,
+    to_y, button} presses, moves and releases; scroll {dy, dx, x, y} turns the
+    wheel by notches (dy > 0 down, dx > 0 right, at x/y or the pointer); focus
+    {window} activates a window id from desktop_windows and waits for it;
+    ui_action acts on a desktop_ui element, naming its UI action as "name", e.g.
+    {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}.
+    key_down and key_up take "key" (a keysym or
     logo/ctrl/alt/shift) to hold a key across steps; everything held is released
     when the run ends, however it ends, and after the screenshot=true image, so
-    that image can show what a held key displays. A ui_action step names its UI action as "name", e.g.
-    {"action": "ui_action", "node": "n5", "name": "set_text", "text": "Ada"}.
+    that image can show what a held key displays.
     Pass the observation token of the screenshot you planned from; coordinates
     in every step are then in that screenshot's image. Input is sent only while
     windows and focus are as they were after the previous step; otherwise the
@@ -560,46 +578,6 @@ def desktop_actions(
     finally:
         if screenshot:
             core.release_held_keys(session, actions, CONTROLLER)
-
-
-@tool()
-def desktop_operation(
-    session: str,
-    action: str = "status",
-    operation_id: str | None = None,
-    actions: list[dict] | None = None,
-    kind: str = "actions",
-    observation: str | None = None,
-    timeout: float = 600,
-    predicates: list[dict] | None = None,
-) -> dict:
-    """Submit, inspect or cooperatively cancel a durable PRIVATE-session job.
-
-    start returns an operation_id and submitted state, not proof of delivery.
-    kind=actions uses desktop_actions steps; kind=browser uses browser steps
-    (at most 30). status without an id lists retained jobs, so a lost submission
-    reply can be reconciled. Each step retains dispatch state and evidence.
-    Cancellation stops future dispatch after in-flight work returns; it cannot
-    undo input or interrupt Firefox/worker commands already running. An uncertain
-    step requires reconciliation, never resubmission. No host sessions or resume.
-    Optional predicates (at most 20 desktop_check predicates) run after dispatch
-    and record separate satisfied/violated/unknown verification. completed means
-    execution completed, not that a task was verified. Retained status evidence
-    includes typed action data; keep exported records private.
-    """
-    from .operations import operate
-
-    return operate(
-        session,
-        action,
-        operation_id,
-        actions,
-        kind,
-        observation,
-        CONTROLLER,
-        timeout,
-        predicates,
-    )
 
 
 @tool()
@@ -745,27 +723,6 @@ def desktop_browser(
 
 
 @tool()
-def desktop_check(session: str, predicate: dict) -> dict:
-    """Read a scoped state predicate, returning satisfied, violated or unknown.
-
-    Examples: {"kind":"file","path":"~/result.txt","contains":"Total"};
-    {"kind":"config","path":"~/app.ini","key":"view/wrap","value":"true"};
-    {"kind":"ui","query":{"role":"check box"},"claim":"all","state":"checked"};
-    {"kind":"ui","query":{"element":"Name","exact":true},"claim":"value",
-    "field":"text","equals":"Ada"}; {"kind":"browser_context","context":"ID",
-    "url":"https://example.com/"}. UI claims: exists, absent, unique, value, all.
-    UI scope is visible accessibility content, not all records. Incomplete reads
-    cannot establish absence, uniqueness or universal success. A witness or
-    counterexample may still decide a claim. File reads are bounded to 2 MiB,
-    regular files only, private sessions only. Checks never prove which action
-    caused a state, and never retry or dispatch input. Compare status explicitly.
-    """
-    from .checks import evaluate
-
-    return evaluate(session, predicate, CONTROLLER)
-
-
-@tool()
 def desktop_ui(
     session: str,
     app: str | None = None,
@@ -773,53 +730,22 @@ def desktop_ui(
     max_nodes: int = 300,
 ) -> str:
     """List visible UI elements through accessibility, one indented line each:
-    id (for desktop_ui_action), role, name, states, text, value and actions.
+    id, role, name, states, text, value and actions.
 
-    Filter by application name and/or window title substring. Usually much
-    smaller than a screenshot and exact about labels and field contents. Some
-    applications expose little (e.g. Chromium needs --force-renderer-accessibility).
+    Use it for native applications (dialogs, settings, forms, office apps)
+    before clicking by coordinates: act on an element with a desktop_actions
+    ui_action step, by id ({"action": "ui_action", "node": "n5", "name":
+    "press"}) or by name ({"action": "ui_action", "element": "Save", "role":
+    "push button", "name": "press"}); names are "press", "focus", "set_text"
+    (with "text"), "select" or a listed action. Filter by application name
+    and/or window title substring. Usually much smaller than a screenshot and
+    exact about labels and field contents. Some applications expose little
+    (e.g. Chromium needs --force-renderer-accessibility); for web pages in
+    Firefox use desktop_browser instead.
     """
     return core.render_tree(
         call(session, "ui", app=app, window=window, max_nodes=max_nodes)
     )
-
-
-@tool(structured_output=False)
-def desktop_ui_action(
-    session: str,
-    node: str,
-    action: str,
-    text: str | None = None,
-    observation: str | None = None,
-    screenshot: bool = False,
-) -> dict | list:
-    """Act on a desktop_ui node: "press" (click/activate/toggle), "focus",
-    "set_text" (replace an editable field's text), "select" (choose a tab,
-    list item or radio button) or a listed action name.
-
-    Works without coordinates. Verify the result with desktop_ui or a screenshot.
-
-    With screenshot=true the reply also contains the settled screen.
-    """
-    result = call(
-        session,
-        "ui_action",
-        node=node,
-        action=action,
-        text=text,
-        observation=observation,
-    )
-    return looked(session, result, screenshot, observation)
-
-
-@tool()
-def desktop_focus(session: str, window: str) -> dict:
-    """Activate a private window and wait for its activated state (up to 2 seconds).
-
-    Returns the observed window; fails if it closes or activation is not observed.
-    Focus can still change afterward, so use screenshot observations for input.
-    """
-    return call(session, "focus", window=window)
 
 
 @tool(structured_output=False)
@@ -926,60 +852,6 @@ def desktop_click(
 
 
 @tool()
-def desktop_move(session: str, x: int, y: int, observation: str | None = None) -> dict:
-    """Move only the private desktop pointer (coordinates as for desktop_click)."""
-    return call(session, "move", x=x, y=y, observation=observation)
-
-
-@tool(structured_output=False)
-def desktop_drag(
-    session: str,
-    x: int,
-    y: int,
-    to_x: int,
-    to_y: int,
-    button: str = "left",
-    observation: str | None = None,
-    screenshot: bool = False,
-) -> dict | list:
-    """Press at (x, y), move in steps to (to_x, to_y) and release (coordinates as
-    for desktop_click).
-
-    With screenshot=true the reply also contains the settled screen."""
-    result = call(
-        session,
-        "drag",
-        x=x,
-        y=y,
-        to_x=to_x,
-        to_y=to_y,
-        button=button,
-        observation=observation,
-    )
-    return looked(session, result, screenshot, observation)
-
-
-@tool(structured_output=False)
-def desktop_scroll(
-    session: str,
-    dy: int,
-    dx: int = 0,
-    observation: str | None = None,
-    screenshot: bool = False,
-    x: int | None = None,
-    y: int | None = None,
-) -> dict | list:
-    """Scroll by mouse-wheel notches at x/y (coordinates as for desktop_click),
-    or at the current pointer location: dy > 0 scrolls down, dx > 0 right (a
-    notch is usually about three lines).
-
-    With screenshot=true the reply also contains the settled screen."""
-    position = {"x": x, "y": y} if x is not None or y is not None else {}
-    result = call(session, "scroll", dy=dy, dx=dx, observation=observation, **position)
-    return looked(session, result, screenshot, observation)
-
-
-@tool()
 def desktop_request_human(
     session: str,
     reason: str | None = None,
@@ -1034,12 +906,6 @@ def desktop_control(session: str, wait_seconds: int = 0) -> dict:
     is back with the agent; call again if it is still pending.
     """
     return core.wait_for_agent_control(session, wait_seconds, CONTROLLER)
-
-
-@tool()
-def desktop_logs(session: str) -> dict:
-    """Read bounded compositor and application log tails, including stopped sessions."""
-    return core.logs(session)
 
 
 @tool()
@@ -1102,6 +968,14 @@ def desktop_run(
 
 if RUN:
     tool(structured_output=False, cancellable=True)(desktop_run)
+
+# Experimental tools are offered only with the variable they need, so they cost
+# no schema otherwise (tool-surface review, 2026-11-26).
+if os.environ.get("AGENT_DESKTOP_ATLAS"):
+    tool()(desktop_atlas)
+    tool()(desktop_set)
+if os.environ.get("AGENT_DESKTOP_EFFECTS") == "1":
+    tool()(desktop_effects)
 
 
 # Experiment baseline (AGENT_DESKTOP_GUARDS=0): sequences without the

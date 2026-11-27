@@ -27,11 +27,11 @@ D-Bus and home directory, and `core.py` talks to it over a Unix socket.
 | Module | Role |
 | --- | --- |
 | `cli.py` | The `agent-desktop` command: create, list, destroy, doctor, wait, ui, browser, jobs, lease, host, profiles, import-cookies, events, review, prune and more. Calls `core`. |
-| `mcp_server.py` | The `agent-desktop-mcp` stdio server (FastMCP). One `desktop_*` tool per operation, each run in a worker thread so a long wait does not block other sessions. Holds one controller id for its lifetime. |
+| `mcp_server.py` | The `agent-desktop-mcp` stdio server (FastMCP). A `desktop_*` tool for each common operation (17 by default; moves, drags, scrolls, focus and UI actions are `desktop_actions` steps), each run in a worker thread so a long wait does not block other sessions. Holds one controller id for its lifetime. |
 | `core.py` | Session lifecycle and the client side of the protocol: `create`, `request`, `destroy`, `recover`, profiles, host requests, `run_actions`, `wait`, activity and trace reports, state-directory paths. |
 | `worker.py` | The per-session supervisor and worker. Starts the compositor and services, serves the control socket and implements every operation (input, screenshots, windows, UI, browser, leases, takeover, host guard, cleanup). Much the largest module. |
 | `wayland.py` | A small pure-Python Wayland client: virtual pointer (`zwlr_virtual_pointer`), virtual keyboard (`zwp_virtual_keyboard`) with layout-aware key placement, toplevel list (`zwlr_foreign_toplevel`), clipboard via data-control, output size, and input-activity detection on a host display. |
-| `atspi.py` | Reads and acts on application UIs through the session's own AT-SPI bus (jeepney). Used by `desktop_ui`, `desktop_ui_action` and element waits. |
+| `atspi.py` | Reads and acts on application UIs through the session's own AT-SPI bus (jeepney). Used by `desktop_ui`, `ui_action` steps and element waits. |
 | `browser.py` | The Firefox bridge client: a WebDriver BiDi connection with the page-side scripts for DOM reads, finds and trusted input. The worker owns the connection and its leases. |
 | `operations.py` | Durable private-session jobs: a detached helper process sends guarded steps, with per-step delivery evidence, cooperative cancel and optional scoped checks. No retry or resume. |
 | `checks.py` | Scoped read-only predicates (file, config, UI, browser state). Unknown evidence never counts as satisfied. |
@@ -98,7 +98,7 @@ An MCP tool call such as `desktop_click` travels like this:
 
 Batches (`desktop_actions` / `run_steps`) send many such steps in order, with
 guards on targets and expectations, and stop at the first failure. A **job**
-(`desktop_operation`) does the same from a separate helper process that records
+(CLI `operation`; its MCP tool was removed on 2026-11-26) does the same from a separate helper process that records
 every step to disk, so its status survives the caller and is readable while the
 worker is busy.
 
@@ -123,8 +123,8 @@ observation tokens, AT-SPI access, the Firefox bridge, leases, takeover and the
 cleanup guardian.
 
 Marked experimental in the code and [guide](USAGE.md): host sessions, durable
-operations and scoped checks, the effect ledger (`AGENT_DESKTOP_EFFECTS=1`), the
-effect atlas (`AGENT_DESKTOP_ATLAS`, `desktop_atlas`, `desktop_set`), scripts
+operations and scoped checks, the effect ledger (`AGENT_DESKTOP_EFFECTS=1`, which also offers `desktop_effects`), the
+effect atlas (`AGENT_DESKTOP_ATLAS`, which offers `desktop_atlas` and `desktop_set`), scripts
 (`AGENT_DESKTOP_RUN=1`, `desktop_run`), changed-only screenshots
 (`AGENT_DESKTOP_LOOK_DELTA=1`) and the offline review. The gated experiments behind
 the last four missed their gates; see the [directions board](project/DIRECTIONS.md).

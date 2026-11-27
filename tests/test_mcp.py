@@ -5,6 +5,7 @@ import base64
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -49,6 +50,24 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                 )
                 # Only the person can hand control back.
                 self.assertNotIn("desktop_release", names)
+                # Folded into other tools or opt-in (tool-surface review, 2026-11-26).
+                self.assertFalse(
+                    {
+                        "desktop_list",
+                        "desktop_logs",
+                        "desktop_focus",
+                        "desktop_move",
+                        "desktop_drag",
+                        "desktop_scroll",
+                        "desktop_ui_action",
+                        "desktop_check",
+                        "desktop_operation",
+                        "desktop_atlas",
+                        "desktop_set",
+                        "desktop_effects",
+                    }
+                    & names
+                )
                 unknown = await client.call_tool(
                     "desktop_type", {"session": "0" * 12, "text": "never delivered"}
                 )
@@ -65,8 +84,15 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     )
                     await asyncio.sleep(0.2)
                     started = asyncio.get_running_loop().time()
-                    listed = await client.call_tool("desktop_list", {})
+                    listed = await client.call_tool("desktop_status", {})
                     self.assertFalse(listed.isError)
+                    self.assertIn(
+                        session_id,
+                        [
+                            entry["session"]
+                            for entry in json.loads(listed.content[0].text)["sessions"]
+                        ],
+                    )
                     self.assertLess(asyncio.get_running_loop().time() - started, 1.5)
                     self.assertFalse(waiting.done())
                     self.assertFalse((await waiting).isError)
@@ -134,6 +160,13 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     )
                     lease = json.loads(status.content[0].text)["lease"]
                     self.assertTrue(lease["holder"].startswith("mcp-"), lease)
+                    with_logs = await client.call_tool(
+                        "desktop_status", {"session": session_id, "logs": True}
+                    )
+                    with_logs = json.loads(with_logs.content[0].text)
+                    self.assertEqual(with_logs["status"], "ready")
+                    self.assertIsInstance(with_logs["logs"], dict)
+                    self.assertTrue(with_logs["logs"], with_logs)
                     for _ in range(100):
                         if (fixture / "mouse-ready").exists():
                             break
@@ -172,6 +205,14 @@ class MCPTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(
                         json.loads(result.content[0].text)["runtime_removed"]
                     )
+                    # Logs stay readable after the session stops.
+                    stopped = await client.call_tool(
+                        "desktop_status", {"session": session_id, "logs": True}
+                    )
+                    self.assertFalse(stopped.isError)
+                    stopped = json.loads(stopped.content[0].text)
+                    self.assertIn("status_error", stopped)
+                    self.assertTrue(stopped["logs"], stopped)
                     # Disconnecting an MCP client does not implicitly own session lifecycle.
                     created_again = await client.call_tool("desktop_create", {})
                     session_id = json.loads(created_again.content[0].text)["session"]
@@ -304,3 +345,65 @@ class MCPCancelTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 server.stdin.close()
                 await server.wait()
+
+
+class ToolSurfaceTests(unittest.TestCase):
+    """The default tool list, and experiments offered only with their variable."""
+
+    def listed(self, **variables):
+        environment = {
+            k: v
+            for k, v in os.environ.items()
+            if k
+            not in ("AGENT_DESKTOP_ATLAS", "AGENT_DESKTOP_EFFECTS", "AGENT_DESKTOP_RUN")
+        }
+        environment.update(variables)
+        code = (
+            "import anyio, json\n"
+            "from agent_desktop import mcp_server\n"
+            "print(json.dumps(sorted(t.name for t in "
+            "anyio.run(mcp_server.mcp.list_tools))))\n"
+        )
+        output = subprocess.run(
+            [sys.executable, "-c", code],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        return set(json.loads(output))
+
+    def test_default_tools(self):
+        self.assertEqual(
+            self.listed(),
+            {
+                f"desktop_{name}"
+                for name in (
+                    "actions",
+                    "browser",
+                    "click",
+                    "control",
+                    "create",
+                    "destroy",
+                    "key",
+                    "launch",
+                    "profiles",
+                    "request_host",
+                    "request_human",
+                    "screenshot",
+                    "status",
+                    "type",
+                    "ui",
+                    "wait",
+                    "windows",
+                )
+            },
+        )
+
+    def test_experiments_need_their_variable(self):
+        self.assertLessEqual(
+            {"desktop_atlas", "desktop_set"},
+            self.listed(AGENT_DESKTOP_ATLAS="/nonexistent"),
+        )
+        self.assertIn("desktop_effects", self.listed(AGENT_DESKTOP_EFFECTS="1"))
+        self.assertIn("desktop_run", self.listed(AGENT_DESKTOP_RUN="1"))
